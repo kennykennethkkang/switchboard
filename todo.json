@@ -21,14 +21,6 @@
    "name": "Set up Instagram video tasks v2"
   },
   {
-   "id": "d16fa4d2-ok",
-   "text": "your Gemini key, then a live test of image, video and notebooks",
-   "at": 1793526789984,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
-   "name": "Set up Instagram video tasks",
-   "why": "you"
-  },
-  {
    "id": "1d1d499f-ok",
    "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
    "at": 1793526817270,
@@ -70,9 +62,17 @@
   "e462a05d": 1793527101142,
   "921edabf": 1793527101539,
   "7bed044f": 1793527101859,
-  "f1634e88": 1793527102198
+  "f1634e88": 1793527102198,
+  "d16fa4d2-ok": 1793527102566
  },
  "ticked": [
+  {
+   "id": "d16fa4d2-ok",
+   "text": "your Gemini key, then a live test of image, video and notebooks",
+   "at": 1793527102566,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
   {
    "id": "f1634e88",
    "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
@@ -133,13 +133,6 @@
    "text": "nothing open. Request your agent-flow chat again, since the earlier attempt never started.",
    "at": 1793390332383,
    "by": "a0ed070c-6c61-4f3f-a746-58fade7f0cea",
-   "from": "b718000f-33f6-4cca-9248-d63589fd2902"
-  },
-  {
-   "id": "8e818c83",
-   "text": "hub-new-chat sometimes cuts off the typed claude command (seen ending at \"...T/switch\"), leaving the shell waiting on a quote and no chat started; likely typed before the login shell is ready. Wait for shell readiness before sending text (extension/src/hub/actions.ts new chat path)",
-   "at": 1793365651621,
-   "by": "b718000f-33f6-4cca-9248-d63589fd2902",
    "from": "b718000f-33f6-4cca-9248-d63589fd2902"
   }
  ]
