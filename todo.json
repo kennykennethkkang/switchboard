@@ -33,6 +33,12 @@
    "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
    "at": 1793527531788,
    "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
+  },
+  {
+   "id": "8133346b",
+   "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
+   "at": 1793534677696,
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
   }
  ],
  "removed": {
