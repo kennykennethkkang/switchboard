@@ -7,12 +7,6 @@
    "at": 1793353577294
   },
   {
-   "id": "e462a05d",
-   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
-   "at": 1793413128748,
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
    "id": "921edabf",
    "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
    "at": 1793413128748,
@@ -91,9 +85,17 @@
   "f9c040dc": 1793526805578,
   "1d1d499f": 1793526817270,
   "1847c229": 1793526827265,
-  "e13decf7": 1793526829953
+  "e13decf7": 1793526829953,
+  "e462a05d": 1793527101142
  },
  "ticked": [
+  {
+   "id": "e462a05d",
+   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
+   "at": 1793527101142,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
   {
    "id": "54dd3840-ok",
    "text": "the memory vault proposal, which needs your approval before anything changes",
@@ -152,12 +154,6 @@
    "id": "0ab0326a",
    "text": "If a send fails again, tell me which chat it was. Its session file will pin down the cause.",
    "at": 1793354522296,
-   "from": "b718000f-33f6-4cca-9248-d63589fd2902"
-  },
-  {
-   "id": "6038dc87",
-   "text": "Restart the phone app on any changed bundle, not only a newer version: ensureWeb in extension/src/hub/local.ts gates the stale check on newerVersion, so reinstalling the same 0.18.0 leaves 3131 on the old build until restarted by hand",
-   "at": 1793354505734,
    "from": "b718000f-33f6-4cca-9248-d63589fd2902"
   }
  ]
