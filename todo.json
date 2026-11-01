@@ -44,6 +44,14 @@
    "at": 1793525870153,
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2"
+  },
+  {
+   "id": "54dd3840-ok",
+   "text": "the memory vault proposal, which needs your approval before anything changes",
+   "at": 1793526763734,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks",
+   "why": "you"
   }
  ],
  "removed": {
@@ -68,7 +76,8 @@
   "4ab33924": 1793413128748,
   "3bc13812": 1793413128748,
   "6e12e12b": 1793506277707,
-  "3c9b30a4": 1793508661192
+  "3c9b30a4": 1793508661192,
+  "54dd3840": 1793526763734
  },
  "ticked": [
   {
@@ -140,14 +149,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "54dd3840",
-   "text": "the memory vault proposal, which needs your approval before anything changes",
-   "at": 1793505496314,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
-   "name": "Set up Instagram video tasks",
-   "why": "you"
-  },
   {
    "id": "d16fa4d2",
    "text": "your Gemini key, then a live test of image, video and notebooks",
