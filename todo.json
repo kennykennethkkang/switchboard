@@ -25,13 +25,6 @@
    "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
   },
   {
-   "id": "3c9b30a4",
-   "text": "Jarvis follow-up: build the Jev command box (3 tiers: saved data, Haiku, start chat or skill) and local Whisper + Kokoro voice inside the Switchboard dashboard; research mic access in the VS Code webview and on iPhone over Tailscale first",
-   "at": 1793505478608,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
-   "name": "Set up Instagram video tasks"
-  },
-  {
    "id": "f1634e88",
    "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
    "at": 1793505480060,
@@ -67,9 +60,35 @@
   "182aa262": 1793413089345,
   "4ab33924": 1793413128748,
   "3bc13812": 1793413128748,
-  "6e12e12b": 1793506277707
+  "6e12e12b": 1793506277707,
+  "3c9b30a4": 1793508661192
  },
+ "suggested": [
+  {
+   "id": "54dd3840",
+   "text": "the memory vault proposal, which needs your approval before anything changes",
+   "at": 1793505496314,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks",
+   "why": "you"
+  },
+  {
+   "id": "d16fa4d2",
+   "text": "your Gemini key, then a live test of image, video and notebooks",
+   "at": 1793505496314,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks",
+   "why": "you"
+  }
+ ],
  "ticked": [
+  {
+   "id": "3c9b30a4",
+   "text": "Jarvis follow-up: build the Jev command box (3 tiers: saved data, Haiku, start chat or skill) and local Whisper + Kokoro voice inside the Switchboard dashboard; research mic access in the VS Code webview and on iPhone over Tailscale first",
+   "at": 1793508661192,
+   "by": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
   {
    "id": "6e12e12b",
    "text": "Memory vault: deep research (Karpathy raw/wiki/outputs, Claude Code + Obsidian, fit with existing ~/.claude memory and the 3D Memory graph), then propose a design to Kenneth and get approval before changing anything",
@@ -129,24 +148,6 @@
    "at": 1793349145205,
    "by": "b718000f-33f6-4cca-9248-d63589fd2902",
    "from": "7ef564d0-2fb7-4499-86fc-c075e2acbcbd"
-  }
- ],
- "suggested": [
-  {
-   "id": "54dd3840",
-   "text": "the memory vault proposal, which needs your approval before anything changes",
-   "at": 1793505496314,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
-   "name": "Set up Instagram video tasks",
-   "why": "you"
-  },
-  {
-   "id": "d16fa4d2",
-   "text": "your Gemini key, then a live test of image, video and notebooks",
-   "at": 1793505496314,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
-   "name": "Set up Instagram video tasks",
-   "why": "you"
   }
  ]
 }
