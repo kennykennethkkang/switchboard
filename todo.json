@@ -90,7 +90,8 @@
   "d16fa4d2": 1793526789984,
   "f9c040dc": 1793526805578,
   "1d1d499f": 1793526817270,
-  "1847c229": 1793526827265
+  "1847c229": 1793526827265,
+  "e13decf7": 1793526829953
  },
  "ticked": [
   {
@@ -158,16 +159,6 @@
    "text": "Restart the phone app on any changed bundle, not only a newer version: ensureWeb in extension/src/hub/local.ts gates the stale check on newerVersion, so reinstalling the same 0.18.0 leaves 3131 on the old build until restarted by hand",
    "at": 1793354505734,
    "from": "b718000f-33f6-4cca-9248-d63589fd2902"
-  }
- ],
- "suggested": [
-  {
-   "id": "e13decf7",
-   "text": "Vault rule in your CLAUDE.md: your `~/.claude/CLAUDE.md` gets the Vault section after you run `node kit/setup.mjs` in claude-mods.",
-   "at": 1793508684827,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "you"
   }
  ]
 }
