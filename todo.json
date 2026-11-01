@@ -44,6 +44,14 @@
    "at": 1793525870153,
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2"
+  },
+  {
+   "id": "d16fa4d2-ok",
+   "text": "your Gemini key, then a live test of image, video and notebooks",
+   "at": 1793526789984,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks",
+   "why": "you"
   }
  ],
  "removed": {
@@ -70,50 +78,9 @@
   "6e12e12b": 1793506277707,
   "3c9b30a4": 1793508661192,
   "54dd3840": 1793526763734,
-  "54dd3840-ok": 1793526777224
+  "54dd3840-ok": 1793526777224,
+  "d16fa4d2": 1793526789984
  },
- "suggested": [
-  {
-   "id": "d16fa4d2",
-   "text": "your Gemini key, then a live test of image, video and notebooks",
-   "at": 1793505496314,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
-   "name": "Set up Instagram video tasks",
-   "why": "you"
-  },
-  {
-   "id": "f9c040dc",
-   "text": "Continue from /Users/kennykennethkkang/.claude/handoffs/agent-flow/2026-11-01-0358-agent-flow-switchboard-redesign-8846e195.md: read it first, recreate every open task in it with the task tools before",
-   "at": 1793508680099,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "missed"
-  },
-  {
-   "id": "1d1d499f",
-   "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
-   "at": 1793508684827,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "you"
-  },
-  {
-   "id": "1847c229",
-   "text": "Task 12, Step 3: reload VS Code, then + New chat with the goal \"add a one-line comment to README explaining Switchboard\". Check it goes from Working to Done, wi",
-   "at": 1793508684827,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "later"
-  },
-  {
-   "id": "e13decf7",
-   "text": "Vault rule in your CLAUDE.md: your `~/.claude/CLAUDE.md` gets the Vault section after you run `node kit/setup.mjs` in claude-mods.",
-   "at": 1793508684827,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "you"
-  }
- ],
  "ticked": [
   {
    "id": "54dd3840-ok",
@@ -180,6 +147,40 @@
    "text": "Restart the phone app on any changed bundle, not only a newer version: ensureWeb in extension/src/hub/local.ts gates the stale check on newerVersion, so reinstalling the same 0.18.0 leaves 3131 on the old build until restarted by hand",
    "at": 1793354505734,
    "from": "b718000f-33f6-4cca-9248-d63589fd2902"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "f9c040dc",
+   "text": "Continue from /Users/kennykennethkkang/.claude/handoffs/agent-flow/2026-11-01-0358-agent-flow-switchboard-redesign-8846e195.md: read it first, recreate every open task in it with the task tools before",
+   "at": 1793508680099,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "missed"
+  },
+  {
+   "id": "1d1d499f",
+   "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
+   "at": 1793508684827,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "you"
+  },
+  {
+   "id": "1847c229",
+   "text": "Task 12, Step 3: reload VS Code, then + New chat with the goal \"add a one-line comment to README explaining Switchboard\". Check it goes from Working to Done, wi",
+   "at": 1793508684827,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "later"
+  },
+  {
+   "id": "e13decf7",
+   "text": "Vault rule in your CLAUDE.md: your `~/.claude/CLAUDE.md` gets the Vault section after you run `node kit/setup.mjs` in claude-mods.",
+   "at": 1793508684827,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "you"
   }
  ]
 }
