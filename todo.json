@@ -30,6 +30,13 @@
    "at": 1793505478608,
    "from": "8846e195-934e-46f1-845f-35d4b664c54b",
    "name": "Set up Instagram video tasks"
+  },
+  {
+   "id": "6e12e12b",
+   "text": "Memory vault: deep research (Karpathy raw/wiki/outputs, Claude Code + Obsidian, fit with existing ~/.claude memory and the 3D Memory graph), then propose a design to Kenneth and get approval before changing anything",
+   "at": 1793505479444,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks"
   }
  ],
  "removed": {
