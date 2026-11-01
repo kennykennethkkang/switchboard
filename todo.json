@@ -23,6 +23,13 @@
    "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
    "at": 1793413128748,
    "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "3c9b30a4",
+   "text": "Jarvis follow-up: build the Jev command box (3 tiers: saved data, Haiku, start chat or skill) and local Whisper + Kokoro voice inside the Switchboard dashboard; research mic access in the VS Code webview and on iPhone over Tailscale first",
+   "at": 1793505478608,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks"
   }
  ],
  "removed": {
