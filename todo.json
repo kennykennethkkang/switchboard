@@ -37,6 +37,13 @@
    "at": 1793506740527,
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2"
+  },
+  {
+   "id": "29c4f61f",
+   "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
+   "at": 1793525870153,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2"
   }
  ],
  "removed": {
