@@ -37,6 +37,13 @@
    "at": 1793505479444,
    "from": "8846e195-934e-46f1-845f-35d4b664c54b",
    "name": "Set up Instagram video tasks"
+  },
+  {
+   "id": "f1634e88",
+   "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
+   "at": 1793505480060,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks"
   }
  ],
  "removed": {
