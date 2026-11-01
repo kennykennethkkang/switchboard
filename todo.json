@@ -52,6 +52,14 @@
    "from": "8846e195-934e-46f1-845f-35d4b664c54b",
    "name": "Set up Instagram video tasks",
    "why": "you"
+  },
+  {
+   "id": "1d1d499f-ok",
+   "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
+   "at": 1793526817270,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "you"
   }
  ],
  "removed": {
@@ -80,7 +88,8 @@
   "54dd3840": 1793526763734,
   "54dd3840-ok": 1793526777224,
   "d16fa4d2": 1793526789984,
-  "f9c040dc": 1793526805578
+  "f9c040dc": 1793526805578,
+  "1d1d499f": 1793526817270
  },
  "ticked": [
   {
@@ -151,14 +160,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "1d1d499f",
-   "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
-   "at": 1793508684827,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "you"
-  },
   {
    "id": "1847c229",
    "text": "Task 12, Step 3: reload VS Code, then + New chat with the goal \"add a one-line comment to README explaining Switchboard\". Check it goes from Working to Done, wi",
