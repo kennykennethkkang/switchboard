@@ -7,12 +7,6 @@
    "at": 1793353577294
   },
   {
-   "id": "7bed044f",
-   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
-   "at": 1793413128748,
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
    "id": "f1634e88",
    "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
    "at": 1793505480060,
@@ -81,9 +75,17 @@
   "1847c229": 1793526827265,
   "e13decf7": 1793526829953,
   "e462a05d": 1793527101142,
-  "921edabf": 1793527101539
+  "921edabf": 1793527101539,
+  "7bed044f": 1793527101859
  },
  "ticked": [
+  {
+   "id": "7bed044f",
+   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
+   "at": 1793527101859,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
   {
    "id": "921edabf",
    "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
@@ -144,12 +146,6 @@
    "text": "temp check, ignore",
    "at": 1793354970213,
    "by": "b718000f-33f6-4cca-9248-d63589fd2902",
-   "from": "b718000f-33f6-4cca-9248-d63589fd2902"
-  },
-  {
-   "id": "eb57bac5",
-   "text": "Reinstalling the same version doesn't restart the phone app by itself; this time I restarted it by hand. That's in the to-do as 6038dc87.",
-   "at": 1793354530652,
    "from": "b718000f-33f6-4cca-9248-d63589fd2902"
   }
  ]
