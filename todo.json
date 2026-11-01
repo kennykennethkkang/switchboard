@@ -70,7 +70,8 @@
   "7bed044f": 1793527101859,
   "f1634e88": 1793527102198,
   "d16fa4d2-ok": 1793527102566,
-  "ed188d8a": 1793527102970
+  "ed188d8a": 1793527102970,
+  "3b20130f": 1793533000918
  },
  "ticked": [
   {
@@ -145,12 +146,36 @@
  ],
  "suggested": [
   {
-   "id": "3b20130f",
-   "text": "Untested by eye: the panel itself.",
-   "at": 1793527916551,
+   "id": "4f43f74a",
+   "text": "The standup shown on the chat page still lists only Done and Left. That's `chat-view.ts:340`, which another chat is editing, so I left it alone.",
+   "at": 1793533000918,
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "later"
+  },
+  {
+   "id": "bc3ce8c9",
+   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
+   "at": 1793533000918,
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "later"
+  },
+  {
+   "id": "ec818f9a",
+   "text": "Reload the agent-flow window.",
+   "at": 1793533000918,
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "you"
+  },
+  {
+   "id": "67a37850",
+   "text": "Commit `../claude-mods` for the `rules.md` change.",
+   "at": 1793533000918,
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "you"
   }
  ]
 }
