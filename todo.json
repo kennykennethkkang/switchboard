@@ -122,5 +122,23 @@
    "by": "b718000f-33f6-4cca-9248-d63589fd2902",
    "from": "7ef564d0-2fb7-4499-86fc-c075e2acbcbd"
   }
+ ],
+ "suggested": [
+  {
+   "id": "54dd3840",
+   "text": "the memory vault proposal, which needs your approval before anything changes",
+   "at": 1793505496314,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks",
+   "why": "you"
+  },
+  {
+   "id": "d16fa4d2",
+   "text": "your Gemini key, then a live test of image, video and notebooks",
+   "at": 1793505496314,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b",
+   "name": "Set up Instagram video tasks",
+   "why": "you"
+  }
  ]
 }
