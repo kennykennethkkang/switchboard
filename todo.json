@@ -198,6 +198,22 @@
    "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
    "name": "Security Audit Application",
    "why": "later"
+  },
+  {
+   "id": "1ecbfca1",
+   "text": "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.",
+   "at": 1793554696152,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "later"
+  },
+  {
+   "id": "33d75d3a",
+   "text": "Earlier to-do items: the phone voice over Tailscale and the Codex transcript are still open.",
+   "at": 1793554696152,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "later"
   }
  ]
 }
