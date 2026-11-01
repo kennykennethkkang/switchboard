@@ -176,6 +176,22 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "you"
+  },
+  {
+   "id": "2c03159b",
+   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
+   "at": 1793533417564,
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "you"
+  },
+  {
+   "id": "6a3650aa",
+   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
+   "at": 1793533417564,
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "later"
   }
  ]
 }
