@@ -27,6 +27,12 @@
    "at": 1793527103741,
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity"
+  },
+  {
+   "id": "6a7283d4",
+   "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
+   "at": 1793527531788,
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
   }
  ],
  "removed": {
