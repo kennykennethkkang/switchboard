@@ -20,6 +20,13 @@
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2",
    "why": "you"
+  },
+  {
+   "id": "9ab89b5f",
+   "text": "Phone voice for Jarvis: add a browser getUserMedia mic path for the phone over the Tailscale Serve URL (port 3131) and test on iPhone (watch tailscale issue 19147)",
+   "at": 1793527103741,
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity"
   }
  ],
  "removed": {
