@@ -156,6 +156,30 @@
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2",
    "why": "missed"
+  },
+  {
+   "id": "1d1d499f",
+   "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
+   "at": 1793508684827,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "you"
+  },
+  {
+   "id": "1847c229",
+   "text": "Task 12, Step 3: reload VS Code, then + New chat with the goal \"add a one-line comment to README explaining Switchboard\". Check it goes from Working to Done, wi",
+   "at": 1793508684827,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "later"
+  },
+  {
+   "id": "e13decf7",
+   "text": "Vault rule in your CLAUDE.md: your `~/.claude/CLAUDE.md` gets the Vault section after you run `node kit/setup.mjs` in claude-mods.",
+   "at": 1793508684827,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "you"
   }
  ]
 }
