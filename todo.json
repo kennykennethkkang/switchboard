@@ -222,6 +222,30 @@
    "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
    "name": "UI UX Site Audit Redesign",
    "why": "missed"
+  },
+  {
+   "id": "c15c87ca",
+   "text": "Reload VS Code so 0.20.1 is the version keeping the note current.",
+   "at": 1793612619804,
+   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
+   "name": "UI UX Site Audit Redesign",
+   "why": "you"
+  },
+  {
+   "id": "cc17341f",
+   "text": "Delete the old note called just \"Switchboard\" in your Notes folder. It still has the dead `:3131` links, and I didn't want to delete your notes myself.",
+   "at": 1793612619804,
+   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
+   "name": "UI UX Site Audit Redesign",
+   "why": "you"
+  },
+  {
+   "id": "c1835040",
+   "text": "Optional: turn on HTTPS in the Tailscale admin console (DNS page) so the copy buttons work on the phone.",
+   "at": 1793612619804,
+   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
+   "name": "UI UX Site Audit Redesign",
+   "why": "you"
   }
  ]
 }
