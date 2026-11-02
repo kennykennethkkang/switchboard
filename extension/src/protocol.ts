@@ -1,4 +1,7 @@
-import type { AiId, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub/types'
+import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub/types'
+import type { MemoryGraph } from './hub/graph'
+import type { RunDetail } from './hub/runs'
+import type { ChatOutputs, ChatTranscript } from './hub/chat-view'
 /**
  * Message protocol between VS Code extension host and webview.
  *
@@ -50,8 +53,20 @@ export type ExtensionToWebviewMessage =
   | { type: 'session-ended'; sessionId: string }
   | { type: 'session-updated'; sessionId: string; label: string }
   | { type: 'hub-state'; hub: HubState }
+  /** The mic's level, 0..1, about 12 a second while it listens; kept out of hub-state. */
+  | { type: 'hub-voice-level'; level: number }
   /** The view was hidden or shown: a hidden view stops its animation (VS Code keeps it alive but sets no document.hidden). */
   | { type: 'hub-visible'; visible: boolean }
+  /** One 'upload-chunk' is on disk; the webview sends the next only after this. */
+  | { type: 'upload-progress'; id: string }
+  /** The end of an upload: where it was saved, or why not. Can come early, after any chunk. */
+  | { type: 'upload-done'; id: string; path?: string; problem?: string }
+  /** The answer to graph-get. */
+  | { type: 'graph'; id: string; graph?: MemoryGraph; problem?: string }
+  /** The answer to runs-get. */
+  | { type: 'runs'; id: string; runs?: RunDetail[]; problem?: string }
+  /** The answer to chat-get: the one asked for, a shot as a data URL; none of them for an unknown chat. */
+  | { type: 'chat'; id: string; outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; problem?: string }
 
 export interface VisualizerConfig {
   mode: 'live' | 'replay'
@@ -68,20 +83,27 @@ export type WebviewToExtensionMessage =
   | { type: 'request-disconnect' }
   | { type: 'open-file'; filePath: string; line?: number }
   | { type: 'log'; level: 'info' | 'warn' | 'error'; message: string }
-  | { type: 'hub-refresh' }
+  /** A file attached in the message box, sent in slices that cross as ArrayBuffers (VS Code 1.57+). Not hub-*, so /hub/command never takes them. */
+  | { type: 'upload-start'; id: string; cwd: string; name: string; session?: string }
+  | { type: 'upload-chunk'; id: string; data: ArrayBuffer | Uint8Array }
+  | { type: 'upload-end'; id: string }
+  /** The chip was removed: drop the partial file. */
+  | { type: 'upload-abort'; id: string }
+  /** The Memory view asks for its graph; answered by 'graph' with the same id. */
+  | { type: 'graph-get'; id: string }
+  /** The node drawer asks for a role's runs in a chat; answered by 'runs' with the same id. */
+  | { type: 'runs-get'; id: string; sessionId: string; role: string }
+  /** The chat view asks for a chat's outputs, a transcript page or one screenshot; answered by 'chat' with the same id. */
+  | { type: 'chat-get'; id: string; sessionId: string; what: 'outputs' | 'transcript' | 'shot'; before?: number; path?: string }
   | { type: 'hub-send'; sessionId: string; text: string }
   | { type: 'hub-answer'; sessionId: string; askId: string; choice: Choice }
   | { type: 'hub-rc'; on: boolean; sessionId?: string }
   | { type: 'hub-open-url'; url: string }
   | { type: 'hub-web'; phone: boolean }
-  | { type: 'hub-stop-server'; pid: number; confirmed?: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
   | { type: 'hub-switchboard'; key: SwitchboardKey; value: boolean | number | string | null }
-  | { type: 'hub-vscode'; action: 'reload' | 'restart' }
   | { type: 'hub-compact'; sessionId: string }
-  | { type: 'hub-open-project'; path: string; newWindow: boolean }
-  | { type: 'hub-clone'; repo: string; newWindow: boolean }
   | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
@@ -107,6 +129,9 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-login-rename'; app: string; id: string; label: string }
   | { type: 'hub-login-delete'; app: string; id: string }
   | { type: 'hub-login-app-delete'; app: string }
+  | { type: 'hub-key-save'; name: ApiKeyName; value: string }
+  | { type: 'hub-key-test'; name: ApiKeyName }
+  | { type: 'hub-key-remove'; name: ApiKeyName }
   | { type: 'hub-kit-export' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
@@ -117,15 +142,25 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-dev-stop'; folder: string }
   | { type: 'hub-awake'; on: boolean }
   | { type: 'hub-device'; id: string; allow: boolean }
+  /** A stuck item (HubState.stuck) by id: stop its process (re-checked under the chat's claude), or dismiss it for 30 min. */
+  | { type: 'hub-stuck-stop'; sessionId: string; id: string }
+  | { type: 'hub-stuck-dismiss'; sessionId: string; id: string }
   | { type: 'hub-changes'; sessionId: string }
   | { type: 'hub-open-diff'; sessionId: string; file: string }
   | { type: 'hub-search'; q: string }
+  /** A Jarvis box question; the answer, or a start to confirm with hub-new-chat, lands in HubState.jarvis. */
+  | { type: 'hub-jarvis'; q: string; voice?: boolean }
+  /** The Jarvis mic: on records the Mac mic, off stops it; the transcript lands in the box as HubState.heard. */
+  | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
   | { type: 'hub-todo-add'; path: string; text: string }
   | { type: 'hub-todo-edit'; path: string; id: string; text: string }
   | { type: 'hub-todo-remove'; path: string; id: string }
-  /** Puts back an item a finished chat ticked off. */
+  /** Puts back an item a chat ticked off. */
   | { type: 'hub-todo-restore'; path: string; id: string }
+  /** A suggestion a finished chat left: into the to-do, or gone. */
+  | { type: 'hub-todo-accept'; path: string; id: string }
+  | { type: 'hub-todo-dismiss'; path: string; id: string }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
   | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
@@ -246,16 +281,16 @@ export interface WatchedSession {
   lastActivityTime: number
   inactivityTimer: NodeJS.Timeout | null
   subagentWatchers: Map<string, SubagentState>
-  /** Names of subagents already spawned (by transcript parser or file watcher) — prevents duplicate spawns */
+  /** Names of subagents already spawned (by transcript parser or file watcher); prevents duplicate spawns */
   spawnedSubagents: Set<string>
-  /** Subagent names currently receiving inline progress events — file watcher skips these */
+  /** Subagent names currently receiving inline progress events; file watcher skips these */
   inlineProgressAgents: Set<string>
   subagentsDirWatcher: import('fs').FSWatcher | null
   subagentsDir: string | null
   label: string
   labelSet: boolean
   model: string | null
-  /** Maps agent names to their last emitted model ID — re-emits on model change */
+  /** Maps agent names to their last emitted model ID; re-emits on model change */
   modelDetectedAgents: Map<string, string>
   permissionTimer: NodeJS.Timeout | null
   permissionEmitted: boolean

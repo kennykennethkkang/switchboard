@@ -101,11 +101,10 @@ function startWatchingSubagentFile(
   // is still active (has unmatched tool_use blocks = pending work).
   const pendingToolUseIds = new Set<string>()
   try {
-    const stat = fs.statSync(filePath)
-    if (stat.size > 0) {
-      const content = fs.readFileSync(filePath, 'utf-8')
-      for (const line of content.split(/\r?\n/)) {
-        if (!line.trim()) continue
+    // Same reader as the tail so the offset matches exactly what was scanned
+    const initial = readNewFileLines(filePath, 0)
+    if (initial) {
+      for (const line of initial.lines) {
         try {
           const raw: unknown = JSON.parse(line.trim())
           const entry = raw as { message?: { content?: Array<{ type: string; id?: string; tool_use_id?: string }> } }
@@ -121,7 +120,7 @@ function startWatchingSubagentFile(
           }
         } catch { /* skip unparseable subagent transcript lines */ }
       }
-      state.fileSize = stat.size
+      state.fileSize = initial.newSize
     }
   } catch (err) { log.debug('Subagent initial read failed:', err) }
 
@@ -162,7 +161,7 @@ export function readSubagentNewLines(
   // so that if inline progress stops (e.g. reconnection), we resume from the
   // correct position without re-emitting old events.
   if (session.inlineProgressAgents.has(state.agentName)) {
-    // Still keep the session alive — the subagent is working
+    // Still keep the session alive; the subagent is working
     delegate.resetInactivityTimer(sessionId)
     return
   }

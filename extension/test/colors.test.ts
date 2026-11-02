@@ -3,9 +3,26 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { spawn } from 'child_process'
 import { PALETTE, assignColors, titleBar, windowColors } from '../src/hub/colors'
 
+/** Another window: holds file's lock for ms, writes body at the end, then lets go. Resolves once it holds the lock. */
+async function otherWindow(file: string, body: string, ms = 50) {
+  const lock = `${file}.lock`
+  const child = spawn(process.execPath, ['-e', `const fs=require('fs');const [l,f,b,ms]=process.argv.slice(1);fs.writeFileSync(l,'x',{flag:'wx'});setTimeout(()=>{fs.writeFileSync(f,b);fs.rmSync(l)},+ms)`, lock, file, body, String(ms)])
+  while (!fs.existsSync(lock)) await new Promise(r => setTimeout(r, 5))
+  return { exited: new Promise(r => child.on('exit', r)) }
+}
+
 describe('window colors', () => {
+  it('waits for another window\'s write instead of losing it', async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'colors-')), 'colors.json')
+    const { exited: done } = await otherWindow(file, JSON.stringify({ '/a': 'violet' }))
+    windowColors(['/b'], file)
+    await done
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8'))).sort(), ['/a', '/b'])
+  })
+
   it('keeps a saved color and gives a new folder the first one no live window uses', () => {
     const saved = { '/a': 'violet', '/b': 'amber' } as const
     const { colors, changed } = assignColors({ ...saved }, ['/b', '/c', '/a'])

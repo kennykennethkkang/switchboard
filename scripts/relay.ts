@@ -1,5 +1,5 @@
 /**
- * Shared relay module — receives agent events and streams them to SSE clients.
+ * Shared relay module: receives agent events and streams them to SSE clients.
  * Used by both the dev relay server and the standalone app.
  */
 import * as http from 'http'
@@ -9,6 +9,7 @@ import * as path from 'path'
 import * as os from 'os'
 
 import { HookServer } from '../extension/src/hook-server'
+import { hub } from '../extension/src/hub/hub-service'
 import { AgentEvent, SessionInfo, WatchedSession } from '../extension/src/protocol'
 import { TranscriptParser } from '../extension/src/transcript-parser'
 import { readNewFileLines, foldPathCase } from '../extension/src/fs-utils'
@@ -21,7 +22,7 @@ import {
   HOOK_SERVER_NOT_STARTED, WORKSPACE_HASH_LENGTH,
 } from '../extension/src/constants'
 import { setLogLevel } from '../extension/src/logger'
-import type { TelemetryClient } from './telemetry'
+import { sseClients } from './sse'
 
 const MAX_EVENT_BUFFER = 5000
 const DISCOVERY_DIR = path.join(os.homedir(), '.claude', 'agent-flow')
@@ -29,29 +30,6 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects')
 
 let relayCreated = false
 let verbose = false
-let sessionEventCount = 0
-/** Distinct model IDs seen across all watched sessions during this relay session.
- *  Populated from `model_detected` events (emitted by both the Claude transcript
- *  parser and the Codex rollout parser). Read at session_end for telemetry. */
-const observedModels = new Set<string>()
-
-// agent-flow-app version. Inlined by esbuild at bundle time via `define`.
-// In dev (running from source via tsx), falls back to reading app/package.json.
-declare const AGENT_FLOW_APP_VERSION: string | undefined
-function resolveAgentFlowVersion(): string {
-  try {
-    if (typeof AGENT_FLOW_APP_VERSION === 'string' && AGENT_FLOW_APP_VERSION) {
-      return AGENT_FLOW_APP_VERSION
-    }
-  } catch { /* ReferenceError in unbundled dev — fall through */ }
-  try {
-    const pkgPath = path.join(__dirname, '..', 'app', 'package.json')
-    if (fs.existsSync(pkgPath)) {
-      return JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version ?? '0.0.0'
-    }
-  } catch { /* ignore */ }
-  return '0.0.0'
-}
 
 function log(...args: unknown[]) {
   if (verbose) console.log(...args)
@@ -59,20 +37,14 @@ function log(...args: unknown[]) {
 
 // ─── SSE client management ──────────────────────────────────────────────────
 
-const sseClients = new Set<http.ServerResponse>()
+const sseHub = sseClients()
 
 function sendSSE(res: http.ServerResponse, data: unknown) {
-  try { res.write(`data: ${JSON.stringify(data)}\n\n`) } catch {
-    sseClients.delete(res)
-  }
+  sseHub.send(res, JSON.stringify(data))
 }
 
 function broadcast(data: string) {
-  for (const res of sseClients) {
-    try { res.write(`data: ${data}\n\n`) } catch {
-      sseClients.delete(res)
-    }
-  }
+  sseHub.broadcast(data)
 }
 
 // ─── Event buffering ────────────────────────────────────────────────────────
@@ -80,11 +52,6 @@ function broadcast(data: string) {
 const eventBuffer = new Map<string, AgentEvent[]>()
 
 function broadcastEvent(event: AgentEvent) {
-  sessionEventCount++
-  if (event.type === 'model_detected') {
-    const m = (event.payload as { model?: unknown } | undefined)?.model
-    if (typeof m === 'string' && m.length > 0) observedModels.add(m)
-  }
   const sid = event.sessionId?.slice(0, SESSION_ID_DISPLAY) || '?'
   log(`[event] ${event.type} (session ${sid})`)
 
@@ -186,8 +153,27 @@ function resetInactivityTimer(sessionId: string) {
         sessionId,
       })
       broadcastSessionLifecycle('ended', sessionId, session.label)
+      // Listed as completed for a while, then dropped; its file is stale by then,
+      // so the scanner only re-attaches it on a fresh write
+      session.inactivityTimer = setTimeout(() => dropSession(session), ACTIVE_SESSION_AGE_S * 1000)
     }
   }, INACTIVITY_TIMEOUT_MS)
+}
+
+function dropSession(session: WatchedSession) {
+  session.fileWatcher?.close()
+  if (session.pollTimer) clearInterval(session.pollTimer)
+  if (session.inactivityTimer) clearTimeout(session.inactivityTimer)
+  if (session.permissionTimer) clearTimeout(session.permissionTimer)
+  for (const sub of session.subagentWatchers.values()) {
+    sub.watcher?.close()
+    if (sub.permissionTimer) clearTimeout(sub.permissionTimer)
+  }
+  session.subagentWatchers.clear()
+  session.subagentsDirWatcher?.close()
+  parser.clearSessionState(session.pendingToolCalls.keys(), session.sessionId)
+  sessions.delete(session.sessionId)
+  eventBuffer.delete(session.sessionId)
 }
 
 function watchSession(sessionId: string, filePath: string) {
@@ -215,8 +201,8 @@ function watchSession(sessionId: string, filePath: string) {
   sessions.set(sessionId, session)
 
   const stat = fs.statSync(filePath)
+  // Sets fileSize to the end of the last complete line
   const catchUpEntries = parser.prescanExistingContent(filePath, stat.size, session)
-  session.fileSize = stat.size
   parser.extractSessionLabel(catchUpEntries, session)
 
   broadcastSessionLifecycle('started', sessionId, session.label)
@@ -230,9 +216,12 @@ function watchSession(sessionId: string, filePath: string) {
   emitContextUpdate(ORCHESTRATOR_NAME, session, sessionId)
   parser.emitCatchUpEntries(catchUpEntries, session, sessionId)
 
-  session.fileWatcher = fs.watch(filePath, (eventType) => {
-    if (eventType === 'change') readNewLines(sessionId)
-  })
+  // The poll below covers it if the watch fails
+  try {
+    session.fileWatcher = fs.watch(filePath, (eventType) => {
+      if (eventType === 'change') readNewLines(sessionId)
+    })
+  } catch {}
 
   session.pollTimer = setInterval(() => {
     readNewLines(sessionId)
@@ -246,7 +235,7 @@ function watchSession(sessionId: string, filePath: string) {
   scanSubagentsDir(watcherDelegate, parser, sessionId)
   resetInactivityTimer(sessionId)
 
-  log(`[session] Watching ${sessionId.slice(0, SESSION_ID_DISPLAY)} — "${session.label}"`)
+  log(`[session] Watching ${sessionId.slice(0, SESSION_ID_DISPLAY)}, "${session.label}"`)
 }
 
 function readNewLines(sessionId: string) {
@@ -260,9 +249,10 @@ function readNewLines(sessionId: string) {
     parser.processTranscriptLine(line, ORCHESTRATOR_NAME, session.pendingToolCalls, session.seenToolUseIds, sessionId, session.seenMessageHashes)
   }
 
+  // Activity first, or the permission timer sees this read as newer than itself
+  resetInactivityTimer(sessionId)
   handlePermissionDetection(watcherDelegate, ORCHESTRATOR_NAME, session.pendingToolCalls, session, sessionId, session.sessionCompleted, true)
   scanSubagentsDir(watcherDelegate, parser, sessionId)
-  resetInactivityTimer(sessionId)
 }
 
 // ─── Session scanner ────────────────────────────────────────────────────────
@@ -275,7 +265,7 @@ function scanForActiveSessions(workspace: string) {
   const encoded = resolved.replace(/[^a-zA-Z0-9]/g, '-')
 
   const dirsToScan: string[] = []
-  // Case-folded on Windows — VS Code/shells report `c:\...` while Claude Code
+  // Case-folded on Windows: VS Code/shells report `c:\...` while Claude Code
   // encodes `C--...`, so exact string matching never found the project dir there.
   const encodedFolded = foldPathCase(encoded)
   try {
@@ -287,7 +277,7 @@ function scanForActiveSessions(workspace: string) {
       }
     }
   } catch {
-    // readdir failed — fall back to the exact-match dir if it exists
+    // readdir failed; fall back to the exact-match dir if it exists
     const projectDir = path.join(CLAUDE_DIR, encoded)
     if (fs.existsSync(projectDir)) dirsToScan.push(projectDir)
   }
@@ -339,7 +329,8 @@ function writeDiscoveryFile(port: number, workspace: string) {
   if (!fs.existsSync(DISCOVERY_DIR)) fs.mkdirSync(DISCOVERY_DIR, { recursive: true })
   const hash = hashWorkspace(workspace)
   discoveryFilePath = path.join(DISCOVERY_DIR, `${hash}-${process.pid}.json`)
-  fs.writeFileSync(discoveryFilePath, JSON.stringify({ port, pid: process.pid, workspace: normalizePath(workspace) }, null, 2) + '\n')
+  // hubToken: the hook server refuses posts without it.
+  fs.writeFileSync(discoveryFilePath, JSON.stringify({ port, pid: process.pid, workspace: normalizePath(workspace), hubToken: hub.token }, null, 2) + '\n', { mode: 0o600 })
 }
 
 function removeDiscoveryFile() {
@@ -362,7 +353,6 @@ export type RelayRuntimeMode = 'claude' | 'codex' | 'auto'
 export interface RelayOptions {
   workspace: string
   verbose?: boolean
-  telemetry?: TelemetryClient
   /** Which runtimes to watch. Defaults to AGENT_FLOW_RUNTIME env var, or 'auto'.
    *  Mirrors the extension's `agentVisualizer.runtime` setting so users of the
    *  dev relay and `npx agent-flow-app` have a way to opt out of one runtime. */
@@ -378,7 +368,7 @@ function resolveRuntimeMode(explicit?: RelayRuntimeMode): RelayRuntimeMode {
 export async function createRelay(options: RelayOptions): Promise<Relay> {
   const { workspace } = options
   verbose = options.verbose ?? false
-  // Keep warnings visible without --verbose — actionable hints (e.g. "Codex
+  // Keep warnings visible without --verbose; actionable hints (e.g. "Codex
   // sessions exist but none match this workspace") must reach the user.
   if (!verbose) setLogLevel('warn')
   if (relayCreated) {
@@ -426,7 +416,7 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
   // ─── Codex runtime ────────────────────────────────────────────────────────
   // Watch Codex rollouts in parallel. No-op if ~/.codex/sessions doesn't
   // exist or no sessions match the current workspace.
-  // We don't subscribe to onSessionDetected — it fires together with the
+  // We don't subscribe to onSessionDetected; it fires together with the
   // lifecycle 'started' event in CodexSessionWatcher.attachSession, so
   // wiring both would double-broadcast session-started to SSE clients.
   let codexWatcher: CodexSessionWatcher | null = null
@@ -439,35 +429,7 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
     codexWatcher.start()
   }
 
-  const telemetry = options.telemetry
-  const sessionStart = Date.now()
   let relayDisposed = false
-  const relaySessionId = `relay-${process.pid}-${Math.floor(sessionStart / 1000)}`
-  sessionEventCount = 0
-
-  const agentFlowVersion = resolveAgentFlowVersion()
-
-  const baseEvent = () => ({
-    session_id: relaySessionId,
-    agent_flow_version: agentFlowVersion,
-    os: os.platform(),
-    arch: os.arch(),
-  })
-
-  telemetry?.emit({ ...baseEvent(), event_type: 'session_start' })
-
-  process.on('uncaughtException', (err) => {
-    try {
-      telemetry?.emit({
-        ...baseEvent(),
-        event_type: 'error',
-        error_class: err?.constructor?.name ?? 'Error',
-      })
-    } catch { /* don't let the handler itself crash */ }
-    // Preserve default crash-on-uncaught behavior: log, then exit.
-    console.error(err)
-    process.exit(1)
-  })
 
   return {
     handleSSE(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -477,13 +439,10 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
         'Connection': 'keep-alive',
       })
 
-      sseClients.add(res)
-      log(`[sse] Client connected (${sseClients.size} total)`)
+      sseHub.add(req, res)
+      log(`[sse] Client connected (${sseHub.size} total)`)
 
-      req.on('close', () => {
-        sseClients.delete(res)
-        log(`[sse] Client disconnected (${sseClients.size} total)`)
-      })
+      req.on('close', () => log(`[sse] Client disconnected (${sseHub.size} total)`))
 
       // Send current session list (Claude + Codex)
       const sessionList: SessionInfo[] = []
@@ -516,20 +475,10 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
     },
 
     dispose() {
-      // Defense in depth — server.ts already guards cleanup(), but direct
+      // Defense in depth: server.ts already guards cleanup(), but direct
       // callers or hot-reload could call this twice.
       if (relayDisposed) return
       relayDisposed = true
-      const models = [...observedModels].sort().join(',').slice(0, 128)
-      const runtimes = [wantClaude && 'claude', wantCodex && 'codex'].filter(Boolean).join(',')
-      telemetry?.emit({
-        ...baseEvent(),
-        event_type: 'session_end',
-        duration_s: Math.round((Date.now() - sessionStart) / 1000),
-        event_count: sessionEventCount,
-        models: models || undefined,
-        runtimes: runtimes || undefined,
-      })
       if (wantClaude) {
         removeDiscoveryFile()
         hookServer?.dispose()

@@ -36,7 +36,7 @@ const project = { type: 'string', description: 'The project folder; defaults to 
 const TODO_TOOLS = [
   {
     name: 'todo_add',
-    description: 'Add future work to the project\'s Switchboard to-do, kept across chats until done. With before_id or before_text it is a prerequisite: something that must be done before that item.',
+    description: 'Add future work to the project\'s Switchboard to-do, kept across chats until done. With before_id or before_text it is a prerequisite: something that must be done before that item. Steps only the user can do by hand (reload, sign in, commit, save a key, test on a device) go under For you in your standup instead, where they show as Finish up, not here.',
     inputSchema: { type: 'object', properties: { text: { type: 'string' }, before_id: { type: 'string', description: 'Id of the item this must come before' }, before_text: { type: 'string', description: 'Text of that item, when the id is not known' }, project }, required: ['text'] },
   },
   {
@@ -150,7 +150,7 @@ async function toolOn(msg) {
   if (!name) return reply(msg.id, 'Not changed: give the plugin or skill name.', true)
   const win = findWindow()
   if (!win) return reply(msg.id, 'Switchboard is not running here; use the plugin or skill anyway, from its files under ~/.claude.', true)
-  const r = await fetch(`http://127.0.0.1:${win.port}/hub/tool-on?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ session: process.env.CLAUDE_CODE_SESSION_ID ?? '', name }) })
+  const r = await fetch(`http://127.0.0.1:${win.port}/hub/tool-on?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ session: process.env.CLAUDE_CODE_SESSION_ID ?? '', name }), signal: AbortSignal.timeout(5000) })
   const text = await r.text()
   return r.ok ? reply(msg.id, text) : reply(msg.id, `Not changed: ${text || `status ${r.status}`}`, true)
 }
@@ -164,7 +164,7 @@ async function todo(msg) {
   const win = findWindow()
   if (!win) return reply(msg.id, 'Switchboard is not running here, so the to-do was not changed.', true)
   const body = { op: add ? 'add' : 'done', cwd: s(a.project) ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), text: s(a.text), id: add ? undefined : s(a.id), before: add ? s(a.before_id) ?? s(a.before_text) : undefined, session: process.env.CLAUDE_CODE_SESSION_ID || undefined }
-  const r = await fetch(`http://127.0.0.1:${win.port}/hub/todo?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify(body) })
+  const r = await fetch(`http://127.0.0.1:${win.port}/hub/todo?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify(body), signal: AbortSignal.timeout(5000) })
   const text = await r.text()
   return r.ok ? reply(msg.id, text) : reply(msg.id, `Not changed: ${text || `status ${r.status}`}`, true)
 }

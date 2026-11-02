@@ -2,7 +2,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import * as path from 'path'
-import { accountOf, addProfile, awsStatus, chromeCall, chromeProfiles, chromeState, openChromeScript, makeDefault, parseAwsConfig, profileFor, validProfileName, validRegion } from '../src/hub/aws'
+import * as fs from 'fs'
+import { accountOf, addProfile, AWS_SESSION_MS, awsProfiles, awsStatus, browserEnv, chromeCall, chromeChoice, chromeProfiles, chromeState, dueHeadsUps, HEADS_UP_MS, loginCacheFile, loginError, openChromeScript, rowText, makeDefault, parseAwsConfig, profileFor, trackSessions, validProfileName, validRegion } from '../src/hub/aws'
 
 const ARN = (acct: string) => `arn:aws:iam::${acct}:root`
 const CONFIG = [
@@ -148,5 +149,148 @@ describe('aws status and helpers', () => {
     assert.match(openChromeScript('darwin')!, /\/usr\/bin\/open -na "Google Chrome" --args --profile-directory="\$SWITCHBOARD_CHROME_DIR" "\$1"/)
     assert.match(openChromeScript('linux')!, /google-chrome --profile-directory="\$SWITCHBOARD_CHROME_DIR" "\$1"/)
     assert.equal(openChromeScript('win32'), undefined)
+  })
+
+  it('opens Chrome itself, in its last used profile, when no profile is picked', () => {
+    const url = 'https://signin.aws.amazon.com/a'
+    assert.deepEqual(chromeCall(url, '', 'darwin', {}, () => false), { cmd: '/usr/bin/open', args: ['-a', 'Google Chrome', url] })
+    assert.deepEqual(chromeCall(url, '', 'linux', {}, () => false), { cmd: 'google-chrome', args: [url] })
+    assert.match(openChromeScript('darwin')!, /if \[ -z "\$SWITCHBOARD_CHROME_DIR" \]; then exec \/usr\/bin\/open -a "Google Chrome" "\$1"; fi/)
+    assert.match(openChromeScript('linux')!, /if \[ -z "\$SWITCHBOARD_CHROME_DIR" \]; then exec google-chrome "\$1"; fi/)
+  })
+
+  it('points every terminal\'s BROWSER at the opener, with or without a project browser', () => {
+    assert.deepEqual(browserEnv('Profile 4', '/s.sh'), { BROWSER: '/s.sh', SWITCHBOARD_CHROME_DIR: 'Profile 4' })
+    assert.deepEqual(browserEnv(undefined, '/s.sh'), { BROWSER: '/s.sh', SWITCHBOARD_CHROME_DIR: '' })
+    assert.deepEqual(browserEnv('', '/s.sh'), { BROWSER: '/s.sh', SWITCHBOARD_CHROME_DIR: '' })
+    // Windows has no script: leave BROWSER alone.
+    assert.deepEqual(browserEnv('Profile 4', ''), {})
+  })
+
+  it('lists every Chrome profile by name from a real Local State', () => {
+    const rows = chromeProfiles(fs.readFileSync(path.join(__dirname, 'fixtures', 'chrome-local-state.json'), 'utf8'))
+    assert.deepEqual(rows.map(r => `${r.dir}=${r.name}`), ['Default=Main', 'Profile 1=SCU', 'Profile 3=SCU TSA', 'Profile 4=Work', 'Profile 5=Yo', 'Profile 9=TheArmoire', 'Profile 10=Zellizard Inc.', 'Profile 11=Tsai'])
+    assert.ok(rows.every(r => !('email' in r)))
+  })
+
+  it('signs in with the login\'s own Chrome pick, else the project\'s, else Chrome\'s last used', () => {
+    const known = ['Profile 4', 'Profile 9']
+    assert.deepEqual(chromeChoice('Profile 9', 'Profile 4', known), { dir: 'Profile 9', gone: [] })
+    assert.deepEqual(chromeChoice('', 'Profile 4', known), { dir: 'Profile 4', gone: [] })
+    assert.deepEqual(chromeChoice(undefined, 'Profile 4', known), { dir: 'Profile 4', gone: [] })
+    assert.deepEqual(chromeChoice('', undefined, known), { dir: '', gone: [] })
+    assert.deepEqual(chromeChoice(undefined, '', known), { dir: '', gone: [] })
+  })
+
+  it('sets and clears one row\'s note or error, and says when nothing changed', () => {
+    assert.deepEqual(rowText(undefined, 'aws:live', 'moved'), { 'aws:live': 'moved' })
+    assert.deepEqual(rowText({ 'aws:live': 'moved', 'aws:yo': 'x' }, 'aws:live'), { 'aws:yo': 'x' })
+    assert.equal(rowText({ 'aws:yo': 'x' }, 'aws:live'), undefined)
+    assert.equal(rowText({ 'aws:live': 'same' }, 'aws:live', 'same'), undefined)
+  })
+
+  it('skips a Chrome profile that was deleted and says which', () => {
+    const known = ['Profile 4']
+    assert.deepEqual(chromeChoice('Profile 7', 'Profile 4', known), { dir: 'Profile 4', gone: ['Profile 7'] })
+    assert.deepEqual(chromeChoice('Profile 7', 'Profile 8', known), { dir: '', gone: ['Profile 7', 'Profile 8'] })
+    assert.deepEqual(chromeChoice('', 'Profile 8', known), { dir: '', gone: ['Profile 8'] })
+    // Chrome's list unreadable: nothing is called gone.
+    assert.deepEqual(chromeChoice('Profile 7', undefined, []), { dir: '', gone: [] })
+  })
+
+  it('keeps the last lines of a failed aws login, with keys, tokens and URL queries cut', () => {
+    const out = [
+      'Attempting to open your default browser.', '', 'https://us-west-1.signin.aws.amazon.com/authorize?client_id=x&state=abc',
+      '\x1b[31mAccess denied for AKIAABCDEFGHIJKLMNOP\x1b[0m', 'token eyJhbGciOiJFUzI1.eyJzdWIiOiJ4eXoifQ.c2lnbmF0dXJlMTIz', 'aws: [ERROR]: An error occurred (AccessDeniedException)',
+    ].join('\n')
+    const text = loginError(out)
+    assert.equal(text.split('\n').length, 5)
+    assert.ok(!text.includes('AKIAABCDEFGHIJKLMNOP') && !text.includes('eyJhbGci') && !text.includes('state=abc') && !text.includes('\x1b'))
+    assert.match(text, /AccessDeniedException/)
+    assert.match(text, /signin\.aws\.amazon\.com\/authorize/)
+    assert.equal(loginError('  \n'), '')
+    assert.ok(loginError('x'.repeat(5000)).length <= 600)
+  })
+})
+
+describe('aws session length', () => {
+  const H = 3600_000
+  it('starts a session when a profile is first seen signed in and keeps it through a failed check', () => {
+    const rows = [{ name: 'live', status: 'signed-in' as const }, { name: 'yo', status: 'expired' as const }]
+    assert.deepEqual(trackSessions({}, rows, 100), { live: { at: 100 } })
+    // Still in the same 12 h: kept as is, even when a check timed out.
+    assert.deepEqual(trackSessions({ live: { at: 100, warned: 100 }, yo: { at: 5 }, gone: { at: 5 } }, rows, 100 + H), { live: { at: 100, warned: 100 }, yo: { at: 5, out: 100 + H } })
+    assert.deepEqual(trackSessions({ yo: { at: 5 } }, rows.slice(1), 5 + AWS_SESSION_MS), {})
+    // Signed in past the old session's end: a new sign-in happened outside Switchboard.
+    assert.deepEqual(trackSessions({ live: { at: 100 } }, rows, 100 + AWS_SESSION_MS + 1), { live: { at: 100 + AWS_SESSION_MS + 1 } })
+  })
+
+  it('never marks a session signed out on a check that could not tell', () => {
+    const unsure = [{ name: 'live', status: 'expired' as const, unsure: true }], on = [{ name: 'live', status: 'signed-in' as const }]
+    const s = trackSessions({ live: { at: H } }, unsure, 2 * H, { live: { birth: 1, mtime: 1.9 * H } })
+    assert.deepEqual(s, { live: { at: H } })
+    // The next refresh writes the file: still the same session.
+    assert.deepEqual(trackSessions(s, on, 2.3 * H, { live: { birth: 1, mtime: 2.25 * H } }), { live: { at: H } })
+  })
+
+  it('says a status check could not tell when STS gave no sign-out answer', async () => {
+    const sts = async (name: string) => (name === 'live' ? { ok: false, stderr: 'Connect timeout on endpoint URL' } : name === 'yo' ? { ok: false, stderr: 'Your session has expired. Please reauthenticate using aws login.' } : { ok: true, account: '137809407381', stderr: '' })
+    const rows = await awsProfiles(1, sts, CONFIG)
+    assert.equal(rows.find(r => r.name === 'live')?.unsure, true)
+    assert.equal(rows.find(r => r.name === 'yo')?.unsure, undefined)
+    assert.equal(rows.find(r => r.name === 'default')?.unsure, undefined)
+  })
+
+  it('finds a profile\'s login cache file the way the CLI names it', () => {
+    assert.equal(loginCacheFile('arn:aws:iam::123456789012:user/k', '/c'), path.join('/c', 'c964cac7a1761ad896e867060a3f8faa5bb3dd2d855d1184a6beeae03ad6410e.json'))
+  })
+
+  it('dates sessions started outside Switchboard from the login cache file\'s times', () => {
+    const on = [{ name: 'live', status: 'signed-in' as const }], off = [{ name: 'live', status: 'expired' as const }]
+    // First seen signed in: the file was made at its sign-in; refreshes only move mtime.
+    assert.deepEqual(trackSessions({}, on, 10 * H, { live: { birth: 3 * H, mtime: 8 * H } }), { live: { at: 3 * H } })
+    // A birth over 12 h back cannot start a live session (a later login rewrote the file): its last write, the latest start.
+    assert.deepEqual(trackSessions({}, on, 20 * H, { live: { birth: 1, mtime: 18 * H } }), { live: { at: 18 * H } })
+    // No birth time on this disk: mtime.
+    assert.deepEqual(trackSessions({}, on, 10 * H, { live: { birth: 0, mtime: 8 * H } }), { live: { at: 8 * H } })
+    // A refresh rewrites the file in place: not a new session.
+    assert.deepEqual(trackSessions({ live: { at: H, warned: H } }, on, 3 * H, { live: { birth: 1, mtime: 2 * H } }), { live: { at: H, warned: H } })
+    // A file made after the session began (aws logout, then aws login): a new session, its heads-up not sent.
+    assert.deepEqual(trackSessions({ live: { at: H, warned: H } }, on, 3 * H, { live: { birth: 2 * H, mtime: 2.5 * H } }), { live: { at: 2 * H } })
+    // Seen signed out, then written and signed in again: aws login ran in a terminal.
+    const out = trackSessions({ live: { at: H } }, off, 2 * H, { live: { birth: 1, mtime: 1.5 * H } })
+    assert.deepEqual(out, { live: { at: H, out: 2 * H } })
+    assert.deepEqual(trackSessions(out, on, 3 * H, { live: { birth: 1, mtime: 2.5 * H } }), { live: { at: 2.5 * H } })
+    // Signed in again with no new write: the same session.
+    assert.deepEqual(trackSessions(out, on, 3 * H, { live: { birth: 1, mtime: 1.5 * H } }), { live: { at: H } })
+  })
+
+  it('gives one heads-up per session, about 30 minutes before it ends', () => {
+    const at = 1000, end = at + AWS_SESSION_MS
+    assert.deepEqual(dueHeadsUps({ live: { at } }, end - HEADS_UP_MS - 1), [])
+    assert.deepEqual(dueHeadsUps({ live: { at } }, end - HEADS_UP_MS), ['live'])
+    assert.deepEqual(dueHeadsUps({ live: { at, warned: at } }, end - 60_000), [])
+    assert.deepEqual(dueHeadsUps({ live: { at, warned: at - 1 } }, end - 60_000), ['live'])
+    assert.deepEqual(dueHeadsUps({ live: { at } }, end), [])
+  })
+})
+
+describe('aws status checks', () => {
+  it('skips old default backups and runs two STS calls at a time', async () => {
+    const config = `${CONFIG}\n[profile previous-default-20261001-1200]\nregion = us-west-1\n[profile extra]\nregion = us-west-2\n`
+    const asked: string[] = []
+    let open = 0, peak = 0
+    const sts = async (name: string) => {
+      asked.push(name); peak = Math.max(peak, ++open)
+      await new Promise(r => setTimeout(r, 5))
+      open--
+      return { ok: false, stderr: 'Unable to locate credentials' }
+    }
+    const rows = await awsProfiles(1, sts, config)
+    assert.deepEqual(rows.map(r => r.name), ['default', 'live', 'yo', 'sso', 'previous-default-20261001-1200', 'extra'])
+    assert.ok(!asked.includes('previous-default-20261001-1200'))
+    assert.equal(asked.length, 5)
+    assert.equal(peak, 2)
+    assert.equal(rows[4].stale, true)
   })
 })

@@ -15,7 +15,7 @@ test('a fresh chat is working', () => {
 
 test('roles: start marks active, stop marks done, order kept', () => {
   const p = run([ev('SessionStart'), ev('SubagentStart', { agent_type: 'researcher' }), ev('SubagentStop', { agent_type: 'researcher' }), ev('SubagentStart', { agent_type: 'engineer' })])
-  assert.deepEqual(p?.roles, [{ id: 'researcher', role: 'researcher', state: 'done', startedAt: 1001 }, { id: 'engineer', role: 'engineer', state: 'active', startedAt: 1003 }])
+  assert.deepEqual(p?.roles, [{ id: 'researcher', role: 'researcher', state: 'done', startedAt: 1001, at: 1002 },{ id: 'engineer', role: 'engineer', state: 'active', startedAt: 1003 }])
 })
 
 test('roles: one entry per subagent, keyed by agent id', () => {
@@ -384,6 +384,78 @@ test('background: a stop with no id or role leaves it running until the 60 minut
   assert.deepEqual(p?.roles.map(r => [r.id, r.state]), [['q1', 'done']])
 })
 
+// The hook post gives up after a second, so a busy window can miss a SubagentStart; the agent's own calls still say it runs.
+test('background: a subagent whose start was lost is running once its own calls arrive, and keeps the chat working', () => {
+  let p = step(undefined, ev('SessionStart'), 0)
+  p = step(p, ev('PreToolUse', { tool_name: 'Agent', tool_input: { subagent_type: 'engineer', run_in_background: true } }), 1000)
+  p = step(p, ev('Stop'), 2000)
+  assert.equal(p?.state, 'idle')
+  p = step(p, ev('PreToolUse', { agent_id: 'e1', agent_type: 'engineer', tool_name: 'Read', tool_input: {} }), 3000)
+  assert.deepEqual([p?.state, p?.waiting, p?.running], ['working', true, ['e1']])
+  assert.deepEqual(p?.roles.map(r => [r.id, r.state]), [['e1', 'active']])
+  p = step(p, ev('SubagentStop', { agent_id: 'e1', agent_type: 'engineer' }), 9000)
+  assert.equal(p?.state, 'idle')
+})
+
+test('background: a subagent call that lands just after its own stop does not bring it back', () => {
+  let p = run([ev('SessionStart'), ev('SubagentStart', { agent_type: 'qa', agent_id: 'q1' }), ev('Stop')])
+  p = step(p, ev('SubagentStop', { agent_id: 'q1', agent_type: 'qa' }), 5000)
+  p = step(p, ev('PostToolUse', { agent_id: 'q1', agent_type: 'qa', tool_name: 'Read', tool_input: {} }), 5200)
+  p = step(p, ev('PreToolUse', { agent_id: 'q1', agent_type: 'qa', tool_name: 'Read', tool_input: {} }), 5300)
+  assert.deepEqual([p?.state, p?.running], ['idle', undefined])
+})
+
+test('background: a late call from a stopped subagent whose role was trimmed does not bring it back', () => {
+  let p = step(undefined, ev('SessionStart'), 0)
+  p = step(p, ev('SubagentStart', { agent_type: 'engineer', agent_id: 'long' }), 0)
+  for (let i = 0; i < 12; i++) {
+    p = step(p, ev('SubagentStart', { agent_type: 'qa', agent_id: `a${i}` }), 10 + i)
+    p = step(p, ev('SubagentStop', { agent_type: 'qa', agent_id: `a${i}` }), 30 + i)
+  }
+  p = step(p, ev('SubagentStop', { agent_type: 'engineer', agent_id: 'long' }), 1000)
+  p = step(p, ev('Stop'), 1100)
+  assert.equal(p?.state, 'idle')
+  p = step(p, ev('PreToolUse', { agent_id: 'long', agent_type: 'engineer', tool_name: 'Read', tool_input: {} }), 1200)
+  assert.deepEqual([p?.state, p?.running], ['idle', undefined])
+})
+
+test('roles: trim drops the finished runs that ended first, not the first in the list', () => {
+  let p = step(undefined, ev('SessionStart'), 0)
+  p = step(p, ev('SubagentStart', { agent_type: 'engineer', agent_id: 'long' }), 0)
+  for (let i = 0; i < 12; i++) p = step(p, ev('SubagentStart', { agent_type: 'qa', agent_id: `a${i}` }), 10 + i)
+  for (let i = 0; i < 12; i++) p = step(p, ev('SubagentStop', { agent_type: 'qa', agent_id: `a${i}` }), 30 + i)
+  p = step(p, ev('SubagentStop', { agent_type: 'engineer', agent_id: 'long' }), 1000)
+  assert.equal(p?.roles.length, 12)
+  assert.ok(p?.roles.some(r => r.id === 'long'))
+  assert.ok(!p?.roles.some(r => r.id === 'a0'))
+})
+
+test('roles: a Stop or StopFailure that marks runs done ends them at their last call', () => {
+  const start = [ev('SessionStart'), ev('SubagentStart', { agent_type: 'qa', agent_id: 'q1' }), ev('PreToolUse', { agent_id: 'q1', agent_type: 'qa', tool_name: 'Read', tool_input: {} })]
+  const at = [0, 0, 5 * 60e3]
+  let p = start.reduce((p, e, i) => step(p, e, at[i]), undefined as ReturnType<typeof step>)
+  const s = step(p, ev('Stop'), 70 * 60e3)
+  assert.deepEqual(s?.roles.map(r => [r.state, r.at]), [['done', 5 * 60e3]])
+  p = step(p, ev('SubagentStart', { agent_type: 'researcher' }), 6 * 60e3)
+  const f = step({ ...p!, running: ['researcher'] }, ev('StopFailure', { error: 'server_error' }), 7 * 60e3)
+  assert.deepEqual(f?.roles.map(r => [r.id, r.state, r.at]), [['q1', 'done', 5 * 60e3], ['researcher', 'active', undefined]])
+})
+
+test('background: the cap counts from a subagent\'s last call, so a long busy one stays running', () => {
+  let p = step(undefined, ev('SessionStart'), 0)
+  p = step(p, ev('SubagentStart', { agent_type: 'engineer', agent_id: 'e1' }), 0)
+  p = step(p, ev('Stop'), 1000)
+  p = step(p, ev('PreToolUse', { agent_id: 'e1', agent_type: 'engineer', tool_name: 'Edit', tool_input: {} }), 59 * MIN)
+  p = step(p, ev('UserPromptSubmit'), 70 * MIN)
+  p = step(p, ev('Stop'), 70 * MIN + 1000)
+  assert.deepEqual([p?.state, p?.running], ['working', ['e1']])
+})
+
+test('roles: a finished step keeps when it ended, for the time estimate', () => {
+  const p = run([ev('SessionStart'), ev('SubagentStart', { agent_type: 'qa', agent_id: 'q1' }), ev('SubagentStop', { agent_type: 'qa', agent_id: 'q1' })])
+  assert.deepEqual(p?.roles, [{ id: 'q1', role: 'qa', state: 'done', startedAt: 1001, at: 1002 }])
+})
+
 test('background: one that never stops keeps the chat working only until the cap, across turns', () => {
   let p = step(undefined, ev('SessionStart'), 0)
   p = step(p, ev('SubagentStart', { agent_type: 'engineer', agent_id: 'e1' }), 0)
@@ -624,7 +696,7 @@ test('finishedJobs: tool use ids of task notifications with an end status', () =
 
 test('jobs: a background Bash keeps the chat wrapping up until its notification, then Done', () => {
   const p = run([ev('SessionStart'), ev('PostToolUse', BG_POST), ev('Stop', COMMIT)])!
-  assert.deepEqual(p.jobs, [{ id: 'toolu_01AoVrFSc66BD5YHtMHRjmbx', label: 'Wait until both windows reload onto the new version', task: 'bo727da6e', startedAt: 1001 }])
+  assert.deepEqual(p.jobs, [{ id: 'toolu_01AoVrFSc66BD5YHtMHRjmbx', label: 'Wait until both windows reload onto the new version', task: 'bo727da6e', command: 'until ...; do sleep 2; done', startedAt: 1001 }])
   assert.equal(p.state, 'working')
   assert.equal(p.waiting, true)
   // The notification starts a lead turn; its Stop carries what the transcript says finished.
@@ -706,6 +778,32 @@ test('jobs: the lead stopping a background Bash with TaskStop ends it', () => {
   assert.equal(p.state, 'done')
 })
 
+test('subJobs: a subagent\'s background Bash is kept apart, never holding the chat, until its transcript says it ended', () => {
+  const p = run([ev('SessionStart'), ev('SubagentStart', { agent_type: 'engineer', agent_id: 'e1' }), ev('PostToolUse', { ...BG_POST, agent_id: 'e1', agent_type: 'engineer' })])!
+  assert.deepEqual(p.subJobs?.map(j => [j.id, j.agent, j.task]), [['toolu_01AoVrFSc66BD5YHtMHRjmbx', 'e1', 'bo727da6e']])
+  assert.equal(p.jobs, undefined)
+  // Its SubagentStop leaves an unfinished one: it outlives the agent.
+  const kept = step(p, ev('SubagentStop', { agent_type: 'engineer', agent_id: 'e1' }), 5000)!
+  assert.equal(kept.subJobs?.length, 1)
+  const done = step(p, ev('SubagentStop', { agent_type: 'engineer', agent_id: 'e1', bg_finished: ['toolu_01AoVrFSc66BD5YHtMHRjmbx'] }), 5000)!
+  assert.equal(done.subJobs, undefined)
+  // Its own TaskStop ends it too.
+  const stopped = step(p, ev('PostToolUse', { tool_name: 'TaskStop', agent_id: 'e1', tool_input: { task_id: 'bo727da6e' }, tool_response: {} }), 5000)!
+  assert.equal(stopped.subJobs, undefined)
+})
+
+test('hub.hook reads finished subagent jobs from the agent transcript on SubagentStop', async () => {
+  const fs = await import('fs'), os = await import('os'), path = await import('path')
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-')), 'agent-e1.jsonl')
+  fs.writeFileSync(file, NOTE + '\n')
+  const h = new HubService()
+  h.hook(ev('SessionStart'), 1)
+  h.hook(ev('SubagentStart', { agent_type: 'engineer', agent_id: 'e1' }), 2)
+  h.hook(ev('PostToolUse', { ...BG_POST, agent_id: 'e1', agent_type: 'engineer' }), 3)
+  h.hook(ev('SubagentStop', { agent_type: 'engineer', agent_id: 'e1', agent_transcript_path: file }), 4)
+  assert.equal(h.get().progress[0].subJobs, undefined)
+})
+
 const LIMIT = { error: 'rate_limit', error_details: '429 Too Many Requests', last_assistant_message: 'API Error: Rate limit reached' }
 
 test('StopFailure on a usage limit ends the turn on needs-you, marked limited', () => {
@@ -766,6 +864,25 @@ test('standup: Done and Left items from bold lines, headings or labels; an empty
   assert.equal(many.done[0].length <= 160, true)
 })
 
+test('standup: a For you section holds the user\'s own steps; Left (needs you) and Left for you are too', () => {
+  const want = { done: ['A'], left: ['B'], you: ['Reload the window'] }
+  for (const h of ['## For you', '**For you**', 'For you:', '**Needs you**', '### Your steps', 'You:']) assert.deepEqual(standup(`**Done**\n- A\n\n${h}\n- Reload the window\n\n**Left**\n- B`), want, h)
+  assert.deepEqual(standup('- **Done:** A\n- **For you:** Reload the window\n- **Left:** B'), want)
+  assert.deepEqual(standup('**Done:** A\n**For you:** Reload the window\n**Left:** B'), want)
+  assert.deepEqual(standup('- Done: A\n- For you: Reload the window\n- Left: B'), want)
+  for (const h of ['**Left (needs you)**', 'Left for you:', '## Left for you']) assert.deepEqual(standup(`**Done**\n- A\n\n${h}\n- B`), { done: ['A'], left: [], you: ['B'] }, h)
+  assert.deepEqual(standup('- **Left for you:** B\n- **Left (needs you):** C'), { done: [], left: [], you: ['B', 'C'] })
+  for (const none of ['- None needed.', '- Nothing for you this time.', '- Nothing, it is all automated.', '- No manual steps.']) assert.deepEqual(standup(`**Done**\n- A\n\n**For you**\n${none}`), { done: ['A'], left: [] }, none)
+  assert.deepEqual(standup('**Done**\n- A\n\n**For you**\n- None needed.\n- Nothing else.'), { done: ['A'], left: [] })
+  assert.deepEqual(standup('**Done**\n- A\n\n**For you**\n- None of the tests run in CI; run pnpm test locally'), { done: ['A'], left: [], you: ['None of the tests run in CI; run pnpm test locally'] })
+  // Prose that happens to open with the label is no standup.
+  assert.equal(standup('Shipped. The cache is warm.\nFor you: nothing to do, it is live.'), undefined)
+  assert.equal(standup('You: rename the button to Save.\nMe: done.'), undefined)
+  assert.deepEqual(standup('**Done**\n- A\n\n**For you**\n- none\n\n**Left**\n- B'), { done: ['A'], left: ['B'] })
+  assert.deepEqual(standup('**For you**\n- Sign in'), { done: [], left: [], you: ['Sign in'] })
+  assert.equal(doneText({ ...run([ev('SessionStart'), ev('Stop', { last_assistant_message: '**Done**\n- A\n\n**For you**\n- Reload\n\n**Left**\n- B' })])!, tasks: [] }), 'finished, 1 suggested for the to-do, 1 for you')
+})
+
 test('Stop keeps the standup: Left items go to the to-do, so a done chat with only Left is finished', () => {
   const tasks = [ev('PreToolUse', { tool_name: 'TaskCreate', tool_input: { subject: 'a' } }), ev('PreToolUse', { tool_name: 'TaskUpdate', tool_input: { taskId: '1', status: 'completed' } })]
   const almost = run([ev('SessionStart'), ...tasks, ev('Stop', { last_assistant_message: STANDUP })])!
@@ -774,7 +891,7 @@ test('Stop keeps the standup: Left items go to the to-do, so a done chat with on
   const done = run([ev('SessionStart'), ...tasks, ev('Stop', { last_assistant_message: STANDUP.replace(/\*\*Left\*\*\n1\. Ship the vsix\n2\) Update docs/, '**Left**\n- none') })])!
   assert.deepEqual(done.report?.left, [])
   assert.equal(almostDone(almost), false)
-  assert.equal(doneText(almost), 'finished, all 1 task done, 2 to the to-do')
+  assert.equal(doneText(almost), 'finished, all 1 task done, 2 suggested for the to-do')
   assert.equal(doneText(done), 'finished, all 1 task done')
   assert.equal(doneText({ ...done, tasks: [] }), 'finished')
   assert.equal(run([ev('SessionStart'), ...tasks, ev('Stop', { last_assistant_message: 'Done.' })])!.report, undefined)
@@ -807,7 +924,7 @@ test('standup: sub-headings, prose openers, real "Nothing" items, wrapped bullet
     '**Done**', '- A', '1. B', '', '**Left**', '- C wraps', '  onto a second line', '', '**Left (needs you)**', '- D',
     '**Left for you:**', '- E', '', '**Risks**', '- R', '', 'Commit message:', '```', '- not an item', '```',
   ].join('\n')
-  assert.deepEqual(standup(msg), { done: ['A', 'B'], left: ['C wraps onto a second line', 'D', 'E'] })
+  assert.deepEqual(standup(msg), { done: ['A', 'B'], left: ['C wraps onto a second line'], you: ['D', 'E'] })
   assert.equal(standup('**Done.** The retries now survive a reload.'), undefined)
   assert.deepEqual(standup('**Left**\n- Nothing blocks shipping, but the legend needs teal')?.left, ['Nothing blocks shipping, but the legend needs teal'])
   assert.deepEqual(standup('**Done**\n- A\n\n**Left**\n- None.')?.left, [])

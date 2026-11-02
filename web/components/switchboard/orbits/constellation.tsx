@@ -8,7 +8,7 @@ import { approach, TAU as TW } from '@/lib/orbit-motion'
 import { ringHeight, rings, teamOf } from '@/lib/orbit-views'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import { describe, MAX_DPR, type OrbitChat } from '../orbit'
-import { LABEL, Legend, NAME, Reveal, glyphOf, leadLine, type ViewProps } from './parts'
+import { LABEL, Legend, NAME, NodeButtons, Reveal, glyphOf, leadLine, placeNodes, type Hit, type ViewProps } from './parts'
 import { CommitText } from '../commit-text'
 
 const KEYS = ['canvas', 'card', 'hair', 'ink', 'mute', 'ash', 'blue', 'red', 'green', 'yellow', 'teal'] as const
@@ -23,8 +23,8 @@ function readPal(el: Element): Pal {
 }
 
 /** Eased values by key, satellites still fading out, tool labels by role, and the call keys already seen. */
-type Scene = { v: Map<string, number>; seen: Set<string>; moving: boolean; snap: boolean; dt: number; sats: Map<string, { role: string; slot: number }>; pops: Map<string, { tool: string; born: number }>; calls: Set<string> | null }
-const newScene = (): Scene => ({ v: new Map(), seen: new Set(), moving: false, snap: true, dt: 0, sats: new Map(), pops: new Map(), calls: null })
+type Scene = { v: Map<string, number>; seen: Set<string>; moving: boolean; snap: boolean; dt: number; sats: Map<string, { role: string; slot: number }>; pops: Map<string, { tool: string; born: number }>; calls: Set<string> | null; hits: Map<string, Hit> }
+const newScene = (): Scene => ({ v: new Map(), seen: new Set(), moving: false, snap: true, dt: 0, sats: new Map(), pops: new Map(), calls: null, hits: new Map() })
 
 function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, now: number, c: OrbitChat, showTools: boolean, C: Pal, still: boolean, S: Scene) {
   if (still) S.snap = true
@@ -37,10 +37,12 @@ function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, no
   }
   // A color eased channel by channel, so a state change fades instead of flipping.
   const twc = (k: string, hex: string) => { const n = parseInt(hex.replace('#', ''), 16) || 0; return '#' + [16, 8, 0].map((sh, i) => Math.round(tw(`${k}.${i}`, (n >> sh) & 255, TW.color * 2)).toString(16).padStart(2, '0')).join('') }
-  const text = (s: string, x: number, y: number, o: { size?: number; color?: string; weight?: number; mono?: boolean; alpha?: number; max?: number } = {}) => {
+  // bg: a canvas-colored backing, for text that sits over link lines.
+  const text = (s: string, x: number, y: number, o: { size?: number; color?: string; weight?: number; mono?: boolean; alpha?: number; max?: number; bg?: boolean } = {}) => {
     const { size = 12, color = C.ink, weight = 500, mono = false, alpha = 1, max = 999 } = o
     ctx.font = `${weight} ${size}px ${mono ? C.mono : C.sans}`
     if (ctx.measureText(s).width > max) { while (s.length > 3 && ctx.measureText(s + '…').width > max) s = s.slice(0, -1); s += '…' }
+    if (o.bg) { const w = ctx.measureText(s).width; ctx.beginPath(); ctx.roundRect(Math.round(x) - w / 2 - 4, Math.round(y) - size * 0.75, w + 8, size * 1.5, 4); ctx.fillStyle = C.canvas; ctx.fill() }
     ctx.fillStyle = rgba(color, alpha); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, Math.round(x), Math.round(y))
   }
   const glyph = (k: string, x: number, y: number, color: string, s = 14) => {
@@ -121,7 +123,9 @@ function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, no
   }
 
   // Roles.
+  S.hits.clear()
   for (const { m, x, y, color, on } of pos.values()) {
+    if (on > 0.5) S.hits.set(m.role, { x, y, r: nr })
     ctx.save(); ctx.globalAlpha = on
     const unused = m.state === 'unused', waiting = m.state === 'waiting'
     disc(x, y, nr, color, { alpha: (unused ? 0.4 : waiting ? 0.7 : 0.9) * dim, width: unused || waiting ? 1 : 1.5, dash: unused ? [2, 3] : [], tint: m.state === 'active' ? 0.08 : 0 })
@@ -163,7 +167,7 @@ function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, no
   }
   text('Lead', L.cx, L.cy, { size: 13, weight: 600, alpha: dim })
   const active = team.filter(m => m.state === 'active').map(m => m.role)
-  text(leadLine(c, almost, active), L.cx, L.cy + lr + 14, { size: 11, mono: true, weight: 400, color: C.mute, alpha: dim, max: L.leadW })
+  text(leadLine(c, almost, active), L.cx, L.cy + lr + 14, { size: 11, mono: true, weight: 400, color: C.mute, alpha: dim, max: L.leadW, bg: true })
 
   // Tool calls: the newest per role, a small label that rises a few pixels above it and fades.
   if (showTools) for (const [role, pop] of S.pops) {
@@ -180,7 +184,8 @@ function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, no
   S.snap = still
 }
 
-export function Constellation({ chat, showTools }: ViewProps) {
+export function Constellation(props: ViewProps) {
+  const { chat, showTools } = props
   const stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null)
   const shown = useRef(chat), tools = useRef(showTools), redraw = useRef(() => {}), scene = useRef(newScene())
 
@@ -207,6 +212,7 @@ export function Constellation({ chat, showTools }: ViewProps) {
       if (W && Math.abs(want - H) > 1) { box.style.height = `${want}px`; return }
       ctx.clearRect(0, 0, W, H)
       if (W && H) draw(ctx, W, H, (now - t0) / 1000, now, shown.current, tools.current, pal, motion.matches, S)
+      placeNodes(box, S.hits)
     }
     const moves = () => {
       const c = shown.current, S = scene.current
@@ -244,6 +250,7 @@ export function Constellation({ chat, showTools }: ViewProps) {
     <div className="ov-stage ov-sky">
       <div ref={stage} className="ov-canvas">
         <canvas ref={canvas} role="img" aria-label={describe(chat)} />
+        <NodeButtons v={props} roles={teamOf(p)} />
       </div>
       <Reveal on={chat.state === 'needs-you'} className="ov-call"><span data-tone="needs"><b>Needs you</b>{p?.question ?? 'This chat is waiting on you.'}</span></Reveal>
       <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{almost ? 'Almost done' : 'Finished'}</b>{p?.commit ? <CommitText text={p.commit} max={180} /> : 'No commit message.'}</span></Reveal>

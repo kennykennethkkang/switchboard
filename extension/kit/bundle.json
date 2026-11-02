@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "2026-10-30T07:06:46Z",
+  "rulesVersion": "2026-11-01T04:04:06Z",
   "generic": true,
   "history": {
     "Explore.md": [
@@ -8,11 +8,13 @@
     ],
     "designer.md": [
       "df4330c3a43e",
-      "7bdfac1ac0fc"
+      "7bdfac1ac0fc",
+      "7b5916509f37"
     ],
     "engineer.md": [
       "f067ddefd984",
-      "395696df58ef"
+      "395696df58ef",
+      "6a39eb7a8428"
     ],
     "growth.md": [
       "8f83534c5908",
@@ -24,7 +26,8 @@
     ],
     "qa.md": [
       "116e389dea0a",
-      "1819be5e3713"
+      "1819be5e3713",
+      "0145b126719d"
     ],
     "researcher.md": [
       "ab8bfc5bda95",

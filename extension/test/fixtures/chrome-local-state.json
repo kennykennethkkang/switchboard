@@ -1,0 +1,17 @@
+{
+  "browser": { "enabled_labs_experiments": [] },
+  "profile": {
+    "last_used": "Profile 5",
+    "info_cache": {
+      "Default": { "name": "Main", "avatar_icon": "chrome://theme/IDR_PROFILE_AVATAR_26" },
+      "Profile 1": { "name": "SCU" },
+      "Profile 3": { "name": "SCU TSA" },
+      "Profile 4": { "name": "Work", "user_name": "" },
+      "Profile 5": { "name": "Yo" },
+      "Profile 9": { "name": "TheArmoire" },
+      "Profile 10": { "name": "Zellizard Inc." },
+      "Profile 11": { "name": "Tsai" },
+      "System Profile": null
+    }
+  }
+}

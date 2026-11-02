@@ -43,7 +43,7 @@ function resolveNodePath() {
 
 function getHookScriptContent() {
   return `#!/usr/bin/env node
-// Agent Flow hook forwarder v3 — installed by the Agent Flow setup script.
+// Agent Flow hook forwarder v4: installed by the Agent Flow setup script.
 // Claude Code invokes this as a command hook. It reads a discovery directory to
 // find live extension instances, checks their PIDs, and forwards the event via
 // HTTP POST. Dead instances are cleaned up automatically.
@@ -114,7 +114,7 @@ process.stdin.on('end', () => {
     const finish = () => { if (settled) return; settled = true; done(); };
     const req = http.request({
       hostname: '127.0.0.1', port: d.port, method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-switchboard-token': String(d.hubToken || '') },
       timeout: ${HOOK_FORWARD_TIMEOUT_MS},
     }, res => { res.resume(); res.on('end', finish); });
     req.on('error', finish);
@@ -138,7 +138,6 @@ function ensureHookScript() {
   const script = getHookScriptContent()
   try {
     if (fs.existsSync(HOOK_SCRIPT_PATH) && fs.readFileSync(HOOK_SCRIPT_PATH, 'utf8') === script) {
-      console.log('Hook script already up to date:', HOOK_SCRIPT_PATH)
       return
     }
   } catch {}
@@ -193,10 +192,15 @@ function readSettings(settingsPath) {
   }
 }
 
-function writeJsonAtomic(filePath, value) {
+function writeJsonAtomic(target, value) {
+  // Write through a symlink (dotfiles) and keep the mode, or rename replaces both
+  let filePath = target
+  let mode = 0o644
+  try { filePath = fs.realpathSync(target); mode = fs.statSync(filePath).mode & 0o777 } catch { /* new file */ }
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
   const tmpPath = `${filePath}.${process.pid}.tmp`
-  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2) + '\n')
+  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2) + '\n', { mode })
+  fs.chmodSync(tmpPath, mode)
   fs.renameSync(tmpPath, filePath)
 }
 
@@ -241,7 +245,8 @@ function isAlreadySetup(settingsPath = SETTINGS_PATH, hookScriptPath = HOOK_SCRI
 
 /** Ensure hooks are configured, skip silently if already set up. */
 function ensureSetup() {
-  if (isAlreadySetup()) return
+  // An older hook.js sends no token and every hook gets a 403; ensureHookScript skips when it matches.
+  if (isAlreadySetup()) { ensureHookScript(); return }
   console.log('Setting up agent hooks...')
   ensureHookScript()
   configureHooks()

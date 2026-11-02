@@ -98,6 +98,24 @@ function bundleApp() {
   console.log('app: bundled app/dist into dist/app')
 }
 
+// dist/build.txt: which build this is, so a same-version reinstall can tell it differs (src/hub/self-update.ts pendingReload).
+const stamp = list => {
+  const h = crypto.createHash('sha256')
+  for (const f of list) h.update(path.relative(__dirname, f)).update(fs.readFileSync(f))
+  return h.digest('hex').slice(0, 16)
+}
+const tree = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive: true }).map(f => path.join(dir, f)).filter(f => fs.statSync(f).isFile()).sort() : [])
+
+// Everything the vsix ships that a window loads at start; a change in any of them is a new build.
+const stampFiles = root => [path.join(root, 'dist', 'extension.js'), path.join(root, 'package.json'),
+  ...['dist/app', 'dist/webview', 'kit', 'ask', 'voice', 'media', 'keeper'].flatMap(d => tree(path.join(root, d)))]
+
+function writeStamp() {
+  const id = stamp(stampFiles(__dirname))
+  fs.writeFileSync(path.join(__dirname, 'dist', 'build.txt'), `${id}\n`)
+  console.log(`build: ${id}`)
+}
+
 async function main() {
   bundleKit()
   bundleMods()
@@ -108,11 +126,12 @@ async function main() {
     console.log('Watching for changes...')
   } else {
     await esbuild.build(config)
+    writeStamp()
     console.log('Build complete')
   }
 }
 
-module.exports = { genericRules, GENERIC }
+module.exports = { genericRules, GENERIC, stamp, stampFiles }
 
 if (require.main === module) main().catch((e) => {
   console.error(e)

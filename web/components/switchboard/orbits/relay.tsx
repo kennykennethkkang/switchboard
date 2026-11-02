@@ -4,14 +4,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { ORDER, almostDone } from '../look'
 import { loopsOf, teamOf, type TeamRole } from '@/lib/orbit-views'
-import { Glyph, LABEL, Legend, NAME, Reveal, leadLine, leadState, useLive, type ViewProps } from './parts'
+import { Glyph, LABEL, Legend, NAME, Reveal, leadLine, leadState, nodeProps, useLive, type ViewProps } from './parts'
 import { describe } from '../orbit'
 import { CommitText } from '../commit-text'
 
 type Station = { k: string; s: string; name: string; small: string; now?: string; role?: TeamRole }
 type Packet = { id: number; wire: number; back?: boolean; tone: string }
 
-export function Relay({ chat, showTools }: ViewProps) {
+export function Relay(v: ViewProps) {
+  const { chat, showTools } = v
   const root = useRef<HTMLDivElement>(null)
   useLive(root)
   const p = chat.progress, almost = almostDone(p), team = teamOf(p), loops = loopsOf(p)
@@ -75,9 +76,11 @@ export function Relay({ chat, showTools }: ViewProps) {
 
   return (
     <div ref={root} className="ov-stage ov-relay">
-      <ol className="ov-chain" role="img" aria-label={`${describe(chat)}${loops ? ` QA sent work back ${loops === 1 ? 'once' : `${loops} times`}.` : ''}`}>
-        {stations.map((s, i) => [
-          <li key={s.k} className="ov-st" data-s={s.s} data-k={s.k}>
+      {/* A list, not an image, so the role stations stay buttons; the summary is read first. */}
+      <p className="sr-only">{`${describe(chat)}${loops ? ` QA sent work back ${loops === 1 ? 'once' : `${loops} times`}.` : ''}`}</p>
+      <ol className="ov-chain">
+        {stations.map((s, i) => {
+          const inner = <>
             <span className="ov-disc">
               <svg className="ov-arc" viewBox="0 0 100 100" aria-hidden><circle cx="50" cy="50" r="47" /></svg>
               <Glyph k={s.k} size={s.k === 'lead' ? 20 : 16} />
@@ -95,13 +98,18 @@ export function Relay({ chat, showTools }: ViewProps) {
                 {s.role.runs.length > 6 && <span className="ov-sub">+{s.role.runs.length - 6}</span>}
               </span>}
             </span>
+          </>
+          return [
+          <li key={s.k} className="ov-st" data-s={s.s} data-k={s.k}>
+            {s.role && v.pick ? <button type="button" className="ov-st-btn" {...nodeProps(v, s.role.role, s.role.state)}>{inner}</button> : inner}
           </li>,
           i < stations.length - 1 && <li key={`w${i}`} className="ov-wire" data-lit={wireLit(i)} aria-hidden>
             {packets.filter(k => k.wire === i).map(k => <span key={k.id} className="ov-run" data-back={k.back || undefined} style={{ '--c': k.tone } as React.CSSProperties}
               onAnimationEnd={() => setPackets(list => list.filter(x => x.id !== k.id))}><i /></span>)}
             {i === eng && qa === eng + 1 && loops > 0 && <span className="ov-loop">↺ {loops} loop{loops > 1 ? 's' : ''} back</span>}
           </li>,
-        ])}
+          ]
+        })}
       </ol>
       {bench.length > 0 && <p className="ov-bench"><span>Not used</span>{bench.map(r => <span key={r} className="ov-chipb"><Glyph k={r} size={13} />{NAME(r)}</span>)}</p>}
       <Reveal on={chat.state === 'needs-you'} className="ov-call"><span data-tone="needs"><b>Needs you</b>{p?.question ?? 'This chat is waiting on you.'}</span></Reveal>

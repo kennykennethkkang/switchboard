@@ -34,7 +34,7 @@ export type DevProject = { folder: string; project: string; /** projectName(fold
 export type GitState = { branch?: string; ahead?: number; behind?: number; changed: number; staged: number; untracked: number }
 export type AwsStatus = 'signed-in' | 'expired' | 'never'
 /** One ~/.aws/config profile. label: from aws-labels.json, by account. chrome: the Chrome profile folder its sign-in opens in ('' = system browser). stale: an old default's backup. */
-export type AwsProfile = { name: string; label?: string; account?: string; region?: string; isDefault: boolean; status: AwsStatus; chrome?: string; checkedAt: number; stale?: boolean; /** Signs in as the account root (aws login): AWS sets the session length, no way to extend it. */ root?: boolean }
+export type AwsProfile = { name: string; label?: string; account?: string; region?: string; isDefault: boolean; status: AwsStatus; chrome?: string; checkedAt: number; stale?: boolean; /** Signs in as the account root (aws login): AWS sets the session length, no way to extend it. */ root?: boolean; /** When the aws login session ends at the latest (sign-in + 12 h). */ expiresAt?: number; /** The last check could not tell (timeout, network), so status may be stale. */ unsure?: boolean }
 export type ChromeProfile = { dir: string; name: string; email?: string }
 /** Chrome profiles to sign in with, the AWS profile picked per project folder, and this window's folder. */
 /** A saved web login: only where to sign in and in which Chrome profile, never a password or token. */
@@ -43,10 +43,15 @@ export type WebLogin = { id: string; label: string; url: string; chrome?: string
 export type WebApp = { id: string; name: string; url: string; logins: WebLogin[]; active?: string }
 /** Apps a project uses, by project folder then app id; the login id is that project's default, null = the app's own. */
 export type Links = Record<string, Record<string, string | null>>
-/** apps, links: an older extension sends none. */
-export type SignIns = { chrome: ChromeProfile[]; projects: Record<string, string>; window?: string; apps?: WebApp[]; links?: Links; /** Chrome folder per project folder, '' the system browser; a login's own pick wins. */ browsers?: Record<string, string> }
+export type ApiKeyName = 'GEMINI_API_KEY' | 'OPENROUTER_API_KEY'
+/** A saved API key as the UI sees it: never the key, only its last four. checked: the last live test. */
+export type ApiKey = { name: ApiKeyName; saved: boolean; last4?: string; checked?: { ok: boolean; at: number; reason?: string } }
+/** apps, links, keys: an older extension sends none. */
+export type SignIns = { chrome: ChromeProfile[]; projects: Record<string, string>; window?: string; apps?: WebApp[]; links?: Links; /** Chrome folder per project folder, '' Chrome's last used profile; a login's own pick wins. */ browsers?: Record<string, string>; keys?: ApiKey[]; /** The last failed sign-in per row (aws:<profile>, login:<app>:<id>), redacted. */ errors?: Record<string, string>; /** Per row: the Chrome pick a sign-in skipped for being deleted, and where it opened instead. */ notes?: Record<string, string> }
 /** One Jev run from the usage mod, tied to the chat that ran it when known. */
 export type JevRun = { sessionId?: string; preset?: string; items: number; costUsd: number; seconds: number; at: number }
+/** Set up Jev's jobs for one project, its newest runs (gate: one command each) and what those runs cost. */
+export type JevProject = { project: string; jobs: { done: boolean; gate: boolean; tells: boolean; route: boolean }; runs: { job: string; at: number; items: number; costUsd: number; result?: string }[]; costUsd: number }
 /** A full chat whose handoff waits on its running subagents (Claude) or open turn (Codex). next: the fresh chat's version, like v2. */
 export type HandoffWait = { sessionId: string; tasks: number; next: string; since: number }
 /** skills: a plugin's own skill names. model: a role's frontmatter model (inherit, an alias or a full id). description: plugin.json's or SKILL.md's, cut short. */
@@ -55,7 +60,7 @@ export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' |
 /** One chat's plugins (by id) and user skills (by name), on or off; tools.ts turns it into the chat's --settings file. */
 /** assets: design references by project-relative path, named to the chat in its system note. */
 export type ChatProfile = { plugins: Record<string, boolean>; skills: Record<string, boolean>; assets?: Record<string, boolean> }
-/** flagged: plugins never turned on by a pick. pick: the last hub-pick-tools answer, for its goal. chats: saved profiles by session id. */
+/** flagged: plugins and skills never turned on by a pick. pick: the last hub-pick-tools answer, for its goal. chats: saved profiles by session id. */
 export type ToolsState = { flagged: string[]; pick: { goal: string; folder?: string; profile: ChatProfile } | null; chats: Record<string, ChatProfile> }
 export type Connection = { kind: 'mcp' | 'app' | 'project' | 'window' | 'repo'; name: string; status: 'on' | 'off' | 'error'; detail?: string }
 
@@ -86,6 +91,12 @@ export type HubState = {
   changes: Changes | null
   /** The last History search (hub-search): closed chats whose handoff note holds q. */
   search: NoteSearch | null
+  /** The Jarvis box's last question (hub-jarvis): busy while the brain thinks, then an answer or a start to confirm. An older extension sends none. */
+  jarvis?: JarvisReply | null
+  /** The Jarvis mic (hub-voice) while it records or transcribes; null or absent otherwise. */
+  voice?: 'listening' | 'transcribing' | null
+  /** The mic's last transcript, for the box to append; at tells a new one from one already taken. */
+  heard?: { text: string; at: number } | null
   /** Where the browser version answers, or null when none runs. */
   webUrl: string | null
   /** The app's phone links with their secret, one per network, for the QRs. Only the VS Code panel gets them; /hub/state blanks them. */
@@ -108,7 +119,15 @@ export type HubState = {
   repo?: RepoView | null
   /** The to-do list by project folder (todo.ts); an older extension sends none. */
   todos?: Record<string, TodoList>
+  /** Jev per project folder (jev-project.ts); an older extension sends none. */
+  jevProjects?: Record<string, JevProject>
+  /** Agents, jobs and processes that look stuck (stuck.ts), snoozed ones left out; an older extension sends none. */
+  stuck?: StuckItem[]
 }
+
+/** agent: a subagent with no tool call; job: a background shell or monitor with no output or end; process: one in the chat's tree eating CPU or memory.
+ * since: when it went quiet or hot. cpu: percent of one core; rss: bytes. pid and started (its start time) only when the process is known; command: cut to 120 and redacted. last: the last tool call. */
+export type StuckItem = { id: string; kind: 'agent' | 'job' | 'process'; sessionId: string; what: string; since: number; cpu?: number; rss?: number; pid?: number; started?: number; command?: string; last?: string }
 
 /** A palette key, not a hex: the panel picks the theme's shade. */
 export type WindowColor = 'violet' | 'amber' | 'teal' | 'rose' | 'lime' | 'cobalt'
@@ -119,7 +138,7 @@ export type ChangedFile = { path: string; added: number; removed: number; status
 export type Changes = { sessionId: string; cwd: string; files: ChangedFile[]; at: number }
 /** One file git status lists, relative to the repo root. from: a rename's old path. */
 export type RepoFile = { path: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'; from?: string }
-export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun'
+export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun' | 'ship'
 /** sync: the one sync button (Publish branch, Pull N, Push N or Fetch). github: the repo's page, from the branch's remote (origin by default). pr: the branch's open PR when gh can tell. busy: the op running now; result: the last one's outcome. */
 export type RepoView = {
   sessionId: string; name: string; branch?: string; upstream?: string; ahead: number; behind: number; files: RepoFile[]; branches: string[]
@@ -130,8 +149,15 @@ export type RepoView = {
   merge?: { base: string; behind: number; files: number; conflicts?: { path: string; by: string; line?: number; ours?: string; theirs?: string }[]; commits: { hash: string; author: string; at: number }[] }
   /** The branch's newest GitHub Actions run, when gh can tell. step: a failed job's first failed step. */
   ci?: CiRun
+  /** The card's lanes: HEAD against the merge base's ref (a branch) or its upstream (main), newest first; fork: where they split. */
+  lanes?: { against: string; fork?: LaneCommit; commits: LaneCommit[] }
+  /** Line counts of the commits not on the upstream yet (or the base, before the first push). */
+  outgoing?: { path: string; added: number; removed: number }[]
+  /** What Commit & push takes (paths, sent back with the confirm) and leaves out (agent files; a rename as old → new). */
+  ship?: { files: string[]; kept: string[] }
   busy?: GitOp; result?: { text: string; ok: boolean; at: number }; at: number
 }
+export type LaneCommit = { hash: string; author: string; at: number; subject?: string; side?: 'head' | 'base' | 'fork' }
 export type CiRun = { id: number; workflow: string; status: string; conclusion?: string; url: string; sha: string; at: number; jobs: { name: string; status: string; conclusion?: string; step?: string }[] }
 export type NoteSearch = { q: string; hits: { sessionId: string; snippet: string }[] }
 
@@ -162,27 +188,34 @@ export type StarredChat = { sessionId: string; ai: AiId; name: string; cwd: stri
 export type ArchivedChat = { sessionId: string; ai: AiId; name: string; origin: string; version: number; cwd: string; project: string; note?: string; startedAt?: number; archivedAt: number }
 /** Where a chat is: working, done (finished with a commit message or every task; almost done while a request is not covered), needs you (a question), idle (stopped, work open). */
 export type ChatState = 'working' | 'done' | 'needs-you' | 'idle'
-/** One subagent run, keyed by its agent id (the role when a payload has none). */
-export type RoleStep = { id: string; role: string; state: 'active' | 'done'; startedAt: number }
+/** One subagent run, keyed by its agent id (the role when a payload has none). at: its last call, or when it ended once done. */
+export type RoleStep = { id: string; role: string; state: 'active' | 'done'; startedAt: number; at?: number }
 export type TaskRow = { id: string; subject: string; status: 'pending' | 'in_progress' | 'completed'; role?: string; /** When it went in progress, and when it completed; drive the time estimate. */ startedAt?: number; doneAt?: number }
 /** One chat's progress, built from its hook events with no model call. */
 /** A background Bash or Monitor, keyed by its tool_use_id; label is its description. */
 /** task: the shell's backgroundTaskId, the name TaskStop uses. */
-export type BgJob = { id: string; label?: string; task?: string; startedAt: number }
+/** command: the Bash command, cut short, to find its shell; agent: the subagent that started it. */
+export type BgJob = { id: string; label?: string; task?: string; command?: string; agent?: string; startedAt: number }
 /** One tool call for the picture: role is "lead" for the main chat, else the subagent type. target: the file, pattern or command it touched, cut short. */
 export type ToolCall = { tool: string; target?: string; role: string; at: number }
-export type ChatProgress = { sessionId: string; cwd: string; state: ChatState; roles: RoleStep[]; tasks: TaskRow[]; question?: string; commit?: string; startedAt: number; at: number; /** The newest tool calls, oldest first, at most 200. */ tools?: ToolCall[]; /** Subagents still running, by agent id (or role); they outlive the chat's Stop. */ running?: string[]; /** The lead's turn ended while some still ran. */ waiting?: boolean; /** Background shells and monitors the lead started, until their task-notification. */ jobs?: BgJob[]; /** The lead's last turn ended with a commit block or every task done; Done once nothing runs. */ finishing?: true; /** When it last reached Done. */ finishedAt?: number; /** The prompt the terminal shows, while it waits. */ ask?: Ask; /** Every prompt waiting, oldest (ask) first. */ asks?: Ask[]; /** The lead's last turn died on an API error (StopFailure), until it makes real progress. */ limited?: { at: number; error: string }; /** The standup in the lead's last message; its Left items go to the to-do. */ report?: Report; /** Kenneth's own prompts in this chat, newest last, at most 8. */ asked?: string[]; /** Jev's score per asked item (0 to 1, null: no answer) for whether Done covers it. */ covered?: Array<number | null>; /** The newest test run any role made, from its Bash hook. */ tests?: TestRun }
+export type ChatProgress = { sessionId: string; cwd: string; state: ChatState; roles: RoleStep[]; tasks: TaskRow[]; question?: string; commit?: string; startedAt: number; at: number; /** The newest tool calls, oldest first, at most 200. */ tools?: ToolCall[]; /** Subagents still running, by agent id (or role); they outlive the chat's Stop. */ running?: string[]; /** Agent ids that stopped lately and when, kept past the role trim so a late hook from one is ignored. */ ended?: Record<string, number>; /** The lead's turn ended while some still ran. */ waiting?: boolean; /** Background shells and monitors the lead started, until their task-notification. */ jobs?: BgJob[]; /** Background shells subagents started, until that subagent's transcript says they ended. */ subJobs?: BgJob[]; /** The lead's last turn ended with a commit block or every task done; Done once nothing runs. */ finishing?: true; /** When it last reached Done. */ finishedAt?: number; /** The prompt the terminal shows, while it waits. */ ask?: Ask; /** Every prompt waiting, oldest (ask) first. */ asks?: Ask[]; /** The lead's last turn died on an API error (StopFailure), until it makes real progress. */ limited?: { at: number; error: string }; /** The standup in the lead's last message; its Left items go to the to-do. */ report?: Report; /** Kenneth's own prompts in this chat, newest last, at most 8. */ asked?: string[]; /** Jev's score per asked item (0 to 1, null: no answer) for whether Done covers it. */ covered?: Array<number | null>; /** The newest test run any role made, from its Bash hook. */ tests?: TestRun }
 /** A test command's outcome. failed, total, first: parsed from its output when it says; tail: its last 8 lines. */
 export type TestRun = { command: string; ok: boolean; at: number; failed?: number; total?: number; first?: string; tail?: string[] }
 /** A standup's Done and Left items, cut short. */
-export type Report = { done: string[]; left: string[] }
+export type Report = { done: string[]; left: string[]; /** For you: steps only the user can do by hand; absent when none. */ you?: string[] }
+/** A chat Jarvis would start once Kenneth taps Confirm. */
+export type JarvisStart = { folder: string; project: string; goal: string }
+export type JarvisReply = { q: string; at: number; busy?: true; answer?: string; start?: JarvisStart }
 /** Future work. chat: in progress there; from: the chat that left or added it; before: the id of the item it must precede. */
-export type TodoItem = { id: string; text: string; at: number; chat?: string; /** The machine that started chat. */ host?: string; from?: string; before?: string }
+/** Why a chat left something: blocked, needs Kenneth (you), out of scope, later, or a request Jev found not covered (missed). */
+export type TodoWhy = 'blocked' | 'you' | 'scope' | 'later' | 'missed'
+/** from: the chat that added it; name: that chat's name when it was added; why: set on what a finished chat left. */
+export type TodoItem = { id: string; text: string; at: number; chat?: string; /** The machine that started chat. */ host?: string; from?: string; before?: string; name?: string; why?: TodoWhy }
 /** How a project's lists sync: synced (private repo or opted in), local only (why), or failing (the last error). canSync: a git repo with an origin. remote: the unreadable remote list's commit, which Replace leases on. */
 export type TodoSync = { state: 'synced' | 'local' | 'failing'; why?: string; canSync?: boolean; optIn?: boolean; remote?: string }
 /** A finished item (by: the chat that finished it, none when the user did), kept so the user can put it back. */
-export type TickedItem = Pick<TodoItem, 'id' | 'text' | 'at' | 'from' | 'before'> & { by?: string }
-export type TodoList = { todo: TodoItem[]; sync?: TodoSync; /** Newest first, at most 10. */ ticked?: TickedItem[] }
+export type TickedItem = Pick<TodoItem, 'id' | 'text' | 'at' | 'from' | 'before' | 'name' | 'why'> & { by?: string }
+export type TodoList = { todo: TodoItem[]; sync?: TodoSync; /** Newest first, at most 10. */ ticked?: TickedItem[]; /** Left by finished chats, waiting for Accept or Dismiss; an older extension sends none. */ suggested?: TodoItem[] }
 /** todo.json on refs/switchboard/todo; removed: tombstones by id (`<id>.back` for a ticked item put back), kept so a merge never brings one back. */
 export type TodoDoc = TodoList & { version: 1; removed: Record<string, number> }
 /** One AskUserQuestion question; options in the terminal's order. */
@@ -200,6 +233,6 @@ export type InboxDraft = { kind: 'prompt'; text: string } | { kind: 'rc' } | { k
 export type InboxItem = InboxDraft & { id: string }
 
 // code: typed with an address on a device that has no cookie yet. The *Name links use this Mac's mDNS or MagicDNS name, which outlast an IP change.
-export type PhoneUrls = { wifi?: string; tailscale?: string; wifiName?: string; tailscaleName?: string; code?: string }
+export type PhoneUrls = { wifi?: string; tailscale?: string; wifiName?: string; tailscaleName?: string; code?: string; problem?: string }
 /** A device on the sign-in page that asked the Mac to let it in. */
 export type DeviceAsk = { id: string; ip: string; ua: string; network: 'Wi-Fi' | 'Tailscale' }

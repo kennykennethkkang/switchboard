@@ -14,7 +14,7 @@ const ASKS = new Set(['permission_prompt', 'elicitation_dialog'])
 // Tools with a dialog of their own: no Yes/No buttons, answer in the terminal.
 const OWN_DIALOG = new Set(['AskUserQuestion', 'ExitPlanMode'])
 const PREVIEW_MAX = 300
-// ponytail: a background subagent that never sends SubagentStop counts as gone after an hour, at the lead's next Stop;
+// A background subagent that never sends SubagentStop counts as gone an hour after its last call, at the lead's next Stop;
 // a real one running longer shows done early. Raise it if that happens. Background shells and monitors share the cap.
 export const RUNNING_CAP_MS = 60 * 60 * 1000
 const BG_TOOLS = new Set(['Monitor'])
@@ -30,14 +30,14 @@ export function finishedJobs(transcript: string): string[] {
   return [...new Set(ids)]
 }
 
-/** A lead call that keeps running after it returns: a Monitor, or a Bash sent to the background. */
+/** A call that keeps running after it returns: a Monitor, or a Bash sent to the background. */
 function bgJob(tool: string, payload: Payload, now: number): BgJob | undefined {
   const id = str(payload.tool_use_id)
   const input = (payload.tool_input ?? {}) as Payload
   const res = payload.tool_response as Payload | undefined
   if (!id || !(BG_TOOLS.has(tool) || (tool === 'Bash' && (str(res?.backgroundTaskId) || input.run_in_background === true)))) return undefined
-  const label = cut(input.description, 60), task = str(res?.backgroundTaskId)
-  return { id, ...(label ? { label } : {}), ...(task ? { task } : {}), startedAt: now }
+  const label = cut(input.description, 60), task = str(res?.backgroundTaskId), command = cut(input.command, 120), agent = str(payload.agent_id)
+  return { id, ...(label ? { label } : {}), ...(task ? { task } : {}), ...(command ? { command } : {}), ...(agent ? { agent } : {}), startedAt: now }
 }
 
 // One step of a shell chain, past env assignments.
@@ -94,11 +94,21 @@ const ITEM = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/
 // A whole section that only says so is empty; an item that merely opens with "Nothing" is real.
 const NONE = /^\(?(none|nothing|n\/a|no (open |remaining |more )?(items?|tasks?|work))\)?[.!]?$/i
 const REPORT_ITEM = 160, REPORT_MAX = 12
-const sectionOf = (label: string): keyof Report | null => /^done$/i.test(label) ? 'done' : /^(left|remaining|open|todo)$/i.test(label) ? 'left' : null
+// The whole label first: "Left (needs you)" and "Left for you" are the user's steps too. Done and Left go by the first word.
+const YOU = 'for you|needs you|your steps|left for you|left \\(needs you\\)'
+// A short For you line that opens with none or no ("No manual steps.") says it is empty; a longer one is a real step.
+const NO_YOU = /^\(?(none|nothing|n\/a|no\b)/i
+const emptyYou = (t: string) => NO_YOU.test(t) && t.split(/\s+/).length <= 6
+/** inline: a bare "You: x" is a line of dialogue, not a section. */
+const sectionOf = (label: string, inline = false): keyof Report | null => {
+  if (new RegExp(`^(${YOU}${inline ? '' : '|you'})$`, 'i').test(label)) return 'you'
+  const w = label.split(/[\s(:]/)[0]
+  return /^done$/i.test(w) ? 'done' : /^(left|remaining|open|todo)$/i.test(w) ? 'left' : null
+}
 
-/** A standup's Done and Left items: under a heading line ("**Left (needs you)**", "## Done", "Left:") or after an inline "Left: item". Undefined when the message has neither. */
+/** A standup's Done, For you and Left items: under a heading line ("**Left (needs you)**", "## Done", "Left:") or after an inline "Left: item". Undefined when the message has none. */
 export function standup(text: string): Report | undefined {
-  const out: Report = { done: [], left: [] }
+  const out = { done: [] as string[], left: [] as string[], you: [] as string[] }
   let at: keyof Report | null = null, found = false, fence = false
   const add = (v: string) => {
     const item = cut(v.replace(/\*\*|__/g, ''), REPORT_ITEM)
@@ -111,17 +121,19 @@ export function standup(text: string): Report | undefined {
     if (t.startsWith('```')) { fence = !fence; at = null; continue }
     if (fence) continue
     // Heading on its own line: "## Left", "**Left (needs you)**", "**Left for you:**", "Left:".
-    const own = /^#{1,6}\s+(.+)$/.exec(t)?.[1] ?? /^(?:\*\*|__)([^*_]+?)(?:\*\*|__):?$/.exec(t)?.[1] ?? /^(\w+):$/.exec(t)?.[1]
+    const own = /^#{1,6}\s+(.+)$/.exec(t)?.[1] ?? /^(?:\*\*|__)([^*_]+?)(?:\*\*|__):?$/.exec(t)?.[1] ?? new RegExp(`^(${YOU}|\\w+):$`, 'i').exec(t)?.[1]
     if (own !== undefined) {
-      at = sectionOf(own.replace(/\*\*|__/g, '').trim().split(/[\s(:]/)[0])
+      at = sectionOf(own.replace(/\*\*|__/g, '').trim().replace(/:$/, ''))
       found ||= !!at
       continue
     }
     // Inline label: "Left: item", "**Left:** item" or "- **Left:** item".
     const bare = t.replace(/^(?:[-*+]|\d+[.)])\s+/, '')
-    const inline = /^(?:\*\*|__)?(\w+)(?::(?:\*\*|__)|(?:\*\*|__)?:)\s*(.+)$/.exec(bare)
-    if (inline && sectionOf(inline[1])) {
-      at = sectionOf(inline[1]); found = true
+    const inline = new RegExp(`^(?:\\*\\*|__)?(${YOU}|\\w+)(?::(?:\\*\\*|__)|(?:\\*\\*|__)?:)\\s*(.+)$`, 'i').exec(bare)
+    const sec = inline && sectionOf(inline[1], true)
+    // For you only as a bullet or in bold; "For you: nothing to do" in prose is no standup.
+    if (sec && (sec !== 'you' || bare !== t || /^(\*\*|__)/.test(bare))) {
+      at = sec; found = true
       add(inline[2])
       continue
     }
@@ -133,7 +145,9 @@ export function standup(text: string): Report | undefined {
     else if (t && !t.endsWith(':')) at = null
   }
   for (const k of ['done', 'left'] as const) if (out[k].length === 1 && NONE.test(out[k][0])) out[k] = []
-  return found ? out : undefined
+  out.you = out.you.filter(t => !emptyYou(t))
+  const { you, ...rest } = out
+  return found ? { ...rest, ...(you.length ? { you } : {}) } : undefined
 }
 
 function rawTasks(p: ChatProgress, tool: string, input: Payload): TaskRow[] {
@@ -144,7 +158,7 @@ function rawTasks(p: ChatProgress, tool: string, input: Payload): TaskRow[] {
       return subject ? [{ id: String(i + 1), subject, status: STATUS.has(String(o.status)) ? o.status as TaskRow['status'] : 'pending' }] : []
     })
   }
-  // ponytail: ids are counted here the way Claude Code numbers tasks (1, 2, ...); a chat that
+  // Ids are counted here the way Claude Code numbers tasks (1, 2, ...); a chat that
   // deletes tasks can drift. Read the TaskCreate result instead if that ever shows up.
   if (tool === 'TaskCreate') {
     const subject = str(input.subject)
@@ -282,7 +296,7 @@ export function askKeys(ask: Ask, picked: Choice): string[] | string {
   return qs.length > 1 || qs.some(q => q.multiSelect) ? [...keys, '1'] : keys
 }
 
-// ponytail: newest MAX_ASKS kept; more parallel prompts than that lose the oldest until Stop clears them.
+// Newest MAX_ASKS kept; more parallel prompts than that lose the oldest until Stop clears them.
 const MAX_ASKS = 6
 const ASKED_ITEM = 200, ASKED_MAX = 8
 /** StopFailure errors that clear up by waiting; hub-service.ts retries these after the reset. */
@@ -306,13 +320,32 @@ export function dropAsk(p: ChatProgress, askId: string): ChatProgress {
   return asks.some(a => a.id === askId) ? withAsks(p, asks.filter(a => a.id !== askId)) : p
 }
 
-/** Running subagents always stay; finished ones only the newest MAX_DONE. */
+/** Running subagents always stay; finished ones only the MAX_DONE that ended last. */
 const MAX_DONE = 12
 /** Tool calls kept per chat, for the Lanes timeline; each is tool, a 48-char target, role and time (about 90 bytes). */
 export const TOOLS_MAX = 200
 function trim(roles: RoleStep[]): RoleStep[] {
-  let drop = roles.filter(r => r.state === 'done').length - MAX_DONE
-  return drop > 0 ? roles.filter(r => r.state !== 'done' || drop-- <= 0) : roles
+  const done = roles.filter(r => r.state === 'done')
+  if (done.length <= MAX_DONE) return roles
+  const gone = new Set(done.sort((a, b) => (a.at ?? a.startedAt) - (b.at ?? b.startedAt)).slice(0, done.length - MAX_DONE))
+  return roles.filter(r => !gone.has(r))
+}
+/** Done, with when it ended: now on its own stop, its last call when a Stop gives up on it. */
+const finish = (r: RoleStep, end = r.at ?? r.startedAt): RoleStep => r.state === 'done' ? r : { ...r, state: 'done', at: end }
+
+// A subagent call this soon after its SubagentStop is a late hook, not a new run.
+const LATE_MS = 5000
+const ENDED_MAX = 24
+/** p.ended with id stopped now; only the newest few, since a late hook comes within LATE_MS. */
+const endedAt = (p: ChatProgress, id: string, now: number) => Object.fromEntries([...Object.entries(p.ended ?? {}).filter(([k]) => k !== id), [id, now] as const].slice(-ENDED_MAX))
+/** A subagent's own call: it runs, even when its SubagentStart was lost (the hook post gives up after a second). A settled chat is busy again. */
+function seen(p: ChatProgress, id: string, role: string | undefined, now: number): ChatProgress {
+  const r = p.roles.find(x => x.id === id), on = p.running?.includes(id)
+  if (!on && now - (p.ended?.[id] ?? -Infinity) < LATE_MS) return p
+  const roles = r ? p.roles.map(x => x === r ? { ...x, state: 'active' as const, at: now } : x) : trim([...p.roles, { id, role: role ?? 'subagent', state: 'active', startedAt: now, at: now }])
+  if (on) return { ...p, roles }
+  const busy = p.state === 'idle' || p.state === 'done' ? { state: 'working' as const, waiting: true } : {}
+  return { ...p, roles, running: [...(p.running ?? []), id], ...busy }
 }
 
 /** The next progress for one hook payload; undefined once the chat has ended. */
@@ -326,7 +359,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
     ? prev
     : { sessionId, cwd: str(payload.cwd) ?? '', state: 'working', roles: [], tasks: [], startedAt: now, at: now }
   // A resumed chat is a new process: the old one's background subagents are gone and send no SubagentStop.
-  const p: ChatProgress = event === 'SessionStart' && payload.source === 'resume' ? { ...base, at: now, running: undefined, waiting: undefined, jobs: undefined } : { ...base, at: now }
+  const p: ChatProgress = event === 'SessionStart' && payload.source === 'resume' ? { ...base, at: now, running: undefined, waiting: undefined, jobs: undefined, subJobs: undefined } : { ...base, at: now }
   const role = str(payload.agent_type)
   // A subagent's own events (a background one runs on after Stop) touch its role and tasks, never the chat's state.
   const sub = !!str(payload.agent_id)
@@ -343,7 +376,13 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const { running: was, ...rest } = p
       const running = was?.filter(x => x !== id && x !== hit?.id)
       const q: ChatProgress = running?.length ? { ...rest, running } : rest
-      const r = hit ? { ...q, roles: trim(q.roles.map(r => r === hit ? { ...r, state: 'done' as const } : r)) } : q
+      const gone = hit?.id ?? id
+      const q2: ChatProgress = gone ? { ...q, ended: endedAt(q, gone, now) } : q
+      const r0 = hit ? { ...q2, roles: trim(q2.roles.map(r => r === hit ? finish(r, now) : r)) } : q2
+      // hub-service.ts reads its transcript; a job not ended there outlives the agent.
+      const over = new Set(Array.isArray(payload.bg_finished) ? payload.bg_finished.map(String) : [])
+      const subJobs = r0.subJobs?.filter(j => !over.has(j.id))
+      const r = { ...r0, subJobs: subJobs?.length ? subJobs : undefined }
       if (!q.waiting || running?.length || q.jobs?.length) return r
       // A finished subagent always starts another lead turn, so a turn that ended with a block or every task done
       // stays wrapping up until that Stop decides; settle() covers a Stop that never comes. A plain turn goes idle now.
@@ -358,7 +397,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const call: ToolCall = { tool, ...(target ? { target } : {}), role: sub ? role ?? 'subagent' : 'lead', at: now }
       p.tools = [...(p.tools ?? []), call].slice(-TOOLS_MAX)
       // A subagent's own TodoWrite is its private list; only the shared task tools reach the chat's list.
-      if (sub) return tool === 'TodoWrite' ? p : { ...p, tasks: tasksFrom(p, tool, input, now) }
+      if (sub) { const q = seen(p, str(payload.agent_id)!, role, now); return tool === 'TodoWrite' ? q : { ...q, tasks: tasksFrom(q, tool, input, now) } }
       delete p.limited
       if (tool === 'AskUserQuestion') {
         const ask = questionAsk(str(payload.tool_use_id) ?? String(now), input)
@@ -380,12 +419,20 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
     }
     case 'PostToolUse':
     case 'PostToolUseFailure': {
-      const job = event === 'PostToolUse' && !sub ? bgJob(str(payload.tool_name) ?? '', payload, now) : undefined
-      if (job) p.jobs = [...(p.jobs ?? []).filter(j => j.id !== job.id), job]
+      const job = event === 'PostToolUse' ? bgJob(str(payload.tool_name) ?? '', payload, now) : undefined
+      // A subagent's job never holds the chat: only the stuck check (stuck.ts) watches it.
+      if (job && sub) p.subJobs = [...(p.subJobs ?? []).filter(j => j.id !== job.id), job]
+      else if (job) p.jobs = [...(p.jobs ?? []).filter(j => j.id !== job.id), job]
       const tests = testRun(event, payload, now)
       if (tests) p.tests = tests
       // A subagent stopped with TaskStop sends no SubagentStop, a stopped shell no notification.
-      const stopped = event === 'PostToolUse' && !sub && payload.tool_name === 'TaskStop' ? str((payload.tool_input as Payload | undefined)?.task_id) : undefined
+      const stopTask = event === 'PostToolUse' && payload.tool_name === 'TaskStop' ? str((payload.tool_input as Payload | undefined)?.task_id) : undefined
+      if (stopTask && p.subJobs) {
+        const jobs = p.subJobs.filter(j => j.task !== stopTask)
+        p.subJobs = jobs.length ? jobs : undefined
+      }
+      // A subagent's own TaskStop ends only subagent jobs, never a running agent or the lead's shell.
+      const stopped = sub ? undefined : stopTask
       if (stopped && p.jobs) {
         const jobs = p.jobs.filter(j => j.task !== stopped)
         p.jobs = jobs.length ? jobs : undefined
@@ -393,7 +440,8 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       if (stopped && p.running?.includes(stopped)) {
         const running = p.running.filter(x => x !== stopped)
         p.running = running.length ? running : undefined
-        p.roles = p.roles.map(r => r.id === stopped ? { ...r, state: 'done' as const } : r)
+        p.roles = p.roles.map(r => r.id === stopped ? finish(r, now) : r)
+        p.ended = endedAt(p, stopped, now)
       }
       // A call ending is the answer to the prompt it raised: same tool_use_id (a question) or same tool and input.
       const asks = pendingAsks(p), id = str(payload.tool_use_id)
@@ -420,12 +468,14 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       // A standup with Done items counts too: a chat with nothing to change has no commit block.
       const finishing = !open && (!!own || p.tasks.length > 0 || !!report?.done.length) ? true as const : undefined
       const fresh = (at: number) => now - at <= RUNNING_CAP_MS
-      const bg = new Set(p.running?.filter(id => { const r = p.roles.find(r => r.id === id); return !!r && fresh(r.startedAt) }))
+      // Fresh by its last call, so a long busy subagent is not dropped an hour after it started.
+      const bg = new Set(p.running?.filter(id => { const r = p.roles.find(r => r.id === id); return !!r && fresh(r.at ?? r.startedAt) }))
       // hub-service.ts reads the ended ones from the transcript; no hook fires when a background shell ends.
       const ended = new Set(Array.isArray(payload.bg_finished) ? payload.bg_finished.map(String) : [])
       const jobs = p.jobs?.filter(j => !ended.has(j.id) && fresh(j.startedAt))
-      const roles = trim(p.roles.map(r => bg.has(r.id) ? r : { ...r, state: 'done' as const }))
-      const q: ChatProgress = { ...p, roles, commit: own ?? p.commit, report, running: bg.size ? [...bg] : undefined, jobs: jobs?.length ? jobs : undefined, finishing, ...NO_ASK }
+      const subJobs = p.subJobs?.filter(j => fresh(j.startedAt))
+      const roles = trim(p.roles.map(r => bg.has(r.id) ? r : finish(r)))
+      const q: ChatProgress = { ...p, roles, commit: own ?? p.commit, report, running: bg.size ? [...bg] : undefined, jobs: jobs?.length ? jobs : undefined, subJobs: subJobs?.length ? subJobs : undefined, finishing, ...NO_ASK }
       // Anything still running keeps the chat working, wrapping up, whatever the message said.
       if (q.running || q.jobs) return { ...q, state: 'working', waiting: true }
       // A turn that ends asking in plain text waits on Kenneth like a prompt does.
@@ -439,7 +489,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const error = str(payload.error) ?? 'unknown'
       const question = LIMITS.has(error) ? LIMIT_TEXT : `API error (${error}): ${cut(payload.last_assistant_message, PREVIEW_MAX) ?? str(payload.error_details) ?? 'the turn ended'}`
       const keep = new Set(p.running)
-      const roles = trim(p.roles.map(r => keep.has(r.id) ? r : { ...r, state: 'done' as const }))
+      const roles = trim(p.roles.map(r => keep.has(r.id) ? r : finish(r)))
       return { ...p, ...NO_ASK, roles, finishing: undefined, waiting: undefined, state: 'needs-you', question, limited: LIMITS.has(error) ? { at: now, error } : undefined }
     }
     case 'SwitchboardCovered':
@@ -463,14 +513,14 @@ export function settle(p: ChatProgress, now: number): ChatProgress {
 export const MISSED = 0.2
 /** Requests Jev says the Done list does not cover; scores for another set of asks count for nothing. */
 export const missed = (p: ChatProgress) => p.covered?.length !== p.asked?.length ? [] : (p.asked ?? []).filter((_, i) => { const s = p.covered?.[i]; return s !== null && s !== undefined && s <= MISSED })
-/** Done, but Jev finds a request not covered. Left items are future work; they go to the to-do (todo.ts). */
+/** Done, but Jev finds a request not covered. Left items are future work; they wait in the to-do's Suggested tray (todo.ts). */
 export const almostDone = (p: ChatProgress) => p.state === 'done' && missed(p).length > 0
 /** What a notification says; the same key twice in a row for one chat is shown once. Almost done and finished differ, so finishing notifies again. */
 export const notifyKey = (p: ChatProgress) => `${almostDone(p) ? `almost ${missed(p).length}` : p.state}\n${(p.state === 'done' ? p.commit : p.question) ?? ''}`
 /** A done chat's notification line. */
 export const doneText = (p: ChatProgress) => missed(p).length
   ? `almost done, ${missed(p).length} of your requests not covered: ${missed(p)[0]}`
-  : `finished${p.tasks.length ? `, all ${p.tasks.length} task${p.tasks.length === 1 ? '' : 's'} done` : ''}${p.report?.left.length ? `, ${p.report.left.length} to the to-do` : ''}`
+  : `finished${p.tasks.length ? `, all ${p.tasks.length} task${p.tasks.length === 1 ? '' : 's'} done` : ''}${p.report?.left.length ? `, ${p.report.left.length} suggested for the to-do` : ''}${p.report?.you?.length ? `, ${p.report.you.length} for you` : ''}`
 export const shouldNotify = (prevKey: string | undefined, p: ChatProgress) => (p.state === 'done' || p.state === 'needs-you') && notifyKey(p) !== prevKey
 /** Whether to show p, and the key to keep. Leaving needs-you forgets the question, so the same prompt asked again shows again; a Done key stays. */
 export function notifyStep(prevKey: string | undefined, p: ChatProgress): { show: boolean; key?: string } {

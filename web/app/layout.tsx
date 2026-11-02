@@ -1,10 +1,9 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Switchboard',
-  description: 'Real-time visualization of LLM agent execution flows - VS Code extension concept',
-  generator: 'v0.app',
+  description: 'Switchboard hub: every Claude chat, its progress and what needs you',
   icons: {
     icon: [
       {
@@ -24,6 +23,16 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0d0d0d' },
+  ],
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="font-sans antialiased bg-[#0a0a1a]">
+      <body className="font-sans antialiased bg-[var(--hub-canvas)]">
         {children}
       </body>
     </html>

@@ -3,7 +3,9 @@
  * Each step is left out when that piece is already there. No vscode here.
  */
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
+import type { ApiKey } from './types'
 
 export type SetupKit = {
   marketplaces: Record<string, string>
@@ -26,8 +28,11 @@ const ASK = '~/.claude/switchboard/ask/ask-server.mjs'
 /** One step for kit/setup-run.mjs: say a line, or copy then run, only when ifExists is there; key: store the key and add that server; skills: clone the repo and copy those in. ~/ is the home folder. */
 export type SetupStep = { label?: string; say?: string; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo }
 
-/** key21st: whether the env holds the key. modsDir: the bundled marketplace, copied out since the extension folder moves on update. */
-export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; modsDir: string; platform?: NodeJS.Platform }): SetupStep[] {
+const KEY_LABEL: Record<ApiKey['name'], string> = { GEMINI_API_KEY: 'Gemini', OPENROUTER_API_KEY: 'Jev (OpenRouter)' }
+const keyLine = (k: ApiKey) => `${KEY_LABEL[k.name]} key: ${!k.saved ? 'missing. Paste it in Switchboard: Settings, Accounts, API keys.' : `saved (ends ${k.last4})${k.checked ? (k.checked.ok ? ', works' : `, failed its test (${k.checked.reason ?? 'no reason'})`) : ''}.`}`
+
+/** key21st: whether the env holds the key. modsDir: the bundled marketplace, copied out since the extension folder moves on update. keys: Sign-ins' API keys, one line each. */
+export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; modsDir: string; platform?: NodeJS.Platform; keys?: ApiKey[] }): SetupStep[] {
   const out: SetupStep[] = []
   const claude = (label: string, ...args: string[]) => out.push({ label, run: ['claude', ...args] })
   for (const [name, repo] of Object.entries(kit.marketplaces)) if (!o.marketplaces.includes(name)) claude(name, 'plugin', 'marketplace', 'add', repo)
@@ -48,7 +53,7 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
     if (names.length) out.push({ label: k.repo, skills: { repo: k.repo, names } })
   }
   if (!o.mcps.includes('switchboard')) out.push({ label: 'Ask tool', ifExists: ASK, run: ['claude', 'mcp', 'add', '--scope', 'user', 'switchboard', '--', 'node', ASK] })
-  out.push({ say: '' }, { say: 'Set up done. Sign in to Slack with /mcp in a chat, then run /reload-plugins in chats that were already open.' })
+  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: 'Set up done. Sign in to Slack with /mcp in a chat, then run /reload-plugins in chats that were already open.' })
   return out
 }
 
@@ -71,9 +76,15 @@ export function setupState(home: string): SetupState {
   }
 }
 
+/** VS Code's PATH often lacks ~/.local/bin, where the claude CLI lives. */
+export function claudeBinary(): string {
+  const local = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
+  return fs.existsSync(local) ? local : 'claude'
+}
+
 /** claude is claude.cmd on Windows, which runs only through a shell; args with spaces or quotes are quoted for it. */
 export function claudeCall(args: string[], platform: NodeJS.Platform = process.platform): { cmd: string; args: string[]; shell: boolean } {
-  if (platform !== 'win32') return { cmd: 'claude', args, shell: false }
+  if (platform !== 'win32') return { cmd: claudeBinary(), args, shell: false }
   // Backslashes before a quote, or the closing one, double.
   return { cmd: 'claude', args: args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"` : a)), shell: true }
 }

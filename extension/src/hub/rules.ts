@@ -24,10 +24,12 @@ export const rulesFile = (rules: string, version: string) => `${HEADER}<!-- rule
 /** A generated file's rules, without its header, version line and the blank line after them. */
 const bodyOf = (text: string) => text.slice(HEADER.length).replace(/^<!-- rules-version: .* -->\n/, '').replace(/^\n/, '')
 
-export function upsertBlock(text: string, rules: string): string {
+/** undefined when a start marker has no end after it: a hand edit lost it, and the next block would eat the text between. */
+export function upsertBlock(text: string, rules: string): string | undefined {
   const block = `${BLOCK_START}\n${rules.trimEnd()}\n${BLOCK_END}`
   const at = text.indexOf(BLOCK_START), end = text.indexOf(BLOCK_END, at)
-  if (at >= 0 && end >= 0) return text.slice(0, at) + block + text.slice(end + BLOCK_END.length)
+  if (at >= 0 && end < 0) return undefined
+  if (at >= 0) return text.slice(0, at) + block + text.slice(end + BLOCK_END.length)
   return `${text.trimEnd()}${text.trim() ? '\n\n' : ''}${block}\n`
 }
 
@@ -35,15 +37,18 @@ export type RulesDecision = { action: 'write' | 'skip'; text?: string; why: stri
 
 export function decideRules(existing: string | undefined, rules: string, version: string, generic = false, shipped: string[] = []): RulesDecision {
   if (existing === undefined) return { action: 'write', text: rulesFile(rules, version), why: 'missing' }
-  if (existing.startsWith(HEADER)) {
-    if (bodyOf(existing) === rules) return { action: 'skip', why: 'current' }
-    if (generic && !existing.includes(GENERIC) && !shipped.includes(shippedSha(bodyOf(existing.replace(/\r\n/g, '\n'))))) return { action: 'skip', why: 'personal copy' }
-    const theirs = VERSION.exec(existing)?.[1]
+  // A Windows editor may have saved it with CRLF.
+  const lf = existing.replace(/\r\n/g, '\n')
+  if (lf.startsWith(HEADER)) {
+    if (bodyOf(lf) === rules) return { action: 'skip', why: 'current' }
+    if (generic && !lf.includes(GENERIC) && !shipped.includes(shippedSha(bodyOf(lf)))) return { action: 'skip', why: 'personal copy' }
+    const theirs = VERSION.exec(lf)?.[1]
     // ISO times in UTC compare as strings.
     if (theirs && theirs >= version) return { action: 'skip', why: 'kit newer' }
     return { action: 'write', text: rulesFile(rules, version), why: 'older' }
   }
   const text = upsertBlock(existing, rules)
+  if (text === undefined) return { action: 'skip', why: 'block broken' }
   return text === existing ? { action: 'skip', why: 'block current' } : { action: 'write', text, why: 'block' }
 }
 
@@ -76,7 +81,7 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
   const rules = fs.readFileSync(path.join(o.kit, 'rules.md'), 'utf8')
   const bundle = JSON.parse(fs.readFileSync(path.join(o.kit, 'bundle.json'), 'utf8')) as Bundle
   const shipped = JSON.parse(read(path.join(o.kit, 'shipped.json')) ?? '[]') as string[]
-  const changed: string[] = [], edited: string[] = [], failed: string[] = [], personal: string[] = []
+  const changed: string[] = [], edited: string[] = [], failed: string[] = [], personal: string[] = [], broken: string[] = []
   const ready = { claude: false, codex: false }
   const put = (p: string, text: string) => { if (o.write) fs.writeFileSync(p, text) }
   const targets = [['claude', path.join(o.home, '.claude', 'CLAUDE.md')], ['codex', path.join(o.home, '.codex', 'AGENTS.md')]] as const
@@ -84,6 +89,7 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
     if (!fs.existsSync(path.dirname(file))) continue
     const d = decideRules(read(file), rules, bundle.rulesVersion, bundle.generic, shipped)
     if (d.why === 'personal copy') personal.push(path.basename(file))
+    if (d.why === 'block broken') { broken.push(path.basename(file)); continue }
     try {
       if (d.action === 'write') { put(file, d.text!); changed.push(`${path.basename(file)} (${d.why})`) }
       ready[tool] = d.action === 'skip' || o.write
@@ -115,6 +121,7 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
     edited.length ? `${edited.join(', ')} edited by you, new copy kept as .switchboard-new` : '',
     personal.length ? `kept your own kit copy of ${personal.join(', ')}` : '',
     failed.length ? `could not write ${failed.join(', ')}` : '',
+    broken.length ? `${broken.join(', ')} has a switchboard rules start line with no end line; fix it by hand, left as is` : '',
   ].filter(Boolean)
   return { note: `Rules and roles: ${parts.length ? parts.join('; ') : 'up to date'}`, ready, changed }
 }

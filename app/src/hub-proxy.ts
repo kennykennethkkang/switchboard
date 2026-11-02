@@ -1,5 +1,5 @@
 /**
- * The standalone app's way to the hub: /hub/state and /hub/command are passed to
+ * The standalone app's way to the hub: /hub/state, /hub/voice, /hub/graph, /hub/runs, /hub/command and /hub/upload are passed to
  * a VS Code window's hook server, found through ~/.claude/switchboard/*.json, with
  * the window's token added here so it never reaches the browser. Only the app's
  * own page may call it: a custom header (no form can send one), the same Origin
@@ -10,11 +10,16 @@ import * as fs from 'fs'
 import * as http from 'http'
 import * as os from 'os'
 import * as path from 'path'
+import { pipeline } from 'stream'
 import * as zlib from 'zlib'
 
 type Win = { port: number; hubToken: string; workspace: string; mtimeMs: number; pid?: number }
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
 const MAX_BODY = 64 * 1024
+// Same cap as extension/src/hub/uploads.ts; the window checks it again.
+const UPLOAD_MAX = 100 * 1024 * 1024
+// How long a cut off upload may keep sending before the socket is dropped.
+const LINGER_MS = 5_000
 // A tool pick or a sync with origin runs well past 5 s; the panel never times them out, so the app waits too.
 const COMMAND_MS = 120_000
 
@@ -52,6 +57,19 @@ export function commandFolder(body: string): string | undefined {
   } catch { return undefined }
 }
 
+// The mic records the room, and a spoken reply (hub-jarvis with voice) plays in it; the rest reach keys, sign-ins, AWS, setup, links opened on the Mac, dev servers and pushes.
+const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser'])
+const MAC_ONLY_GIT = new Set(['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch'])
+
+/** A command that only this Mac may send, never the phone. */
+export function macOnly(body: string): boolean {
+  try {
+    const c = JSON.parse(body) as { type?: unknown; op?: unknown; voice?: unknown }
+    if (typeof c?.type !== 'string') return false
+    return MAC_ONLY.has(c.type) || (c.type === 'hub-jarvis' && c.voice !== undefined) || /^hub-(key|login|aws)-/.test(c.type) || (c.type === 'hub-git' && MAC_ONLY_GIT.has(c.op as string))
+  } catch { return false }
+}
+
 /** The chat a command names (send, answer, focus, git...), so it can go to the window holding that chat's terminal. */
 export function commandSession(body: string): string | undefined {
   try {
@@ -62,39 +80,48 @@ export function commandSession(body: string): string | undefined {
 
 // 204: this window holds the chat's terminal (a Codex tie, a Claude terminal); its Codex typing and focus work only there.
 const holds = (w: Win, id: string) => new Promise<boolean>(done => {
-  const r = http.request({ host: '127.0.0.1', port: w.port, path: `/hub/holds?session=${encodeURIComponent(id)}&token=${encodeURIComponent(w.hubToken)}`, timeout: 1500 }, x => { x.resume(); done(x.statusCode === 204) })
+  const r = http.request({ host: '127.0.0.1', port: w.port, path: `/hub/holds?session=${encodeURIComponent(id)}`, headers: { 'X-Switchboard-Token': w.hubToken }, timeout: 1500 }, x => { x.resume(); done(x.statusCode === 204) })
   r.on('error', () => done(false))
   r.on('timeout', () => r.destroy())
   r.end()
 })
 
-/** lan only for a request whose localAddress is a LAN one, already through lanGate. */
+/** lan only for a phone request (lanFor), already through lanGate. */
 export function allowed(h: http.IncomingHttpHeaders, port: number, lan?: Lan): boolean {
-  if (h['x-switchboard'] !== '1') return false
-  const hosts = lan ? lanHostsFor(lan, port) : [`127.0.0.1:${port}`, `localhost:${port}`]
-  if (!hosts.includes(String(h.host).toLowerCase())) return false
-  return h.origin === undefined || sameOrigin(h.origin, hosts)
+  if (h['x-switchboard'] !== '1' || !hostOk(h, port, lan)) return false
+  return h.origin === undefined || sameOrigin(h.origin, port, lan)
 }
 
-/** names: this Mac's mDNS and MagicDNS names, taken on any LAN socket like its address. */
-export type Lan = { host: string; secret: string; names?: string[] }
+const loopHosts = (port: number) => [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`, `0.0.0.0:${port}`]
+// Exact names only: a rebound name (evil.test pointing here) never matches. tailscale serve passes the phone's Host on.
+const hostsFor = (port: number, lan?: Lan) => lan ? lan.names.flatMap(n => [n.toLowerCase(), `${n.toLowerCase()}:${lan.plain ? 80 : 443}`]) : loopHosts(port)
+const sameOrigin = (origin: string, port: number, lan?: Lan) => (lan ? lan.names.map(n => `${lan.plain ? 'http' : 'https'}://${n.toLowerCase()}`) : loopHosts(port).map(x => `http://${x}`)).includes(origin.toLowerCase())
+
+/** The Host check alone, for every request: a rebound name (evil.test pointing at 127.0.0.1) must not read /events either.
+ * EventSource cannot send x-switchboard, so /events gets this and not allowed(). */
+export function hostOk(h: http.IncomingHttpHeaders, port: number, lan?: Lan): boolean {
+  return hostsFor(port, lan).includes(String(h.host).toLowerCase())
+}
+
+/** names: this Mac's MagicDNS name, the only Host a phone may use. plain: served over http (no tailnet certs). */
+export type Lan = { secret: string; names: string[]; plain?: boolean }
 import { phoneCode } from '../../extension/src/hub/lan'
-export { lanHosts, localName, macNames, phoneCode, tailscaleName } from '../../extension/src/hub/lan'
+export { macNames, phoneCode, tailscaleName, tailscaleProblem } from '../../extension/src/hub/lan'
 
-// Exact names only: a rebound name (evil.test pointing here) never matches.
-const lanHostsFor = (lan: Lan, port: number) => [lan.host, ...(lan.names ?? [])].map(x => `${x.toLowerCase()}:${port}`)
-const onLanHost = (h: http.IncomingHttpHeaders, port: number, lan: Lan) => lanHostsFor(lan, port).includes(String(h.host).toLowerCase())
-const sameOrigin = (origin: string, hosts: string[]) => hosts.some(x => origin.toLowerCase() === `http://${x}`)
-
-/** The --lan server listens on 0.0.0.0, so the address a request came in on decides: loopback passes as before,
- * anything else is gated and pinned to that address. Read per request, so a new Wi-Fi address needs no restart. */
-export function lanFor(localAddress: string | undefined, secret: string, names: string[] = []): Lan | undefined {
-  const host = (localAddress ?? '').replace(/^::ffff:/, '')
-  return host.startsWith('127.') || host === '::1' ? undefined : { host, secret, names }
+const PROXIED = ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-host', 'tailscale-user-login']
+/** The app listens on loopback only and the phone comes through tailscale serve, so the socket says nothing:
+ * the Mac itself is a loopback Host with no proxy headers, anything else is the phone and gets gated. */
+export function lanFor(h: http.IncomingHttpHeaders, port: number, secret: string, names: string[] = [], plain = false): Lan | undefined {
+  return hostOk(h, port) && !PROXIED.some(k => h[k] !== undefined) ? undefined : plain ? { secret, names, plain } : { secret, names }
 }
+/** The phone's address as tailscale serve reports it. */
+export const forwardedIp = (h: http.IncomingHttpHeaders) => String(h['x-forwarded-for'] ?? '').split(',')[0].trim()
+
 // Browsers send cookies to every port on the host, so the port in the name only keeps two Switchboard apps apart.
 // Anything else on this Mac that sees it could already read phone.secret.
 export const lanCookie = (port: number) => `sb${port}`
+// Secure over tailscale serve's https; dropped on the plain http fallback, where a browser would never keep it.
+export const lanSetCookie = (port: number, secret: string, secure = true) => `${lanCookie(port)}=${secret}; HttpOnly; ${secure ? 'Secure; ' : ''}SameSite=Strict; Path=/; Max-Age=${30 * 24 * 3600}`
 
 /** The phone link's secret, kept in a file so a restart (an update) does not log the phone out. */
 export function phoneSecret(file: string): string {
@@ -116,7 +143,7 @@ const same = (a: string | null | undefined, b: string) => {
  * Mac's own Host only, then /?k=<secret> once ('login': set the cookie), then the cookie on every request. */
 export function lanGate(h: http.IncomingHttpHeaders, url: string, port: number, lan: Lan | undefined): 'ok' | 'login' | 'deny' {
   if (!lan) return 'ok'
-  if (!onLanHost(h, port, lan)) return 'deny'
+  if (!hostOk(h, port, lan)) return 'deny'
   // '//' and the like throw, and a throw here takes the whole app down.
   let u: URL
   try { u = new URL(url, 'http://x') } catch { return 'deny' }
@@ -130,12 +157,12 @@ export function lanGate(h: http.IncomingHttpHeaders, url: string, port: number, 
  * the code check for POST /login there, an ask to the Mac on POST /device and its answer on GET /device/wait.
  * Assets, /events and /hub/* stay refused. */
 export function deniedAs(method: string | undefined, h: http.IncomingHttpHeaders, url: string, port: number, lan: Lan): 'page' | 'login' | 'device' | 'wait' | 'forbid' {
-  if (!onLanHost(h, port, lan)) return 'forbid'
+  if (!hostOk(h, port, lan)) return 'forbid'
   let u: URL
   try { u = new URL(url, 'http://x') } catch { return 'forbid' }
   if (method === 'POST') {
     // Another site's form could post wrong codes and keep sign-in locked, or fill the Mac with asks.
-    if (h.origin !== undefined && !sameOrigin(h.origin, lanHostsFor(lan, port))) return 'forbid'
+    if (h.origin !== undefined && !sameOrigin(h.origin, port, lan)) return 'forbid'
     return u.pathname === '/login' ? 'login' : u.pathname === '/device' ? 'device' : 'forbid'
   }
   if (method === 'GET' && u.pathname === '/device/wait') return 'wait'
@@ -192,7 +219,7 @@ export function liveToken(files: Partial<Win>[], token: unknown, alive: (pid: nu
 const LOCK_MS = 10 * 60_000
 
 /** The typed code check, one per server. 5 wrong codes in 10 minutes lock it, the right code too; a right code clears the count. */
-// ponytail: one lock for everyone, so anyone on the network can lock sign-in (the QR link still works); per-IP counts if that bites.
+// One lock for everyone, so anyone on the network can lock sign-in (the QR link still works). Count per IP if that bites.
 export function codeLogin(now = Date.now) {
   let wrong: number[] = []
   return (code: string, secret: string): 'ok' | 'wrong' | 'locked' => {
@@ -249,24 +276,30 @@ export async function windows(): Promise<Partial<Win>[]> {
 /** Posts body to /hub/device on every live window; fire and forget. */
 export async function tellWindows(body: object): Promise<void> {
   for (const w of (await windows()).filter(f => usable(f, pidAlive))) {
-    const r = http.request({ host: '127.0.0.1', port: w.port, method: 'POST', path: `/hub/device?token=${encodeURIComponent(w.hubToken)}`, headers: { 'Content-Type': 'application/json' }, timeout: 2000 }, x => x.resume())
+    const r = http.request({ host: '127.0.0.1', port: w.port, method: 'POST', path: '/hub/device', headers: { 'Content-Type': 'application/json', 'X-Switchboard-Token': w.hubToken }, timeout: 2000 }, x => x.resume())
     r.on('error', () => {})
     r.on('timeout', () => r.destroy())
     r.end(JSON.stringify(body))
   }
 }
 
+const CHAT_READS = new Set(['/hub/chat/outputs', '/hub/chat/transcript', '/hub/chat/shot'])
+
 /** list: the window files, swapped in tests so none reaches a real window. */
 export async function proxyHub(req: http.IncomingMessage, res: http.ServerResponse, port: number, workspace: string, lan?: Lan, list = windows): Promise<void> {
   let u: URL
   try { u = new URL(req.url ?? '/', 'http://x') } catch { res.writeHead(400).end(); return }
-  const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'POST' && u.pathname === '/hub/command' ? 'command' : undefined
+  const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs'
+    : req.method === 'GET' && CHAT_READS.has(u.pathname) ? u.pathname.slice('/hub/'.length) : req.method === 'POST' && u.pathname === '/hub/command' ? 'command'
+    : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : undefined
   if (!route || !allowed(req.headers, port, lan)) { res.writeHead(route ? 403 : 404).end(); return }
+  if (route === 'upload') return proxyUpload(req, res, u, workspace, list)
   let body = ''
   for await (const chunk of req) {
     body += chunk
     if (body.length > MAX_BODY) { res.writeHead(413).end(); return }
   }
+  if (lan && route === 'command' && macOnly(body)) { res.writeHead(403, { 'Content-Type': 'text/plain' }).end('Only the Mac can do that, not the phone.'); return }
   const files = await list()
   const folder = route === 'command' ? commandFolder(body) : undefined
   let win = pickWindow(files, workspace, undefined, folder)
@@ -282,9 +315,12 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
     })
     if (holder) win = holder
   }
-  const up = http.request({ host: '127.0.0.1', port: win.port, method: req.method, path: `/hub/${route}?token=${encodeURIComponent(win.hubToken)}`, headers: { 'Content-Type': 'application/json' }, timeout: route === 'state' ? 5000 : COMMAND_MS }, r => {
+  // Reads pass their own fields only, so a token the page put in the query never reaches the window.
+  const fields = route === 'runs' ? ['session', 'role'] : route === 'chat/outputs' ? ['session'] : route === 'chat/transcript' ? ['session', 'before'] : route === 'chat/shot' ? ['session', 'path'] : []
+  const query = new URLSearchParams(fields.flatMap(k => { const v = u.searchParams.get(k); return v === null ? [] : [[k, v]] })).toString()
+  const up = http.request({ host: '127.0.0.1', port: win.port, method: req.method, path: `/hub/${route}${query ? `?${query}` : ''}`, headers: { 'Content-Type': 'application/json', 'X-Switchboard-Token': win.hubToken }, timeout: route === 'state' || route === 'voice' ? 5000 : COMMAND_MS }, r => {
     const head = { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' }
-    if (route !== 'state' || r.statusCode !== 200) { res.writeHead(r.statusCode ?? 502, head); r.pipe(res); return }
+    if (route !== 'state' || r.statusCode !== 200) { res.writeHead(r.statusCode ?? 502, head); pipeline(r, res, err => { if (err) res.destroy() }); return }
     // The page polls state every 2s: a 304 when nothing changed, else gzip, since a full state runs to a few hundred KB.
     const parts: Buffer[] = []
     r.on('data', (c: Buffer) => parts.push(c))
@@ -301,4 +337,39 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
   up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
   up.on('timeout', () => up.destroy())
   up.end(body)
+}
+
+/** POST /hub/upload?cwd=&name=&session=, streamed to the window holding cwd: never buffered, cut off past 100 MB. */
+async function proxyUpload(req: http.IncomingMessage, res: http.ServerResponse, u: URL, workspace: string, list: typeof windows): Promise<void> {
+  let cut = false
+  const tooBig = () => {
+    if (cut) return
+    cut = true
+    if (res.headersSent) { req.destroy(); return }
+    // Closing with unread bytes sends a reset, and the client drops the 413 for EPIPE. Swallow the rest for a bit instead.
+    res.writeHead(413, { 'Content-Type': 'text/plain' }).end('the file is over the 100 MB limit')
+    req.resume()
+    const t = setTimeout(() => req.destroy(), LINGER_MS).unref()
+    req.once('end', () => clearTimeout(t))
+  }
+  if (Number(req.headers['content-length']) > UPLOAD_MAX) { tooBig(); return }
+  const cwd = u.searchParams.get('cwd') ?? ''
+  const win = pickWindow(await list(), workspace, undefined, cwd || undefined)
+  if (!win) { res.writeHead(502).end(); return }
+  // Only the three fields go on, so a token the page put in the query never reaches the window.
+  const q = new URLSearchParams({ cwd, name: u.searchParams.get('name') ?? '', session: u.searchParams.get('session') ?? '' })
+  const up = http.request({ host: '127.0.0.1', port: win.port, method: 'POST', path: `/hub/upload?${q}`, headers: { 'Content-Type': 'application/octet-stream', 'X-Switchboard-Token': win.hubToken }, timeout: COMMAND_MS }, r => {
+    res.writeHead(r.statusCode ?? 502, { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' })
+    pipeline(r, res, err => { if (err) res.destroy() })
+  })
+  up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
+  up.on('timeout', () => up.destroy())
+  let size = 0
+  req.on('data', (c: Buffer) => {
+    size += c.length
+    if (size > UPLOAD_MAX) { req.unpipe(up); up.destroy(); tooBig() }
+  })
+  // A phone dropping mid-file: the window sees its request break and deletes the part it wrote.
+  req.on('close', () => { if (!req.complete) up.destroy() })
+  req.pipe(up)
 }

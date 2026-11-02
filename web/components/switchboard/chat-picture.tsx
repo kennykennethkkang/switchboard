@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useReducer, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import type { Ask, ChatProfile, Choice, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, TaskRow } from '@/lib/hub-types'
 import { askChoice } from '@/lib/ask'
 import { limitLine, testsPrompt } from '@/lib/checks'
-import { eta, say, type Eta } from '@/lib/eta'
+import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
 import { projectName } from '@/lib/archive'
 import { ago, almostDone, caps, coverage, panel } from './look'
 import { OrbitView } from './orbits'
@@ -12,6 +12,8 @@ import { Check, CopyCommit, Receipt, chipOf, finishedLine, hhmm, plural, stillRu
 import { ToolsCard } from './tools-card'
 import { CommitText } from './commit-text'
 import { TestsCard } from './check-cards'
+import { onMac } from './dev-rows'
+import { vscodeBridge } from '@/lib/vscode-bridge'
 
 const TOOLS_KEY = 'switchboard.toolCalls'
 const clock = (at: number) => new Date(at).toTimeString().slice(0, 8)
@@ -43,7 +45,7 @@ function Progress({ p, e, now, models, since }: { p: ChatProgress; e: Eta; now: 
     <h3 style={caps}><span>Tasks in this chat</span>{!stopped && <span>Running {dur(e.elapsedMs)}</span>}</h3>
     <div style={{ display: 'grid', gap: 4 }}>
       <p style={{ margin: 0, font: '500 12px/1.3 var(--hub-mono)', color: 'var(--hub-mute)' }}>{e.done} of {e.total} done</p>
-      {cur && <p data-s="in_progress" data-c={p.state} aria-current="step" style={{ margin: 0, display: 'flex', gap: 10, alignItems: 'center', font: '500 17px/1.3 var(--hub-sans)', color: 'var(--hub-ink)', overflowWrap: 'anywhere', textWrap: 'balance' }}><span className="hub-tick" aria-hidden /><span><span className="sr-only">now: </span>{cur.subject}</span></p>}
+      {cur && <p data-s="in_progress" data-c={p.state} aria-current="step" style={{ margin: 0, display: 'flex', gap: 10, alignItems: 'center', font: '500 18px/1.3 var(--hub-sans)', color: 'var(--hub-ink)', overflowWrap: 'anywhere', textWrap: 'balance' }}><span className="hub-tick" aria-hidden /><span><span className="sr-only">now: </span>{cur.subject}</span></p>}
       {cur && (cur.role || cur.startedAt !== undefined) && <p style={{ ...mono, margin: 0, paddingLeft: 24, whiteSpace: 'normal' }}>{role(cur).slice(3)}{cur.role && cur.startedAt !== undefined ? ' · ' : ''}{cur.startedAt !== undefined && `for ${dur(now - cur.startedAt)}`}</p>}
     </div>
     <Steps tasks={p.tasks} stopped={stopped} />
@@ -140,26 +142,33 @@ function AskButtons({ ask, onAnswer }: { ask: Ask; onAnswer: (askId: string, cho
   </>
 }
 
+const NO_MODELS: Record<string, string> = {}
+
 /** models: each role's model, for the orbit and the task list. */
 /** profile: the chat's own plugins and skills, when Switchboard started it with a set; onProfile saves a change. */
 /** limits and autoContinue: for the usage-limit card; onSend: queues a message to this chat. */
-/** place: the VS Code window holding the chat, by color. menu: the chat's more actions. installed, connections, onInstalled, toolsOpen: for the Tools card. */
-export function ChatPicture({ chat, progress, live, instant, models = {}, profile, flagged = [], limits = [], autoContinue = false, place, menu, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend }: {
-  chat: ChatRow; progress?: ChatProgress; live?: SessionLive; instant?: boolean; models?: Record<string, string>
+/** place: the VS Code window holding the chat, by color. menu: the chat's more actions. message: the message box, above the Tools card. installed, connections, onInstalled, toolsOpen: for the Tools card. */
+export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], limits = [], autoContinue = false, place, menu, message, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend }: {
+  chat: ChatRow; progress?: ChatProgress; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
   profile?: ChatProfile; flagged?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void
-  place?: { name: string; color: string }; menu?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void
+  place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void
 }) {
   const [showTools, setShowTools] = useState(true)
   useEffect(() => { try { if (localStorage.getItem(TOOLS_KEY) === 'off') setShowTools(false) } catch { /* no storage: keep on */ } }, [])
   // Durations move with the clock, not only with hook events.
   const [, tick] = useReducer((n: number) => n + 1, 0)
   useEffect(() => { const t = setInterval(tick, 30e3); return () => clearInterval(t) }, [])
+  // Off the Mac (phone, LAN) the button can only raise the terminal on the Mac. Read after mount so SSR matches.
+  const [remote, setRemote] = useState(false)
+  useEffect(() => setRemote(!vscodeBridge?.isVSCode && !onMac()), [])
   const toggle = (on: boolean) => { setShowTools(on); try { localStorage.setItem(TOOLS_KEY, on ? 'on' : 'off') } catch { /* no storage */ } }
 
   const state = progress?.state ?? 'idle', s = chipOf(progress), name = chat.name ?? projectName(chat)
   const since = ago(progress?.at ?? chat.updatedAt ?? Date.now())
+  // The views redraw when this changes, so it changes only with what they show.
+  const orbit = useMemo(() => ({ id: chat.sessionId, name, state, ago: since, progress, live, models }), [chat.sessionId, name, state, since, progress, live, models])
   const tasks = progress?.tasks ?? [], now = Date.now(), e = progress && tasks.length ? eta(progress, now) : undefined
-  const running = stillRunning(progress)
+  const running = stillRunning(progress), timeleft = progress && timeLeft(progress, all, now)
   const subs = (progress?.roles ?? []).filter(r => r.state === 'active' && progress?.running?.includes(r.id))
   const feed = [...(progress?.tools ?? [])].reverse().slice(0, 6)
   const cost = [live?.costUsd !== undefined ? `$${live.costUsd.toFixed(2)}` : '', live?.tokens ? `${Math.round(live.tokens / 1000)}k tokens` : ''].filter(Boolean).join(' · ')
@@ -167,10 +176,10 @@ export function ChatPicture({ chat, progress, live, instant, models = {}, profil
   let left
   if (state === 'needs-you') left = <>
     <h3 style={{ ...caps, color: 'var(--hub-red)' }}><span>{progress?.limited ? 'Usage limit' : 'Needs you'}</span></h3>
-    <p style={{ margin: 0, font: '500 17px/1.3 var(--hub-sans)', color: 'var(--hub-ink)', overflowWrap: 'anywhere', textWrap: 'balance' }}>{progress?.question ?? 'This chat is waiting on you.'}</p>
+    <p style={{ margin: 0, font: '500 18px/1.3 var(--hub-sans)', color: 'var(--hub-ink)', overflowWrap: 'anywhere', textWrap: 'balance' }}>{progress?.question ?? 'This chat is waiting on you.'}</p>
     {progress?.limited && <p style={{ margin: 0, color: 'var(--hub-body)', fontSize: 13 }}>{limitLine(limits, autoContinue)}</p>}
     {progress?.ask && onAnswer && chat.ai !== 'codex' && <AskButtons ask={progress.ask} onAnswer={onAnswer} />}
-    <div><button type="button" className={progress?.ask && onAnswer ? 'hub-btn' : 'hub-btn primary'} onClick={onFocus}>Answer in terminal</button></div>
+    <div><button type="button" className={progress?.ask && onAnswer ? 'hub-btn' : 'hub-btn primary'} onClick={onFocus}>{remote ? 'Open terminal on Mac' : 'Answer in terminal'}</button></div>
   </>
   else if (state === 'done' && progress) left = <>
     <h3 style={caps}><span>{s.label}</span>{progress.finishedAt && <span>{hhmm(progress.finishedAt)}</span>}</h3>
@@ -190,7 +199,7 @@ export function ChatPicture({ chat, progress, live, instant, models = {}, profil
     {progress && e ? <Progress p={progress} e={e} now={now} models={models} since={since} />
       : <><h3 style={caps}><span>Tasks in this chat</span></h3><p style={{ margin: 0, color: 'var(--hub-ash)' }}>No task list yet{state === 'idle' ? `. This chat has been quiet for ${since}.` : '.'}</p></>}
     {running && <div role="status" style={{ display: 'grid', gap: 4, paddingTop: 4, borderTop: '1px solid var(--hub-hair)' }}>
-      <p style={{ margin: 0, color: 'var(--hub-blue)', fontSize: 13 }}>{running}</p>
+      <p style={{ margin: 0, color: 'var(--hub-blue)', fontSize: 13 }}>{running}{timeleft && <span style={{ color: 'var(--hub-ash)' }}> · {sayLeft(timeleft)}</span>}</p>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2, font: '400 12px/1.5 var(--hub-mono)', color: 'var(--hub-body)' }}>
         {subs.map(r => <li key={r.id}>{r.role} <span style={{ color: 'var(--hub-ash)' }}>· since {hhmm(r.startedAt)}</span></li>)}
         {(progress?.jobs ?? []).map(j => <li key={j.id}>{j.label ?? 'Background command'} <span style={{ color: 'var(--hub-ash)' }}>· since {hhmm(j.startedAt)}</span></li>)}
@@ -207,13 +216,13 @@ export function ChatPicture({ chat, progress, live, instant, models = {}, profil
             {place && <span title={`In the ${place.name} window`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: place.color, marginRight: 8 }}><i aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />{place.name}{place.name === projectName(chat) && <span className="sr-only"> window</span>}</span>}
             {place?.name === projectName(chat) ? '' : projectName(chat)}{place?.name === projectName(chat) ? '· ' : ' · '}<span style={{ color: s.color }}>{s.label}</span> · {since}</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="hub-pic-acts" style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
           <Switch on={showTools} onChange={toggle} label="Show tool calls on the map" text="Tool calls" />
           <button type="button" className="hub-btn" onClick={onFocus}>Open terminal</button>
           {menu}
         </div>
       </div>
-      <OrbitView chat={{ id: chat.sessionId, name, state, ago: since, progress, live, models }} showTools={showTools} instant={instant} />
+      <OrbitView chat={orbit} showTools={showTools} instant={instant} all={all} demo={demo} onFocus={onFocus} onCopy={onCopy} />
       {progress?.tests && !progress.tests.ok && <TestsCard run={progress.tests} onSend={onSend && (() => onSend(testsPrompt(progress.tests!)))} />}
       <div className="hub-below">
         <div style={state === 'needs-you' ? { ...panel, border: '1px solid var(--hub-red)', background: 'var(--hub-red-soft)' } : panel}>{left}</div>
@@ -223,22 +232,23 @@ export function ChatPicture({ chat, progress, live, instant, models = {}, profil
           {feed.length
             ? <ul className="hub-feed" aria-label="Latest tool calls, newest first" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6, font: '400 12px/1.5 var(--hub-mono)' }}>
                 {feed.map(c => (
-                  <li key={`${c.at}:${c.tool}`} style={{ display: 'grid', gridTemplateColumns: '64px minmax(0, 92px) minmax(0, 72px) minmax(0, 1fr)', gap: 8, color: 'var(--hub-mute)', whiteSpace: 'nowrap' }}>
+                  <li key={`${c.at}:${c.tool}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 64px) minmax(0, 80px) minmax(0, 1fr)', gap: 8, color: 'var(--hub-mute)', whiteSpace: 'nowrap' }}>
                     <span>{clock(c.at)}</span>
                     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
                       <i aria-hidden style={{ flex: 'none', width: 6, height: 6, borderRadius: '50%', background: c.role === 'lead' ? 'var(--hub-ink)' : c.role === 'jev' ? 'var(--hub-violet)' : 'var(--hub-blue)' }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.role}</span>
                     </span>
-                    <span style={{ color: 'var(--hub-yellow)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.tool}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--hub-body)' }}>{c.target ?? ''}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--hub-body)' }}><span style={{ color: 'var(--hub-yellow)' }}>{c.tool}</span>{c.target ? ` ${c.target}` : ''}</span>
                   </li>
                 ))}
               </ul>
             : <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No tool calls yet.</p>}
         </div>
       </div>
+      {message}
+      {/* Not the bare session id: the message box beside it is keyed by that. */}
       {chat.ai !== 'codex' && (
-        <ToolsCard profile={profile} flagged={flagged} installed={installed} connections={connections} open={toolsOpen} onProfile={onProfile} onInstalled={onInstalled} />
+        <ToolsCard key={`tools-${chat.sessionId}`} profile={profile} flagged={flagged} installed={installed} connections={connections} open={toolsOpen} onProfile={onProfile} onInstalled={onInstalled} />
       )}
     </section>
   )

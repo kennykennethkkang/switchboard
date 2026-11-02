@@ -60,14 +60,12 @@ export function handlePermissionDetection(
       if (!stillPending) return
 
       // For the orchestrator, check if any session file (main or subagent) has
-      // been written to recently — if so, tools are running, not blocked on permission.
-      // Skip this check for subagents: their permission state is independent.
+      // been written to since the timer started; if so, tools are running, not
+      // blocked on permission. Compared to the snapshot, not Date.now() - delay,
+      // since timers can fire a ms early. Skip for subagents: their state is independent.
       if (checkSessionActivity) {
         const lastActivity = delegate.getLastActivityTime(sessionId)
-        if (lastActivity !== undefined) {
-          const recentThreshold = Date.now() - PERMISSION_DETECT_MS
-          if (lastActivity > recentThreshold) return
-        }
+        if (lastActivity !== undefined && lastActivity > snapshotTime) return
       }
 
       permState.permissionEmitted = true

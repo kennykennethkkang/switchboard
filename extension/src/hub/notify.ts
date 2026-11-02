@@ -12,7 +12,7 @@ import { hub } from './hub-service'
 import { foldPathCase } from '../fs-utils'
 import { focusChat } from './actions'
 import { canPrefill, desktopNotice, doneText, notifyStep, todayText } from './progress'
-import type { ChatProgress, ChatState } from './types'
+import type { ChatProgress, ChatState, StuckItem } from './types'
 
 const titleOf = (p: ChatProgress) => hub.get().chats.find(c => c.sessionId === p.sessionId)?.name ?? p.cwd.split(/[\\/]/).pop() ?? 'A chat'
 
@@ -55,7 +55,25 @@ export function notify(change: { from?: ChatState; to: ChatProgress }): void {
   }
 }
 
-// ponytail: fixed 6 pm; one file stamps the day so only the first window to look sends it.
+/** One notice per stuck item; the hub hands each over once (unseenStuck). */
+export function notifyStuck(i: StuckItem, now = Date.now()): void {
+  const title = hub.get().chats.find(c => c.sessionId === i.sessionId)?.name ?? 'A chat'
+  const min = Math.max(1, Math.round((now - i.since) / 60_000))
+  const use = [i.cpu !== undefined && `CPU ${Math.round(i.cpu)}%`, i.rss !== undefined && `${(i.rss / 1024 ** 3).toFixed(1)} GB`].filter(Boolean).join(', ')
+  const text = `Stuck: ${i.what} for ${min} min${use ? ` (${use})` : ''}`
+  mac(title, text)
+  void vscode.window.showWarningMessage(`Switchboard: ${title}: ${text}.`, 'Show').then(c => c && focusChat(i.sessionId))
+}
+
+/** An AWS session about to end, with one tap to sign in again in its Chrome profile. */
+export function notifyAwsExpiry(profile: string, leftMs: number, signIn: () => void): void {
+  const label = hub.get().aws.find(a => a.name === profile)?.label
+  const text = `AWS sign-in for ${label ? `${label} (${profile})` : profile} ends in about ${Math.max(1, Math.round(leftMs / 60_000))} min`
+  mac('AWS', text)
+  void vscode.window.showWarningMessage(`Switchboard: ${text}.`, 'Sign in again').then(c => c && signIn())
+}
+
+// Fixed at 6 pm. One file stamps the day, so only the first window to look sends it.
 const SUMMARY_HOUR = 18
 const SENT = path.join(os.homedir(), '.claude', 'switchboard', 'today-sent')
 /** Once a day after SUMMARY_HOUR: one notification for every chat that finished, is almost done, or needs Kenneth. */

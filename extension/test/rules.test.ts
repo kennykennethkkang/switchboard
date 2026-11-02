@@ -48,11 +48,29 @@ describe('rules file', () => {
   })
 
   it('replaces a stale managed block in place', () => {
-    const old = upsertBlock('# Mine\n', '# Old\n')
-    const next = upsertBlock(`${old}\n# After\n`, RULES)
+    const old = upsertBlock('# Mine\n', '# Old\n')!
+    const next = upsertBlock(`${old}\n# After\n`, RULES)!
     assert.ok(!next.includes('# Old'))
     assert.ok(next.includes('# After'))
     assert.equal(next.split(BLOCK_START).length, 2)
+  })
+  it('leaves a start marker with no end alone, so the text after it is never eaten', () => {
+    const t = `# Mine\n${BLOCK_START}\nold\n\n## My own notes\n- keep me\n`
+    assert.equal(upsertBlock(t, RULES), undefined)
+    assert.deepEqual(decideRules(t, RULES, V), { action: 'skip', why: 'block broken' })
+    // An end before the start is no end for it.
+    assert.equal(upsertBlock(`${BLOCK_END}\n${t}`, RULES), undefined)
+    // A stray end before a whole block still updates the block.
+    assert.ok(upsertBlock(`${BLOCK_END}\nstray\n${BLOCK_START}\nold\n${BLOCK_END}\n`, RULES)!.includes(`stray\n${BLOCK_START}\n${RULES.trimEnd()}`))
+  })
+
+  it('reads a generated file saved with Windows line endings as generated', () => {
+    const crlf = rulesFile(RULES, V).replace(/\n/g, '\r\n')
+    assert.equal(decideRules(crlf, RULES, V).action, 'skip')
+    const older = rulesFile('# Old\n', '2026-01-01T00:00:00Z').replace(/\n/g, '\r\n')
+    const d = decideRules(older, RULES, V)
+    assert.equal(d.why, 'older')
+    assert.ok(!d.text!.includes(BLOCK_START))
   })
 })
 
@@ -162,6 +180,18 @@ describe('syncRules', () => {
     assert.ok(r.changed.length > 0)
     assert.equal(r.ready.claude, false)
     assert.deepEqual(fs.readdirSync(path.join(home, '.claude')), [])
+  })
+
+  it('says when a hand edit broke the managed block, and writes nothing', () => {
+    const home = tmp(), k = tmp()
+    kit(k)
+    fs.mkdirSync(path.join(home, '.claude'))
+    const broken = `# Mine\n${BLOCK_START}\n- keep me\n`
+    fs.writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), broken)
+    const r = syncRules({ home, kit: k, write: true })
+    assert.equal(fs.readFileSync(path.join(home, '.claude', 'CLAUDE.md'), 'utf8'), broken)
+    assert.equal(r.ready.claude, false)
+    assert.match(r.note, /CLAUDE\.md has a switchboard rules start line with no end line/)
   })
 
   it('says up to date when everything matches', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { demoApply, demoHub, demoTick } from './hub-demo'
+import { demoApply, demoChat, demoHub, demoTick, demoUpload } from './hub-demo'
 
 test('a demo New chat puts a working chat on top, named from the goal', () => {
   const h = demoApply(demoHub(), { type: 'hub-new-chat', path: '/Users/k/Documents/GitHub/Armasu', text: 'fix the closet door animation on settings page', remote: false })
@@ -72,6 +72,18 @@ test('the demo Sign-ins: make default, rename, add, pick for this window', () =>
   assert.equal(h.signIns.projects[h.signIns.window!], undefined)
 })
 
+test('demo accounts show an expiring session and failures; signing in again clears one', () => {
+  let h = demoHub(0)
+  assert.ok(h.aws.some(a => a.status === 'signed-in' && a.expiresAt && a.expiresAt - 0 < 3_600_000))
+  assert.ok(h.signIns.errors?.['aws:yo'] && h.signIns.errors['login:auth0:a-me'])
+  assert.ok(h.signIns.browsers?.[h.signIns.window!])
+  h = demoApply(h, { type: 'hub-aws-login', profile: 'yo', chrome: '' })
+  assert.equal(h.signIns.errors?.['aws:yo'], undefined)
+  assert.equal(h.aws.find(a => a.name === 'yo')?.status, 'signed-in')
+  h = demoApply(h, { type: 'hub-login-open', app: 'auth0', id: 'a-me' })
+  assert.equal(h.signIns.errors?.['login:auth0:a-me'], undefined)
+})
+
 test('the demo browser per project: set, system browser, forget', () => {
   let h = demoHub()
   const folder = h.signIns.window!, dir = h.signIns.chrome[0].dir
@@ -123,6 +135,20 @@ test('the demo applies to-do commands to its sample list, with one item a chat t
   assert.equal(demoApply(h, { type: 'hub-todo-remove', path: '/nowhere', id: 'x' }), h)
 })
 
+test('the demo suggests what finished chats left, with a reason and the chat, and takes Accept or Dismiss', () => {
+  const at = '/Users/k/GitHub/Armasu'
+  let h = demoHub(0)
+  const list = () => h.todos![at]
+  const [first, second] = list().suggested!
+  assert.ok(first.why && first.from && second)
+  h = demoApply(h, { type: 'hub-todo-accept', path: at, id: first.id })
+  assert.ok(!list().suggested?.some(t => t.id === first.id))
+  assert.ok(list().todo.some(t => t.text === first.text && t.from === first.from && t.why === first.why))
+  h = demoApply(h, { type: 'hub-todo-dismiss', path: at, id: second.id })
+  assert.ok(!list().suggested?.some(t => t.id === second.id))
+  assert.ok(!list().todo.some(t => t.text === second.text))
+})
+
 test('the name setting round-trips in the demo, empty by default', () => {
   assert.equal(demoHub().controls.switchboard.name, '')
   const h = demoApply(demoHub(), { type: 'hub-switchboard', key: 'name', value: 'Kenneth' })
@@ -136,4 +162,67 @@ test('a demo run starts the picked item and its prerequisite, like the extension
   assert.ok(chat)
   assert.equal(todo.find(t => t.id === 'dt2')?.chat, chat)
   assert.equal(todo.find(t => t.id === 'dt4')?.chat, undefined)
+})
+
+test('demo sign-ins name only folders the projects list has', () => {
+  const h = demoHub(0), paths = h.projects.map(p => p.path), s = h.signIns!
+  for (const f of [...Object.keys(s.projects), s.window!, ...Object.keys(s.links ?? {})]) assert.ok(paths.includes(f), f)
+})
+
+test('a demo upload answers a path laid out like the real uploads folder', () => {
+  assert.equal(demoUpload('../shot.png', '/Users/k/Documents/GitHub/Armasu', new Date(2026, 9, 3)), '~/.claude/switchboard/uploads/Armasu/2026-10-03/shot.png')
+})
+
+test('the demo opens with a stuck job and a quiet agent; Dismiss and Stop take one off', () => {
+  const h = demoHub(0)
+  assert.deepEqual(h.stuck?.map(i => i.kind), ['job', 'agent'])
+  assert.deepEqual(demoApply(h, { type: 'hub-stuck-dismiss', sessionId: 'd-work', id: 'agent:d-work:q2' }).stuck?.map(i => i.kind), ['job'])
+  assert.deepEqual(demoApply(h, { type: 'hub-stuck-stop', sessionId: 'd-wrap', id: 'job:d-wrap:t9' }).stuck?.map(i => i.kind), ['agent'])
+})
+
+test('a demo Jarvis question proposes a start for an instruction and answers anything else', () => {
+  const s = demoApply(demoHub(), { type: 'hub-jarvis', q: 'start a chat to fix the size chart' }).jarvis!
+  assert.deepEqual(s.start, { folder: '/Users/k/Documents/GitHub/Armasu', project: 'Armasu', goal: 'fix the size chart' })
+  const a = demoApply(demoHub(), { type: 'hub-jarvis', q: 'what is running' }).jarvis!
+  assert.equal(a.start, undefined)
+  assert.ok(a.answer)
+  assert.equal(demoApply(demoHub(), { type: 'hub-jarvis', q: ' ' }).jarvis, null)
+})
+
+test('the demo mic listens, stops on a pause or a tap, and puts its words in the box', () => {
+  const on = demoApply(demoHub(), { type: 'hub-voice', on: true })
+  assert.equal(on.voice, 'listening')
+  assert.equal(demoTick(on, Date.now() + 1000).voice, 'listening')
+  const paused = demoTick(on, Date.now() + 4000)
+  assert.equal(paused.voice, null)
+  assert.equal(paused.heard?.text, 'what is running')
+  const tapped = demoApply(on, { type: 'hub-voice', on: false })
+  assert.equal(tapped.voice, null)
+  assert.ok(tapped.heard?.text)
+  assert.equal(demoApply(demoHub(), { type: 'hub-voice', on: false }).heard, undefined)
+})
+
+test('the demo chat view answers outputs, a paged transcript and a screenshot', () => {
+  const h = demoHub(0)
+  const o = demoChat(h, 'd-done', 'outputs')
+  assert.ok(o.outputs?.final && o.outputs.commit && o.outputs.reports.length >= 2 && o.outputs.shots.length >= 1)
+  assert.ok(o.outputs.tests.length && o.outputs.errors.length && o.outputs.files.length && o.outputs.questions.length)
+  const first = demoChat(h, 'd-done', 'transcript').transcript!
+  assert.equal(first.messages.length, 50)
+  assert.ok(first.before !== null)
+  const rest = demoChat(h, 'd-done', 'transcript', { before: first.before! }).transcript!
+  assert.ok(rest.messages.length > 0 && rest.messages.length < 50)
+  assert.equal(rest.before, null)
+  assert.match(demoChat(h, 'd-done', 'shot', { path: o.outputs.shots[0] }).shot ?? '', /^data:image\/svg\+xml/)
+  assert.equal(demoChat(h, 'd-done', 'shot', { path: '/etc/passwd' }).shot, undefined)
+  assert.equal(demoChat(h, 'nope', 'outputs').outputs, undefined)
+})
+
+test('the demo transcript fits each chat, not the same script for all', () => {
+  const h = demoHub(0)
+  const work = demoChat(h, 'd-work', 'transcript').transcript!
+  assert.match(work.messages[0].text, /Fix login redirect/)
+  assert.ok(!work.messages.some(m => /Codex/.test(m.text)))
+  assert.equal(work.before, null)
+  assert.match(demoChat(h, 'd-done', 'transcript').transcript!.messages.at(-1)!.text, /Codex|engineer|AI/)
 })

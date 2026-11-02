@@ -4,21 +4,26 @@ import type { ChatRow } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { projectName } from '@/lib/archive'
 
-type Item = { label: string; done: string; cmd: HubCommand; hint: string }
+type Item = { label: string; done: string; cmd: HubCommand; hint: string; /** Two steps: the first press shows this. */ confirm?: string }
+type Act = { label: string; hint: string; run: () => void }
 
-/** A chat's extra actions behind a "more" button: star, hand off, compact, open its terminal. Arrows move, Esc closes. */
-export function ChatMenu({ chat, starred, send, onMac }: { chat: ChatRow; starred: boolean; send: (c: HubCommand) => void; onMac?: boolean }) {
+/** A chat's extra actions behind a "more" button: star, hand off, compact, open its terminal. Arrows move, Esc closes.
+ *  inPicture: the chat page has its own Open terminal button, so the menu leaves it out. onRead: opens the chat view. */
+export function ChatMenu({ chat, starred, send, onMac, inPicture, onRead }: { chat: ChatRow; starred: boolean; send: (c: HubCommand) => void; onMac?: boolean; inPicture?: boolean; onRead?: () => void }) {
   const [open, setOpen] = useState(false)
   const [said, setSaid] = useState('')
+  const [armed, setArmed] = useState<string>()
+  useEffect(() => { if (!open) setArmed(undefined) }, [open])
   const id = useId()
   const wrap = useRef<HTMLSpanElement>(null), btn = useRef<HTMLButtonElement>(null)
   const sessionId = chat.sessionId
   const items: Item[] = [
     { label: starred ? 'Unstar' : 'Star', done: starred ? 'Unstarred' : 'Starred', hint: 'Starred chats stay easy to find and resume', cmd: { type: 'hub-star', sessionId, ai: chat.ai ?? 'claude', on: !starred } },
-    { label: 'Hand off to a fresh chat', done: 'Handing off', hint: 'Writes a handoff note and carries on in a new chat with the next version number', cmd: { type: 'hub-handoff', sessionId } },
-    { label: 'Compact', done: 'Compact queued', hint: 'Asks this chat to compact its context', cmd: { type: 'hub-compact', sessionId } },
-    { label: 'Open terminal', done: onMac === false ? 'Opened on the Mac' : 'Opened', hint: onMac === false ? 'Brings up its terminal on the Mac' : 'Brings up its terminal', cmd: { type: 'hub-focus-chat', sessionId } },
+    { label: 'Hand off to a fresh chat', done: 'Handing off', hint: 'Writes a handoff note and carries on in a new chat with the next version number', cmd: { type: 'hub-handoff', sessionId }, confirm: 'Press again to hand off' },
+    { label: 'Compact', done: 'Compact queued', hint: 'Asks this chat to compact its context', cmd: { type: 'hub-compact', sessionId }, confirm: 'Press again to compact' },
+    ...inPicture ? [] : [{ label: 'Open terminal', done: onMac === false ? 'Opened on the Mac' : 'Opened', hint: onMac === false ? 'Brings up its terminal on the Mac' : 'Brings up its terminal', cmd: { type: 'hub-focus-chat', sessionId } } as Item],
   ]
+  const acts: Act[] = onRead ? [{ label: 'Read outputs and transcript', hint: 'What this chat produced, and its transcript', run: onRead }] : []
   useEffect(() => { if (!said) return; const t = setTimeout(() => setSaid(''), 1800); return () => clearTimeout(t) }, [said])
   useEffect(() => {
     if (!open) return
@@ -43,9 +48,16 @@ export function ChatMenu({ chat, starred, send, onMac }: { chat: ChatRow; starre
       </button>
       {open && (
         <span id={id} role="menu" aria-label={`Actions for ${name}`} className="hub-menu">
+          {acts.map(a => (
+            <button key={a.label} type="button" role="menuitem" tabIndex={-1} title={a.hint}
+              onClick={() => { setOpen(false); btn.current?.focus(); a.run() }}>{a.label}</button>
+          ))}
           {items.map(it => (
-            <button key={it.cmd.type} type="button" role="menuitem" tabIndex={-1} title={it.hint}
-              onClick={() => { send(it.cmd); setSaid(it.done); setOpen(false); btn.current?.focus() }}>{it.label}</button>
+            <button key={it.cmd.type} type="button" role="menuitem" tabIndex={-1} title={it.hint} data-armed={armed === it.cmd.type || undefined}
+              onClick={() => {
+                if (it.confirm && armed !== it.cmd.type) { setArmed(it.cmd.type); setSaid(it.confirm); return }
+                send(it.cmd); setSaid(it.done); setOpen(false); btn.current?.focus()
+              }}>{armed === it.cmd.type ? it.confirm : it.label}</button>
           ))}
         </span>
       )}

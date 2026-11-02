@@ -3,10 +3,22 @@ import type { EngineInterface, Register } from 'claude-code'
 
 type Spend = { key: string; what: string }
 
-const AWS_CHANGE = /\baws\s+[\w-]+\s+(create|delete|put|update|modify|run|terminate|start|stop|reboot|attach|detach|associate|deploy|register|deregister|import|restore|copy|purchase)\b[\w-]*/
+const AWS_VERB = /^(create|delete|put|update|modify|run|terminate|start|stop|reboot|attach|detach|associate|deploy|register|deregister|import|restore|copy|purchase|invoke|rm|mv|cp|sync|mb|rb)\b/
+// Flags may sit before the service or the verb (aws --profile p ec2 --region r run-instances). Skip dash tokens; each
+// flag without = may have eaten a word as its value, so widen the window by one per flag. Token scan, no backtracking.
+// Common flags that take no value, so they do not widen the window.
+const AWS_BARE = /^--(recursive|debug|dryrun|dry-run|quiet|force|no-[\w-]+|only-show-errors|human-readable|summarize)$/
+const AWS_CHANGE = {
+  test: (s: string) => [...s.matchAll(/\baws\s+([^|;&\n"]*)/g)].some(m => {
+    const tokens = m[1].split(/\s+/).filter(Boolean)
+    const valued = tokens.filter(t => t.startsWith('-') && !t.includes('=') && !AWS_BARE.test(t)).length
+    const words = tokens.filter(t => !t.startsWith('-')).slice(0, 2 + valued)
+    return words.slice(1).some(w => AWS_VERB.test(w))
+  }),
+}
 const AWS_SPEND: Spend = { key: 'aws', what: 'an AWS change (may cost money)' }
 
-const BASH: { test: RegExp; spend: Spend }[] = [
+const BASH: { test: { test(s: string): boolean }; spend: Spend }[] = [
   { test: /\bbland\s+(call|sms|batch)\s+(send|create)\b|api\.bland\.ai/, spend: { key: 'bland', what: 'a Bland call or text (Bland credit)' } },
   { test: /openrouter\.ai\/api/, spend: { key: 'openrouter', what: 'an OpenRouter request (OpenRouter credit)' } },
   { test: /thenewblack\.ai|\/api\/closet\/virtualtryon/, spend: { key: 'newblack', what: 'a NewBlack try-on render (render credit)' } },

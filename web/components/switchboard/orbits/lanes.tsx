@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { almostDone } from '../look'
 import { axisTicks, laneBars, loopBacks, teamOf, timeline, trackWidth, type LaneBar } from '@/lib/orbit-views'
 import type { ToolCall } from '@/lib/hub-types'
-import { Glyph, NAME, Reveal, useLive, type ViewProps } from './parts'
+import { Glyph, NAME, Reveal, nodeProps, useLive, type ViewProps } from './parts'
 import { describe } from '../orbit'
 import { say } from '@/lib/eta'
 
@@ -28,7 +28,8 @@ export function Commit({ text }: { text: string }) {
   )
 }
 
-export function Lanes({ chat, showTools }: ViewProps) {
+export function Lanes(v: ViewProps) {
+  const { chat, showTools } = v
   const root = useRef<HTMLDivElement>(null), scroller = useRef<HTMLDivElement>(null)
   useLive(root)
   // The whole chat on a fixed minute scale; the chart scrolls sideways and opens at now. While the view sits at
@@ -52,7 +53,8 @@ export function Lanes({ chat, showTools }: ViewProps) {
     stick.current = s.scrollLeft >= max - 4
     setAt(o => o.start === s.scrollLeft <= 4 && o.end === stick.current ? o : { start: s.scrollLeft <= 4, end: stick.current })
   }
-  useLayoutEffect(() => { const s = scroller.current; if (s && stick.current) s.scrollLeft = s.scrollWidth; sync() })
+  // The chart is lw + px wide; only a change there moves the end.
+  useLayoutEffect(() => { const s = scroller.current; if (s && stick.current) s.scrollLeft = s.scrollWidth; sync() }, [px, box.vw, box.lw])
   const go = (left: number) => {
     const s = scroller.current
     if (s) s.scrollTo({ left, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
@@ -92,12 +94,11 @@ export function Lanes({ chat, showTools }: ViewProps) {
   const grid = <span className="ovl-grid" aria-hidden>{axis.slice(1).map(t => <i key={t.label} style={{ left: pct(f(t.at)) }} />)}</span>
   const ticks = (list: ToolCall[]) => showTools && list.map(t =>
     <i key={`${t.at}:${t.tool}`} className="ovl-tick" style={{ left: pct(f(t.at)) }} title={`${t.tool}${t.target ? ` ${t.target}` : ''} · ${new Date(t.at).toTimeString().slice(0, 8)}`} />)
-  const label = (k: string, name: string, word: string, s: string, model?: string) => (
-    <div className="ovl-label" data-s={s}>
-      <Glyph k={k} size={14} />
-      <span><b>{name}</b><small><span className="ovl-word">{word}</span>{model ? ` · ${model}` : ''}</small></span>
-    </div>
-  )
+  // A role's label is its node: a button that opens the drawer. The lead's stays a label.
+  const label = (k: string, name: string, word: string, s: string, model?: string, node?: ReturnType<typeof nodeProps>) => {
+    const inner = <><Glyph k={k} size={14} /><span><b>{name}</b><small><span className="ovl-word">{word}</span>{model ? ` · ${model}` : ''}</small></span></>
+    return node ? <button type="button" className="ovl-label" data-s={s} {...node}>{inner}</button> : <div className="ovl-label" data-s={s}>{inner}</div>
+  }
   // A bar too narrow for its label: the lane's last one says it beside itself, on the side with room; earlier ones stay quiet.
   const bar = (b: LaneBar, text: string, last: boolean) => {
     const a = f(b.from), z = f(b.to), inside = (z - a) * px >= 72, tag = <>{b.count > 1 && <b>×{b.count}</b>}{text}</>
@@ -111,7 +112,7 @@ export function Lanes({ chat, showTools }: ViewProps) {
     <div ref={root} className="ov-stage ov-lanes" data-chat={lead}>
       <div ref={scroller} className="ovl-scroll" tabIndex={over ? 0 : -1} role="region" aria-label="Timeline, scrolls sideways"
         data-over={over || undefined} onScroll={sync} onKeyDown={keys} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-        <div className="ovl-chart" style={box.vw ? { width: box.lw + px } : undefined} role="img" aria-label={`${describe(chat)} Timeline from ${clock(tl.t0)} to ${end === 'now' ? 'now' : clock(tl.t1)}.`}>
+        <div className="ovl-chart" style={box.vw ? { width: box.lw + px } : undefined} role="group" aria-label={`${describe(chat)} Timeline from ${clock(tl.t0)} to ${end === 'now' ? 'now' : clock(tl.t1)}.`}>
           <div className="ovl-row ovl-axis">
             <div className="ovl-label ovl-jump">
               {over && <>
@@ -139,7 +140,7 @@ export function Lanes({ chat, showTools }: ViewProps) {
             const row = tl.rows.find(r => r.role === m.role)!, bars = laneBars(row.runs, tl.t0, tl.t1, 8 / px)
             return (
               <div key={m.role} className="ovl-row" data-s={m.state}>
-                {label(m.role, NAME(m.role), WORD[m.state], m.state, chat.models?.[m.role])}
+                {label(m.role, NAME(m.role), WORD[m.state], m.state, chat.models?.[m.role], v.pick ? nodeProps(v, m.role, m.state) : undefined)}
                 <div className="ovl-track">
                   {grid}
                   {bars.map((b, i) => bar(b, i === bars.length - 1 && m.task ? m.task : bars.length > 1 ? `Run ${i + 1}` : say(b.to - b.from).replace(/^about /, ''), i === bars.length - 1))}

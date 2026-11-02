@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AiId, ArchivedChat, ChatProgress, ChatRow, ChatState, TaskRow, HandoffWait, NoteSearch, WindowInfo } from '@/lib/hub-types'
+import type { AiId, ArchivedChat, ChatProgress, ChatRow, ChatState, TaskRow, HandoffWait, NoteSearch, StuckItem, WindowInfo } from '@/lib/hub-types'
+import { stuckTone } from '@/lib/stuck'
 import { byWindow } from '@/lib/windows'
-import { eta, say } from '@/lib/eta'
+import { busyLine, projectLeft, sayLeft, timeLeft } from '@/lib/eta'
 import { archiveChains, filterChains, historyCount, liveVersion, projectName, splitVersion } from '@/lib/archive'
 import { ALMOST, STATE, WINDOW_VAR, ago, almostDone, caps, coverage, label, missedCount } from './look'
 import { chip } from './tool-chips'
@@ -22,16 +23,11 @@ export function TaskBar({ done, total, label, height = 4 }: { done: number; tota
 export const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 export const hhmm = (at: number) => new Date(at).toTimeString().slice(0, 5)
 
-/** The state chip: a working chat whose lead already stopped is wrapping up, not working; a done one with a request not covered is almost done. */
-export const chipOf = (p?: ChatProgress) => p?.state === 'working' && p.waiting ? { ...STATE.working, label: 'Wrapping up' } : almostDone(p) ? ALMOST : STATE[p?.state ?? 'idle']
+/** The state chip: a chat whose lead stopped while agents or shells run is still Working; a done one with a request not covered is almost done. */
+export const chipOf = (p?: ChatProgress) => almostDone(p) ? ALMOST : STATE[p?.state ?? 'idle']
 
-/** "1 subagent, 1 job still running" while the lead waits on them; the chip already says Wrapping up. */
-export function stillRunning(p?: ChatProgress): string | undefined {
-  if (!p?.waiting) return undefined
-  const subs = p.running?.length ?? 0, jobs = p.jobs?.length ?? 0
-  const parts = [subs ? plural(subs, 'subagent') : '', jobs ? plural(jobs, 'job') : ''].filter(Boolean)
-  return parts.length ? `${parts.join(', ')} still running` : undefined
-}
+/** "3 agents, 1 shell running", whether or not the lead's turn is over. */
+export const stillRunning = busyLine
 
 /** "All 3 tasks done" for a finished chat; "1 request not covered" for an almost done one. */
 export const finishedLine = (p: ChatProgress) => missedCount(p)
@@ -98,8 +94,7 @@ export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (tex
     if (ok) setTimeout(() => setSaid(undefined), 1400)
   }
   return <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%' }}>
-    <button type="button" className="hub-btn" onClick={() => void copy()} aria-live="polite"
-      style={small ? { padding: '6px 10px', fontSize: 12 } : undefined}>{said ?? 'Copy commit message'}</button>
+    <button type="button" className={small ? 'hub-btn sm' : 'hub-btn'} onClick={() => void copy()} aria-live="polite">{said ?? 'Copy commit message'}</button>
     {manual && <textarea readOnly aria-label="Commit message" value={text} rows={Math.min(12, Math.max(3, text.split("\n").length))} autoFocus onFocus={e => e.currentTarget.select()} onBlur={() => { setManual(false); setSaid(undefined) }}
       ref={el => el?.select()} style={{ font: '400 12px/1.5 var(--hub-mono)', padding: '6px 8px', borderRadius: 6, minWidth: 0, flex: '1 1 160px', background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)', resize: 'none' }} />}
   </span>
@@ -108,22 +103,28 @@ export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (tex
 /** onSelect's key: the pick came from the keyboard, so the picture swaps with no crossfade. */
 /** windows: grouped under each VS Code window, here (the panel's own) first. */
 /** starred: session ids with a star. menu: each card's actions, beside it (a card is one button, so the menu cannot sit inside it). */
-export function ChatCards({ cards, waits = [], selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, onSelect }: { cards: Card[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void }) {
+/** all: every chat's progress (hub.progress), the history behind the estimates, so the cards and the chat page agree. */
+/** stuck: hub.stuck, for the Stuck note in the meta line. */
+export function ChatCards({ cards, all = [], waits = [], stuck, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, onSelect }: { cards: Card[]; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[] }) {
   if (!cards.length) return <p style={{ color: 'var(--hub-ash)', margin: 0, padding: 4 }}>{empty}</p>
   const groups = byWindow(cards, windows, here)
-  const more = { waits, selected, starred, menu, onSelect }
+  const now = Date.now()
+  const more = { waits, stuck, selected, starred, menu, onSelect, all, now }
   if (!groups.some(g => g.window)) return <CardList cards={cards} label="Chats" {...more} />
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       {groups.map(g => {
         const color = g.window && WINDOW_VAR[g.window.color]
         const name = g.window?.name ?? 'Other'
+        const busy = g.cards.filter(c => c.progress?.state === 'working')
+        const left = busy.length > 1 ? projectLeft(busy.map(c => timeLeft(c.progress!, all, now))) : undefined
         return (
           <section key={g.window?.workspace ?? ''} aria-label={g.here ? `${name}, this window` : name} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
-            <h3 title={g.window?.workspace} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 4px', minWidth: 0, font: '600 12px/1.2 var(--hub-sans)', letterSpacing: 0.5, textTransform: 'uppercase', color: color ?? 'var(--hub-ash)' }}>
+            <h3 title={g.window?.workspace} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 4px', minWidth: 0, font: 'var(--hub-caps-font, 600 12px/1.2 var(--hub-sans))', letterSpacing: 'var(--hub-caps-track, 0.5px)', textTransform: 'var(--hub-caps-case, uppercase)' as 'uppercase', color: color ?? 'var(--hub-ash)' }}>
               {color && <i aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />}
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-              {g.here && <span style={{ font: '600 12px/1 var(--hub-mono)', letterSpacing: 0.4, flexShrink: 0, textTransform: 'none' }}>· this window</span>}
+              {g.here && <span style={{ fontWeight: 400, flexShrink: 0, textTransform: 'none' }}>· this window</span>}
+              {busy.length > 1 && <span style={{ marginLeft: 'auto', font: '400 12px/1 var(--hub-mono)', letterSpacing: 0, flexShrink: 0, textTransform: 'none', color: 'var(--hub-blue)' }}>{busy.length} working{left ? ` · ${sayLeft(left)}` : ''}</span>}
             </h3>
             <CardList cards={g.cards} label={`Chats in ${name}`} stripe={color} grouped {...more} />
           </section>
@@ -134,7 +135,8 @@ export function ChatCards({ cards, waits = [], selected, windows = [], here, emp
 }
 
 /** stripe: the window color down each card's left edge. grouped: the group heading names the project, so the card does not. */
-function CardList({ cards, label, stripe, grouped, waits, selected, starred, menu, onSelect }: { cards: Card[]; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void }) {
+/** all: every chat's progress, the history behind each estimate. */
+function CardList({ cards, label, stripe, grouped, waits, stuck, selected, starred, menu, onSelect, all, now }: { cards: Card[]; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; stuck?: StuckItem[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
   return (
     <ul role="list" aria-label={label} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
       {cards.map(({ chat, progress }) => {
@@ -145,7 +147,9 @@ function CardList({ cards, label, stripe, grouped, waits, selected, starred, men
         const wait = waits.find(w => w.sessionId === chat.sessionId)
         const tasks = progress?.tasks ?? [], done = tasks.filter(t => t.status === 'completed').length
         const open = tasks.length - done
-        const left = progress?.state === 'working' && open ? eta(progress, Date.now()).leftMs : undefined
+        const left = progress && timeLeft(progress, all, now), leftText = left && sayLeft(left)
+        const tone = stuckTone(stuck, chat.sessionId)
+        const meta = [grouped ? '' : projectName(chat), finished ? '' : active, progress ? ago(progress.at) : ''].filter(Boolean).join(' · ')
         return (
           <li key={chat.sessionId} className="hub-card-li" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6, position: 'relative' }}>
             <button type="button" className="hub-card" onClick={e => onSelect(chat.sessionId, e.detail === 0)} aria-pressed={on} style={stripe ? { borderLeft: `3px solid ${stripe}` } : undefined}>
@@ -157,17 +161,18 @@ function CardList({ cards, label, stripe, grouped, waits, selected, starred, men
                 </span>
                 <span className="hub-chip" style={{ color: s.color, background: s.soft, flexShrink: 0 }}>{finished ? <Check /> : <i aria-hidden />}{s.label}</span>
               </span>
+              {/* Stuck rides in the meta line, so the name keeps the room beside the one chip. */}
               <span style={{ font: '400 12px/1.5 var(--hub-mono)', color: 'var(--hub-ash)' }}>
-                {[grouped ? '' : projectName(chat), finished ? '' : active, progress ? ago(progress.at) : ''].filter(Boolean).join(' · ')}
+                {tone && <span title="Something in this chat looks stuck: see Needs attention" style={{ color: `var(--hub-${tone})`, fontWeight: 500 }}>Stuck{meta ? ' · ' : ''}</span>}
+                {meta}
               </span>
               {/* A button reads its children as flat text, so the progressbar screen readers get sits beside it; this one is the look. */}
               {tasks.length > 0 && !finished && <span aria-hidden style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
                 <TaskBar done={done} total={tasks.length} height={3} label="" />
-                <span style={{ font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-ash)' }}>{done} of {tasks.length}{left !== undefined && <span style={{ color: 'var(--hub-mute)' }}> · {say(left)} left</span>}</span>
+                <span style={{ font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-ash)' }}>{done} of {tasks.length}</span>
               </span>}
-              {left !== undefined && <span className="sr-only">{say(left)} left</span>}
               {tasks.length > 0 && !finished && <span aria-hidden style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)' }}><TaskRows tasks={tasks} max={5} small state={progress?.state} /></span>}
-              {running && <span style={{ color: 'var(--hub-blue)', fontSize: 13 }}>{running}</span>}
+              {(running || leftText) && <span style={{ color: 'var(--hub-blue)', fontSize: 13 }}>{[running, leftText].filter(Boolean).join(' · ')}</span>}
               {progress?.state === 'idle' && open > 0 && <span style={{ color: 'var(--hub-yellow)', fontSize: 13 }}>{plural(open, 'task')} open</span>}
               {finished && <span style={{ color: s.color, fontSize: 13 }}>{finishedLine(progress)}{progress.finishedAt ? <span className="hub-num"> · {hhmm(progress.finishedAt)}</span> : ''}</span>}
               {wait && <span style={{ color: 'var(--hub-yellow)', fontSize: 13 }}>Waiting for {wait.tasks} task{wait.tasks === 1 ? '' : 's'} to finish before moving to {wait.next}</span>}
@@ -183,16 +188,17 @@ function CardList({ cards, label, stripe, grouped, waits, selected, starred, men
 }
 
 /** Toggle chips, one per project; none pressed shows every project. */
-/** tint: a project's window color, as a dot in its chip. */
-export function ProjectFilter({ projects, picked, tint, onChange }: { projects: { name: string; count: number }[]; picked: string[]; tint?: (name: string) => string | undefined; onChange: (picked: string[]) => void }) {
+/** tint: a project's window color, as a dot in its chip. busy: how many of its chats are working. */
+export function ProjectFilter({ projects, picked, tint, busy, onChange }: { projects: { name: string; count: number }[]; picked: string[]; tint?: (name: string) => string | undefined; busy?: (name: string) => number; onChange: (picked: string[]) => void }) {
   return (
-    <div role="group" aria-label="Show chats from these projects" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+    <div role="group" aria-label="Show chats from these projects" className="hub-filter" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
       {projects.map(({ name, count }) => {
         const on = picked.includes(name)
         return (
           <button key={name} type="button" aria-pressed={on} style={chip(on)} onClick={() => onChange(on ? picked.filter(p => p !== name) : [...picked, name])}>
             {tint?.(name) && <i aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: tint(name), flex: 'none' }} />}
             {name}<span style={{ color: 'var(--hub-mute)' }}>{count}</span>
+            {!!busy?.(name) && <span style={{ color: 'var(--hub-blue)' }}>· {busy(name)} working</span>}
           </button>
         )
       })}
@@ -214,11 +220,12 @@ function Snippet({ text, q }: { text: string; q: string }) {
 /**
  * Chats that filled up and continued in a new one, one row per chain; a row opens its versions, newest first.
  * The search box filters by name, and by words in the handoff notes (the extension searches those: onSearch).
- * reveal: the switcher's pick, which opens History at that chain.
+ * reveal: the switcher's pick, which opens History at that chain. onRead: opens a version in the chat view.
  */
-export function History({ archive, chats, search, reveal, onSearch, onNote, onResume }: {
+export function History({ archive, chats, search, reveal, onSearch, onNote, onResume, onRead }: {
   archive: ArchivedChat[]; chats: ChatRow[]; search: NoteSearch | null; reveal?: { chain: string; at: number }
   onSearch: (q: string) => void; onNote: (sessionId: string) => void; onResume: (sessionId: string, ai: AiId) => void
+  onRead?: (sessionId: string, name: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [chain, setChain] = useState<string>()
@@ -285,7 +292,8 @@ export function History({ archive, chats, search, reveal, onSearch, onNote, onRe
                           <span style={{ font: '500 12px/1 var(--hub-mono)', color: 'var(--hub-body)', minWidth: 22 }}>v{v.version}</span>
                           <span style={{ ...ellipsis, font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-ash)', flex: 1 }}>closed {since(v.archivedAt)}</span>
                           {v.note && <button type="button" className="hub-link" style={{ padding: '6px 4px' }} onClick={() => onNote(v.sessionId)} aria-label={`Open the handoff note of v${v.version}`}>Note</button>}
-                          <button type="button" className="hub-btn" style={{ padding: '6px 10px', fontSize: 12 }} aria-label={`Resume v${v.version}`}
+                          {onRead && <button type="button" className="hub-link" style={{ padding: '6px 4px' }} onClick={() => onRead(v.sessionId, `${c.origin} v${v.version}`)} aria-label={`Read v${v.version}: outputs and transcript`}>Read</button>}
+                          <button type="button" className="hub-btn sm" aria-label={`Resume v${v.version}`}
                             onClick={() => { if (now !== undefined && now > v.version && warn !== v.sessionId) setWarn(v.sessionId); else { setWarn(undefined); onResume(v.sessionId, v.ai) } }}>
                             Resume
                           </button>

@@ -8,7 +8,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, dropped } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -62,6 +62,21 @@ describe('todo merge', () => {
     assert.equal(finishItem(d, 'nope', undefined, 5), d)
   })
 
+  it('Done on a suggestion (a Finish up row) ticks it, tombstoned', () => {
+    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Reload the window, Kenneth'] } }), 1)
+    const id = d.suggested![0].id
+    const out = finishItem(d, id, undefined, 2)
+    assert.equal(out.suggested, undefined)
+    assert.ok(out.removed[id])
+    assert.deepEqual(out.ticked, [{ id, text: 'Reload the window, Kenneth', at: 2, from: 's1', why: 'you' }])
+    // Put back, it is a hand step again, also after a round trip through the file.
+    const named = { ...out, ticked: [{ ...out.ticked![0], name: 'Fix login' }] }
+    assert.deepEqual(parseDoc(JSON.stringify(named)).ticked, named.ticked)
+    const back = restoreTicked(parseDoc(JSON.stringify(named)), id, 3, 'r1').todo[0]
+    assert.equal(back.why, 'you')
+    assert.equal(back.name, 'Fix login')
+  })
+
   it('unions ticked items by id, newest 10, and never brings back one put back', () => {
     const t = (id: string, at: number) => ({ id, text: id, at, by: 's1' })
     const a: TodoDoc = { version: 1, todo: [], removed: {}, ticked: [t('k1', 3), t('k2', 2)] }
@@ -107,11 +122,27 @@ describe('todo finish', () => {
   it('adds the standup Left items once; open tasks stay on the chat, not the to-do', () => {
     const p = chat({ report: { done: ['did a'], left: ['Write docs', 'Deploy'] }, tasks: [{ id: '1', subject: 'Open task', status: 'pending' }, { id: '2', subject: 'Closed', status: 'completed' }] })
     const d = afterFinish(emptyDoc(), p, [], 5)
-    assert.deepEqual(d.todo.map(l => [l.text, l.from]), [['Write docs', 's1'], ['Deploy', 's1']])
-    assert.deepEqual(afterFinish(d, p, [], 6).todo, d.todo)
+    assert.deepEqual(d.todo, [])
+    assert.deepEqual(d.suggested?.map(l => [l.text, l.from]), [['Write docs', 's1'], ['Deploy', 's1']])
+    assert.deepEqual(afterFinish(d, p, [], 6).suggested, d.suggested)
     // The same chat finishing again with a shorter Left list drops what it no longer lists.
     const again = afterFinish(d, chat({ report: { done: [], left: ['Deploy'] } }), [], 7)
-    assert.deepEqual(again.todo.map(l => l.text), ['Deploy'])
+    assert.deepEqual(again.suggested?.map(l => l.text), ['Deploy'])
+  })
+
+  it('For you lines are hand steps as written, replaced by the chat\'s next Done like its Left', () => {
+    const p = chat({ report: { done: ['x'], left: ['Deploy'], you: ['Untested by eye: the panel itself.', 'Commit the repo'] } })
+    const d = afterFinish(emptyDoc(), p, [], 1, [])
+    assert.deepEqual(d.suggested?.map(l => [l.text, l.why]), [['Untested by eye: the panel itself.', 'you'], ['Commit the repo', 'you']])
+    // Not the Left line's id: the same text as a Left line stays apart.
+    assert.equal(afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Commit the repo'] } }), [], 1).suggested![0].id === d.suggested![1].id, false)
+    const again = afterFinish(d, chat({ report: { done: [], left: [], you: ['Commit the repo'] } }), [], 2)
+    assert.deepEqual(again.suggested?.map(l => l.text), ['Commit the repo'])
+    assert.ok(again.removed[d.suggested![0].id])
+    assert.deepEqual(afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: [], you: ['Sign in'] } }), 1, []).suggested?.map(l => [l.text, l.why]), [['Sign in', 'you']])
+    // An explicit For you line wins over a Left line that holds it.
+    const both = afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Reload the window and check the panel'], you: ['Reload the window'] } }), [], 1)
+    assert.deepEqual(both.suggested?.map(l => [l.text, l.why]), [['Reload the window', 'you']])
   })
 
   it('keeps only the Left lines the model calls later work; a failed answer keeps them all', async () => {
@@ -128,23 +159,26 @@ describe('todo finish', () => {
   it('a filter answer that drops a line the chat still lists never tombstones it', () => {
     const p = chat({ report: { done: ['x'], left: ['Deploy to prod'] } })
     const one = afterFinish(emptyDoc(), p, [], 1, ['Deploy to prod'])
-    const two = afterFinish(backInChat(one, 's1', 2), p, [], 3, [])
-    assert.deepEqual(two.todo.map(l => l.text), ['Deploy to prod'])
+    const two = afterFinish(one, p, [], 3, [])
+    assert.deepEqual(two.suggested?.map(l => l.text), ['Deploy to prod'])
     assert.deepEqual(two.removed, {})
     // Dropped by the filter on its first Done: not added, and still free to be added later.
     const skipped = afterFinish(emptyDoc(), p, [], 1, [])
-    assert.deepEqual(skipped.todo, [])
-    assert.deepEqual(afterFinish(skipped, p, [], 2, ['Deploy to prod']).todo.map(l => l.text), ['Deploy to prod'])
+    assert.equal(skipped.suggested, undefined)
+    assert.deepEqual(afterFinish(skipped, p, [], 2, ['Deploy to prod']).suggested?.map(l => l.text), ['Deploy to prod'])
   })
 
-  it('takes a chat\'s Left items back while Kenneth keeps working in it, and its next Done settles them', () => {
+  it('takes an older doc\'s auto added Left items back while Kenneth keeps working in it, and its next Done settles them', () => {
     const p = chat({ report: { done: ['x'], left: ['Live test in two windows', 'Deploy'] } })
-    const d = addTodo(afterFinish(emptyDoc(), p, [], 1), 'Kenneth item', 1, 'k1')
+    // Before the Suggested tray, Left lines went straight into todo.
+    const auto = afterFinish(emptyDoc(), p, [], 1)
+    const d = addTodo({ ...auto, todo: auto.suggested!, suggested: undefined }, 'Kenneth item', 1, 'k1')
     const back = backInChat(d, 's1', 2)
     assert.deepEqual(back.todo.map(l => [l.text, l.chat]), [['Live test in two windows', 's1'], ['Deploy', 's1'], ['Kenneth item', undefined]])
     // It did the test; only Deploy is still left.
     const next = afterFinish(back, chat({ report: { done: ['tested'], left: ['Deploy'] } }), [], 3)
     assert.deepEqual(next.todo.map(l => [l.text, l.chat]), [['Deploy', undefined], ['Kenneth item', undefined]])
+    assert.equal(next.suggested, undefined)
   })
 
   it('keeps an item a chat added with todo_add when that chat finishes', () => {
@@ -157,8 +191,9 @@ describe('todo finish', () => {
     const after = afterFinish(d, chat({ sessionId: 's2', report: { done: ['x'], left: [] } }), ['aaaa1111'], 5)
     assert.deepEqual(after.todo.map(l => l.id), ['bbbb2222'])
     assert.equal(after.removed.aaaa1111, 5)
-    const ticked = removeItem(afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Z'] } }), [], 1), afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Z'] } }), [], 1).todo[0].id, 2)
-    assert.equal(afterFinish(ticked, chat({ report: { done: [], left: ['Z'] } }), [], 3).todo.length, 0)
+    const z = afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Z'] } }), [], 1)
+    const dismissed = dismissSuggestion(z, z.suggested![0].id, 2)
+    assert.equal(afterFinish(dismissed, chat({ report: { done: [], left: ['Z'] } }), [], 3).suggested, undefined)
   })
 
   it('keeps the last 10 items the model ticked, with the chat, and puts one back under a new id', () => {
@@ -182,7 +217,8 @@ describe('todo finish', () => {
     assert.equal(afterFinish(d, chat({ report: { done: ['Receipts'], left: [] } }), [], 3).removed.t1, 3)
     // Left with other lines only: done, and the lines join the to-do.
     const other = afterFinish(d, chat({ report: { done: [], left: ['Deploy to staging'] } }), [], 3)
-    assert.deepEqual(other.todo.map(t => [t.text, t.from]), [['Deploy to staging', 's1']])
+    assert.deepEqual(other.todo, [])
+    assert.deepEqual(other.suggested?.map(t => [t.text, t.from]), [['Deploy to staging', 's1']])
     // Left mentions it: open again, not started, and no duplicate line.
     const kept = afterFinish(d, chat({ report: { done: [], left: ['Add the receipts page (needs the API key)'] } }), [], 3)
     assert.deepEqual(kept.todo, [{ id: 't1', text: 'Add the receipts page', at: 3 }])
@@ -201,6 +237,85 @@ describe('todo finish', () => {
     assert.match(prompt, /aaaa1111: Fix login/)
     assert.match(prompt, /Fixed login/)
     assert.match(prompt, /fix the login/)
+  })
+})
+
+describe('todo suggestions', () => {
+  it('reads why a Left line was left from its text', () => {
+    assert.equal(whyLeft('Blocked: needs the Stripe key'), 'blocked')
+    assert.equal(whyLeft('Waiting on the API team for the schema'), 'blocked')
+    assert.equal(whyLeft('Kenneth to decide the pricing tiers'), 'you')
+    assert.equal(whyLeft('Needs your sign in to the AWS console'), 'you')
+    assert.equal(whyLeft('Out of scope: rewrite the router'), 'scope')
+    assert.equal(whyLeft('Unrelated flaky test in billing'), 'scope')
+    assert.equal(whyLeft('Add rate limits to export'), 'later')
+  })
+
+  it('suggests Left lines with the chat name and reason, never straight into the to-do', () => {
+    const was = hub.get().chats
+    try {
+      hub.set({ chats: [{ pid: 1, sessionId: 's1', name: 'Fix login', cwd: '/p', link: '', live: false, why: [] }] })
+      const d = afterFinish(emptyDoc(), chat({ report: { done: ['x'], left: ['Blocked on the Stripe key', 'Add rate limits'] } }), [], 5)
+      assert.deepEqual(d.todo, [])
+      assert.deepEqual(d.suggested?.map(t => [t.text, t.from, t.name, t.why, t.at]), [['Blocked on the Stripe key', 's1', 'Fix login', 'blocked', 5], ['Add rate limits', 's1', 'Fix login', 'later', 5]])
+    } finally { hub.set({ chats: was }) }
+  })
+
+  it('accepts a suggestion into the to-do keeping where it came from, and dismisses one for good', () => {
+    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Deploy', 'Docs'] } }), 1)
+    const [dep, docs] = d.suggested!
+    const ok = acceptSuggestion(d, dep.id, 2, 'new11111')
+    assert.deepEqual(ok.todo, [{ id: 'new11111', text: 'Deploy', at: 2, from: 's1', why: 'later' }])
+    assert.deepEqual(ok.suggested?.map(t => t.id), [docs.id])
+    assert.equal(ok.removed[dep.id], 2)
+    const gone = dismissSuggestion(ok, docs.id, 3)
+    assert.equal(gone.suggested, undefined)
+    assert.equal(gone.removed[docs.id], 3)
+    // Neither comes back when the chat ends again with the same Left.
+    assert.deepEqual(afterEnd(gone, chat({ state: 'idle', report: { done: [], left: ['Deploy', 'Docs'] } }), 4), gone)
+    assert.equal(acceptSuggestion(gone, 'nope', 5), gone)
+  })
+
+  it('suggests the requests Jev found not covered, once', () => {
+    const p = chat({ asked: ['fix the login', 'add dark mode'], covered: [0.9, 0.1] })
+    const d = addMissed(emptyDoc(), p, 5)
+    assert.deepEqual(d.suggested?.map(t => [t.text, t.why, t.from]), [['add dark mode', 'missed', 's1']])
+    assert.deepEqual(addMissed(d, p, 6), d)
+    assert.equal(addMissed(emptyDoc(), chat({ asked: ['x'] }), 5).suggested, undefined)
+  })
+
+  it('clears a not covered suggestion once Jev scores that request covered', () => {
+    const d = addMissed(emptyDoc(), chat({ asked: ['fix the login', 'add dark mode'], covered: [0.9, 0.1] }), 5)
+    // Resumed and finished again: now covered. A request that rolled out of asked is left alone.
+    const again = addMissed(d, chat({ asked: ['add dark mode', 'ship it'], covered: [0.95, 0.9] }), 6)
+    assert.equal(again.suggested, undefined)
+    assert.ok(again.removed[d.suggested![0].id])
+    assert.deepEqual(addMissed(d, chat({ asked: ['ship it'], covered: [0.9] }), 6), d)
+  })
+
+  it('todo_done closes a suggestion by id or text, into the finished list', () => {
+    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Deploy to staging'] } }), 1)
+    const id = d.suggested![0].id
+    for (const key of [{ id }, { text: 'Deploy to staging' }]) {
+      const r = toolStep(d, { op: 'done', session: 'c9', ...key }, 2)
+      assert.equal(r.said, 'Done: Deploy to staging')
+      assert.equal(r.doc.suggested, undefined)
+      assert.ok(r.doc.removed[id])
+      assert.deepEqual(r.doc.ticked, [{ id, text: 'Deploy to staging', at: 2, by: 'c9', from: 's1', why: 'later' }])
+    }
+    assert.throws(() => toolStep(d, { op: 'done', id: 'nothing' }), /no open to-do item/)
+    const two = addTodo(addTodo(d, 'Deploy prod', 3, 'a1'), 'Deploy docs', 3, 'a2')
+    assert.throws(() => toolStep(two, { op: 'done', text: 'deploy' }), /matches 2 items/)
+  })
+
+  it('keeps suggestions through a disk round trip and a merge, with tombstones', () => {
+    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Deploy'] } }), 1)
+    assert.deepEqual(parseDoc(JSON.stringify(d)).suggested, d.suggested)
+    const id = d.suggested![0].id
+    assert.deepEqual(mergeDocs(d, emptyDoc(), 10).suggested, d.suggested)
+    assert.equal(mergeDocs(d, dismissSuggestion(d, id, 2), 10).suggested, undefined)
+    // An older doc with no suggested field reads as none.
+    assert.equal(parseDoc(JSON.stringify({ version: 1, todo: [], removed: {} })).suggested, undefined)
   })
 })
 
@@ -277,7 +392,8 @@ describe('todo end', () => {
     const d: TodoDoc = { ...emptyDoc(), todo: [{ id: 'x', text: 'already listed', at: 1, from: 'other' }] }
     const p = chat({ state: 'idle', tasks, report: { done: [], left: ['Docs', 'Already listed'] } })
     const after = afterEnd(d, p, 5)
-    assert.deepEqual(after.todo.map(l => l.text), ['already listed', 'Docs'])
+    assert.deepEqual(after.todo.map(l => l.text), ['already listed'])
+    assert.deepEqual(after.suggested?.map(l => l.text), ['Docs'])
     assert.deepEqual(afterEnd(after, p, 6), after)
   })
 
@@ -419,6 +535,13 @@ describe('todo storage', () => {
     ]) assert.equal((await git(a, args)).err, 'Switchboard never force pushes', args.join(' '))
   })
 
+  it('keeps both of two overlapping adds to a file list', async () => {
+    const s = await storeFor(path.join(root, 'no-such-folder'), files)
+    assert.ok(s.file)
+    await Promise.all([updateDoc(s, d => addTodo(d, 'One', 1, 'o1')), updateDoc(s, d => addTodo(d, 'Two', 2, 'o2'))])
+    assert.deepEqual((await readDoc(s)).todo.map(t => t.text).sort(), ['One', 'Two'])
+  })
+
   it('keeps a repo with no origin local', async () => {
     const solo = path.join(root, 'solo')
     sh(root, 'init', '-q', 'solo')
@@ -450,6 +573,36 @@ describe('todo storage', () => {
       assert.deepEqual(d.todo.map(x => [x.id, x.before, x.from]).sort(), [['f1', undefined, 'cB'], ['p1', 't2', 'cA'], ['t2', undefined, undefined]])
       assert.ok(d.removed.t3)
     }
+  })
+
+  it('keeps suggestions, name and why when an older device writes a doc without them', async () => {
+    const sa = await storeFor(a, files), sb = await storeFor(b, files)
+    await syncDoc(sa); await syncDoc(sb)
+    const t = Date.now()
+    await updateDoc(sa, d => afterEnd(addTodo(d, 'Named', t, 'nm1', { from: 'cA', name: 'Fix login', why: 'blocked' }), chat({ sessionId: 'oldnew', state: 'idle', report: { done: [], left: ['wire the deploy key for staging'] } }), t))
+    await syncDoc(sa); await syncDoc(sb)
+    // An older extension reads and writes only todo, ticked and removed.
+    const old = (d: TodoDoc): TodoDoc => ({ version: 1, removed: d.removed, todo: d.todo.map(({ name: _n, why: _w, ...x }) => x) })
+    await updateDoc(sb, d => old(addTodo(d, 'typed on the old laptop', t + 1, 'old1')))
+    await syncDoc(sb); await syncDoc(sa)
+    const d = await readDoc(sa)
+    assert.deepEqual(d.suggested?.map(x => x.text), ['wire the deploy key for staging'])
+    assert.deepEqual(d.todo.find(x => x.id === 'nm1'), { id: 'nm1', text: 'Named', at: t, from: 'cA', name: 'Fix login', why: 'blocked' })
+    assert.ok(d.todo.some(x => x.id === 'old1'))
+    // The merge is pushed, so the other device gets them back too.
+    await syncDoc(sb)
+    assert.equal((await readDoc(sb)).suggested?.length, 1)
+  })
+
+  it('accepting one suggestion on two devices makes one item', async () => {
+    const sa = await storeFor(a, files), sb = await storeFor(b, files)
+    await updateDoc(sa, d => afterEnd(d, chat({ sessionId: 'twice', state: 'idle', report: { done: [], left: ['rotate the staging tokens'] } })))
+    await syncDoc(sa); await syncDoc(sb)
+    const id = (await readDoc(sb)).suggested!.find(x => x.text === 'rotate the staging tokens')!.id
+    await updateDoc(sa, d => acceptSuggestion(d, id))
+    await updateDoc(sb, d => acceptSuggestion(d, id))
+    await syncDoc(sa); await syncDoc(sb); await syncDoc(sa)
+    assert.equal((await readDoc(sa)).todo.filter(x => x.text === 'rotate the staging tokens').length, 1)
   })
 
   it('reads ticked items and put-back tombstones back from disk', async () => {
@@ -508,7 +661,7 @@ describe('todo storage', () => {
     await todoFinished(s, chat({ sessionId: 'r1', report: { done: ['b'], left: ['New B'] } }), async () => '1')
     await slow
     const d = await readDoc(s)
-    assert.deepEqual(d.todo.map(l => l.text), ['New B'])
+    assert.deepEqual(d.suggested?.map(l => l.text), ['New B'])
     assert.deepEqual(d.removed, {})
   })
 
@@ -517,10 +670,15 @@ describe('todo storage', () => {
     // The Left filter keeps every line here; its own tests are above.
     const keep = (f: (q: string) => Promise<string>) => async (q: string) => q.startsWith("A coding chat's standup") ? '1, 2, 3, 4, 5' : f(q)
     await todoFinished(s, chat({ sessionId: 'c1', report: { done: [], left: ['Old thing'] } }), keep(async () => 'none'))
-    const id = (await readDoc(s)).todo.find(t => t.text === 'Old thing')!.id
+    const sug = (await readDoc(s)).suggested!.find(t => t.text === 'Old thing')!
+    await updateDoc(s, d => acceptSuggestion(d, sug.id, 2, 'acc11111'))
+    const id = 'acc11111'
     let asked = ''
     await todoFinished(s, chat({ sessionId: 'c2', report: { done: ['Old thing done'], left: ['New thing'] } }), keep(async q => { asked = q; return id }))
     assert.match(asked, /Old thing/)
+    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain'])
+    const next = (await readDoc(s)).suggested!.find(t => t.text === 'New thing')!
+    await updateDoc(s, d => acceptSuggestion(d, next.id, 3, 'new11111'))
     assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain', 'New thing'])
     // A failed model call removes nothing.
     await todoFinished(s, chat({ sessionId: 'c3', report: { done: ['x'], left: [] } }), keep(async () => { throw new Error('offline') }))
@@ -535,6 +693,31 @@ describe('todo storage', () => {
     await todoFinished(s, chat({ sessionId: 'c2', report: { done: ['part of it'], left: ['New thing'] } }), keep(async q => { asked = q; return (await readDoc(s)).todo.map(l => l.id).join(',') }))
     assert.doesNotMatch(asked, /New thing/)
     assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['New thing', 'Busy'])
+  })
+
+  it('any finished chat can tick a Finish up step another chat left; its own listed Left line is never asked about', async () => {
+    const s = await storeFor(fs.mkdtempSync(path.join(os.tmpdir(), 'you-')), fs.mkdtempSync(path.join(os.tmpdir(), 'you-files-')))
+    const keep = (f: (q: string) => Promise<string>) => async (q: string) => q.startsWith("A coding chat's standup") ? '1, 2' : f(q)
+    await updateDoc(s, d => afterEnd(d, chat({ sessionId: 'y1', state: 'idle', report: { done: [], left: ['Reload the window, Kenneth', 'Add rate limits later'] } }), 1))
+    const sug = (await readDoc(s)).suggested!
+    const you = sug.find(x => x.why === 'you')!, later = sug.find(x => x.why === 'later')!
+    let asked = ''
+    await todoFinished(s, chat({ sessionId: 'y2', report: { done: ['Kenneth reloaded the window'], left: ['Sign in to Vercel yourself'] } }), keep(async q => { asked = q; return `${you.id}, ${later.id}` }))
+    assert.match(asked, /Reload the window/)
+    assert.doesNotMatch(asked, /rate limits/)
+    const d = await readDoc(s)
+    assert.deepEqual(d.ticked?.map(t => [t.id, t.by]), [[you.id, 'y2']])
+    assert.deepEqual(d.suggested?.map(x => x.text).sort(), ['Add rate limits later', 'Sign in to Vercel yourself'])
+    // y2's own Left line, still listed, is not offered to the model.
+    await todoFinished(s, chat({ sessionId: 'y2', report: { done: ['more'], left: ['Sign in to Vercel yourself'] } }), keep(async q => { asked = q; return 'none' }))
+    assert.doesNotMatch(asked, /Vercel/)
+    // Nor its own For you lines; the Left filter never sees them.
+    await todoFinished(s, chat({ sessionId: 'y3', report: { done: ['x'], left: [], you: ['Tap the mic on the phone'] } }), keep(async () => 'none'))
+    asked = ''
+    await todoFinished(s, chat({ sessionId: 'y3', report: { done: ['more'], left: [], you: ['Tap the mic on the phone'] } }), async q => { asked = q; return 'none' })
+    assert.match(asked, /Vercel/)
+    assert.doesNotMatch(asked, /mic/)
+    assert.ok((await readDoc(s)).suggested?.some(x => x.text === 'Tap the mic on the phone' && x.why === 'you'))
   })
 })
 
@@ -554,6 +737,9 @@ describe('hub-todo route shapes', () => {
     assert.match(commandProblem({ type: 'hub-todo-replace', path: '/p', remote: 'main' }) ?? '', /remote/)
     assert.equal(commandProblem({ type: 'hub-todo-restore', path: '/p', id: 'a' }), undefined)
     assert.match(commandProblem({ type: 'hub-todo-restore', path: '/p' }) ?? '', /id/)
+    assert.equal(commandProblem({ type: 'hub-todo-accept', path: '/p', id: 'a' }), undefined)
+    assert.equal(commandProblem({ type: 'hub-todo-dismiss', path: '/p', id: 'a' }), undefined)
+    assert.match(commandProblem({ type: 'hub-todo-dismiss', path: '/p' }) ?? '', /id/)
   })
 })
 
@@ -591,6 +777,22 @@ describe('todo tool', () => {
     assert.throws(() => toolStep(d, { op: 'add', text: 'X', before: 'nothing like it' }), /no open to-do item/)
     assert.throws(() => toolStep(d, { op: 'add', text: ' ' }), /text/)
   })
+  it('an add that an open item or suggestion already says is not added again', () => {
+    const r = toolStep(d, { op: 'add', text: 'ship receipts', session: 'c1' }, 5, 'f1')
+    assert.equal(r.doc, d)
+    assert.equal(r.said, 'Already on the list as a: Ship receipts')
+    const g = addTodo(d, 'Write the migration guide for v2', 1, 'g')
+    assert.equal(toolStep(g, { op: 'add', text: 'Write a migration guide for v2' }, 5, 'f2').said, 'Already on the list as g: Write the migration guide for v2')
+  })
+  it('an add a shorter or longer item only partly says still goes on', () => {
+    const base = ['CI', 'docs', 'Fix login'].reduce((o, t, i) => addTodo(o, t, 1, `k${i}`), emptyDoc())
+    for (const text of ['Add CircleCI config', 'Update docstrings', 'Fix login redirect loop on Safari']) assert.match(toolStep(base, { op: 'add', text }, 5, 'n1').said, /^Added n1/)
+    assert.match(toolStep(addTodo(emptyDoc(), 'Fix login redirect loop on Safari', 1, 'k'), { op: 'add', text: 'Fix login' }, 5, 'n1').said, /^Added n1/)
+  })
+  it('a suggestion in the tray never blocks an add, so dismissing it loses nothing', () => {
+    const s = { ...emptyDoc(), suggested: [{ id: 's9', text: 'Write the migration guide for v2', at: 1 }] }
+    assert.deepEqual(toolStep(s, { op: 'add', text: 'Write the migration guide for v2' }, 5, 'f2').doc.todo.map(t => t.id), ['f2'])
+  })
   it('closes an item by id or text, with a tombstone', () => {
     assert.deepEqual(toolStep(d, { op: 'done', id: 'b' }, 6).doc.removed, { b: 6 })
     assert.deepEqual(toolStep(d, { op: 'done', text: 'ship receipts' }, 6).doc.todo.map(t => t.id), ['b'])
@@ -608,5 +810,14 @@ describe('todo tool', () => {
     assert.equal((await handleHub(hub, 'POST', `/hub/todo?token=${hub.token}`, JSON.stringify({ op: 'zap', cwd: '/p' }), undefined, fake))?.status, 400)
     const bad = await handleHub(hub, 'POST', `/hub/todo?token=${hub.token}`, body, undefined, async () => { throw new Error('no open to-do item matches "x"') })
     assert.deepEqual([bad?.status, bad?.body], [400, 'no open to-do item matches "x"'])
+  })
+})
+
+describe('dropped', () => {
+  it('sees a finished row an older device wrote without why or name', () => {
+    const row = { id: 'a1', text: 'Reload the window', at: 5 }
+    const mine: TodoDoc = { ...emptyDoc(), ticked: [{ ...row, why: 'you', name: 'Chat A' }] }
+    assert.equal(dropped(mine, { ...emptyDoc(), ticked: [row] }), true)
+    assert.equal(dropped(mine, mine), false)
   })
 })

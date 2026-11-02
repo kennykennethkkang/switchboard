@@ -7,6 +7,7 @@
 import { execFile } from 'child_process'
 import * as path from 'path'
 import { repoTop } from './projects'
+import { claudeBinary } from './setup'
 import type { BoardProject, HubState, Server, SessionLive, Suggestion } from './types'
 
 const CLASH_MS = 60 * 60 * 1000
@@ -18,17 +19,37 @@ const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
 const inside = (cwd: string, root: string) => norm(cwd) === norm(root) || norm(cwd).startsWith(`${norm(root)}/`)
 
 // Same shapes the usage mod strips from handoff notes.
-const SECRETS: RegExp[] = [
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+const SECRETS: Array<RegExp | [RegExp, string]> = [
+  // to the END line, or to the end when the text was cut before it
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
   /\bsk-[A-Za-z0-9_-]{16,}/g,
-  /\bAKIA[0-9A-Z]{16}\b/g,
+  // AWS: only the value goes, so the key name still says what was there. A value is 16+ token chars, never the next word.
+  [/\b(aws_(?:secret_access_key|session_token|security_token)[ \t]*[=:][ \t]*["']?)[A-Za-z0-9/+=_.-]{16,}/gi, '$1[removed]'],
+  [/("(?:AccessKeyId|SecretAccessKey|SessionToken)"[ \t]*:[ \t]*")[^"]+/g, '$1[removed]'],
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
   /\b(?:ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9]{20,}\b/g,
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
   /\b[0-9a-fA-F]{32,}\b/g,
 ]
-export const redact = (text: string) => SECRETS.reduce((s, re) => s.replace(re, '[removed]'), text)
+// A token run this long is never prose, and the open-ended patterns above overflow the regex stack on one of millions of chars.
+const LONG = 4096
+const tokenChar = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 45 || c === 43 || c === 47 || c === 61 || c === 46
+function dropLong(s: string): string {
+  if (s.length < LONG) return s
+  const out: string[] = []
+  let from = 0
+  for (let i = 0; i < s.length;) {
+    if (!tokenChar(s.charCodeAt(i))) { i++; continue }
+    let j = i
+    while (j < s.length && tokenChar(s.charCodeAt(j))) j++
+    if (j - i >= LONG) { out.push(s.slice(from, i), '[removed]'); from = j }
+    i = j
+  }
+  return out.length ? out.join('') + s.slice(from) : s
+}
+export const redact = (text: string) => SECRETS.reduce((s, p) => (Array.isArray(p) ? s.replace(p[0], p[1]) : s.replace(p, '[removed]')), dropLong(text))
 
 /** The project a folder belongs to: its git repo, else the longest listed project holding it, else its last part. */
 function projectOf(state: HubState, cwd: string): { project: string; cwd: string } {
@@ -77,7 +98,7 @@ export function suggest(state: HubState, gone: Server[], now = Date.now()): Sugg
   const open = state.projects.find(p => p.isOpen)
   if (task && open) {
     const n = taskNumber(task)
-    // ponytail: a chat "has" a task when its latest prompt names it; a chat can drift off one silently.
+    // A chat "has" a task when its latest prompt names it; a chat can drift off one silently.
     const taken = state.live.some(s => inside(s.cwd, open.path) && s.prompt && (n ? new RegExp(`\\btask\\s*${n}\\b`, 'i').test(s.prompt) : s.prompt.includes(task)))
     if (!taken) out.push({ id: `task:${task}`, kind: 'task', text: `No chat is on Task ${task}.`, sessions: [], folder: open.path, task })
   }
@@ -107,7 +128,7 @@ export function brief(state: HubState, cwd: string, self: string, now = Date.now
   if (files.length) lines.push(`Leave alone, another chat is editing: ${files.join(', ')}`)
   if (task) lines.push(`Next open plan task: ${task}`)
   if (task && state.plan?.decisions?.length) lines.push(`Recent decisions: ${state.plan.decisions.join('; ')}`)
-  const todo = Object.entries(state.todos ?? {}).find(([f]) => norm(f) === home.cwd)?.[1].todo ?? []
+  const todo = Object.entries(state.todos ?? {}).find(([f]) => norm(f) === home.cwd)?.[1].todo.filter(t => t.why !== 'you') ?? []
   if (todo.length) {
     lines.push('Open to-do (if your work completes one, even one you were not asked to do, call todo_done with its id before you finish):')
     for (const t of todo) lines.push(`- ${t.id}: ${t.text.slice(0, 120)}`)
@@ -145,7 +166,7 @@ export const quickAskArgs = (prompt: string) => ['-p', '--no-session-persistence
 /** One quick answer from Claude Code's Haiku on the subscription; rejects on error. */
 export function quickAsk(prompt: string, timeoutMs = ASK_TIMEOUT_MS): Promise<string> {
   // CLAUDE_CODE_CHILD_SESSION keeps this throwaway call out of the chat list and /resume.
-  return new Promise((resolve, reject) => execFile('claude', quickAskArgs(prompt), { timeout: timeoutMs, maxBuffer: 1 << 20, env: { ...process.env, CLAUDE_CODE_CHILD_SESSION: '1' } },
+  return new Promise((resolve, reject) => execFile(claudeBinary(), quickAskArgs(prompt), { timeout: timeoutMs, maxBuffer: 1 << 20, env: { ...process.env, CLAUDE_CODE_CHILD_SESSION: '1' } },
     (err, stdout) => (err ? reject(err) : resolve(stdout.trim()))))
 }
 

@@ -1,12 +1,14 @@
 /**
  * Whether each thing Kenneth asked a chat for shows up as done, judged by Jev from the chat's own Done list.
  * Left is future work for the to-do, so it is not judged.
- * Runs only when the claude-x-jev skill is installed; its key comes from Kenneth's shell, so a login shell runs it.
+ * Runs only when the claude-x-jev skill is installed; its key comes from Kenneth's shell, else the key Sign-ins saved.
  */
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { keyEnv, keyStore } from './keys'
+import { presetFor } from './jev-project'
 import type { ChatProgress } from './types'
 
 const JEV = path.join(os.homedir(), '.claude', 'skills', 'claude-x-jev', 'scripts', 'jev.py')
@@ -42,12 +44,13 @@ export async function checkAsked(p: ChatProgress): Promise<Array<number | null> 
   if (!items.length || !fs.existsSync(JEV)) return undefined
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-jev-'))
   try {
-    const preset = path.join(dir, 'preset.json'), input = path.join(dir, 'items.json')
-    fs.writeFileSync(preset, JSON.stringify(PRESET))
+    // Set up Jev's <project>-done preset when the project has one, so its wording can be tuned per repo.
+    const preset = presetFor(p.cwd, 'done') ?? path.join(dir, 'preset.json'), input = path.join(dir, 'items.json')
+    if (preset.startsWith(dir)) fs.writeFileSync(preset, JSON.stringify(PRESET))
     fs.writeFileSync(input, JSON.stringify(items))
     // Paths go in as $0..$2, never into the command text.
     const out = await new Promise<string | undefined>(done => execFile('/bin/zsh', ['-ic', 'python3 "$0" ask --preset "$1" --input "$2"', JEV, preset, input],
-      { timeout: 20_000, maxBuffer: 1 << 20 }, (err, stdout) => done(err ? undefined : String(stdout))))
+      { timeout: 20_000, maxBuffer: 1 << 20, env: { ...process.env, ...keyEnv(keyStore(), process.env) } }, (err, stdout) => done(err ? undefined : String(stdout))))
     return out === undefined ? undefined : parseScores(out, items.length)
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })

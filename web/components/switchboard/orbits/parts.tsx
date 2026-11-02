@@ -1,11 +1,43 @@
 'use client'
 // Bits the four extra pictures share: role glyphs, labels, the on-screen check, and Reveal for callouts.
+import { busyLine } from '@/lib/eta'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { RoleState } from '@/lib/orbit-views'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import type { OrbitChat } from '../orbit'
 
-export type ViewProps = { chat: OrbitChat; showTools: boolean; instant?: boolean }
+/** pick: a role node was pressed, open its drawer; picked: the role the drawer shows. */
+export type ViewProps = { chat: OrbitChat; showTools: boolean; instant?: boolean; pick?: (role: string) => void; picked?: string }
+
+/** A role node's accessible name: "engineer, 3 runs, working". */
+export function nodeName(c: OrbitChat, role: string, state: RoleState): string {
+  const n = c.progress?.roles.filter(r => r.role === role).length ?? 0
+  return `${role}, ${n} run${n === 1 ? '' : 's'}, ${LABEL[state]}`
+}
+
+/** What a node button needs: its name, the drawer it opens, and whether that drawer shows it. */
+export const nodeProps = (v: ViewProps, role: string, state: RoleState) => ({
+  'data-node': role, 'aria-label': nodeName(v.chat, role, state), 'aria-expanded': v.picked === role, 'aria-controls': v.picked ? 'ov-drawer' : undefined,
+  onClick: () => v.pick?.(role),
+})
+
+/** Buttons over a canvas picture's role bubbles, hidden until the frame loop places them (placeNodes). */
+export function NodeButtons({ v, roles }: { v: ViewProps; roles: Array<{ role: string; state: RoleState }> }) {
+  if (!v.pick) return null
+  return <>{roles.map(r => <button key={r.role} type="button" className="ov-node" {...nodeProps(v, r.role, r.state)} />)}</>
+}
+
+export type Hit = { x: number; y: number; r: number }
+/** Moves each node button over its bubble, in the canvas's CSS pixels; a role not drawn is hidden. */
+export function placeNodes(box: HTMLElement | null, hits: Map<string, Hit>) {
+  box?.querySelectorAll<HTMLElement>(':scope > .ov-node').forEach(b => {
+    const h = hits.get(b.dataset.node ?? '')
+    if (!h) { b.removeAttribute('data-placed'); return }
+    const css = `left:${(h.x - h.r).toFixed(1)}px;top:${(h.y - h.r).toFixed(1)}px;width:${(2 * h.r).toFixed(1)}px;height:${(2 * h.r).toFixed(1)}px`
+    if (b.dataset.at !== css) { b.style.cssText = css; b.dataset.at = css }
+    b.setAttribute('data-placed', '')
+  })
+}
 
 export const NAME = (r: string) => r === 'qa' ? 'QA' : r ? r[0].toUpperCase() + r.slice(1) : r
 export const LABEL: Record<RoleState, string> = { active: 'working', done: 'done', waiting: 'queued', unused: 'not used' }
@@ -75,7 +107,7 @@ export const leadState = (c: OrbitChat, almost: boolean) => c.state === 'working
 
 /** The line under the lead, same words as the Orbit's. */
 export function leadLine(c: OrbitChat, almost: boolean, active: string[]): string {
-  if (c.state === 'working') return active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : 'planning'
+  if (c.state === 'working') return active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning'
   if (c.state === 'needs-you') return 'waiting on you'
   if (c.state === 'done') return almost ? 'almost done' : 'finished'
   return `idle ${c.ago}`

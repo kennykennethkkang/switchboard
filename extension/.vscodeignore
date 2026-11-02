@@ -15,3 +15,5 @@ tsconfig.json
 .next/**
 # Stray logs and test leftovers never ship
 *.jsonl
+# Old builds never ship inside a new one
+**/*.vsix

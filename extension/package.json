@@ -2,7 +2,7 @@
   "name": "switchboard",
   "displayName": "Switchboard",
   "description": "Claude Code sessions, usage, timeline and controls in one panel. Based on Agent Flow.",
-  "version": "0.18.0",
+  "version": "0.20.1",
   "publisher": "kennykennethkkang",
   "license": "Apache-2.0",
   "icon": "media/icon.png",
@@ -143,7 +143,7 @@
     "package": "vsce package",
     "lint": "tsc --noEmit",
     "lint:test": "tsc --noEmit --project tsconfig.test.json",
-    "test": "tsx --test test/**/*.test.ts",
+    "test": "tsx --test --test-timeout=120000 test/**/*.test.ts",
     "vscode:uninstall": "node scripts/uninstall.js"
   },
   "devDependencies": {

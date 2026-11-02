@@ -30,6 +30,18 @@ export async function fetchHubWhy(f: typeof fetch = fetch): Promise<{ hub: HubSt
   }
 }
 
+export type VoicePoll = { voice: HubState['voice']; level: number; heard: HubState['heard'] }
+
+/** The mic's level, state and last transcript: polled while it runs, since state comes every 2 s. */
+export async function fetchVoice(f: typeof fetch = fetch): Promise<VoicePoll | null> {
+  try {
+    const r = await f('/hub/voice', { headers: HEADERS, cache: 'no-store' })
+    return r.ok ? ((await r.json()) as VoicePoll) : null
+  } catch {
+    return null
+  }
+}
+
 export const fetchHub = async (f: typeof fetch = fetch) => (await fetchHubWhy(f)).hub
 
 /** Undefined when the command ran; otherwise why not, from the hub's own reply where it gave one. */
@@ -41,4 +53,26 @@ export async function postCommand(c: HubCommand, f: typeof fetch = fetch): Promi
   } catch {
     return 'could not reach the hub'
   }
+}
+
+/** Streams one file to /hub/upload; XHR for its upload progress, which fetch does not give. */
+export function uploadFile(file: File, cwd: string, session: string | undefined, onProgress: (f: number) => void, signal?: AbortSignal): Promise<{ path: string } | { problem: string }> {
+  return new Promise(done => {
+    const x = new XMLHttpRequest()
+    const q = new URLSearchParams({ cwd, name: file.name, ...(session ? { session } : {}) })
+    x.open('POST', `/hub/upload?${q}`)
+    x.setRequestHeader('X-Switchboard', '1')
+    x.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total) }
+    x.onload = () => {
+      if (x.status === 200) {
+        try { return done({ path: (JSON.parse(x.responseText) as { path: string }).path }) } catch { /* below */ }
+      }
+      done({ problem: x.status === 413 ? 'over the 100 MB limit' : x.responseText.trim().slice(0, 200) || downReason(x.status) })
+    }
+    x.onerror = () => done({ problem: downReason(undefined) })
+    // The hub drops the partial file when the body breaks off.
+    x.onabort = () => done({ problem: 'removed' })
+    signal?.addEventListener('abort', () => x.abort(), { once: true })
+    x.send(file)
+  })
 }

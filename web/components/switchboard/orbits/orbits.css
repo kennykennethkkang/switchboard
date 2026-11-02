@@ -2,8 +2,8 @@
    Motion: transitions (they retarget mid-move), ease-out to enter, ease-in-out to move, 200 to 360 ms. */
 .ov { --ov-io: cubic-bezier(0.77, 0, 0.175, 1); display: grid; gap: 8px; min-width: 0; }
 
-.ov-seg { justify-self: start; max-width: 100%; display: flex; padding: 2px; border-radius: 9px; background: var(--hub-elev); border: 1px solid var(--hub-hair); overflow-x: auto; scrollbar-width: none; }
-.ov-seg > button { flex: 1 0 auto; border: 0; background: none; border-radius: 7px; padding: 0 10px; font: 500 12px/1 var(--hub-sans); color: var(--hub-mute); cursor: pointer; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.ov-seg { justify-self: start; max-width: 100%; display: flex; padding: 2px; border-radius: 10px; background: var(--hub-elev); border: 1px solid var(--hub-hair); overflow-x: auto; scrollbar-width: none; }
+.ov-seg > button { flex: 1 0 auto; border: 0; background: none; border-radius: 8px; padding: 0 10px; font: 500 12px/1 var(--hub-sans); color: var(--hub-mute); cursor: pointer; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
 .ov-seg > button[aria-checked='true'] { background: var(--hub-card); color: var(--hub-ink); box-shadow: 0 0 0 1px var(--hub-hair); }
 @media (hover: hover) and (pointer: fine) { .ov-seg > button:hover { color: var(--hub-ink); } }
 @media (max-width: 420px) { .ov-seg > button { padding: 0 7px; } }
@@ -31,7 +31,7 @@
 
 .ov-bench { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 400 12px/1 var(--hub-mono); color: var(--hub-ash); }
 .ov-chipb { display: inline-flex; gap: 6px; align-items: center; font: 500 12px/1 var(--hub-sans); color: var(--hub-mute); border: 1px dashed var(--hub-hair-strong); border-radius: 99px; padding: 6px 10px; }
-.ov-count { position: absolute; top: -6px; right: -10px; font: 600 10.5px/1 var(--hub-mono); padding: 3px 5px; border-radius: 99px; background: var(--hub-ink); color: var(--hub-canvas); box-shadow: 0 0 0 2px var(--hub-canvas); }
+.ov-count { position: absolute; top: -6px; right: -10px; font: 600 11px/1 var(--hub-mono); padding: 3px 5px; border-radius: 99px; background: var(--hub-ink); color: var(--hub-canvas); box-shadow: 0 0 0 2px var(--hub-canvas); }
 
 /* State colors, shared: --c is the state's color. */
 [data-s='active'], [data-s='working'] { --c: var(--hub-blue); }
@@ -121,6 +121,11 @@
 @media (hover: hover) and (pointer: fine) { .ovl-jump button:hover:not(:disabled) { color: var(--hub-ink); background: var(--hub-hair); } }
 .ovl-jump button:active:not(:disabled) { transform: scale(0.96); }
 .ovl-jump button:disabled { opacity: 0.4; cursor: default; }
+@media (pointer: coarse) {
+  .ovl-jump { z-index: 3; padding: 0 4px; }
+  .ovl-jump button { position: relative; min-width: 44px; box-sizing: border-box; text-align: center; }
+  .ovl-jump button::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; margin-top: -22px; }
+}
 .ovl-label > span { min-width: 0; display: grid; gap: 2px; }
 .ovl-label b { font: 500 13px/1.2 var(--hub-sans); color: var(--hub-ink); }
 .ovl-label small { font: 400 11px/1.2 var(--hub-mono); color: var(--hub-ash); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -145,7 +150,7 @@
   transition: left 400ms var(--ov-io), width 400ms var(--ov-io), background-color 240ms ease; }
 .ovl-bar[data-s='active'] { --c: var(--hub-blue); }
 .ov-lanes[data-chat='almost'] .ovl-bar[data-s='done'] { --c: var(--hub-teal); }
-.ovl-bar > span { position: sticky; left: var(--lw); max-width: calc(100% - 14px); padding-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11.5px/1 var(--hub-sans); color: var(--hub-ink); }
+.ovl-bar > span { position: sticky; left: var(--lw); max-width: calc(100% - 14px); padding-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/1 var(--hub-sans); color: var(--hub-ink); }
 .ovl-bar > span > b { font: 600 11px/1 var(--hub-mono); color: var(--c); margin-right: 6px; }
 @starting-style { .ovl-bar { clip-path: inset(0 100% 0 0 round 4px); } }
 .ovl-bar { clip-path: inset(0 0 0 0 round 4px); transition-property: left, width, background-color, clip-path; }
@@ -155,10 +160,12 @@
 /* The wait for an answer: one band to the end, labelled at its right edge so it reads however short it is. */
 .ovl-wait { position: absolute; top: 6px; bottom: 6px; right: 0; border-radius: 4px 0 0 4px; background: var(--hub-red-soft); box-shadow: inset 2px 0 0 var(--hub-red); }
 .ovl-wait > b { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font: 500 11px/1 var(--hub-mono); color: var(--hub-red); white-space: nowrap; background: var(--hub-canvas); padding: 3px 6px; border-radius: 4px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hub-red) 35%, transparent); }
-.ovl-tag { position: absolute; top: 50%; transform: translateY(-50%); max-width: min(45%, 240px); font: 500 11.5px/1 var(--hub-sans); color: var(--hub-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ovl-tag { position: absolute; top: 50%; transform: translateY(-50%); max-width: min(45%, 240px); font: 500 12px/1 var(--hub-sans); color: var(--hub-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ovl-tag > b { font: 600 11px/1 var(--hub-mono); color: var(--c); margin-right: 6px; }
 .ovl-tag[data-s='active'] { --c: var(--hub-blue); } .ovl-tag[data-s='done'] { --c: var(--hub-green); }
-.ovl-queued { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); max-width: calc(100% - 16px); font: 400 12px/1 var(--hub-sans); color: var(--hub-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Sticks past the pinned label column, so a chart opened at now still shows its start. */
+.ovl-track:has(> .ovl-queued) { display: flex; align-items: center; }
+.ovl-queued { position: sticky; left: calc(var(--lw) + 8px); margin-left: 8px; max-width: calc(100% - 16px); font: 400 12px/1 var(--hub-sans); color: var(--hub-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ovl-loop { position: absolute; top: 2px; margin-left: -6px; font: 600 11px/1 var(--hub-mono); color: var(--hub-red); background: var(--hub-canvas); border-radius: 99px; padding: 1px 3px; z-index: 1; cursor: default; }
 /* Tool calls: faint 4px ticks on the lane's floor; a wider hit area carries the hover detail. */
 .ovl-tick { position: absolute; bottom: 0; width: 9px; height: 10px; margin-left: -4px; cursor: default; }

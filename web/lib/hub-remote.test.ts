@@ -1,7 +1,7 @@
 /** The standalone web app's calls to its own proxy. */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { downReason, fetchHub, fetchHubWhy, postCommand } from './hub-remote'
+import { downReason, fetchHub, fetchHubWhy, fetchVoice, postCommand } from './hub-remote'
 import type { HubCommand } from './vscode-bridge'
 
 describe('hub-remote', () => {
@@ -16,20 +16,29 @@ describe('hub-remote', () => {
     assert.equal(await fetchHub(thrown), null)
   })
 
+  it('reads the mic through /hub/voice, null when it cannot', async () => {
+    let url = ''
+    const ok = (async (u: string) => { url = u; return new Response('{"voice":"listening","level":0.5,"heard":null}', { status: 200 }) }) as typeof fetch
+    assert.deepEqual(await fetchVoice(ok), { voice: 'listening', level: 0.5, heard: null })
+    assert.equal(url, '/hub/voice')
+    assert.equal(await fetchVoice((async () => new Response('', { status: 502 })) as typeof fetch), null)
+    assert.equal(await fetchVoice((async () => { throw new Error('x') }) as typeof fetch), null)
+  })
+
   it('posts a command as JSON and answers no problem when it ran', async () => {
     let sent = ''
     const f = (async (_u: string, init?: RequestInit) => { sent = String(init?.body); return new Response(null, { status: 204 }) }) as typeof fetch
-    assert.equal(await postCommand({ type: 'hub-refresh' }, f), undefined)
-    assert.equal(sent, '{"type":"hub-refresh"}')
+    assert.equal(await postCommand({ type: 'hub-aws-check' }, f), undefined)
+    assert.equal(sent, '{"type":"hub-aws-check"}')
   })
 
   it('answers the reason a command failed', async () => {
     const bad = (async () => new Response('hub-send needs sessionId', { status: 400 })) as typeof fetch
-    assert.equal(await postCommand({ type: 'hub-refresh' }, bad), 'hub-send needs sessionId')
+    assert.equal(await postCommand({ type: 'hub-aws-check' }, bad), 'hub-send needs sessionId')
     const bare = (async () => new Response('', { status: 502 })) as typeof fetch
-    assert.match((await postCommand({ type: 'hub-refresh' }, bare)) ?? '', /502/)
+    assert.match((await postCommand({ type: 'hub-aws-check' }, bare)) ?? '', /502/)
     const thrown = (async () => { throw new Error('no server') }) as typeof fetch
-    assert.match((await postCommand({ type: 'hub-refresh' }, thrown)) ?? '', /reach/)
+    assert.match((await postCommand({ type: 'hub-aws-check' }, thrown)) ?? '', /reach/)
   })
 
   it('says why the hub is out of reach', async () => {

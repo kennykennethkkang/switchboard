@@ -27,7 +27,7 @@ export function Switcher({ items, tint, onPick, onClose }: { items: SwitchItem[]
   useEffect(() => { document.getElementById(`${list}-${sel}`)?.scrollIntoView({ block: 'nearest' }) }, [sel, list])
   const key = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setAt((sel + (e.key === 'ArrowDown' ? 1 : -1) + ranked.length) % Math.max(1, ranked.length)) }
-    else if (e.key === 'Enter') { e.preventDefault(); if (ranked[sel]) onPick(ranked[sel].item) }
+    else if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); if (ranked[sel]) onPick(ranked[sel].item) }
     else if (e.key === 'Escape') { e.preventDefault(); onClose() }
     // The input is the dialog's one stop: Tab stays in it.
     else if (e.key === 'Tab') e.preventDefault()

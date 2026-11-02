@@ -27,10 +27,9 @@ export class JsonlEventSource implements vscode.Disposable {
       fs.writeFileSync(this.filePath, '')
     }
 
-    // Read existing content
-    const stat = fs.statSync(this.filePath)
-    this.fileSize = stat.size
-    this.processExistingContent()
+    // Read existing content through the tail reader so the offset matches it
+    this.fileSize = 0
+    this.readNewLines()
 
     // Watch for changes
     this.watcher = fs.watch(this.filePath, (eventType) => {
@@ -40,17 +39,6 @@ export class JsonlEventSource implements vscode.Disposable {
     })
 
     this._onStatus.fire('connected')
-  }
-
-  private processExistingContent(): void {
-    const content = fs.readFileSync(this.filePath, 'utf-8')
-    const lines = content.split(/\r?\n/).filter(Boolean)
-    for (const line of lines) {
-      const event = this.parseLine(line)
-      if (event) {
-        this._onEvent.fire(event)
-      }
-    }
   }
 
   private readNewLines(): void {

@@ -87,7 +87,16 @@ const LIVE_MS = 10 * 60 * 1000
 const HEAD_BYTES = 512 * 1024
 const TAIL_BYTES = 256 * 1024
 const CODEX_FILES = 20
-const onPath = async (cli: string) => !!(await cliPath(cli))
+// Looked up at most every five minutes per CLI; the chats tick asks every 15 s.
+const PATH_MS = 5 * 60 * 1000
+const pathSeen = new Map<string, { at: number; on: Promise<boolean> }>()
+const onPath = (cli: string) => {
+  const was = pathSeen.get(cli)
+  if (was && Date.now() - was.at < PATH_MS) return was.on
+  const on = cliPath(cli).then(Boolean)
+  pathSeen.set(cli, { at: Date.now(), on })
+  return on
+}
 
 type Line = { type?: string; payload?: { id?: string; cwd?: string; type?: string; message?: string; info?: { last_token_usage?: { input_tokens?: number }; model_context_window?: number } } }
 const parse = (line: string): Line | undefined => { try { return JSON.parse(line) } catch { return undefined } }

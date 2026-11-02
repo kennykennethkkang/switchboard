@@ -37,6 +37,16 @@ describe('logins.json', () => {
     for (const bad of ['javascript:alert(1)', 'file:///x', 'manage.auth0.com', 'https://u:p@x.com/', 'https://x.com/?access_token=abc', 'https://x.com/?password=1'])
       assert.equal(loginUrl(bad), undefined, bad)
   })
+
+  it('judges whole parameter names: harmless ones pass, secrets in any spelling do not', () => {
+    for (const ok of ['https://mail.google.com/mail/?authuser=1', 'https://x.com/?keyword=a&passage=2', 'https://x.com/?author=k&codec=h264&tokenizer=bpe'])
+      assert.equal(loginUrl(ok), ok, ok)
+    for (const bad of ['https://x.com/?token=a', 'https://x.com/?api_key=a', 'https://x.com/?apiKey=a', 'https://x.com/?x-api-key=a', 'https://x.com/?code=a',
+      'https://x.com/?session=a', 'https://x.com/?sessionToken=a', 'https://x.com/?client_secret=a', 'https://x.com/?auth=a', 'https://x.com/?passwd=a',
+      'https://x.com/?X-Amz-Signature=a', 'https://x.com/?refresh_token=a', 'https://x.com/?SECRET=a',
+      'https://x.com/?authtoken=a', 'https://x.com/?secretkey=a', 'https://x.com/?accesskey=a', 'https://x.com/?passphrase=a', 'https://x.com/?oauth_verifier=a', 'https://x.com/?authorization=a'])
+      assert.equal(loginUrl(bad), undefined, bad)
+  })
 })
 
 describe('applyLogin', () => {
@@ -206,7 +216,10 @@ describe('project links', () => {
     const note = accountsNote(APPS, { [P]: { auth0: 'k', vercel: null } }, P, chrome)
     assert.equal(note, 'Web accounts for this project: Auth0 uses kenneth@x (Chrome Kenneth); Vercel uses team login (Chrome Person 1).')
     assert.ok(!note?.includes('http'))
-    assert.equal(accountsNote(APPS, { [P]: { auth0: 'w' } }, P, []), 'Web accounts for this project: Auth0 uses work (system browser).')
+    assert.equal(accountsNote(APPS, { [P]: { auth0: 'w' } }, P, []), 'Web accounts for this project: Auth0 uses work (Chrome, last used profile).')
+    // No pick of its own: the project's browser.
+    assert.equal(accountsNote(APPS, { [P]: { auth0: 'w' } }, P, chrome, 'Profile 4'), 'Web accounts for this project: Auth0 uses work (Chrome Kenneth).')
+    assert.equal(accountsNote(APPS, { [P]: { auth0: 'w' } }, P, chrome, ''), 'Web accounts for this project: Auth0 uses work (Chrome, last used profile).')
     assert.equal(accountsNote(APPS, {}, P, chrome), undefined)
   })
 })

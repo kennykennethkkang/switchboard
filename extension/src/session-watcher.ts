@@ -19,7 +19,7 @@ const log = createLogger('SessionWatcher')
 /**
  * Watches Claude Code JSONL session transcript files for activity.
  *
- * Supports multiple concurrent sessions — each gets its own WatchedSession
+ * Supports multiple concurrent sessions; each gets its own WatchedSession
  * with independent state for tool call tracking, dedup, and subagent watchers.
  *
  * Claude Code writes full conversation transcripts to:
@@ -38,6 +38,10 @@ const log = createLogger('SessionWatcher')
 export type { WatchedSession, SubagentState } from './protocol'
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects')
+/** Ended sessions kept listed for panels opened later */
+const MAX_ENDED = 50
+
+type EndedSession = { info: SessionInfo; model: string | null; fileSize: number; mtime: number }
 
 export class SessionWatcher implements AgentSessionWatcher {
   private dirWatcher: fs.FSWatcher | null = null
@@ -46,8 +50,10 @@ export class SessionWatcher implements AgentSessionWatcher {
   private workspacePath: string | null = null
   /** Resolved absolute workspace path for subdirectory verification */
   private resolvedWorkspace: string | null = null
-  /** Cache for isContainedProject results — avoids re-reading JSONL files every scan */
+  /** Cache for isContainedProject results; avoids re-reading JSONL files every scan */
   private containedProjectCache = new Map<string, boolean>()
+  /** Sessions dropped on inactivity, oldest first; re-attached only once their newest mtime moves */
+  private ended = new Map<string, EndedSession>()
   private scanInterval: NodeJS.Timeout | null = null
 
   private readonly _onEvent = new vscode.EventEmitter<AgentEvent>()
@@ -91,18 +97,24 @@ export class SessionWatcher implements AgentSessionWatcher {
 
   /** Get list of currently tracked sessions */
   getActiveSessions(): SessionInfo[] {
-    return Array.from(this.sessions.values()).map(s => ({
+    const live: SessionInfo[] = Array.from(this.sessions.values()).map(s => ({
       id: s.sessionId,
       label: s.label,
       status: s.sessionCompleted ? 'completed' : 'active',
       startTime: s.sessionStartTime,
       lastActivityTime: s.lastActivityTime,
     }))
+    return [...live, ...[...this.ended.values()].map(e => e.info)]
   }
 
   /** Re-emit session start + conversation events for a newly connected webview.
    *  If sessionIds is provided, only replay those sessions. */
   replaySessionStart(sessionIds?: string[]): void {
+    for (const [sessionId, e] of this.ended) {
+      if (sessionIds && !sessionIds.includes(sessionId)) { continue }
+      this.emit({ time: 0, type: 'agent_spawn', payload: { name: ORCHESTRATOR_NAME, isMain: true, task: e.info.label, ...(e.model ? { model: e.model } : {}) } }, sessionId)
+      this.emit({ time: 0, type: 'agent_complete', payload: { name: ORCHESTRATOR_NAME } }, sessionId)
+    }
     for (const [sessionId, session] of this.sessions) {
       if (!session.sessionDetected) { continue }
       if (sessionIds && !sessionIds.includes(sessionId)) { continue }
@@ -158,9 +170,9 @@ export class SessionWatcher implements AgentSessionWatcher {
       this.workspacePath = this.findProjectDirName(encoded)
         ?? this.findProjectDirName(unresolvedEncoded)
         ?? encoded
-      log.info(`Starting — scoped to project: ${this.workspacePath}`)
+      log.info(`Starting: scoped to project: ${this.workspacePath}`)
     } else {
-      log.info('Starting — no workspace, scanning all projects')
+      log.info('Starting: no workspace, scanning all projects')
     }
 
     this.scanForActiveSessions()
@@ -190,7 +202,7 @@ export class SessionWatcher implements AgentSessionWatcher {
       try {
         this.dirWatcher = fs.watch(CLAUDE_DIR, (_eventType, filename) => {
           if (!filename) return
-          // A new project dir appeared — check if it's a subdirectory of our workspace
+          // A new project dir appeared; check if it's a subdirectory of our workspace
           const dirPath = path.join(CLAUDE_DIR, filename)
           try {
             if (fs.statSync(dirPath).isDirectory() && this.isContainedProject(filename)) {
@@ -240,27 +252,27 @@ export class SessionWatcher implements AgentSessionWatcher {
   /** Check whether a project dir contains sessions running under the workspace.
    *  The encoded dir name is lossy (hyphens and path separators both become -),
    *  so instead of trying to decode it, we read the cwd from the JSONL files
-   *  in the directory — that's the authoritative source of truth.
+   *  in the directory; that's the authoritative source of truth.
    *  Results are cached since a project dir's cwd never changes. */
   private isContainedProject(encodedDirName: string): boolean {
     if (!this.workspacePath || !this.resolvedWorkspace) return false
     // Quick prefix check to avoid reading files from obviously unrelated dirs
-    // (case-folded on Windows — encodings from different tools disagree on case)
+    // (case-folded on Windows, encodings from different tools disagree on case)
     if (!foldPathCase(encodedDirName).startsWith(foldPathCase(this.workspacePath) + '-')) return false
 
     const cached = this.containedProjectCache.get(encodedDirName)
     if (cached !== undefined) return cached
 
     const result = this.readCwdFromProjectDir(encodedDirName)
-    // Only cache positive results — a dir with no JSONL files yet (race on
-    // creation) should be re-checked on the next scan once files appear.
-    if (result) this.containedProjectCache.set(encodedDirName, true)
-    return result
+    // null = no cwd found yet (dir just created), re-check on the next scan
+    if (result !== null) this.containedProjectCache.set(encodedDirName, result)
+    return !!result
   }
 
-  /** Read JSONL files in a project dir to find the cwd and check containment. */
-  private readCwdFromProjectDir(encodedDirName: string): boolean {
-    if (!this.resolvedWorkspace) return false
+  /** Read JSONL files in a project dir to find the cwd and check containment.
+   *  Null when no cwd was found. */
+  private readCwdFromProjectDir(encodedDirName: string): boolean | null {
+    if (!this.resolvedWorkspace) return null
     const workspaceFolded = foldPathCase(this.resolvedWorkspace)
     const dirPath = path.join(CLAUDE_DIR, encodedDirName)
     try {
@@ -290,7 +302,7 @@ export class SessionWatcher implements AgentSessionWatcher {
         } finally { fs.closeSync(fd) }
       }
     } catch { /* dir may not exist or be readable */ }
-    return false
+    return null
   }
 
   private scanForActiveSessions(): void {
@@ -341,7 +353,7 @@ export class SessionWatcher implements AgentSessionWatcher {
             const stat = fs.statSync(filePath)
             let newestMtime = stat.mtimeMs
 
-            // Also check subagent files — a session's main JSONL may be stale
+            // Also check subagent files; a session's main JSONL may be stale
             // while subagents are still actively writing.
             const sessionId = path.basename(file, '.jsonl')
             const subagentsDir = path.join(projectPath, sessionId, 'subagents')
@@ -356,6 +368,9 @@ export class SessionWatcher implements AgentSessionWatcher {
             } catch { /* expected if subagents dir doesn't exist yet */ }
 
             const ageSeconds = (Date.now() - newestMtime) / 1000
+            // Ended on inactivity: skip until it is written again
+            const endedAt = this.ended.get(sessionId)?.mtime
+            if (endedAt !== undefined && newestMtime <= endedAt) continue
             if (ageSeconds <= ACTIVE_SESSION_AGE_S) {
               activeFiles.push({
                 sessionId,
@@ -375,7 +390,7 @@ export class SessionWatcher implements AgentSessionWatcher {
           log.info(`Active session found: ${af.filePath}`)
           this.watchSession(af.sessionId, af.filePath)
         } else {
-          // Already watching — scan for subagents
+          // Already watching; scan for subagents
           scanSubagentsDir(this.selfDelegate, this.parser, af.sessionId)
         }
       }
@@ -385,6 +400,10 @@ export class SessionWatcher implements AgentSessionWatcher {
   }
 
   private watchSession(sessionId: string, filePath: string): void {
+    let stat: fs.Stats
+    try { stat = fs.statSync(filePath) } catch { return /* removed since the scan */ }
+    const prior = this.ended.get(sessionId)
+    this.ended.delete(sessionId)
     const defaultLabel = `Session ${sessionId.slice(0, SESSION_ID_DISPLAY)}`
     const session: WatchedSession = {
       sessionId,
@@ -392,7 +411,7 @@ export class SessionWatcher implements AgentSessionWatcher {
       fileWatcher: null,
       pollTimer: null,
       fileSize: 0,
-      sessionStartTime: Date.now(),
+      sessionStartTime: prior?.info.startTime ?? Date.now(),
       pendingToolCalls: new Map(),
       seenToolUseIds: new Set(),
       seenMessageHashes: new Set(),
@@ -415,13 +434,10 @@ export class SessionWatcher implements AgentSessionWatcher {
     }
     this.sessions.set(sessionId, session)
 
-    const stat = fs.statSync(filePath)
-
-    // Pre-scan existing content for dedup IDs + collect recent entries for catch-up
-    const catchUpEntries = this.parser.prescanExistingContent(filePath, stat.size, session)
-
-    // Start from current end — only process NEW events going forward
-    session.fileSize = stat.size
+    // Pre-scan existing content for dedup IDs + collect recent entries for catch-up.
+    // Sets fileSize, so only NEW events are processed going forward.
+    // A re-attach stops where it ended: the panel already has that turn, and readNewLines below sends the rest.
+    const catchUpEntries = this.parser.prescanExistingContent(filePath, prior ? Math.min(prior.fileSize, stat.size) : stat.size, session)
 
     // Extract session label from the first user message in catch-up entries
     this.parser.extractSessionLabel(catchUpEntries, session)
@@ -448,20 +464,22 @@ export class SessionWatcher implements AgentSessionWatcher {
     // Emit catch-up messages for content that was already in the file when we detected
     // the session (e.g. the first user message). These were pre-scanned for dedup/tokens
     // but never emitted as events. Emit them now so the webview shows the full history.
-    this.parser.emitCatchUpEntries(catchUpEntries, session, sessionId)
+    if (!prior) this.parser.emitCatchUpEntries(catchUpEntries, session, sessionId)
 
-    // Watch for new content
-    session.fileWatcher = fs.watch(filePath, (eventType) => {
-      if (eventType === 'change') {
-        this.readNewLines(sessionId)
-      }
-    })
+    // Watch for new content; the poll below covers it if the watch fails
+    try {
+      session.fileWatcher = fs.watch(filePath, (eventType) => {
+        if (eventType === 'change') {
+          this.readNewLines(sessionId)
+        }
+      })
+    } catch (err) { log.debug('File watch failed:', filePath, err) }
 
-    // Poll fallback — fs.watch on macOS can silently stop firing events
+    // Poll fallback: fs.watch on macOS can silently stop firing events
     // for long-lived watchers. This ensures we still detect new content.
     session.pollTimer = setInterval(() => {
       this.readNewLines(sessionId)
-      // Also poll subagent files — fs.watch may not fire after extension restart
+      // Also poll subagent files; fs.watch may not fire after extension restart
       for (const [subPath] of session.subagentWatchers) {
         readSubagentNewLines(this.selfDelegate, this.parser,subPath, sessionId)
       }
@@ -472,6 +490,7 @@ export class SessionWatcher implements AgentSessionWatcher {
     session.subagentsDir = path.join(path.dirname(filePath), sessionId, 'subagents')
     scanSubagentsDir(this.selfDelegate, this.parser, sessionId)
 
+    if (prior) this.readNewLines(sessionId)
     // Start inactivity timer so the session completes if no new content arrives
     this.resetInactivityTimer(sessionId)
   }
@@ -487,14 +506,15 @@ export class SessionWatcher implements AgentSessionWatcher {
       this.parser.processTranscriptLine(line, ORCHESTRATOR_NAME, session.pendingToolCalls, session.seenToolUseIds, sessionId, session.seenMessageHashes)
     }
 
-    // Detect permission-gated tool calls (skip Agent/Task — subagents are inherently slow)
+    // Reset inactivity timer first: the permission timer below compares against
+    // lastActivityTime, so updating it afterwards would suppress the prompt
+    this.resetInactivityTimer(sessionId)
+
+    // Detect permission-gated tool calls (skip Agent/Task; subagents are inherently slow)
     handlePermissionDetection(this.selfDelegate, ORCHESTRATOR_NAME, session.pendingToolCalls, session, sessionId, session.sessionCompleted, true)
 
     // Check for new subagent files
     scanSubagentsDir(this.selfDelegate, this.parser, sessionId)
-
-    // Reset inactivity timer — session is still active
-    this.resetInactivityTimer(sessionId)
   }
 
   /** Reset the inactivity timer. When no new content arrives, emit agent_complete */
@@ -529,7 +549,7 @@ export class SessionWatcher implements AgentSessionWatcher {
 
     session.inactivityTimer = setTimeout(() => {
       if (!session.sessionCompleted && session.sessionDetected) {
-        log.info(`Session ${sessionId.slice(0, SESSION_ID_DISPLAY)} inactive — emitting orchestrator completion`)
+        log.info(`Session ${sessionId.slice(0, SESSION_ID_DISPLAY)} inactive: emitting orchestrator completion`)
         session.sessionCompleted = true
         this.emit({
           time: this.elapsed(sessionId),
@@ -537,8 +557,31 @@ export class SessionWatcher implements AgentSessionWatcher {
           payload: { name: ORCHESTRATOR_NAME },
         }, sessionId)
         this._onSessionLifecycle.fire({ type: 'ended', sessionId, label: session.label })
+        // Drop it so its watchers and poll stop; the scan re-attaches on fresh writes
+        this.ended.set(sessionId, {
+          info: { id: sessionId, label: session.label, status: 'completed', startTime: session.sessionStartTime, lastActivityTime: session.lastActivityTime },
+          model: session.model, fileSize: session.fileSize, mtime: this.newestMtime(session.filePath, sessionId),
+        })
+        if (this.ended.size > MAX_ENDED) this.ended.delete(this.ended.keys().next().value!)
+        this.closeSession(session)
+        this.sessions.delete(sessionId)
       }
     }, INACTIVITY_TIMEOUT_MS)
+  }
+
+  private closeSession(session: WatchedSession): void {
+    session.fileWatcher?.close()
+    if (session.pollTimer) { clearInterval(session.pollTimer) }
+    if (session.inactivityTimer) { clearTimeout(session.inactivityTimer) }
+    if (session.permissionTimer) { clearTimeout(session.permissionTimer) }
+    for (const [, sub] of session.subagentWatchers) {
+      sub.watcher?.close()
+      if (sub.permissionTimer) clearTimeout(sub.permissionTimer)
+    }
+    session.subagentWatchers.clear()
+    session.subagentsDirWatcher?.close()
+    // Clean up orphaned parser state for this session
+    this.parser.clearSessionState(session.pendingToolCalls.keys(), session.sessionId)
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -594,20 +637,7 @@ export class SessionWatcher implements AgentSessionWatcher {
     this.dirWatcher = null
     for (const w of this.dirWatchers.values()) w.close()
     this.dirWatchers.clear()
-    for (const [, session] of this.sessions) {
-      session.fileWatcher?.close()
-      if (session.pollTimer) { clearInterval(session.pollTimer) }
-      if (session.inactivityTimer) { clearTimeout(session.inactivityTimer) }
-      if (session.permissionTimer) { clearTimeout(session.permissionTimer) }
-      for (const [, sub] of session.subagentWatchers) {
-        sub.watcher?.close()
-        if (sub.permissionTimer) clearTimeout(sub.permissionTimer)
-      }
-      session.subagentWatchers.clear()
-      session.subagentsDirWatcher?.close()
-      // Clean up orphaned parser state for this session
-      this.parser.clearSessionState(session.pendingToolCalls.keys(), session.sessionId)
-    }
+    for (const session of this.sessions.values()) this.closeSession(session)
     this.sessions.clear()
     if (this.scanInterval) {
       clearInterval(this.scanInterval)

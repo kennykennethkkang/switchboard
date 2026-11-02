@@ -10,6 +10,7 @@ type InboxItem = { id: string; kind: 'prompt'; text: string } | { id: string; ki
 const POST_EVERY_MS = 5_000
 const POLL_MS = 2_000
 const REDISCOVER_MS = 30_000
+const FETCH_MS = 2_000
 
 export const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
 
@@ -443,7 +444,7 @@ const ASK_RULE = 'When you need the user to answer or act, ask with the AskUserQ
 // Same rule as Switchboard's progress.ts askedQuestion: the last paragraph, past a trailing fenced block, ends in '?'.
 // Both test suites hold the same table of cases (agent-flow extension/test/progress.test.ts).
 export const endsAsking = (text: string) => (text.replace(/\n*```[^\n]*\n(?:(?!```)[\s\S])*```\s*$/, '').trim().split(/\n\s*\n/).pop() ?? '').trim().endsWith('?')
-// ponytail: a chat that keeps stopping without touching its tasks gets this many nudges, then waits for the user.
+// Nudges per chat that keeps stopping without touching its tasks; after that it waits for the user.
 const NUDGES = 3
 // The main chat's last answer, so a later compaction does not push past a question; a reload forgets it.
 let lastAnswer = ''
@@ -546,14 +547,24 @@ async function discover($: EngineInterface) {
   return feed.targets
 }
 
+// $.http.fetch takes no timeout or signal, so a frozen window would hold the chat: undefined after two seconds.
+// A host with no clock.sleep (a test double) just waits on the fetch.
+const fetchSoon = ($: EngineInterface, url: string, init?: Parameters<EngineInterface['http']['fetch']>[1]) => Promise.race([
+  $.http.fetch(url, init),
+  Promise.resolve().then(() => $.clock.sleep(FETCH_MS)).then(() => undefined, () => new Promise<never>(() => {})),
+]).catch(() => undefined)
+
+// The window token goes in a header, out of the URL.
+const withToken = (t: Target) => ({ headers: { 'X-Switchboard-Token': t.token } })
+
 async function post($: EngineInterface, body: Record<string, unknown>) {
-  for (const t of await discover($)) {
-    const sent = await $.http.fetch(`http://127.0.0.1:${t.port}/hub`, {
+  await Promise.all((await discover($)).map(async t => {
+    const sent = await fetchSoon($, `http://127.0.0.1:${t.port}/hub`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: t.token, ...body }),
-    }).catch(() => undefined)
+    })
     // A closed window or a new token: look again next time.
     if (!sent || sent.status === 403) feed.foundAt = -Infinity
-  }
+  }))
 }
 
 async function postLive($: EngineInterface, usage: Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>) {
@@ -572,13 +583,19 @@ async function count($: EngineInterface, owner: string) {
   await $.store.set('uses', { ...uses, [owner]: (uses[owner] ?? 0) + 1 })
 }
 
-async function poll($: EngineInterface) {
-  const id = await $.session.id()
-  for (const t of await discover($)) {
-    const got = await $.http.fetch(`http://127.0.0.1:${t.port}/hub/inbox?session=${encodeURIComponent(id)}&token=${t.token}`).catch(() => undefined)
-    if (!got?.ok) continue
-    try { await deliver($, JSON.parse(got.text) as InboxItem[]) } catch { /* not a list */ }
-  }
+// clock.every does not wait on its fn, and a slow window outlasts a period.
+let polling = false
+export async function poll($: EngineInterface) {
+  if (polling) return
+  polling = true
+  try {
+    const id = await $.session.id()
+    const got = await Promise.all((await discover($)).map(t => fetchSoon($, `http://127.0.0.1:${t.port}/hub/inbox?session=${encodeURIComponent(id)}`, withToken(t))))
+    for (const g of got) {
+      if (!g?.ok) continue
+      try { await deliver($, JSON.parse(g.text) as InboxItem[]) } catch { /* not a list */ }
+    }
+  } finally { polling = false }
 }
 
 /** The window holding this chat's folder, asked for its brief or an answer; this project only. */
@@ -586,8 +603,8 @@ async function askHome($: EngineInterface, route: 'brief' | 'ask', q?: string) {
   const cwd = norm(await $.session.cwd())
   const home = homeOf(await discover($), cwd)
   if (!home) return undefined
-  const query = `cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(await $.session.id())}${q ? `&q=${encodeURIComponent(q)}` : ''}&token=${home.token}`
-  const got = await $.http.fetch(`http://127.0.0.1:${home.port}/hub/${route}?${query}`).catch(() => undefined)
+  const query = `cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(await $.session.id())}${q ? `&q=${encodeURIComponent(q)}` : ''}`
+  const got = await fetchSoon($, `http://127.0.0.1:${home.port}/hub/${route}?${query}`, withToken(home))
   return got?.ok ? got.text : undefined
 }
 
@@ -631,7 +648,7 @@ async function readNote($: EngineInterface) {
 async function keepOf($: EngineInterface) {
   const home = homeOf(await discover($), norm(await $.session.cwd()))
   if (!home) return undefined
-  const got = await $.http.fetch(`http://127.0.0.1:${home.port}/hub/keep?token=${home.token}`).catch(() => undefined)
+  const got = await fetchSoon($, `http://127.0.0.1:${home.port}/hub/keep`, withToken(home))
   if (!got?.ok) return undefined
   return { home, keep: JSON.parse(got.text) as { onFull?: string; freshBranch?: boolean } }
 }
@@ -683,7 +700,10 @@ async function settle($: EngineInterface, answer: string) {
 // One handoff at a time: the hub's inbox and settle can both ask before the first has written its note.
 let handingOff: Promise<void> | undefined
 /** Writes the note and has this chat's window open the next one: from settle in fresh chat mode, or whenever the hub asks (force). */
-const maybeHandoff = ($: EngineInterface, force = false) => (handingOff ??= handoff($, force).finally(() => { handingOff = undefined }))
+// After a refused handoff, settles wait this long before writing another note; a forced one goes now.
+const HANDOFF_RETRY_MS = 5 * 60_000
+let handoffFailedAt: number | undefined
+export const maybeHandoff = ($: EngineInterface, force = false) => (handingOff ??= handoff($, force).finally(() => { handingOff = undefined }))
 
 async function handoff($: EngineInterface, force: boolean) {
   const id = await $.session.id()
@@ -693,18 +713,19 @@ async function handoff($: EngineInterface, force: boolean) {
   if (feed.handedOff === id || done) {
     // Asked again by hand: the window may have lost the first post or still be waiting on subagents.
     const kept = force && done ? await keepOf($) : undefined
-    if (kept) await $.http.fetch(`http://127.0.0.1:${kept.home.port}/hub`, {
+    if (kept) await fetchSoon($, `http://127.0.0.1:${kept.home.port}/hub`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: kept.home.token, kind: 'handoff', sessionId: id, cwd, note: done, force: true }),
-    }).catch(() => undefined)
+    })
     return
   }
   const kept = await keepOf($)
   if (!kept || (!force && kept.keep.onFull !== 'fresh')) return
   const { home, keep } = kept
+  const now = await $.clock.now()
+  if (!force && handoffFailedAt !== undefined && now - handoffFailedAt < HANDOFF_RETRY_MS) return
   feed.handedOff = id
   const { note, planPath, firstTask } = await readNote($)
-  const now = await $.clock.now()
   const home_ = norm((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
   const iso = new Date(now).toISOString()
   const label = (planWords(planPath).slice(0, 3).join('-') || words(firstTask ?? '').slice(0, 3).join('-') || 'continued').slice(0, 40).replace(/-+$/, '')
@@ -715,11 +736,19 @@ async function handoff($: EngineInterface, force: boolean) {
   // Outside every repo, so a note is never committed. The hub matches a note by its -<id8>.md ending.
   const path = `${home_}/.claude/handoffs/${dir}/${[iso.slice(0, 10), iso.slice(11, 16).replace(':', ''), project, label, id.slice(0, 8)].filter(Boolean).join('-')}.md`
   await $.fs.write(path, note)
-  await rememberHandoff($, id, path, now).catch(() => undefined)
-  await $.http.fetch(`http://127.0.0.1:${home.port}/hub`, {
+  const sent = await fetchSoon($, `http://127.0.0.1:${home.port}/hub`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: home.token, kind: 'handoff', sessionId: id, cwd, note: path, plan: planPath, task: firstTask, branch: keep.freshBranch ? branchFor(planPath, firstTask, new Date(now)) : undefined, ...(force ? { force: true } : {}) }),
-  }).catch(() => undefined)
+  })
+  // No successor opened: keep working, and the next settle or hub ask tries again.
+  if (!sent?.ok) {
+    feed.handedOff = undefined
+    handoffFailedAt = now
+    await $.ui.toast(`Handoff failed: the Switchboard window did not take it; the note is at ${path}`)
+    return
+  }
+  handoffFailedAt = undefined
+  await rememberHandoff($, id, path, now).catch(() => undefined)
   await $.ui.toast(`Context nearly full: a fresh chat continues from ${path}`)
 }
 
@@ -744,7 +773,7 @@ export const register: Register = on => {
   })
 
   on('session.measure', async ($, e, next) => {
-    await postLive($, e)
+    void postLive($, e).catch(() => undefined)
     return next(e)
   })
 
@@ -797,10 +826,10 @@ export const register: Register = on => {
     const model = roleModel(role)
     const started = await next(model ? { ...e, model } : e)
     if (started.deny !== undefined) return started
-    // ponytail: read-modify-write, parallel spawns can undercount; use an atomic increment if the store gains one.
+    // Read-modify-write, so parallel spawns can undercount. Switch to an atomic increment if the store gets one.
     const counted = { ...used, [role]: (used[role] ?? 0) + 1 }
     await $.store.set('starts', { day, used: counted })
-    await post($, { kind: 'agent', sessionId: await $.session.id(), day, used: counted }).catch(() => undefined)
+    void (async () => post($, { kind: 'agent', sessionId: await $.session.id(), day, used: counted }))().catch(() => undefined)
     return started
   }).catch(($, e, next) => next(e))
 

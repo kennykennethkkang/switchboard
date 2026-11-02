@@ -5,15 +5,21 @@ import type { EngineInterface, Register } from 'claude-code'
 // Built from its code point so this file holds no em dash itself.
 export const EM = String.fromCharCode(0x2014)
 
-const RULES: { test: RegExp; why: string; short: string }[] = [
+// flat: matched with quotes and backslashes stripped, so escaped JSON and quote-split paths read plainly.
+const RULES: { test: RegExp; why: string; short: string; flat?: true }[] = [
   { test: /\bgit\b(\s+-[cC]\s+\S+)*\s+(commit|push)\b/, short: 'a git commit or push', why: 'The user commits and pushes themselves, from their own terminal or VS Code Source Control. Leave the work modified.' },
   { test: /\bgit\b(\s+-[cC]\s+\S+)*\s+rm\b[^|;&]*--cached/, short: 'git rm --cached', why: 'git rm --cached stages a deletion. Delete with plain rm; if the index was touched, git reset -q -- <paths>.' },
+  // The hub's git buttons and Stop process are the user's. A speed bump, not a boundary: a script file gets past it.
+  { flat: true, test: /^(?=[\s\S]*\/hub\/command\b)(?=[\s\S]*(\bop\s*:\s*(ship|commit-push|push|sync)\b|\bhub-stuck-stop\b|(^|\s)(-d|--data(-binary|-raw|-urlencode)?|--json|-F|--form)(\s+|=)?@))/, short: 'a hub button', why: 'The user presses Commit & push, Sync and Stop process in Switchboard themselves. Leave the work modified, and say what looks stuck.' },
   { test: /\bprettier\b[^|;&]*\s(--write|-w)\b/, short: 'prettier --write', why: 'No formatter here: prettier --write rewraps whole files at 80 columns. Edit by hand.' },
 ]
 
 const DASH = 'An em dash in the new text. Use a comma, a colon, or "to".'
 
-export const bashRule = (command: string) => RULES.find(r => r.test.test(command))
+export const bashRule = (command: string) => {
+  const flat = command.replace(/["'\\]/g, '')
+  return RULES.find(r => r.test.test(r.flat ? flat : command))
+}
 
 const count = (s: string) => s.split(EM).length - 1
 export const addsEmDash = (before: string, after: string) => count(after) > count(before)

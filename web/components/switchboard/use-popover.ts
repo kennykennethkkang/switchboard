@@ -1,5 +1,19 @@
 'use client'
-import { useEffect, useId, useRef, useState, type FocusEvent, type PointerEvent as PE } from 'react'
+import { useEffect, useId, useRef, useState, type FocusEvent, type PointerEvent as PE, type RefObject } from 'react'
+
+/** While open, Escape or a press outside wrap calls close. */
+export function useDismiss(open: boolean, wrap: RefObject<HTMLElement | null>, close: () => void) {
+  const shut = useRef(close)
+  shut.current = close
+  useEffect(() => {
+    if (!open) return
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') shut.current() }
+    const down = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) shut.current() }
+    document.addEventListener('keydown', key)
+    document.addEventListener('pointerdown', down)
+    return () => { document.removeEventListener('keydown', key); document.removeEventListener('pointerdown', down) }
+  }, [open, wrap])
+}
 
 /**
  * A hover-or-click popover: a mouse opens it on hover and a click keeps it, a tap or Enter toggles it, keyboard focus opens it.
@@ -9,14 +23,7 @@ export function usePopover() {
   const [open, setOpen] = useState(false)
   const id = useId()
   const wrapRef = useRef<HTMLSpanElement>(null), btnRef = useRef<HTMLButtonElement>(null), mouse = useRef(false)
-  useEffect(() => {
-    if (!open) return
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    const down = (e: PointerEvent) => { if (!wrapRef.current?.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('keydown', key)
-    document.addEventListener('pointerdown', down)
-    return () => { document.removeEventListener('keydown', key); document.removeEventListener('pointerdown', down) }
-  }, [open])
+  useDismiss(open, wrapRef, () => setOpen(false))
   return {
     open, id,
     wrap: {

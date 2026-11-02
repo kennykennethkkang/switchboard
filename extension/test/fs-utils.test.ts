@@ -1,10 +1,8 @@
 /**
  * Unit tests for readNewFileLines.
  *
- * The critical invariant: if a writer flushes a line in two chunks, the reader
- * reassembles it via the `tail` field instead of dropping the split line. A
- * watcher that doesn't forward `tail` back on the next call silently loses
- * the line — which is the bug we'd silently regress if this test goes away.
+ * The critical invariant: if a writer flushes a line in two chunks, newSize
+ * stops after the last newline, so the next read picks up the whole line.
  */
 
 import { describe, it, before, after } from 'node:test'
@@ -12,7 +10,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { readNewFileLines, upperDrive } from '../src/fs-utils'
+import { readNewFileLines, readFileBytes, tryLock, upperDrive, withLock } from '../src/fs-utils'
 
 describe('upperDrive', () => {
   it('gives one spelling to c:\\ and C:\\, leaving other paths alone', () => {
@@ -44,59 +42,46 @@ describe('readNewFileLines', () => {
     const r = readNewFileLines(file, 0)
     assert.ok(r)
     assert.deepEqual(r!.lines, ['a', 'b', 'c'])
-    assert.equal(r!.tail, '')
     assert.equal(r!.newSize, fs.statSync(file).size)
   })
 
-  it('returns the trailing partial line as tail', () => {
-    fs.writeFileSync(file, 'first\nsecond-incompl')
-    const r = readNewFileLines(file, 0)
-    assert.ok(r)
-    assert.deepEqual(r!.lines, ['first'])
-    assert.equal(r!.tail, 'second-incompl')
-  })
-
-  it('reassembles a line split across two reads via tail', () => {
-    // Simulate a JSONL writer that flushes mid-line.
-    fs.writeFileSync(file, '{"type":"session_meta","pay')
+  it('stops at the last newline so a half-written line is read again whole', () => {
+    // Writer flushes mid-line; the caller only keeps newSize.
+    fs.writeFileSync(file, 'first\n{"type":"session_meta","pay')
     const first = readNewFileLines(file, 0)
     assert.ok(first)
-    assert.deepEqual(first!.lines, [])
-    assert.equal(first!.tail, '{"type":"session_meta","pay')
+    assert.deepEqual(first!.lines, ['first'])
+    assert.equal(first!.newSize, Buffer.byteLength('first\n'))
 
-    // Writer appends the rest of the line plus a new one.
     fs.appendFileSync(file, 'load":{}}\n{"type":"other"}\n')
-    const second = readNewFileLines(file, first!.newSize, first!.tail)
+    const second = readNewFileLines(file, first!.newSize)
     assert.ok(second)
-    assert.deepEqual(second!.lines, [
-      '{"type":"session_meta","payload":{}}',
-      '{"type":"other"}',
-    ])
-    assert.equal(second!.tail, '')
+    assert.deepEqual(second!.lines, ['{"type":"session_meta","payload":{}}', '{"type":"other"}'])
+    assert.equal(second!.newSize, fs.statSync(file).size)
   })
 
-  it('drops the split line when caller ignores tail (regression guard)', () => {
-    // If a caller passes no lastTail and silently discards tail, a split line
-    // is lost. This test locks in the "contract" so the mistake is visible.
-    fs.writeFileSync(file, 'aaa\nbbb-cut')
-    const first = readNewFileLines(file, 0)
-    assert.ok(first)
-    assert.equal(first!.tail, 'bbb-cut')
+  it('returns null while only a partial line is new', () => {
+    fs.writeFileSync(file, 'done\nhalf')
+    assert.equal(readNewFileLines(file, Buffer.byteLength('done\n')), null)
+  })
 
-    fs.appendFileSync(file, 'here\nccc\n')
-    // Caller forgets to forward tail — "bbb-cuthere" never appears.
-    const second = readNewFileLines(file, first!.newSize /* no tail */)
+  it('keeps a multi-byte char split across reads intact', () => {
+    const line = '{"t":"caf\u00e9 \u{1F600}"}\n'
+    const bytes = Buffer.from(line)
+    fs.writeFileSync(file, bytes.subarray(0, 11)) // ends inside the 2-byte e-acute
+    const first = readNewFileLines(file, 0)
+    fs.appendFileSync(file, bytes.subarray(11))
+    const second = readNewFileLines(file, first?.newSize ?? 0)
     assert.ok(second)
-    assert.ok(!second!.lines.includes('bbb-cuthere'))
+    assert.deepEqual(second!.lines, [line.trim()])
   })
 
   it('resets to 0 when the file is truncated', () => {
     fs.writeFileSync(file, 'only\n')
-    const r = readNewFileLines(file, 9999, 'stale-tail')
+    const r = readNewFileLines(file, 9999)
     assert.ok(r)
     assert.deepEqual(r!.lines, [])
     assert.equal(r!.newSize, 0)
-    assert.equal(r!.tail, '')
   })
 
   it('tolerates CRLF line endings', () => {
@@ -106,7 +91,42 @@ describe('readNewFileLines', () => {
     assert.deepEqual(r!.lines, ['x', 'y'])
   })
 
+  it('readFileBytes returns only the bytes read when the file is shorter', () => {
+    fs.writeFileSync(file, 'abc')
+    assert.equal(readFileBytes(file, 0, 10).toString(), 'abc')
+  })
+
   it('returns null when the file does not exist', () => {
     assert.equal(readNewFileLines(path.join(dir, 'missing.jsonl'), 0), null)
+  })
+})
+
+describe('file locks across windows', () => {
+  const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sb-lock-'))
+
+  it('one holder at a time; a stale lock is taken over', () => {
+    const lock = path.join(dir(), 'sub', 'x.lock')
+    const release = tryLock(lock)
+    assert.ok(release)
+    assert.equal(tryLock(lock), undefined)
+    release!()
+    assert.ok(!fs.existsSync(lock))
+    fs.writeFileSync(lock, '1')
+    const old = new Date(Date.now() - 120_000)
+    fs.utimesSync(lock, old, old)
+    assert.ok(tryLock(lock))
+    assert.ok(tryLock(path.join(path.dirname(lock), 'y.lock'), 0))
+  })
+
+  it('withLock runs the edit under the lock and frees it, and waits out a holder only so long', () => {
+    const lock = path.join(dir(), 'x.lock')
+    assert.equal(withLock(lock, () => { assert.ok(fs.existsSync(lock)); return 7 }), 7)
+    assert.ok(!fs.existsSync(lock))
+    const held = tryLock(lock)!
+    const t = Date.now()
+    assert.equal(withLock(lock, () => 'ran', 50), 'ran')
+    assert.ok(Date.now() - t >= 45)
+    assert.ok(fs.existsSync(lock), 'the other holder keeps its lock')
+    held()
   })
 })

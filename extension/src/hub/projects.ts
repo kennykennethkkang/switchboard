@@ -9,7 +9,7 @@ import * as path from 'path'
 import { upperDrive } from '../fs-utils'
 import type { Project } from './types'
 
-// ponytail: cached for the window's life, so a folder git-inited later keeps its old name until reload.
+// Cached for the window's life, so a folder git-inited later keeps its old name until reload.
 const tops = new Map<string, string | undefined>()
 /** The git repo holding a folder (nearest .git dir or file), else undefined. Home never counts, so a dotfiles repo does not swallow everything. */
 export function repoTop(cwd: string): string | undefined {
@@ -123,7 +123,7 @@ export function planLabel(plan?: string, task?: string): string {
 /** `Project · Label`, at most 60 characters. */
 export const chatLabel = (project: string, plan?: string, task?: string) => `${project} · ${planLabel(plan, task)}`.slice(0, MAX_NAME).trim()
 
-// `Origin vN`, or the older `Origin · N`. ponytail: a name that ends in ` v18` of its own reads as a version; tag handoff names if that bites.
+// `Origin vN`, or the older `Origin · N`. A name that ends in ` v18` of its own reads as a version; tag handoff names if that bites.
 const CHAIN = /^(.+?)(?: v| · )(\d+)$/
 /** The origin chat a name continues, without its ` vN`; undefined for an origin itself. */
 export const chainBase = (name?: string) => (name ? CHAIN.exec(name.trim())?.[1] : undefined)

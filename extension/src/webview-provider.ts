@@ -297,7 +297,7 @@ export class VisualizerPanel implements vscode.Disposable {
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none';
       style-src ${webview.cspSource} 'unsafe-inline';
-      img-src ${webview.cspSource} https: data:;
+      img-src ${webview.cspSource} data:;
       font-src ${webview.cspSource} data:;
       script-src 'nonce-${nonce}';"
   />

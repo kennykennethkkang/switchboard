@@ -19,6 +19,7 @@ export function createBuildConfig(target: BuildTarget): UserConfig {
     resolve: {
       alias: {
         '@': resolve(__dirname),
+        'three/webgpu': resolve(__dirname, 'lib/no-webgpu.ts'),
       },
     },
     publicDir: false,
@@ -31,7 +32,7 @@ export function createBuildConfig(target: BuildTarget): UserConfig {
         name: target.name,
         fileName: () => 'index',
       },
-      // @ts-expect-error — cssFileName is valid in Vite 8 but not yet in @types
+      // @ts-expect-error: cssFileName is valid in Vite 8 but not yet in @types
       cssFileName: 'index',
       sourcemap: false,
       minify: true,

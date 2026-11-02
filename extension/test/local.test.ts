@@ -203,4 +203,15 @@ describe('design library', () => {
     assert.deepEqual(await libraryInventory(path.join(tmp, 'none')), [])
     fs.rmSync(tmp, { recursive: true, force: true })
   })
+
+  it('a read during a copy waits for it instead of seeing a half empty folder', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lib-'))
+    const src = path.join(tmp, 'kit'), dir = path.join(tmp, 'home')
+    for (let i = 0; i < 40; i++) { fs.mkdirSync(path.join(src, `b${i}`), { recursive: true }); fs.writeFileSync(path.join(src, `b${i}`, 'DESIGN.md'), '# x') }
+    fs.writeFileSync(path.join(src, 'VERSION'), 'v1')
+    const copy = syncLibrary(src, dir)
+    assert.equal((await libraryInventory(dir)).length, 40)
+    await copy
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
 })

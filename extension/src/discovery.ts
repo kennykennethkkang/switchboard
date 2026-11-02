@@ -111,7 +111,7 @@ export function addWorkspaceToManifest(workspace: string): void {
   const workspaces = readManifest()
   if (workspaces.includes(resolved)) { return }
   workspaces.push(resolved)
-  fs.writeFileSync(WORKSPACES_MANIFEST_PATH, JSON.stringify(workspaces, null, 2) + '\n')
+  fs.writeFileSync(WORKSPACES_MANIFEST_PATH, JSON.stringify(workspaces, null, 2) + '\n', { mode: 0o600 })
 }
 
 function readManifest(): string[] {
@@ -145,16 +145,22 @@ export function ensureHookScript(): void {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Owner-only: keys, logins, uploads and window tokens all live under it, whoever made the file inside.
 function ensureDir(): void {
-  if (!fs.existsSync(DISCOVERY_DIR)) {
-    fs.mkdirSync(DISCOVERY_DIR, { recursive: true })
-  }
+  fs.mkdirSync(DISCOVERY_DIR, { recursive: true, mode: 0o700 })
+  try { fs.chmodSync(DISCOVERY_DIR, 0o700) } catch { /* Windows keeps its own ACLs */ }
 }
+
+// A Bash call that both talks to the network and touches a secret is denied; either alone is normal work.
+const NET_RE = /\b(curl|wget|ncat|socat|scp|sftp|ftp|telnet)\b|(^|[|;&(]\s*)nc\b|\brsync\b.*\S:|\/dev\/(tcp|udp)\/|\b(python3?|node|ruby|perl|php|deno|bun)\b.*(urllib|requests|http\.client|fetch\(|https?\.request|Net::HTTP|LWP|socket)/
+const SECRET_RE = /security\s+find-(generic|internet)-password|\.aws(\/|\s|$|['"])|\.ssh\/|id_rsa|id_ed25519|(^|[^\w.])\.env(?!\.(example|sample|template))\b|\.envrc|\.netrc|\.npmrc|\.git-credentials|\.docker\/config\.json|gh\/hosts\.yml|\.credentials\.json|switchboard\/keys|keys\.json|phone\.secret|\.codex\/auth\.json|\.claude\.json|\bprintenv\b|(^|[\s|;&(`$\/])env(?=\s*($|[|;&)`]))|\$\(\s*(set|export\s+-p)\s*\)|os\.environ|process\.env\b(?!\.)|\bgh\s+auth\s+(token|status\s+.*-t)\b|git\s+credential\s+fill/i
+// A key var on the wire is often legit (an API call): no auto-allow, so the user sees the prompt.
+const VAR_RE = /\$\{?\w*(KEY|TOKEN|SECRET|PASS|CRED|AUTH)|\$\{?\w*_PAT\b/i
 
 /** The forwarder script's text; exported for the test that runs it. */
 export function getHookScriptContent(): string {
   return `#!/usr/bin/env node
-// Agent Flow hook forwarder v7, installed by the Agent Flow VS Code extension.
+// Agent Flow hook forwarder v8, installed by the Agent Flow VS Code extension.
 // Claude Code invokes this as a command hook. It reads a discovery directory to
 // find live extension instances, checks their PIDs, and forwards the event via
 // HTTP POST. Dead instances are cleaned up automatically.
@@ -165,6 +171,7 @@ export function getHookScriptContent(): string {
 // v5: Bash tool calls are allowed without a permission prompt.
 // v6: every other live window gets a copy marked x-switchboard-mirror, for chat status only.
 // v7: mirror copies give up after 300ms, so a frozen window barely slows the hook.
+// v8: posts carry the window's hubToken; Bash sending a secret over the network is denied.
 //
 // Discovery dir: ~/.claude/switchboard/
 // Discovery file: {workspace-hash}-{pid}.json  →  { port, pid, workspace }
@@ -204,9 +211,17 @@ process.stdin.on('data', c => { input += c; });
 process.stdin.on('end', () => {
   let cwd, ev;
   try { ev = JSON.parse(input); cwd = ev.cwd; } catch { process.exit(0); }
-  // Bash never asks; deny rules in settings still win over a hook's allow. writeSync: an async pipe write can be cut off by exit.
+  // Bash never asks, unless it looks like exfiltration; deny rules in settings still win over a hook's allow.
+  // writeSync: an async pipe write can be cut off by exit.
   if (ev.hook_event_name === 'PreToolUse' && ev.tool_name === 'Bash') {
-    fs.writeSync(1, JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' } }));
+    const cmd = String((ev.tool_input && ev.tool_input.command) || '');
+    const net = ${NET_RE}, secret = ${SECRET_RE};
+    // Same step (pipes included): deny. Secret and network in different steps, or a key var: the normal prompt.
+    const out = cmd.split(/;|&&|\\|\\||\\n/).some(p => net.test(p) && secret.test(p))
+      ? { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'Switchboard blocked this: it sends a secret (key, token, env, credentials) over the network. Ask the user to run it themselves if it is really needed.' }
+      : net.test(cmd) && (secret.test(cmd) || ${VAR_RE}.test(cmd)) ? undefined
+      : { hookEventName: 'PreToolUse', permissionDecision: 'allow' };
+    if (out) fs.writeSync(1, JSON.stringify({ hookSpecificOutput: out }));
   }
   if (!cwd) process.exit(0);
 
@@ -264,7 +279,7 @@ process.stdin.on('end', () => {
     const finish = () => { if (settled) return; settled = true; done(); };
     const req = http.request({
       hostname: '127.0.0.1', port: d.port, method: 'POST',
-      headers: mirror ? { 'Content-Type': 'application/json', 'x-switchboard-mirror': '1' } : { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-switchboard-token': String(d.hubToken || ''), ...(mirror ? { 'x-switchboard-mirror': '1' } : {}) },
       timeout: mirror ? 300 : ${HOOK_FORWARD_TIMEOUT_MS},
     }, res => { res.resume(); res.on('end', finish); });
     req.on('error', finish);

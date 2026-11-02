@@ -2,9 +2,9 @@
  * Claude Code runtime.
  *
  * Wires together the two event sources for a Claude Code session:
- *   1. Hook server — receives live events via a stdin-piped hook script
+ *   1. Hook server: receives live events via a stdin-piped hook script
  *      configured in Claude's settings.json
- *   2. Session watcher — tails Claude Code's JSONL transcripts at
+ *   2. Session watcher: tails Claude Code's JSONL transcripts at
  *      ~/.claude/projects/<encoded>/<session>.jsonl
  *
  * Both sources can be active simultaneously; this runtime routes hook
@@ -31,10 +31,11 @@ import {
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
 import { dailySummary, notify } from './hub/notify'
-import { newerVersion } from './hub/progress'
+import { onSwitchboard, pendingReload, readBuild } from './hub/self-update'
+import { refreshWeb } from './hub/hub-panel'
 import { checkAsked } from './hub/coverage'
-import { readWindows } from './hub/dev'
-import { chatEnded, chatFinished, chatResumed } from './hub/todo'
+import { postLocal, readWindows } from './hub/dev'
+import { chatEnded, chatFinished, chatMissed, chatResumed } from './hub/todo'
 import type { ChatProgress, ChatState } from './hub/types'
 import { wireWatcherToPanel } from './session-runtime'
 import type { AgentRuntime } from './session-runtime'
@@ -77,12 +78,12 @@ export async function startClaudeRuntime(
   const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 
   if (hookPort === HOOK_SERVER_NOT_STARTED) {
-    log.info('Hook server skipped (another instance owns the port) — using session watcher only')
+    log.info('Hook server skipped (another instance owns the port), using session watcher only')
   } else {
     log.info(`Hook server running on port ${hookPort}`)
 
     // Write discovery file so the hook script can find us.
-    // The hook script reads this at invocation time — no port in settings.json.
+    // The hook script reads this at invocation time; no port in settings.json.
     if (workspace) {
       ensureHookScript()
       writeDiscoveryFile(hookPort, workspace)
@@ -96,8 +97,11 @@ export async function startClaudeRuntime(
   context.subscriptions.push(watcher)
 
   const summary = setInterval(() => dailySummary(), 10 * 60_000)
-  const reload = setInterval(() => reloadIfUpdated(context, context.extension.packageJSON.version as string), 60_000)
-  context.subscriptions.push({ dispose: () => { clearInterval(summary); clearInterval(reload) } })
+  const running = { version: context.extension.packageJSON.version as string, build: readBuild(context.extensionPath) }
+  const reload = setInterval(() => reloadIfUpdated(context, running), 15_000)
+  context.subscriptions.push({ dispose: () => { clearInterval(summary); clearInterval(reload) } },
+    // A rebuild waiting on chats reloads when the user leaves the window.
+    vscode.window.onDidChangeWindowState(st => { if (!st.focused && waiting?.rebuilds) { waiting.since = 0; reloadIfUpdated(context, running) } }))
 
   // Route hook events → panel, but filter out events the watcher already owns
   if (hookPort !== HOOK_SERVER_NOT_STARTED) {
@@ -132,11 +136,11 @@ export async function startClaudeRuntime(
           return
         }
 
-        // Subagent lifecycle events — let the watcher handle these (it has
+        // Subagent lifecycle events: let the watcher handle these (it has
         // the correct display name from transcript/meta files)
         if (SUBAGENT_LIFECYCLE_EVENTS.has(event.type)) return
 
-        // Subagent tool/message events — pass through
+        // Subagent tool/message events: pass through
         panel.sendEvent(event)
         return
       }
@@ -161,7 +165,7 @@ export async function startClaudeRuntime(
 
   const dispose = (): void => {
     // Remove our discovery file so the hook script won't forward to a dead port.
-    // Hook entries in settings.json are left intact — the command is stable
+    // Hook entries in settings.json are left intact; the command is stable
     // (node ~/.claude/agent-flow/hook.js) and the script handles dead instances
     // gracefully via PID checks. This avoids breaking multi-window setups and
     // means hooks survive VS Code restarts without reconfiguration.
@@ -181,29 +185,38 @@ async function withCoverage(change: { from?: ChatState; to: ChatProgress }): Pro
   if (scores) {
     const ev = { session_id: p.sessionId, cwd: p.cwd, hook_event_name: 'SwitchboardCovered', scores }
     hub.hook(ev)
-    const body = JSON.stringify(ev)
     for (const w of readWindows().filter(w => w.pid !== process.pid)) {
-      void fetch(`http://127.0.0.1:${w.port}/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-switchboard-mirror': '1' }, body, signal: AbortSignal.timeout(2000) }).catch(() => undefined)
+      void postLocal(w.port, '/', ev, 2000, { 'x-switchboard-mirror': '1' }).catch(() => undefined)
     }
   }
-  notify({ ...change, to: hub.get().progress.find(x => x.sessionId === p.sessionId) ?? p })
+  const scored = hub.get().progress.find(x => x.sessionId === p.sessionId) ?? p
+  if (scores) chatMissed(scored).catch(err => log.warn('To-do update failed:', err))
+  notify({ ...change, to: scored })
 }
 
-/** A newer Switchboard installed: reload this window once none of its own chats is mid-turn, so nothing in flight is lost. */
-function reloadIfUpdated(context: vscode.ExtensionContext, running: string): void {
-  const dir = path.join(os.homedir(), '.vscode', 'extensions')
-  let newest = running
-  try {
-    let obsolete: Record<string, unknown> = {}
-    try { obsolete = JSON.parse(fs.readFileSync(path.join(dir, '.obsolete'), 'utf8')) } catch { /* none */ }
-    for (const n of fs.readdirSync(dir)) {
-      const v = /^kennykennethkkang\.switchboard-(\d+\.\d+\.\d+)$/.exec(n)?.[1]
-      if (v && !obsolete[n] && newerVersion(v, newest)) newest = v
-    }
-  } catch { return }
-  // Once per version: a copy that will not load must not reload the window every minute.
-  if (newest === running || context.globalState.get('reloadedFor') === newest) return
+/** A newer Switchboard installed, or in a window on the Switchboard checkout any rebuild of it: reload this window
+ * once none of its own chats is mid-turn, so nothing in flight is lost. A rebuild waits at most WAIT_MS or until the
+ * window loses focus. Once per version (or build) per window, so a copy that will not load cannot loop. */
+const WAIT_MS = 10 * 60_000
+let waiting: { key: string; since: number; rebuilds: boolean } | undefined
+function reloadIfUpdated(context: vscode.ExtensionContext, running: { version: string; build?: string }): void {
   const roots = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
+  // Not in a dev host: its build is the checkout's, never the installed one.
+  const rebuilds = context.extensionMode === vscode.ExtensionMode.Production && onSwitchboard(roots)
+  const key = pendingReload(path.join(os.homedir(), '.vscode', 'extensions'), running, rebuilds)
+  if (!key || context.workspaceState.get('reloadedFor') === key) return
+  const reload = () => {
+    waiting = undefined
+    void context.workspaceState.update('reloadedFor', key).then(() => vscode.commands.executeCommand('workbench.action.reloadWindow'))
+  }
   const busy = hub.get().progress.some(p => p.state === 'working' && roots.some(r => p.cwd === r || p.cwd.startsWith(r + path.sep)))
-  if (!busy) void context.globalState.update('reloadedFor', newest).then(() => vscode.commands.executeCommand('workbench.action.reloadWindow'))
+  if (waiting?.key !== key) {
+    waiting = { key, since: Date.now(), rebuilds }
+    if (rebuilds) {
+      // The browser app and its pages need not wait for this window's chats.
+      refreshWeb()
+      if (busy) void vscode.window.showInformationMessage('Switchboard rebuilt, reloading when your chats finish.', 'Reload now').then(pick => { if (pick && waiting?.key === key) reload() })
+    }
+  }
+  if (!busy || (waiting.rebuilds && Date.now() - waiting.since >= WAIT_MS)) reload()
 }

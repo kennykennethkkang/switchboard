@@ -11,7 +11,7 @@ import { summarizeInput, summarizeResult, extractFilePath, buildDiscovery } from
 import { estimateTokenCost } from './token-estimator'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
-import { handleHub, type HubReply } from './hub/routes'
+import { handleHubRequest, handleUpload, tokenHeader, type HubReply } from './hub/routes'
 
 const log = createLogger('HookServer')
 
@@ -51,7 +51,7 @@ interface HookPayload {
 export class HookServer implements vscode.Disposable {
   private server: http.Server | null = null
   private port: number
-  /** Per-session state — cleaned up on SessionEnd/Stop to prevent unbounded growth */
+  /** Per-session state: cleaned up on SessionEnd/Stop to prevent unbounded growth */
   private sessionState = new Map<string, {
     startTime: number
     agentNames: Map<string, string> // agent_id → friendly name
@@ -72,8 +72,24 @@ export class HookServer implements vscode.Disposable {
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => {
+        // An upload streams to disk; the string read below caps at 1 MB and is not binary safe.
+        if (req.method === 'POST' && req.url?.startsWith('/hub/upload?')) {
+          void handleUpload(hub, req.url, req, undefined, tokenHeader(req.headers)).then(r => {
+            res.writeHead(r.status, r.contentType ? { 'Content-Type': r.contentType } : undefined)
+            // Refused before the end (a bad token, over the cap): drop the rest once the answer is out.
+            res.end(r.body, () => { if (!req.readableEnded) req.destroy() })
+          })
+          return
+        }
         if (req.url === '/hub' || req.url?.startsWith('/hub/') || req.url?.startsWith('/hub?')) {
           this.serveHub(req, res)
+          return
+        }
+        // Hooks send the window token and never an Origin; a web page's forged post has neither.
+        if (req.method === 'POST' && (req.headers.origin !== undefined || !hub.isToken(req.headers['x-switchboard-token']))) {
+          req.resume()
+          res.writeHead(403)
+          res.end()
           return
         }
         if (req.method === 'POST') {
@@ -103,7 +119,7 @@ export class HookServer implements vscode.Disposable {
                 log.error('Failed to parse payload:', e)
               }
             }
-            // Always return 200 with empty body — we're observing, not blocking.
+            // Always return 200 with empty body; we're observing, not blocking.
             // Empty body = "success, no output" per Claude Code docs.
             // Returning JSON (even '{}') triggers schema parsing which can cause issues.
             res.writeHead(200)
@@ -117,9 +133,9 @@ export class HookServer implements vscode.Disposable {
 
       this.server.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
-          // Another instance already owns this port — skip instead of incrementing
+          // Another instance already owns this port; skip instead of incrementing
           // to a port nobody sends to. The session watcher handles all events via JSONL.
-          log.info(`Port ${this.port} in use (another instance owns it) — skipping hook server`)
+          log.info(`Port ${this.port} in use (another instance owns it); skipping hook server`)
           this.server?.close()
           this.server = null
           resolve(HOOK_SERVER_NOT_STARTED)
@@ -149,12 +165,12 @@ export class HookServer implements vscode.Disposable {
     req.on('end', async () => {
       let reply: HubReply
       try {
-        reply = oversized ? { status: 413, body: '' } : await handleHub(hub, req.method, req.url, body) ?? { status: 404, body: '' }
+        reply = oversized ? { status: 413, body: '' } : await handleHubRequest(hub, req, body) ?? { status: 404, body: '' }
       } catch {
         reply = { status: 500, body: '' }
       }
       res.writeHead(reply.status, reply.contentType ? { 'Content-Type': reply.contentType } : undefined)
-      res.end(reply.body)
+      res.end(reply.bytes ?? reply.body)
     })
   }
 

@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { WindowColor } from './types'
+import { withLock } from '../fs-utils'
 
 export const PALETTE: WindowColor[] = ['violet', 'amber', 'teal', 'rose', 'lime', 'cobalt']
 const FILE = path.join(os.homedir(), '.claude', 'switchboard', 'colors.json')
@@ -31,20 +32,28 @@ export function assignColors(saved: Record<string, WindowColor>, live: string[])
 }
 
 /** Reads the colors file, gives each live folder one and writes it back when that added any. */
-export function windowColors(live: string[], file = FILE): Record<string, WindowColor> {
-  let saved: Record<string, WindowColor> = {}
+function readColors(file: string): Record<string, WindowColor> {
   try {
     const v = JSON.parse(fs.readFileSync(file, 'utf8'))
-    if (v && typeof v === 'object' && !Array.isArray(v)) saved = Object.fromEntries(Object.entries(v).filter(([, c]) => PALETTE.includes(c as WindowColor))) as Record<string, WindowColor>
+    if (v && typeof v === 'object' && !Array.isArray(v)) return Object.fromEntries(Object.entries(v).filter(([, c]) => PALETTE.includes(c as WindowColor))) as Record<string, WindowColor>
   } catch { /* none yet, or broken: start over */ }
-  const { colors, changed } = assignColors(saved, live)
-  if (changed) {
-    try {
-      fs.mkdirSync(path.dirname(file), { recursive: true })
-      fs.writeFileSync(file, JSON.stringify(colors, null, 2) + '\n')
-    } catch { /* colors still show, just not kept */ }
-  }
-  return colors
+  return {}
+}
+
+export function windowColors(live: string[], file = FILE): Record<string, WindowColor> {
+  const first = assignColors(readColors(file), live)
+  if (!first.changed) return first.colors
+  // Read again under the lock: another window may have just added its folder.
+  return withLock(`${file}.lock`, () => {
+    const { colors, changed } = assignColors(readColors(file), live)
+    if (changed) {
+      try {
+        fs.mkdirSync(path.dirname(file), { recursive: true })
+        fs.writeFileSync(file, JSON.stringify(colors, null, 2) + '\n', { mode: 0o600 })
+      } catch { /* colors still show, just not kept */ }
+    }
+    return colors
+  })
 }
 
 export const titleBarColors = (c: WindowColor): Record<string, string> => ({

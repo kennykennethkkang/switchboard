@@ -44,3 +44,6 @@ export function gearRows(hub: Pick<HubState, 'installed' | 'connections'>, q: st
 export function roleModels(installed: Installed[], lead?: string): Record<string, string> {
   return Object.fromEntries(installed.filter(i => i.kind === 'role').map(i => [i.name, !i.model || i.model === 'inherit' ? lead ?? 'inherit' : i.model]))
 }
+
+/** Whether a settings search hits one of the words: whole keywords by their start, so one letter does not match everything. */
+export const keywordHit = (words: string, q: string) => !!q && words.split(/\s+/).some(w => w.startsWith(q))

@@ -1,53 +1,49 @@
 import * as fs from 'fs'
+import * as path from 'path'
 
-/**
- * Read a chunk of bytes from a file at a given offset.
- * Uses try/finally to guarantee the file descriptor is always closed.
- */
-export function readFileChunk(filePath: string, offset: number, length: number): string {
+/** Read up to `length` bytes at `offset`; shorter if the file is shorter. */
+export function readFileBytes(filePath: string, offset: number, length: number): Buffer {
   const fd = fs.openSync(filePath, 'r')
   try {
     const buffer = Buffer.alloc(length)
-    fs.readSync(fd, buffer, 0, length, offset)
-    return buffer.toString('utf-8')
+    return buffer.subarray(0, fs.readSync(fd, buffer, 0, length, offset))
   } finally {
     fs.closeSync(fd)
   }
 }
 
+/** Decode only up to the last newline. `used` is that byte count, so a
+ *  half-written line (and any split multi-byte char) waits for the next read. */
+export function completeLines(buf: Buffer): { lines: string[]; used: number } {
+  const used = buf.lastIndexOf(0x0a) + 1
+  return { lines: buf.toString('utf-8', 0, used).split(/\r?\n/).filter(Boolean), used }
+}
+
 /**
- * Read new lines appended to a file since `lastSize` bytes.
- * Returns the new lines, updated file size, and any trailing partial line
- * (bytes past the last newline) as `tail` — pass it back on the next call as
- * `lastTail` to reassemble lines split across reads. If callers ignore `tail`,
- * they silently lose any line that wasn't fully flushed by the writer yet.
- * Handles truncation (file shrunk) by resetting to 0.
+ * Read complete lines appended to a file since `lastSize` bytes.
+ * newSize stops after the last newline, so a partial line is read again whole
+ * next time. Null when no complete line is new. Truncation resets to 0.
  */
 export function readNewFileLines(
   filePath: string,
   lastSize: number,
-  lastTail = '',
-): { lines: string[]; newSize: number; tail: string } | null {
+): { lines: string[]; newSize: number } | null {
   let stat: fs.Stats
   try {
     stat = fs.statSync(filePath)
   } catch { return null /* expected if file was removed */ }
 
   if (stat.size < lastSize) {
-    // File was truncated — reset both size and tail
-    return { lines: [], newSize: 0, tail: '' }
+    // File was truncated
+    return { lines: [], newSize: 0 }
   }
   if (stat.size <= lastSize) {
     return null
   }
 
-  const newContent = lastTail + readFileChunk(filePath, lastSize, stat.size - lastSize)
-  const parts = newContent.split(/\r?\n/)
-  // Last fragment is whatever follows the final newline — empty if the file
-  // ended on a newline, otherwise a partial line we need to carry forward.
-  const tail = parts.pop() ?? ''
-  const lines = parts.filter(Boolean)
-  return { lines, newSize: stat.size, tail }
+  const { lines, used } = completeLines(readFileBytes(filePath, lastSize, stat.size - lastSize))
+  if (used === 0) return null
+  return { lines, newSize: lastSize + used }
 }
 
 /** c:\ and C:\ as one spelling, so a path used as a key does not split by who reported it. */
@@ -58,4 +54,24 @@ export const upperDrive = (p: string) => p.replace(/^[a-z]:/, d => d.toUpperCase
  *  `c:\...`, Claude Code and most shells report `C:\...`). Identity elsewhere. */
 export function foldPathCase(p: string): string {
   return process.platform === 'win32' ? p.toLowerCase() : p
+}
+
+/** A lock file every window sees; the release, or undefined while another holder's is younger than staleMs (a crashed one's is taken over). */
+export function tryLock(lock: string, staleMs = 60_000): (() => void) | undefined {
+  try { fs.mkdirSync(path.dirname(lock), { recursive: true }); fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }) } catch {
+    try { if (Date.now() - fs.statSync(lock).mtimeMs < staleMs) return undefined; fs.writeFileSync(lock, String(process.pid)) } catch { return undefined }
+  }
+  return () => fs.rmSync(lock, { force: true })
+}
+
+const nap = new Int32Array(new SharedArrayBuffer(4))
+
+/** A short read-modify-write under lock, waiting up to waitMs for another window's.
+ * Past that it runs unlocked, so a stuck holder never blocks the write; a lost update is the ceiling. */
+export function withLock<T>(lock: string, fn: () => T, waitMs = 100): T {
+  const until = Date.now() + waitMs
+  // Holds last milliseconds, so a 2 s old lock is a crashed window's; the wait blocks the host, keep it short.
+  let release = tryLock(lock, 2_000)
+  while (!release && Date.now() < until) { Atomics.wait(nap, 0, 0, 10); release = tryLock(lock, 2_000) }
+  try { return fn() } finally { release?.() }
 }

@@ -7,7 +7,7 @@ import { execFileSync } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { claudeCall, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
+import { claudeBinary, claudeCall, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
 // @ts-expect-error plain .mjs, no types
 import { commandFor, expand, installSkills, keyFor, mcpConfig, readKey, storeKey } from '../kit/setup-run.mjs'
 
@@ -207,7 +207,7 @@ describe('setup runner', () => {
 describe('claude call', () => {
   it('registers the ask tool directly on macOS and through a shell with quoted paths on Windows', () => {
     const args = ['mcp', 'add', '--scope', 'user', 'switchboard', '--', 'node', 'C:\\Users\\A B\\.claude\\switchboard\\ask\\ask-server.mjs']
-    assert.deepEqual(claudeCall(args, 'darwin'), { cmd: 'claude', args, shell: false })
+    assert.deepEqual(claudeCall(args, 'darwin'), { cmd: claudeBinary(), args, shell: false })
     const w = claudeCall(args, 'win32')
     assert.equal(w.shell, true)
     assert.deepEqual(w.args.slice(0, 7), args.slice(0, 7))
@@ -230,5 +230,18 @@ describe('setup state', () => {
     assert.deepEqual(setupState(home).mcps, ['b', 'c'])
     assert.deepEqual(setupState(home).plain, ['a'])
     fs.rmSync(home, { recursive: true, force: true })
+  })
+})
+
+describe('setup key lines', () => {
+  const says = (o = {}) => steps(o).flatMap(s => (s.say ? [s.say] : []))
+  it('points a missing key to Sign-ins, not ~/.zshrc', () => {
+    const lines = says({ keys: [{ name: 'GEMINI_API_KEY', saved: true, last4: 'wxyz', checked: { ok: true, at: 1 } }, { name: 'OPENROUTER_API_KEY', saved: false }] })
+    assert.ok(lines.includes('Gemini key: saved (ends wxyz), works.'))
+    assert.ok(lines.includes('Jev (OpenRouter) key: missing. Paste it in Switchboard: Settings, Accounts, API keys.'))
+    assert.ok(!lines.some(l => l.includes('zshrc')))
+  })
+  it('says nothing about keys when an older caller passes none', () => {
+    assert.ok(!says().some(l => /key:/.test(l)))
   })
 })

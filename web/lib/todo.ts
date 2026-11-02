@@ -7,6 +7,11 @@ const fold = (p: string) => (/^[a-z]:[\\/]/i.test(p) ? p.replace(/\\/g, '/').toL
 /** Whether cwd is the folder or under it. */
 export const inside = (folder: string, cwd: string) => { const c = fold(cwd), f = fold(folder); return c === f || c.startsWith(`${f}/`) }
 
+/** The lists, plus an empty one for cwd when no listed project holds it, so its first item can be added. */
+export function withHome(todos: Record<string, TodoList> = {}, cwd?: string): Record<string, TodoList> {
+  return !cwd || Object.keys(todos).some(f => inside(f, cwd)) ? todos : { ...todos, [cwd]: { todo: [] } }
+}
+
 /** The listed project holding the folder (the longest), else the window's, else the first. */
 export function todoFolder(folders: string[], cwd?: string, here?: string): string | undefined {
   const holding = (f?: string) => (f ? folders.filter(p => inside(p, f)).sort((a, b) => b.length - a.length)[0] : undefined)
@@ -52,3 +57,10 @@ export const runCount = (todo: TodoItem[], ids: string[]) => runIds(todo, ids).s
 /** Whether a run shows in the list: each picked item gone or in the chat it went to (to), else in a chat other than the one it had (was). */
 export const runLanded = (todo: TodoItem[], ids: string[], was: Map<string, string | undefined>, to?: string) =>
   ids.every(id => { const t = todo.find(x => x.id === id); return !t || (to ? t.chat === to : !!t.chat && t.chat !== was.get(id)) })
+
+/** Finish up: Kenneth's own hand steps (why 'you'), from the tray or accepted before, grouped by the chat's name. */
+export function finishUp(list: TodoList): Array<[string, TodoItem[]]> {
+  const g = new Map<string, TodoItem[]>()
+  for (const t of [...list.suggested ?? [], ...list.todo]) if (t.why === 'you') g.set(t.name ?? 'a chat', [...g.get(t.name ?? 'a chat') ?? [], t])
+  return [...g]
+}

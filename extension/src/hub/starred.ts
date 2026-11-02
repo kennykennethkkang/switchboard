@@ -25,7 +25,7 @@ export function readStarred(): Star[] {
 
 export function writeStarred(list: Star[]): void {
   fs.mkdirSync(path.dirname(FILE), { recursive: true })
-  fs.writeFileSync(FILE, JSON.stringify(list, null, 2))
+  fs.writeFileSync(FILE, JSON.stringify(list, null, 2), { mode: 0o600 })
 }
 
 export function toggleStar(list: Star[], s: Omit<Star, 'starredAt'>, on: boolean, now = Date.now()): Star[] {
@@ -36,16 +36,15 @@ export function toggleStar(list: Star[], s: Omit<Star, 'starredAt'>, on: boolean
 /** The newest handoff note per session id, named <stamp>-<first 8 of the id>.md. */
 export async function newestNotes(ids: string[]): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
+  if (!ids.length) return out
   const projects = await fs.promises.readdir(HANDOFFS).catch(() => [] as string[])
+  const files = (await Promise.all(projects.map(async p => (await fs.promises.readdir(path.join(HANDOFFS, p)).catch(() => [] as string[])).map(n => path.join(HANDOFFS, p, n))))).flat()
   for (const id of ids) {
     let best: { file: string; mtime: number } | undefined
-    for (const p of projects) {
-      for (const n of await fs.promises.readdir(path.join(HANDOFFS, p)).catch(() => [] as string[])) {
-        if (!n.endsWith(`-${id.slice(0, 8)}.md`)) continue
-        const file = path.join(HANDOFFS, p, n)
-        const st = await fs.promises.stat(file).catch(() => undefined)
-        if (st && (!best || st.mtimeMs > best.mtime)) best = { file, mtime: st.mtimeMs }
-      }
+    for (const file of files) {
+      if (!file.endsWith(`-${id.slice(0, 8)}.md`)) continue
+      const st = await fs.promises.stat(file).catch(() => undefined)
+      if (st && (!best || st.mtimeMs > best.mtime)) best = { file, mtime: st.mtimeMs }
     }
     if (best) out[id] = await fs.promises.readFile(best.file, 'utf8').catch(() => '')
   }

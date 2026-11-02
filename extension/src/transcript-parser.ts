@@ -10,7 +10,7 @@ import {
   TranscriptEntry, ToolUseBlock, ToolResultBlock,
   emitSubagentSpawn,
 } from './protocol'
-import { readFileChunk } from './fs-utils'
+import { readFileBytes, completeLines } from './fs-utils'
 import {
   PREVIEW_MAX, ARGS_MAX, RESULT_MAX, MESSAGE_MAX,
   SESSION_LABEL_MAX, SESSION_LABEL_TRUNCATED,
@@ -265,7 +265,7 @@ export class TranscriptParser {
     if (session) { this.delegate.emitContextUpdate(agentName, session, sessionId) }
   }
 
-  /** Process a text block — dedup, track tokens, emit message event */
+  /** Process a text block: dedup, track tokens, emit message event */
   private handleTextBlock(
     block: unknown,
     emitRole: 'user' | 'assistant',
@@ -295,7 +295,7 @@ export class TranscriptParser {
     }, sessionId)
   }
 
-  /** Process a thinking block — dedup, track tokens, emit message event.
+  /** Process a thinking block: dedup, track tokens, emit message event.
    *  Redacted thinking (Opus 4.7+) is shown as a "Thinking..." placeholder. */
   private handleThinkingBlock(
     block: unknown,
@@ -313,7 +313,7 @@ export class TranscriptParser {
     if (seenMsgs?.has(hash)) return
     seenMsgs?.add(hash)
 
-    // Reasoning tokens are unknown for redacted blocks — skip breakdown update
+    // Reasoning tokens are unknown for redacted blocks; skip breakdown update
     if (session && thinking) { session.contextBreakdown.reasoning += estimateTokensFromText(thinking) }
     this.delegate.emit({
       time: this.delegate.elapsed(sessionId),
@@ -513,7 +513,7 @@ export class TranscriptParser {
       }
       this.inlineSubagentState.set(parentToolUseID, subState)
 
-      // Mark this subagent as receiving inline progress — file watcher should skip events
+      // Mark this subagent as receiving inline progress; file watcher should skip events
       if (sessionId) {
         const session = this.delegate.getSession(sessionId)
         session?.inlineProgressAgents.add(childName)
@@ -534,11 +534,13 @@ export class TranscriptParser {
     if (size === 0) { return [] }
     const catchUpEntries: TranscriptEntry[] = []
     try {
-      // Read only up to `size` bytes — the file may have grown since stat.
+      // Read only up to `size` bytes; the file may have grown since stat.
       // Reading beyond would add tool_use IDs to the dedup set that haven't
       // been accounted for in fileSize, causing readNewLines to silently skip them.
-      const content = readFileChunk(filePath, 0, size)
-      for (const line of content.split(/\r?\n/)) {
+      // fileSize stops after the last newline so a half-written line is read later.
+      const { lines, used } = completeLines(readFileBytes(filePath, 0, size))
+      session.fileSize = used
+      for (const line of lines) {
         if (!line.trim()) { continue }
         try {
           const entry = JSON.parse(line.trim()) as TranscriptEntry & { toolUseResult?: unknown }
@@ -628,7 +630,7 @@ export class TranscriptParser {
   /** Emit message events for pre-existing transcript entries (catch-up on session detection).
    *  Only emits the last user message (the current turn), not the full history. */
   emitCatchUpEntries(entries: TranscriptEntry[], session: WatchedSession, sessionId: string): void {
-    // Find the last user entry — that's the current turn
+    // Find the last user entry; that's the current turn
     let lastUserIndex = -1
     for (let i = entries.length - 1; i >= 0; i--) {
       if (entries[i].type === 'user') { lastUserIndex = i; break }
@@ -709,7 +711,7 @@ export class TranscriptParser {
     return SYSTEM_CONTENT_PREFIXES.some(prefix => text.startsWith(prefix))
   }
 
-  /** Truncate to first line, max chars — fits in a tab */
+  /** Truncate to first line and max chars so it fits in a tab */
   truncateLabel(text: string): string {
     const firstLine = text.split('\n')[0].trim()
     if (firstLine.length <= SESSION_LABEL_MAX) return firstLine

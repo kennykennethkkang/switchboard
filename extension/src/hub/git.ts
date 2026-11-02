@@ -7,7 +7,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { cliPath } from './ais'
 import { insideCwd } from './local'
-import type { GitOp, RepoFile, RepoView } from './types'
+import type { GitOp, LaneCommit, RepoFile, RepoView } from './types'
 
 const QUICK = 15_000
 const SLOW = 60_000
@@ -114,7 +114,10 @@ async function pushTarget(root: string, s: Status): Promise<{ remote: string; na
   const b = s.branch ?? ''
   if (!s.upstream) return { remote: 'origin', name: b, publish: true }
   const merge = await config(root, `branch.${b}.merge`)
-  return { remote: (await config(root, `branch.${b}.remote`)) || 'origin', name: merge.replace(/^refs\/heads\//, '') || b, publish: false }
+  const remote = (await config(root, `branch.${b}.remote`)) || 'origin', name = merge.replace(/^refs\/heads\//, '') || b
+  // A feature branch made with --track origin/main publishes under its own name instead.
+  if (MAIN.test(name) && !MAIN.test(b)) return { remote, name: b, publish: true }
+  return { remote, name, publish: false }
 }
 
 // HEAD:refs/heads/<name> so a branch name can never read as a flag or a +force refspec.
@@ -219,12 +222,69 @@ export function firstConflict(text: string): { line: number; ours: string; their
   return { line: start + 1 + k, ours: cut(ours[k]), theirs: cut(theirs[k]) }
 }
 
-/** `git log --format=%h%x00%an%x00%ae%x00%ct` rows; my own email reads as You. */
-export function parseCommits(out: string, me: string): Merge['commits'] {
+const SIDE: Record<string, LaneCommit['side']> = { '>': 'head', '<': 'base', '-': 'fork' }
+
+/** `git log --format=%h%x00%an%x00%ae%x00%ct` rows, plus `%x00%m%x00%s` for the card's lanes; my own email reads as You. */
+export function parseCommits(out: string, me: string): LaneCommit[] {
   return out.split('\n').filter(Boolean).map(l => {
-    const [hash, name, email, ct] = l.split('\0')
-    return { hash, author: me && email?.toLowerCase() === me.toLowerCase() ? 'You' : name, at: Number(ct) * 1000 }
+    const [hash, name, email, ct, mark, subject] = l.split('\0')
+    const c: LaneCommit = { hash, author: me && email?.toLowerCase() === me.toLowerCase() ? 'You' : name, at: Number(ct) * 1000 }
+    if (subject !== undefined) c.subject = subject
+    if (mark && SIDE[mark]) c.side = SIDE[mark]
+    return c
   })
+}
+
+/** `git diff --numstat -z`; a rename counts under its new path, a binary as 0 and 0. */
+export function parseNumstat(out: string): { path: string; added: number; removed: number }[] {
+  const parts = out.split('\0'), got: { path: string; added: number; removed: number }[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const m = /^(-|\d+)\t(-|\d+)\t(.*)$/.exec(parts[i])
+    if (!m) continue
+    const p = m[3] || (i += 2, parts[i])
+    got.push({ path: p, added: Number(m[1]) || 0, removed: Number(m[2]) || 0 })
+  }
+  return got
+}
+
+// Kept out of Commit & push: agent files never get committed, wherever they sit.
+const AGENT = /(^|\/)(\.claude|\.superpowers|\.playwright-mcp|docs\/superpowers)(\/|$)|(^|\/)(CLAUDE(\.local)?\.md|AGENTS\.md|skills-lock\.json|\.mcp\.json)$/
+export const agentPath = (p: string) => AGENT.test(p)
+
+/** Commit & push's split of git status. A rename touching an agent file stays out whole.
+ *  held: deleted in the index but still on disk (untracked on purpose): the deletion ships, the file stays untracked. */
+export function shipFiles(listed: RepoFile[]): { take: RepoFile[]; kept: RepoFile[]; held: Set<string> } {
+  const held = new Set(listed.filter(f => f.status === 'deleted' && listed.some(u => u.status === 'untracked' && u.path === f.path)).map(f => f.path))
+  const rest = listed.filter(f => !(f.status === 'untracked' && held.has(f.path)))
+  const out = (f: RepoFile) => agentPath(f.path) || (!!f.from && agentPath(f.from))
+  return { take: rest.filter(f => !out(f)), kept: rest.filter(out), held }
+}
+const shown = (f: RepoFile) => (f.from ? `${f.from} → ${f.path}` : f.path)
+const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\0') === [...b].sort().join('\0')
+const isLink = (p: string) => { try { return fs.lstatSync(p).isSymbolicLink() } catch { return false } }
+
+/** git add -A on the paths git can match: a staged rename's old path is gone from disk and index, and add fails on it. */
+async function stage(root: string, paths: string[]): Promise<Ran> {
+  if (!paths.length) return { ok: true, out: '', err: '' }
+  const indexed = new Set((await git(root, [LIT, 'ls-files', '-z', '--', ...paths])).out.split('\0'))
+  const real = paths.filter(p => indexed.has(p) || fs.existsSync(path.join(root, p)) || isLink(path.join(root, p)))
+  return real.length ? git(root, [LIT, 'add', '-A', '--', ...real]) : { ok: true, out: '', err: '' }
+}
+
+/** The message without attribution trailers. */
+export const cleanMessage = (text: string) => text.split('\n').filter(l => !/^\s*(co-authored-by|claude-session):/i.test(l)).join('\n').trim()
+
+const LANE_FORMAT = '--format=%h%x00%an%x00%ae%x00%ct%x00%m%x00%s'
+
+/** HEAD against ref on two lanes, newest first, with the merge base they split at. */
+async function readLanes(root: string, ref: string, me: string): Promise<NonNullable<RepoView['lanes']>> {
+  const [log, fork] = await Promise.all([
+    git(root, ['log', '-12', '--left-right', LANE_FORMAT, `${ref}...HEAD`]),
+    git(root, ['merge-base', 'HEAD', ref]),
+  ])
+  const at = fork.out.trim()
+  const base = at ? parseCommits((await git(root, ['log', '-1', LANE_FORMAT, at])).out, me)[0] : undefined
+  return { against: ref, ...(base ? { fork: { ...base, side: 'fork' as const } } : {}), commits: parseCommits(log.out, me) }
 }
 
 // Keyed by both tips, so a refresh with nothing new runs no merge-tree.
@@ -275,9 +335,17 @@ export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView
   const github = githubRepo((await git(root, ['remote', 'get-url', remote])).out)
   const pr = github && gh && s.branch && s.upstream ? await prFor(root, github, (await pushTarget(root, s)).name, gh) : undefined
   const merge = s.branch ? await readMerge(root, s.branch, remote, pr?.base).catch(() => undefined) : undefined
+  // The card's lanes: a branch against its base (the remote one when there is one), main against its upstream.
+  const baseRef = merge && ((await git(root, ['rev-parse', '--verify', '-q', `${remote}/${merge.base}`])).ok ? `${remote}/${merge.base}` : merge.base)
+  const against = baseRef ?? s.upstream
+  const me = await config(root, 'user.email')
+  const lanes = against ? await readLanes(root, against, me).catch(() => undefined) : undefined
+  const sent = s.upstream ?? baseRef
+  const outgoing = sent ? parseNumstat((await git(root, [LIT, 'diff', '--numstat', '-z', `${sent}...HEAD`])).out) : undefined
   const ci = github && gh && s.branch && s.upstream ? await runFor(root, github, (await pushTarget(root, s)).name, gh).catch(() => undefined) : undefined
   return {
-    merge,
+    merge, ...(lanes ? { lanes } : {}), ...(outgoing ? { outgoing } : {}),
+    ship: (({ take, kept }) => ({ files: take.map(f => f.path), kept: kept.map(shown) }))(shipFiles(s.files)),
     name: path.basename(root), branch: s.branch, upstream: s.upstream, ahead: s.ahead, behind: s.behind, files: s.files, branches: heads, sync: syncAction(s),
     log: log.out.split('\n').filter(Boolean).map(l => { const [hash, subject, when] = l.split('\t'); return { hash, subject: subject ?? '', when: when ?? '' } }),
     stashes: stash.out.split('\n').filter(Boolean).length, github, pr, ...(ci ? { ci } : {}), at: Date.now(),
@@ -316,7 +384,7 @@ export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitRe
       const ask = c.op === 'commit-push' ? pushConfirm(t) : undefined
       if (ask) return no(ask)
       const paths = files.flatMap(f => (f.from ? [f.from, f.path] : [f.path]))
-      const add = await git(root, [LIT, 'add', '-A', '--', ...paths])
+      const add = await stage(root, paths)
       if (!add.ok) return no(why(add))
       // The paths again so anything else already staged stays out of this commit. Hooks may run, hence the long timeout.
       const made = await git(root, [LIT, ...args, '--', ...paths], SLOW)
@@ -325,6 +393,46 @@ export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitRe
       if (c.op === 'commit') return { ok: true, text: done }
       const p = await push(root, t)
       return p.ok ? { ok: true, text: `${done} and pushed to ${t.remote}/${t.name}` } : no(`${done}, but the push failed: ${why(p)}`)
+    }
+    case 'ship': {
+      // The card's one press: every change but agent files, then push. Never pulls, never forces.
+      if (!c.confirmed) return no('Confirm the commit and push first')
+      if (!s.branch) return no('Not on a branch (detached HEAD), so nothing was committed')
+      if (s.files.some(f => f.status === 'conflict')) return no('Resolve the conflicts first')
+      const { take, kept, held } = shipFiles(s.files)
+      if (!sameSet(c.files ?? [], take.map(f => f.path))) return no('Changed since you confirmed; review again')
+      const t = await pushTarget(root, s)
+      if (s.behind && !t.publish) return no(`Pull first: ${s.upstream} has ${plural(s.behind, 'commit')} this branch does not`)
+      const m = await readMerge(root, s.branch, t.remote).catch(() => undefined)
+      if (m?.files) return no(`Merge ${m.base} first: ${plural(m.files, 'file')} would conflict`)
+      if (!take.length && !s.ahead && !t.publish) return no(kept.length ? `Only agent files changed (${kept.map(shown).join(', ')}), so nothing was committed` : 'Nothing to commit or push')
+      // Reach the remote before committing, and catch a push made since the last fetch.
+      if (!(await git(root, ['remote', 'get-url', t.remote])).ok) return no(`There is no remote named ${t.remote}, so nothing was committed`)
+      const ls = await git(root, ['ls-remote', t.remote, `refs/heads/${t.name}`])
+      if (!ls.ok) return no(`Can't reach ${t.remote} (${why(ls)}), so nothing was committed`)
+      const tip = ls.out.split('\t')[0].trim()
+      if (tip && !(await git(root, ['merge-base', '--is-ancestor', tip, 'HEAD'])).ok) return no(`Pull first: ${t.remote}/${t.name} has commits this branch does not`)
+      let done = ''
+      if (take.length) {
+        const args = commitArgs(c.summary ?? '', cleanMessage(c.description ?? ''))
+        if (typeof args === 'string') return no(args)
+        // Agent files out of the index, the rest in, then commit the index as it stands. --no-renames: a rename lists both sides.
+        const out = kept.flatMap(f => (f.from ? [f.from, f.path] : [f.path]))
+        const staged = out.length ? (await git(root, [LIT, 'diff', '--cached', '--no-renames', '--name-only', '-z', '--', ...out])).out.split('\0').filter(Boolean) : []
+        if (staged.length) {
+          const r = await git(root, [LIT, 'reset', '-q', '--', ...staged])
+          if (!r.ok) return no(why(r))
+        }
+        const add = await stage(root, take.filter(f => !held.has(f.path)).map(f => f.path))
+        if (!add.ok) return no(why(add))
+        const made = await git(root, args, SLOW)
+        if (!made.ok) return no(why(made))
+        done = `Committed ${plural(take.length, 'file')} to ${s.branch}`
+      }
+      const p = await push(root, t)
+      const left = kept.length ? `; left out ${kept.map(shown).join(', ')}` : ''
+      if (!p.ok) return no(`${done ? `${done}, but the push failed` : 'The push failed'}: ${why(p)}`)
+      return { ok: true, text: `${done ? `${done} and pushed` : `Pushed ${s.branch}`} to ${t.remote}/${t.name}${left}` }
     }
     case 'sync': {
       if (!s.branch) return no('Not on a branch (detached HEAD)')

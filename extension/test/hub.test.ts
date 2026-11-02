@@ -11,7 +11,7 @@ import * as os from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { HubService } from '../src/hub/hub-service'
-import { commandProblem, handleHub as route, type HubReply } from '../src/hub/routes'
+import { commandProblem, handleHub as route, handleHubRequest, type HubReply } from '../src/hub/routes'
 import { board, suggest } from '../src/hub/brain'
 
 // Only /hub/ask answers later, and its test awaits it.
@@ -213,6 +213,16 @@ describe('brain routes', () => {
 })
 
 describe('hub state and command routes', () => {
+  it('answers the memory graph only with the token', async () => {
+    const h = new HubService()
+    const graph = async () => ({ nodes: [{ id: 'project:/w', kind: 'project' as const, label: 'w' }], edges: [] })
+    const ask = (token: string) => route(h, 'GET', `/hub/graph?token=${token}`, '', undefined, undefined, graph) as HubReply | Promise<HubReply>
+    assert.equal((await ask('wrong')).status, 403)
+    const ok = await ask(h.token)
+    assert.equal(ok.status, 200)
+    assert.equal(JSON.parse(ok.body).nodes[0].label, 'w')
+  })
+
   it('answers the state only with the token', () => {
     const h = new HubService()
     assert.equal((handleHub(h, 'GET', '/hub/state?token=wrong', '') as { status: number }).status, 403)
@@ -230,16 +240,40 @@ describe('hub state and command routes', () => {
     assert.ok(h.stateReadAt > 0)
   })
 
+  it('answers the mic level, state and last transcript in a small read, only with the token', () => {
+    const h = new HubService()
+    assert.equal((handleHub(h, 'GET', '/hub/voice?token=wrong', '') as { status: number }).status, 403)
+    h.voiceLevel = 0.4
+    h.set({ voice: 'listening', heard: { text: 'what is running', at: 5 } })
+    const ok = handleHub(h, 'GET', `/hub/voice?token=${h.token}`, '') as { status: number; body: string }
+    assert.equal(ok.status, 200)
+    assert.deepEqual(JSON.parse(ok.body), { voice: 'listening', level: 0.4, heard: { text: 'what is running', at: 5 } })
+  })
+
+  it('takes the token from the x-switchboard-token header, and still from the query for older callers', async () => {
+    const h = new HubService()
+    h.runner = () => true
+    const req = (url: string, token?: string, method = 'GET', body = '') => handleHubRequest(h, { method, url, headers: token === undefined ? {} : { 'x-switchboard-token': token } }, body)
+    assert.equal((await req('/hub/state', h.token))?.status, 200)
+    assert.equal((await req('/hub/state', 'wrong'))?.status, 403)
+    assert.equal((await req('/hub/state'))?.status, 403)
+    assert.equal((await req(`/hub/state?token=${h.token}`))?.status, 200)
+    // A wrong header is not rescued by a right query.
+    assert.equal((await req(`/hub/state?token=${h.token}`, 'wrong'))?.status, 403)
+    assert.equal((await req('/hub/command', h.token, 'POST', '{"type":"hub-aws-check"}'))?.status, 204)
+    assert.equal((await req('/hub/inbox?session=s1', h.token))?.status, 200)
+  })
+
   it('hands a hub command to the runner and refuses anything else', () => {
     const h = new HubService()
     const seen: unknown[] = []
     h.runner = c => { seen.push(c); return true }
     const post = (body: string) => (handleHub(h, 'POST', `/hub/command?token=${h.token}`, body) as { status: number }).status
-    assert.equal(post(JSON.stringify({ type: 'hub-refresh' })), 204)
+    assert.equal(post(JSON.stringify({ type: 'hub-aws-check' })), 204)
     assert.equal(post(JSON.stringify({ type: 'ready' })), 400)
     assert.equal(post('not json'), 400)
-    assert.equal((handleHub(h, 'POST', '/hub/command?token=no', '{"type":"hub-refresh"}') as { status: number }).status, 403)
-    assert.deepEqual(seen, [{ type: 'hub-refresh' }])
+    assert.equal((handleHub(h, 'POST', '/hub/command?token=no', '{"type":"hub-aws-check"}') as { status: number }).status, 403)
+    assert.deepEqual(seen, [{ type: 'hub-aws-check' }])
   })
 
   it('refuses a command whose fields are the wrong shape, and says why', () => {
@@ -303,17 +337,26 @@ describe('hub state and command routes', () => {
     assert.match(r.body, /unknown command/)
   })
 
+  it('has none of the commands nothing sent', () => {
+    const h = new HubService()
+    h.runner = () => true
+    for (const type of ['hub-refresh', 'hub-stop-server', 'hub-vscode', 'hub-open-project', 'hub-clone']) {
+      const r = handleHub(h, 'POST', `/hub/command?token=${h.token}`, JSON.stringify({ type })) as { status: number; body: string }
+      assert.match(r.body, /unknown command/, type)
+    }
+  })
+
   it('answers 500 with the message when the runner throws', () => {
     const h = new HubService()
     h.runner = () => { throw new Error('boom') }
-    const r = handleHub(h, 'POST', `/hub/command?token=${h.token}`, '{"type":"hub-refresh"}') as { status: number; body: string }
+    const r = handleHub(h, 'POST', `/hub/command?token=${h.token}`, '{"type":"hub-aws-check"}') as { status: number; body: string }
     assert.equal(r.status, 500)
     assert.equal(r.body, 'boom')
   })
 
   it('answers 503 while no runner is set', () => {
     const h = new HubService()
-    assert.equal((handleHub(h, 'POST', `/hub/command?token=${h.token}`, '{"type":"hub-refresh"}') as { status: number }).status, 503)
+    assert.equal((handleHub(h, 'POST', `/hub/command?token=${h.token}`, '{"type":"hub-aws-check"}') as { status: number }).status, 503)
   })
 })
 
@@ -336,6 +379,17 @@ describe('close after handoff', () => {
     assert.deepEqual(closing, ['old'])
     h.ingest({ token: h.token, kind: 'live', sessionId: 'newer', cwd: '/u/Armasu', limits: [] }, 5)
     assert.deepEqual(h.take('old'), [])
+  })
+
+  it('matches the fresh chat\'s folder whatever its case and slashes on Windows', () => {
+    const real = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    try {
+      const h = new HubService()
+      h.closeAfterFresh('old', 'C:\\Users\\A\\Armasu', 1)
+      h.ingest({ token: h.token, kind: 'live', sessionId: 'new', cwd: 'c:/users/a/armasu/', limits: [] }, 2)
+      assert.deepEqual(h.take('old').map(i => i.kind), ['close'])
+    } finally { Object.defineProperty(process, 'platform', { value: real }) }
   })
 
   it('leaves alone a chat already open in the folder before the handoff', () => {

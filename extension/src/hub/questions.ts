@@ -70,17 +70,22 @@ export const askRegistered = (claudeJson: unknown) => !!(claudeJson as { mcpServ
 
 const FILES = ['ask-core.mjs', 'ask-server.mjs']
 
-/** Copies the bundled ask server to ~/.claude/switchboard/ask when changed; register runs once while ~/.claude.json lacks it. */
-export function installAsk(from: string, home: string, register: (server: string) => void): string {
-  const dir = path.join(home, '.claude', 'switchboard', 'ask')
+/** Copies files from one folder to another, skipping any already the same. */
+export function copyChanged(from: string, dir: string, files: string[]): void {
   fs.mkdirSync(dir, { recursive: true })
-  for (const f of FILES) {
+  for (const f of files) {
     const src = fs.readFileSync(path.join(from, f))
     const dest = path.join(dir, f)
     let same = false
     try { same = fs.readFileSync(dest).equals(src) } catch { /* not there yet */ }
     if (!same) fs.writeFileSync(dest, src)
   }
+}
+
+/** Copies the bundled ask server to ~/.claude/switchboard/ask when changed; register runs once while ~/.claude.json lacks it. */
+export function installAsk(from: string, home: string, register: (server: string) => void): string {
+  const dir = path.join(home, '.claude', 'switchboard', 'ask')
+  copyChanged(from, dir, FILES)
   const server = path.join(dir, 'ask-server.mjs')
   let json: unknown
   try { json = JSON.parse(fs.readFileSync(path.join(home, '.claude.json'), 'utf8')) } catch { /* no file yet */ }

@@ -10,13 +10,14 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { writeJsonAtomic } from '../hook-entries'
+import { withLock } from '../fs-utils'
 import { chainBase, inWorkspace, projectName } from './projects'
 import { isAi } from './ais'
 import type { ArchivedChat, ChatRow } from './types'
 
 const FILE = path.join(os.homedir(), '.claude', 'switchboard', 'chains.json')
 const ARCHIVE = path.join(os.homedir(), '.claude', 'switchboard', 'archive.json')
-// ponytail: the newest 500 closed chats; page or prune by age if History ever needs more.
+// Keeps the newest 500 closed chats; page or prune by age if History ever needs more.
 const ARCHIVE_MAX = 500
 
 export function readChains(file = FILE): Record<string, string> {
@@ -27,7 +28,8 @@ export function readChains(file = FILE): Record<string, string> {
 }
 
 export function recordChain(sessionId: string, base: string, file = FILE): void {
-  writeJsonAtomic(file, { ...readChains(file), [sessionId]: base })
+  // Every window records; the lock keeps one from dropping another's row.
+  withLock(`${file}.lock`, () => writeJsonAtomic(file, { ...readChains(file), [sessionId]: base }))
 }
 
 /** Each row with the chain its name says, else the one it was recorded under. */
@@ -100,9 +102,11 @@ export const readArchive = (file = ARCHIVE): ArchivedChat[] => loadArchive(file)
 
 /** Writes the archive; an unreadable file is kept beside it first, so a write never wipes History. */
 function writeArchive(file: string, edit: (rows: ArchivedChat[]) => ArchivedChat[]): void {
-  const { rows, bad } = loadArchive(file)
-  if (bad) fs.copyFileSync(file, `${file}.bad-${Date.now()}`)
-  writeJsonAtomic(file, edit(rows).slice(-ARCHIVE_MAX))
+  withLock(`${file}.lock`, () => {
+    const { rows, bad } = loadArchive(file)
+    if (bad) fs.copyFileSync(file, `${file}.bad-${Date.now()}`)
+    writeJsonAtomic(file, edit(rows).slice(-ARCHIVE_MAX))
+  })
 }
 
 /** Adds a closed chat, replacing an earlier row for the same session. */
@@ -122,7 +126,7 @@ export function removeArchive(sessionId: string, file = ARCHIVE): boolean {
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
 const NOTE_MAX = 64 * 1024
 const SNIPPET = 60
-// Note text by path and mtime; ponytail: grows with the archive (at most ARCHIVE_MAX notes of 64 KB).
+// Note text by path and mtime. Grows with the archive (at most ARCHIVE_MAX notes of 64 KB).
 const noteCache = new Map<string, { mtime: number; text: string }>()
 
 function readNote(full: string): string | undefined {

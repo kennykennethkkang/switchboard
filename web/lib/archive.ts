@@ -32,7 +32,7 @@ export function hideIdle<T extends IdleCard>(cards: T[], minutes: number | null,
 }
 
 type Placed = { cwd: string; project?: string }
-// ponytail: a folder outside git is named by its last part, so two such folders with one name share a chip; key by full path if that happens.
+// A folder outside git is named by its last part, so two such folders with one name share a chip; key by full path if that happens.
 /** The extension's repo name for a chat (agent-flow for agent-flow/extension), else the folder's last part. */
 export const projectName = (c: Placed) => c.project || c.cwd.split(/[\\/]/).filter(Boolean).pop() || c.cwd
 

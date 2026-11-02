@@ -6,11 +6,12 @@
  * with no window behind that either, the dev build answers sample data; the phone app never does,
  * it keeps the last real state and says why it is not live.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import type { HubState } from '@/lib/hub-types'
-import { demoApply, demoHub, demoTick, emptyHub } from '@/lib/hub-demo'
-import { fetchHub, fetchHubWhy, postCommand } from '@/lib/hub-remote'
+import { demoApply, demoHub, demoTick, demoUpload, emptyHub } from '@/lib/hub-demo'
+import { fetchHub, fetchHubWhy, postCommand, uploadFile } from '@/lib/hub-remote'
+import { UPLOAD_MAX, fmtSize, type Upload } from '@/lib/attach'
 
 const POLL_MS = 2000
 const IDLE_POLL_MS = 15000
@@ -20,13 +21,16 @@ const IDLE_POLL_MS = 15000
 const DEMO_OK = process.env.NEXT_PUBLIC_DEMO !== '0'
 
 /** down: why the standalone app is not live right now, while it shows the last state it had (or nothing). */
-export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isVSCode: boolean; send: (c: HubCommand) => void; problem: { text: string; at: number } | null; down?: string } {
+export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isVSCode: boolean; send: (c: HubCommand) => void; upload: Upload; problem: { text: string; at: number; for?: HubCommand } | null; down?: string } {
   const [hub, setHub] = useState<HubState | null>(null)
   const [isVSCode, setIsVSCode] = useState(false)
   const [remote, setRemote] = useState<HubState | null>(null)
+  // send reads it here, so it stays one function across polls.
+  const remoteRef = useRef(remote)
+  remoteRef.current = remote
   const [tried, setTried] = useState(false)
   const [demo, setDemo] = useState<HubState>(() => demoHub())
-  const [problem, setProblem] = useState<{ text: string; at: number } | null>(null)
+  const [problem, setProblem] = useState<{ text: string; at: number; for?: HubCommand } | null>(null)
   const [down, setDown] = useState<string>()
 
   useEffect(() => {
@@ -68,16 +72,27 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   }, [isDemo])
   const send = useCallback((c: HubCommand) => {
     if (isDemo) setDemo(d => demoApply(d, c))
-    else if (!isVSCode && remote) {
+    else if (!isVSCode && remoteRef.current) {
       void postCommand(c).then(why => {
-        if (why) setProblem({ text: `${c.type.replace('hub-', '')} failed: ${why}`, at: Date.now() })
+        if (why) setProblem({ text: `${c.type.replace('hub-', '')} failed: ${why}`, at: Date.now(), for: c })
         return fetchHub()
       }).then(s => s && setRemote(s))
     }
     else vscodeBridge?.sendHub(c)
-  }, [isDemo, isVSCode, remote])
+  }, [isDemo, isVSCode])
+  const upload = useCallback<Upload>(async (file, cwd, session, onProgress, signal) => {
+    if (file.size > UPLOAD_MAX) return { problem: `over the ${fmtSize(UPLOAD_MAX)} limit` }
+    if (isDemo) {
+      for (const f of [0.3, 0.7, 1]) { await new Promise(ok => setTimeout(ok, 250)); onProgress(f) }
+      return { path: demoUpload(file.name, cwd) }
+    }
+    if (!isVSCode) return remoteRef.current ? uploadFile(file, cwd, session, onProgress, signal) : { problem: 'not connected to the Mac' }
+    return vscodeBridge ? vscodeBridge.upload(file, cwd, session, onProgress, signal) : { problem: 'not connected to VS Code' }
+  }, [isDemo, isVSCode])
   // A window still running an older Switchboard sends fewer fields; missing ones start empty.
   const got = hub ?? (isVSCode ? null : remote)
-  const live = got && { ...emptyHub(), ...got }
-  return { hub: live ?? (isDemo ? demo : emptyHub()), isLive: live !== null && !down, isDemo, isVSCode, send, problem, down: isVSCode ? undefined : down }
+  // One object per state, so memos downstream hold between renders.
+  const live = useMemo(() => got && { ...emptyHub(), ...got }, [got])
+  const empty = useMemo(() => emptyHub(), [])
+  return { hub: live ?? (isDemo ? demo : empty), isLive: live !== null && !down, isDemo, isVSCode, send, upload, problem, down: isVSCode ? undefined : down }
 }

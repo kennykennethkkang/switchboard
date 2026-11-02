@@ -29,10 +29,25 @@ it('sends only to shown views, and counts them', () => {
   assert.deepEqual(got, ['shown'])
 })
 
-it('the 15 s tick: everything while a view shows, only handoffs while views are hidden, nothing with no view', () => {
-  assert.equal(tickWork(1, 2, false), 'full')
-  assert.equal(tickWork(0, 2, false), 'essentials')
-  assert.equal(tickWork(0, 0, false), 'none')
+it('skips a view already sent the same state, but not one that was hidden for it', () => {
+  const posters = new Posters<string>()
+  const a: string[] = []
+  const b: string[] = []
+  let bShown = false
+  posters.add(m => a.push(m))
+  posters.add(m => b.push(m), () => bShown)
+  posters.send('s1', 'k1')
+  posters.send('s1 again', 'k1')
+  bShown = true
+  posters.send('s1 shown', 'k1')
+  posters.send('s2', 'k2')
+  assert.deepEqual(a, ['s1', 's2'])
+  assert.deepEqual(b, ['s1 shown', 's2'])
+})
+
+it('the 15 s tick: everything while a view shows, else only the chats, which handoffs and asks need in any window', () => {
+  assert.equal(tickWork(1, false), 'full')
+  assert.equal(tickWork(0, false), 'essentials')
   // The standalone app reading /hub/state counts as a shown view.
-  assert.equal(tickWork(0, 0, true), 'full')
+  assert.equal(tickWork(0, true), 'full')
 })

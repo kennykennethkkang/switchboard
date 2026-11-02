@@ -16,7 +16,9 @@ const recorder = (fail = false) => {
 describe('access note', () => {
   it('noteBody has the title, code and labelled links with Tailscale name first', () => {
     const b = noteBody(urls)
-    assert.ok(b.startsWith('<div><h1>Switchboard access</h1></div>'))
+    assert.ok(b.startsWith('<div><h1>Switchboard Access</h1></div>'))
+    assert.ok(b.includes('#SwitchboardAccess'))
+    assert.ok(b.includes('Address: <a href="http://mac.tail.ts.net:3131">'))
     assert.ok(b.includes('123456'))
     assert.ok(b.indexOf('mac.tail.ts.net') < b.indexOf('192.168.1.5'))
     assert.ok(b.includes('<a href="http://mac.tail.ts.net:3131/?k=s3cret">'))
@@ -39,6 +41,21 @@ describe('access note', () => {
     assert.ok(!calls[0].args.join(' ').includes('s3cret'))
     assert.ok(!calls[0].args.join(' ').includes('123456'))
     assert.equal(calls[0].env.SB_NOTE, noteBody(urls))
+    assert.equal(calls[0].env.SB_LINK, urls.tailscaleName)
+    assert.equal(calls[0].env.SB_FORCE, '1')
+  })
+
+  it('checks the note itself again every 30 minutes, so a stale or hand-edited note is fixed', async () => {
+    const file = tmp(), { calls, run } = recorder()
+    let t = 5_000_000
+    assert.equal(await syncAccessNote(urls, 'darwin', run, file, () => t), true)
+    t += 29 * 60_000
+    assert.equal(await syncAccessNote(urls, 'darwin', run, file, () => t), false)
+    t += 2 * 60_000
+    assert.equal(await syncAccessNote(urls, 'darwin', run, file, () => t), true)
+    assert.equal(calls.length, 2)
+    // a recheck of an unchanged body only fixes a note missing the link
+    assert.equal(calls[1].env.SB_FORCE, '')
   })
 
   it('only runs on a Mac, with a code and a link', async () => {
@@ -86,6 +103,17 @@ describe('access note', () => {
     assert.equal(await syncAccessNote(urls, 'darwin', run, file), true)
     assert.equal(calls.length, 1)
     assert.ok(!fs.existsSync(file + '.lock'))
+  })
+
+  it('touches no lock while the note is current', async () => {
+    const file = tmp(), { run } = recorder()
+    await syncAccessNote(urls, 'darwin', run, file)
+    // A stale lock a locking sync would take over and remove.
+    fs.writeFileSync(file + '.lock', '')
+    const old = new Date(Date.now() - 120_000)
+    fs.utimesSync(file + '.lock', old, old)
+    assert.equal(await syncAccessNote(urls, 'darwin', run, file), false)
+    assert.ok(fs.existsSync(file + '.lock'))
   })
 
   it('forgetAccessNote makes the next sync write again, for a deleted note', async () => {

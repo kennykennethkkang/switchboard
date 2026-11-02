@@ -5,7 +5,7 @@ import { almostDone } from '../look'
 import { teamOf, timeline, type TeamRole } from '@/lib/orbit-views'
 import type { ToolCall } from '@/lib/hub-types'
 import { say } from '@/lib/eta'
-import { Glyph, LABEL, NAME, leadLine, leadState, useLive, type ViewProps } from './parts'
+import { Glyph, LABEL, NAME, leadLine, leadState, nodeProps, useLive, type ViewProps } from './parts'
 import { CommitText } from '../commit-text'
 
 const clock = (at: number) => new Date(at).toTimeString().slice(0, 8)
@@ -19,7 +19,8 @@ function Feed({ list }: { list: ToolCall[] }) {
   </div>
 }
 
-export function Deck({ chat, showTools }: ViewProps) {
+export function Deck(v: ViewProps) {
+  const { chat, showTools } = v
   const root = useRef<HTMLDivElement>(null)
   useLive(root)
   const [manual, setManual] = useState<Record<string, boolean>>({})
@@ -32,14 +33,15 @@ export function Deck({ chat, showTools }: ViewProps) {
   const cur = p?.tasks.find(t => t.status === 'in_progress')?.subject
   const tokens = chat.live?.tokens, cap = chat.live?.compactAt
 
-  const card = (k: string, s: string, name: string, model: string | undefined, sum: string, chip: string, auto: boolean, body: React.ReactNode, tools: number, count = 0) => {
-    const open = manual[k] ?? auto
+  // A role card's header opens the drawer (its body stays open while it works); the lead's folds by hand.
+  const card = (k: string, s: string, name: string, model: string | undefined, sum: string, chip: string, auto: boolean, body: React.ReactNode, tools: number, count = 0, node?: ReturnType<typeof nodeProps>) => {
+    const open = node ? auto : manual[k] ?? auto
     return (
-      <article key={k} className="ov-card" data-s={s} data-open={open || undefined}>
-        <button type="button" className="ov-hd" aria-expanded={open} aria-controls={`ov-bd-${k}`} onClick={() => setManual(m => ({ ...m, [k]: !open }))}>
+      <article key={k} className="ov-card" data-s={s} data-open={open || undefined} data-picked={v.picked === k || undefined}>
+        <button type="button" className="ov-hd" {...(node ?? { 'aria-expanded': open, 'aria-controls': `ov-bd-${k}`, onClick: () => setManual(m => ({ ...m, [k]: !open })) })}>
           <span className="ov-gl" data-s={s}><Glyph k={k} />{count > 1 && <b className="ov-count">×{count}</b>}</span>
           <span className="ov-ttl"><span><i className="ov-ping" aria-hidden /><b>{name}</b>{model && <small>{model}</small>}</span><span className="ov-sum">{sum}</span></span>
-          <span className="ov-end">{showTools && tools > 0 && <span className="ov-n">{tools} tool call{tools > 1 ? 's' : ''}</span>}<span className="ov-chip" data-s={s}><i /><span>{chip}</span></span>{CHEV}</span>
+          <span className="ov-end">{showTools && tools > 0 && <span className="ov-n">{tools} tool call{tools > 1 ? 's' : ''}</span>}<span className="ov-chip" data-s={s}><i /><span>{chip}</span></span>{!node && CHEV}</span>
         </button>
         <div className="ov-bd" id={`ov-bd-${k}`}><div><div className="ov-in">{body}</div></div></div>
       </article>
@@ -55,7 +57,7 @@ export function Deck({ chat, showTools }: ViewProps) {
         <ul className="ov-runs">{spans.map((x, j) => <li key={x.id} data-s={x.state}><i aria-hidden /><span>Run {j + 1}{x.state === 'active' ? ', working' : ''}</span><span>{x.state === 'active' ? `${dur(now - x.from)} so far` : dur(x.to - x.from)}</span></li>)}</ul>
       </div>}
       {showTools && <Feed list={r.tools} />}
-    </>, r.tools.length, r.running)
+    </>, r.tools.length, r.running, v.pick ? nodeProps(v, r.role, r.state) : undefined)
   }
 
   const leadSum = chat.state === 'needs-you' ? p?.question ?? 'Waiting on you' : chat.state === 'done' ? (p?.commit ? 'Finished. Commit message ready.' : 'Finished.') : cur ?? leadLine(chat, almost, active)

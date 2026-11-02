@@ -41,7 +41,7 @@ export function ToolsCard({ profile, flagged = [], installed = [], connections =
           : <>
               <p style={hint}>This chat runs with your default plugins and skills.</p>
               {on.length > 0 && <ul role="list" aria-label="Default plugins and skills" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {on.map(o => <li key={o.name} title={[o.name, tips[o.name]].filter(Boolean).join('\n')} style={{ ...chip(true), cursor: 'default' }}>{short(o.name)}</li>)}
+                {on.map(o => <li key={o.name} title={[o.name, tips[o.name]].filter(Boolean).join('\n')} style={{ ...chip(false), cursor: 'default', color: 'var(--hub-body)' }}>{short(o.name)}</li>)}
               </ul>}
             </>}
         {described.length > 0 && (
@@ -66,7 +66,7 @@ export function ToolsCard({ profile, flagged = [], installed = [], connections =
             </li>)}
           </ul>
         </div>}
-        {onInstalled && <div><button type="button" className="hub-btn" onClick={onInstalled} style={{ padding: '6px 10px', fontSize: 12 }}>Everything installed</button></div>}
+        {onInstalled && <div><button type="button" className="hub-btn sm" onClick={onInstalled}>Everything installed</button></div>}
       </div>
     </details>
   )

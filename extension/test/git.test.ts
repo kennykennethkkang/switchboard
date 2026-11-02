@@ -77,6 +77,12 @@ describe('hub-git route shape', () => {
     assert.match(commandProblem({ type: 'hub-git', sessionId: 's', op: 'commit', files: 'a' }) ?? '', /files/)
     assert.match(commandProblem({ type: 'hub-git', op: 'sync' }) ?? '', /sessionId/)
   })
+
+  it('says plainly when there are too many files to send', () => {
+    const files = Array.from({ length: 1001 }, (_, i) => `f${i}`)
+    assert.equal(commandProblem({ type: 'hub-git', sessionId: 's', op: 'ship', files, confirmed: true }), 'More than 1000 files changed: commit these from a terminal')
+    assert.equal(commandProblem({ type: 'hub-git', sessionId: 's', op: 'ship', files: files.slice(1), confirmed: true }), undefined)
+  })
 })
 
 describe('git ops end to end', () => {

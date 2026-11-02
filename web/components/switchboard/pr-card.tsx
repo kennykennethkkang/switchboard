@@ -30,7 +30,7 @@ export function PrCard({ repo: r, create, busy, onOpen, onResolve }: {
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      <div style={{ border: '1px solid var(--hub-hair)', borderRadius: 10, background: 'var(--hub-canvas)', minWidth: 0 }}>
+      <div className="hub-tip-box" style={{ border: '1px solid var(--hub-hair)', borderRadius: 10, background: 'var(--hub-canvas)', minWidth: 0 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 20px', padding: 12 }}>
           <div style={{ flex: '1 1 160px', minWidth: 0, display: 'grid', gap: 4, alignContent: 'start' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, font: '500 14px/1.3 var(--hub-sans)', color: 'var(--hub-ink)' }}>
@@ -59,14 +59,14 @@ export function PrCard({ repo: r, create, busy, onOpen, onResolve }: {
         </div>
 
         {cs.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: '1px solid var(--hub-hair)' }}>
-          <span {...p.wrap} style={{ position: 'relative', minWidth: 0 }}>
+          <span {...p.wrap} className="hub-tip-at">
             <button type="button" className="hub-link" {...p.button}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 12, color: 'var(--hub-yellow)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'color-mix(in srgb, currentColor 45%, transparent)' }}>
               <Warn />{m.files} {m.files === 1 ? 'conflict' : 'conflicts'} with {m.base}
             </button>
             {/* The top padding bridges the gap, so moving the mouse down keeps it open. */}
-            {p.open && <div id={p.id} role="tooltip" style={{ position: 'absolute', left: 0, top: '100%', paddingTop: 6, zIndex: 5, width: 'min(480px, 86vw)' }}><div style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 10,
-              background: 'var(--hub-elev)', border: '1px solid var(--hub-hair-strong)', boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)' }}>
+            {p.open && <div id={p.id} role="tooltip" className="hub-tip"><div style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 10,
+              background: 'var(--hub-elev)', border: '1px solid var(--hub-hair-strong)', boxShadow: 'var(--hub-shadow-pop)' }}>
               <span style={{ fontSize: 13, color: 'var(--hub-ink)' }}><b style={{ fontWeight: 500, color: tint(cs[0].by) }}>{who}</b> changed the same lines on {m.base}</span>
               {cs.map(c => <div key={c.path} style={{ display: 'grid', gap: 4, minWidth: 0 }}>
                 <span style={{ fontSize: 12, color: 'var(--hub-mute)' }}><code style={{ ...mono, color: 'var(--hub-body)' }} title={c.path}>{name(c.path)}</code>{c.line ? ` line ${c.line}` : ''}</span>
@@ -78,8 +78,8 @@ export function PrCard({ repo: r, create, busy, onOpen, onResolve }: {
               {m.files > cs.length && <span style={{ fontSize: 12, color: 'var(--hub-ash)' }}>and {m.files - cs.length} more</span>}
             </div></div>}
           </span>
-          <button type="button" className="hub-btn primary" disabled={busy} onClick={onResolve} title="Asks this chat to merge and fix them; nothing is committed"
-            style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: 12, borderRadius: 99 }}>Resolve conflicts</button>
+          <button type="button" className="hub-btn primary sm" disabled={busy} onClick={onResolve} title="Asks this chat to merge and fix them; nothing is committed"
+            style={{ marginLeft: 'auto' }}>Resolve conflicts</button>
         </div>}
       </div>
 

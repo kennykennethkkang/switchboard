@@ -4,7 +4,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { allowed, codeLogin, commandSession, deniedAs, deviceAsks, lanCookie, lanFor, lanGate, lanHosts, commandFolder, liveToken, localName, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, uaSummary, waitPage } from './hub-proxy'
+import { allowed, codeLogin, macOnly, hostOk, commandSession, deniedAs, deviceAsks, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as http from 'http'
@@ -12,6 +12,7 @@ import type { AddressInfo } from 'net'
 import * as os from 'os'
 import * as path from 'path'
 import * as zlib from 'zlib'
+import { macNamesOf, phoneServeArgs } from '../../extension/src/hub/lan'
 
 const w = (workspace: string, mtimeMs: number, port = 1) => ({ port, hubToken: 't', workspace, mtimeMs })
 
@@ -55,6 +56,36 @@ describe('pickWindow', () => {
   })
 })
 
+describe('macOnly', () => {
+  it('keeps the Mac mic off for a phone and lets other commands by', () => {
+    assert.equal(macOnly('{"type":"hub-voice","on":true}'), true)
+    // A spoken reply plays out of the Mac's speakers; the phone asks in text only.
+    assert.equal(macOnly('{"type":"hub-jarvis","q":"hi","voice":true}'), true)
+    assert.equal(macOnly('{"type":"hub-jarvis","q":"hi"}'), false)
+    assert.equal(macOnly('{"type":"hub-jarvis","q":"x"}'), false)
+    assert.equal(macOnly('not json'), false)
+  })
+  it('keeps keys, sign-ins, AWS, setup, links, dev servers and pushes on the Mac', () => {
+    for (const type of ['hub-key-save', 'hub-key-remove', 'hub-key-test', 'hub-login-add', 'hub-login-open', 'hub-login-delete', 'hub-aws-add', 'hub-aws-login', 'hub-aws-delete',
+      'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser']) assert.equal(macOnly(JSON.stringify({ type })), true, type)
+    for (const op of ['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch']) assert.equal(macOnly(JSON.stringify({ type: 'hub-git', sessionId: 's', op })), true, op)
+  })
+  it('lets the phone chat, answer, read, upload and keep to-dos', () => {
+    for (const type of ['hub-send', 'hub-answer', 'hub-new-chat', 'hub-focus-chat', 'hub-changes', 'hub-todo-add', 'hub-todo-run', 'hub-star', 'hub-search', 'hub-dev-stop', 'hub-setting'])
+      assert.equal(macOnly(JSON.stringify({ type })), false, type)
+    for (const op of ['commit', 'stash', 'pop', 'switch', 'create', 'undo', 'rerun']) assert.equal(macOnly(JSON.stringify({ type: 'hub-git', sessionId: 's', op })), false, op)
+  })
+})
+
+describe('lanCookie', () => {
+  it('sets a Secure cookie for 30 days, since the phone only comes in over https', () => {
+    assert.equal(lanSetCookie(3131, 'abc'), 'sb3131=abc; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000')
+  })
+  it('drops Secure over plain http, or the phone never keeps it', () => {
+    assert.equal(lanSetCookie(3131, 'abc', false), 'sb3131=abc; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000')
+  })
+})
+
 describe('commandSession', () => {
   it('reads the chat a command names, nothing else', () => {
     assert.equal(commandSession('{"type":"hub-send","sessionId":"ab-12","text":"x"}'), 'ab-12')
@@ -78,15 +109,36 @@ describe('allowed', () => {
   })
 })
 
+describe('hostOk', () => {
+  it('takes only the loopback names on loopback, so a rebound name never reads /events', () => {
+    for (const host of ['127.0.0.1:3131', 'localhost:3131', '[::1]:3131', 'LOCALHOST:3131']) assert.equal(hostOk({ host }, 3131), true, host)
+    for (const host of ['attacker.example:3131', '127.0.0.1:3132', '127.0.0.1', undefined]) assert.equal(hostOk({ host }, 3131), false, String(host))
+  })
+  it('takes only the MagicDNS name through tailscale serve', () => {
+    const lan = { secret: 's', names: ['mac.tail1.ts.net'] }
+    assert.equal(hostOk({ host: 'mac.tail1.ts.net' }, 3131, lan), true)
+    assert.equal(hostOk({ host: 'Mac.Tail1.ts.net:443' }, 3131, lan), true)
+    for (const host of ['127.0.0.1:3131', 'mac.tail1.ts.net:3131', 'mac.tail1.ts.net.evil.test', '192.168.1.5:3131']) assert.equal(hostOk({ host }, 3131, lan), false, host)
+  })
+  it('takes the name on port 80 when served over plain http', () => {
+    const lan = { secret: 's', names: ['mac.tail1.ts.net'], plain: true }
+    assert.equal(hostOk({ host: 'mac.tail1.ts.net' }, 3131, lan), true)
+    assert.equal(hostOk({ host: 'mac.tail1.ts.net:80' }, 3131, lan), true)
+    assert.equal(hostOk({ host: 'mac.tail1.ts.net:3131' }, 3131, lan), false)
+    assert.equal(allowed({ host: 'mac.tail1.ts.net', 'x-switchboard': '1', origin: 'http://mac.tail1.ts.net' }, 3131, lan), true)
+    assert.equal(allowed({ host: 'mac.tail1.ts.net', 'x-switchboard': '1', origin: 'https://mac.tail1.ts.net' }, 3131, lan), false)
+  })
+})
+
 describe('lanGate', () => {
-  const lan = { host: '192.168.1.5', secret: 'a'.repeat(64) }
-  const h = { host: '192.168.1.5:3131' }
+  const lan = { secret: 'a'.repeat(64), names: ['mac.tail1.ts.net'] }
+  const h = { host: 'mac.tail1.ts.net' }
   it('passes loopback requests as before', () => {
     assert.equal(lanGate({ host: '127.0.0.1:3131' }, '/', 3131, undefined), 'ok')
     assert.equal(allowed({ host: '127.0.0.1:3131', 'x-switchboard': '1' }, 3131), true)
-    assert.equal(allowed({ host: '192.168.1.5:3131', 'x-switchboard': '1' }, 3131), false)
+    assert.equal(allowed({ host: 'mac.tail1.ts.net', 'x-switchboard': '1' }, 3131), false)
   })
-  it('refuses a LAN request without the secret or with a wrong one', () => {
+  it('refuses a phone request without the secret or with a wrong one', () => {
     assert.equal(lanGate(h, '/', 3131, lan), 'deny')
     assert.equal(lanGate(h, '/hub/state', 3131, lan), 'deny')
     assert.equal(lanGate(h, '/?k=' + 'b'.repeat(64), 3131, lan), 'deny')
@@ -96,61 +148,44 @@ describe('lanGate', () => {
   it('logs in with the QR secret once, then lets the cookie through', () => {
     assert.equal(lanGate(h, '/?k=' + lan.secret, 3131, lan), 'login')
     assert.equal(lanGate({ ...h, cookie: 'x=1; sb3131=' + lan.secret }, '/hub/state', 3131, lan), 'ok')
-    assert.equal(allowed({ ...h, 'x-switchboard': '1', origin: 'http://192.168.1.5:3131' }, 3131, lan), true)
+    assert.equal(allowed({ ...h, 'x-switchboard': '1', origin: 'https://mac.tail1.ts.net' }, 3131, lan), true)
+    assert.equal(allowed({ ...h, 'x-switchboard': '1', origin: 'http://mac.tail1.ts.net' }, 3131, lan), false)
     assert.equal(allowed({ ...h }, 3131, lan), false)
   })
   it('refuses a path it cannot parse instead of throwing', () => {
     assert.equal(lanGate(h, '//', 3131, lan), 'deny')
     assert.equal(lanGate({ ...h, cookie: 'sb3131=' + lan.secret }, '//', 3131, lan), 'deny')
   })
-  it('names the cookie per port, so two apps on one IP keep apart', () => {
+  it('names the cookie per port, so two apps keep apart', () => {
     assert.equal(lanCookie(3131), 'sb3131')
     assert.equal(lanGate({ ...h, cookie: 'sb=' + lan.secret }, '/', 3131, lan), 'deny')
     assert.equal(lanGate({ ...h, cookie: 'sb3001=' + lan.secret }, '/', 3131, lan), 'deny')
   })
   it('refuses another Host even with the right secret', () => {
-    assert.equal(lanGate({ host: 'evil.test:3131', cookie: 'sb3131=' + lan.secret }, '/', 3131, lan), 'deny')
-    assert.equal(lanGate({ host: 'evil.test:3131' }, '/?k=' + lan.secret, 3131, lan), 'deny')
+    assert.equal(lanGate({ host: 'evil.test', cookie: 'sb3131=' + lan.secret }, '/', 3131, lan), 'deny')
+    assert.equal(lanGate({ host: 'evil.test' }, '/?k=' + lan.secret, 3131, lan), 'deny')
+    // tailscale serve is on loopback, so a loopback Host with its headers is still the phone.
+    assert.equal(lanGate({ host: '127.0.0.1:3131', 'x-forwarded-for': '100.1.2.3', cookie: 'sb3131=' + lan.secret }, '/', 3131, lanFor({ host: '127.0.0.1:3131', 'x-forwarded-for': '100.1.2.3' }, 3131, lan.secret, lan.names)), 'deny')
   })
 })
 
 describe('lanFor', () => {
-  const secret = 'a'.repeat(64)
-  it('lets loopback through ungated and pins the rest to the address they came in on', () => {
-    assert.equal(lanFor('127.0.0.1', secret), undefined)
-    assert.equal(lanFor('::ffff:127.0.0.1', secret), undefined)
-    assert.equal(lanFor('::1', secret), undefined)
-    assert.deepEqual(lanFor('::ffff:192.168.1.103', secret), { host: '192.168.1.103', secret, names: [] })
-    assert.deepEqual(lanFor('100.101.2.3', secret), { host: '100.101.2.3', secret, names: [] })
+  const secret = 'a'.repeat(64), names = ['mac.tail1.ts.net']
+  it('is the Mac itself only for a loopback Host with no proxy headers', () => {
+    assert.equal(lanFor({ host: '127.0.0.1:3131' }, 3131, secret, names), undefined)
+    assert.equal(lanFor({ host: 'localhost:3131' }, 3131, secret, names), undefined)
   })
-  it('follows a new Wi-Fi address without a restart', () => {
-    const lan = lanFor('192.168.1.103', secret)
-    assert.equal(lanGate({ host: '192.168.1.103:3131', cookie: 'sb3131=' + secret }, '/', 3131, lan), 'ok')
-    assert.equal(lanGate({ host: '192.168.1.236:3131', cookie: 'sb3131=' + secret }, '/', 3131, lan), 'deny')
+  it('is the phone for the ts.net Host or any tailscale serve header', () => {
+    for (const h of [{ host: 'mac.tail1.ts.net' }, { host: '127.0.0.1:3131', 'x-forwarded-for': '100.1.2.3' }, { host: '127.0.0.1:3131', 'x-forwarded-proto': 'https' },
+      { host: '127.0.0.1:3131', 'tailscale-user-login': 'a@b.c' }, { host: 'evil.test:3131' }, {}]) assert.deepEqual(lanFor(h, 3131, secret, names), { secret, names }, JSON.stringify(h))
   })
-  it('gates a request with no local address', () => {
-    assert.equal(lanGate({ host: 'x:3131' }, '/', 3131, lanFor(undefined, secret)), 'deny')
+  it('marks a plain http phone', () => {
+    assert.deepEqual(lanFor({ host: 'mac.tail1.ts.net' }, 3131, secret, names, true), { secret, names, plain: true })
+    assert.equal(lanFor({ host: '127.0.0.1:3131' }, 3131, secret, names, true), undefined)
   })
-})
-
-describe('lanHosts', () => {
-  it('splits Wi-Fi from Tailscale (100.64.0.0/10)', () => {
-    assert.deepEqual(lanHosts(['100.101.2.3', '192.168.1.5']), { wifi: '192.168.1.5', tailscale: '100.101.2.3' })
-    assert.deepEqual(lanHosts(['192.168.1.5']), { wifi: '192.168.1.5', tailscale: undefined })
-    assert.deepEqual(lanHosts(['100.64.0.1', '100.127.255.1']), { wifi: undefined, tailscale: '100.64.0.1' })
-    // Outside the CGNAT block: plain addresses
-    assert.deepEqual(lanHosts(['100.63.0.1', '100.128.0.1']), { wifi: '100.63.0.1', tailscale: undefined })
-  })
-  it('gates each socket on its own Host only', () => {
-    const secret = 'a'.repeat(64), cookie = 'sb3131=' + secret
-    const wifi = { host: '192.168.1.5', secret }, ts = { host: '100.101.2.3', secret }
-    assert.equal(lanGate({ host: '100.101.2.3:3131', cookie }, '/', 3131, ts), 'ok')
-    assert.equal(lanGate({ host: '192.168.1.5:3131', cookie }, '/', 3131, wifi), 'ok')
-    assert.equal(lanGate({ host: '192.168.1.5:3131', cookie }, '/', 3131, ts), 'deny')
-    assert.equal(lanGate({ host: '192.168.1.5:3131' }, '/?k=' + secret, 3131, ts), 'deny')
-    assert.equal(lanGate({ host: '100.101.2.3:3131', cookie }, '/', 3131, wifi), 'deny')
-    assert.equal(allowed({ host: '100.101.2.3:3131', 'x-switchboard': '1', origin: 'http://100.101.2.3:3131' }, 3131, ts), true)
-    assert.equal(allowed({ host: '192.168.1.5:3131', 'x-switchboard': '1' }, 3131, ts), false)
+  it('reads the phone address from x-forwarded-for', () => {
+    assert.equal(forwardedIp({ 'x-forwarded-for': '100.101.2.3, 127.0.0.1' }), '100.101.2.3')
+    assert.equal(forwardedIp({}), '')
   })
 })
 
@@ -178,8 +213,8 @@ describe('phoneCode', () => {
 })
 
 describe('deniedAs', () => {
-  const lan = { host: '192.168.1.5', secret: 'a'.repeat(64) }
-  const h = { host: '192.168.1.5:3131' }
+  const lan = { secret: 'a'.repeat(64), names: ['mac.tail1.ts.net'] }
+  const h = { host: 'mac.tail1.ts.net' }
   it('gives a typed page address the sign-in page', () => {
     assert.equal(deniedAs('GET', h, '/', 3131, lan), 'page')
     assert.equal(deniedAs('GET', { ...h, accept: 'text/html,*/*' }, '/chat/1', 3131, lan), 'page')
@@ -196,9 +231,9 @@ describe('deniedAs', () => {
     assert.equal(deniedAs('GET', h, '//', 3131, lan), 'forbid')
   })
   it('pins the Host, so a rebound name gets neither page nor login', () => {
-    assert.equal(deniedAs('GET', { host: 'evil.test:3131' }, '/', 3131, lan), 'forbid')
-    assert.equal(deniedAs('POST', { host: 'evil.test:3131' }, '/login', 3131, lan), 'forbid')
-    assert.equal(deniedAs('GET', { host: '192.168.1.5:3001' }, '/', 3131, lan), 'forbid')
+    assert.equal(deniedAs('GET', { host: 'evil.test' }, '/', 3131, lan), 'forbid')
+    assert.equal(deniedAs('POST', { host: 'evil.test' }, '/login', 3131, lan), 'forbid')
+    assert.equal(deniedAs('GET', { host: 'mac.tail1.ts.net:3001' }, '/', 3131, lan), 'forbid')
   })
 })
 
@@ -236,16 +271,16 @@ describe('signInPage', () => {
 })
 
 describe('sign-in hardening', () => {
-  const lan = { host: '192.168.1.103', secret: 'a'.repeat(64) }
-  const h = { host: '192.168.1.103:3131' }
+  const lan = { secret: 'a'.repeat(64), names: ['mac.tail1.ts.net'] }
+  const h = { host: 'mac.tail1.ts.net' }
   it('takes /login only from the page itself or with no Origin', () => {
     assert.equal(deniedAs('POST', h, '/login', 3131, lan), 'login')
-    assert.equal(deniedAs('POST', { ...h, origin: 'http://192.168.1.103:3131' }, '/login', 3131, lan), 'login')
+    assert.equal(deniedAs('POST', { ...h, origin: 'https://mac.tail1.ts.net' }, '/login', 3131, lan), 'login')
     assert.equal(deniedAs('POST', { ...h, origin: 'http://evil.example' }, '/login', 3131, lan), 'forbid')
     assert.equal(deniedAs('POST', { ...h, origin: 'null' }, '/login', 3131, lan), 'forbid')
   })
   it('a right code clears the wrong ones', () => {
-    const check = codeLogin(() => 0)
+    const check = codeLogin()
     for (let i = 0; i < 4; i++) assert.equal(check('000000', lan.secret), 'wrong')
     assert.equal(check(phoneCode(lan.secret), lan.secret), 'ok')
     for (let i = 0; i < 4; i++) assert.equal(check('000000', lan.secret), 'wrong')
@@ -254,50 +289,44 @@ describe('sign-in hardening', () => {
 })
 
 describe('Mac names', () => {
-  const secret = 'a'.repeat(64), cookie = 'sb3131=' + secret
-  const lan = lanFor('192.168.1.103', secret, ['kennys-mbp.local', 'kennys-mbp.tail1234.ts.net'])!
-  it('takes the mDNS and MagicDNS names like the address, any case', () => {
-    assert.equal(lanGate({ host: 'kennys-mbp.local:3131', cookie }, '/', 3131, lan), 'ok')
-    assert.equal(lanGate({ host: 'Kennys-MBP.local:3131', cookie }, '/', 3131, lan), 'ok')
-    assert.equal(lanGate({ host: 'kennys-mbp.tail1234.ts.net:3131' }, '/?k=' + secret, 3131, lan), 'login')
-    assert.equal(lanGate({ host: '192.168.1.103:3131', cookie }, '/', 3131, lan), 'ok')
-    assert.equal(deniedAs('GET', { host: 'kennys-mbp.local:3131' }, '/', 3131, lan), 'page')
-    assert.equal(deniedAs('POST', { host: 'kennys-mbp.local:3131', origin: 'http://kennys-mbp.local:3131' }, '/login', 3131, lan), 'login')
-    assert.equal(allowed({ host: 'kennys-mbp.local:3131', 'x-switchboard': '1', origin: 'http://kennys-mbp.local:3131' }, 3131, lan), true)
-  })
-  it('refuses any other name, a lookalike or the wrong port (DNS rebinding)', () => {
-    for (const host of ['evil.test:3131', 'kennys-mbp.local.evil.test:3131', 'x.kennys-mbp.local:3131', 'kennys-mbp.local:3001', 'kennys-mbp.local', 'tail1234.ts.net:3131']) {
-      assert.equal(lanGate({ host, cookie }, '/', 3131, lan), 'deny', host)
-      assert.equal(deniedAs('GET', { host }, '/', 3131, lan), 'forbid', host)
-      assert.equal(allowed({ host, 'x-switchboard': '1' }, 3131, lan), false, host)
-    }
-    assert.equal(allowed({ host: 'kennys-mbp.local:3131', 'x-switchboard': '1', origin: 'http://evil.test' }, 3131, lan), false)
-    assert.equal(deniedAs('POST', { host: 'kennys-mbp.local:3131', origin: 'http://evil.test' }, '/login', 3131, lan), 'forbid')
-    // Without names only the address passes.
-    assert.equal(lanGate({ host: 'kennys-mbp.local:3131', cookie }, '/', 3131, lanFor('192.168.1.103', secret)), 'deny')
-  })
-  it('reads the names from scutil and tailscale, lowercased, without the trailing dot', () => {
-    assert.equal(localName('Kennys-MacBook-Pro\n'), 'kennys-macbook-pro.local')
-    assert.equal(localName(''), undefined)
-    assert.equal(localName('bad name!'), undefined)
-    const ts = (o: object) => JSON.stringify(o)
-    assert.equal(tailscaleName(ts({ BackendState: 'Running', Self: { DNSName: 'Kennys-MBP.tail1234.ts.net.' } })), 'kennys-mbp.tail1234.ts.net')
-    assert.equal(tailscaleName(ts({ BackendState: 'Stopped', Self: { DNSName: 'a.ts.net.' } })), undefined)
-    assert.equal(tailscaleName(ts({ BackendState: 'Running', Self: { DNSName: 'a b.ts.net.' } })), undefined)
+  const ts = (o: object) => JSON.stringify({ BackendState: 'Running', CertDomains: ['kennys-mbp.tail1234.ts.net'], Self: { DNSName: 'Kennys-MBP.tail1234.ts.net.' }, ...o })
+  it('reads the MagicDNS name from tailscale, lowercased, without the trailing dot', () => {
+    assert.equal(tailscaleName(ts({})), 'kennys-mbp.tail1234.ts.net')
+    assert.equal(tailscaleName(ts({ Self: { DNSName: 'a b.ts.net.' } })), undefined)
     assert.equal(tailscaleName('not json'), undefined)
+  })
+  it('has no name, and says why, without tailscale or signed out', () => {
+    assert.match(tailscaleProblem(undefined)!, /install/i)
+    assert.match(tailscaleProblem(ts({ BackendState: 'Stopped' }))!, /sign in/i)
+    assert.match(tailscaleProblem('not json')!, /sign in/i)
+    assert.equal(tailscaleName(ts({ BackendState: 'Stopped' })), undefined)
+    assert.equal(tailscaleProblem(ts({})), undefined)
+  })
+  it('still has a name without HTTPS certs, flagged for the plain http fallback', () => {
+    assert.equal(tailscaleProblem(ts({ CertDomains: null })), undefined)
+    assert.deepEqual(macNamesOf(ts({})), { tailscale: 'kennys-mbp.tail1234.ts.net', https: true })
+    assert.deepEqual(macNamesOf(ts({ CertDomains: [] })), { tailscale: 'kennys-mbp.tail1234.ts.net', https: false })
+    assert.deepEqual(macNamesOf(ts({ CertDomains: null })), { tailscale: 'kennys-mbp.tail1234.ts.net', https: false })
+    assert.match(macNamesOf(undefined).problem!, /install/i)
+  })
+  it('serves https on 443, else plain http on 80', () => {
+    assert.deepEqual(phoneServeArgs(3131, true, true), ['serve', '--bg', '--https=443', 'http://127.0.0.1:3131'])
+    assert.deepEqual(phoneServeArgs(3131, false, true), ['serve', '--https=443', 'off'])
+    assert.deepEqual(phoneServeArgs(3131, true, false), ['serve', '--bg', '--http=80', 'http://127.0.0.1:3131'])
+    assert.deepEqual(phoneServeArgs(3131, false, false), ['serve', '--http=80', 'off'])
   })
 })
 
 describe('device approval', () => {
-  const lan = { host: '192.168.1.103', secret: 'a'.repeat(64) }
-  const h = { host: '192.168.1.103:3131' }
-  const d = { ip: '192.168.1.50', ua: 'iPhone Safari', host: '192.168.1.103:3131', network: 'Wi-Fi' as const }
+  const lan = { secret: 'a'.repeat(64), names: ['mac.tail1.ts.net'] }
+  const h = { host: 'mac.tail1.ts.net' }
+  const d = { ip: '100.101.2.3', ua: 'iPhone Safari', host: 'mac.tail1.ts.net', network: 'Tailscale' as const }
   it('routes Ask and the wait page past the gate, with the /login Origin rule', () => {
     assert.equal(deniedAs('POST', h, '/device', 3131, lan), 'device')
-    assert.equal(deniedAs('POST', { ...h, origin: 'http://192.168.1.103:3131' }, '/device', 3131, lan), 'device')
+    assert.equal(deniedAs('POST', { ...h, origin: 'https://mac.tail1.ts.net' }, '/device', 3131, lan), 'device')
     assert.equal(deniedAs('POST', { ...h, origin: 'http://evil.test' }, '/device', 3131, lan), 'forbid')
     assert.equal(deniedAs('GET', h, '/device/wait?id=x', 3131, lan), 'wait')
-    assert.equal(deniedAs('GET', { host: 'evil.test:3131' }, '/device/wait?id=x', 3131, lan), 'forbid')
+    assert.equal(deniedAs('GET', { host: 'evil.test' }, '/device/wait?id=x', 3131, lan), 'forbid')
     assert.equal(deniedAs('POST', h, '/device/answer', 3131, lan), 'forbid')
   })
   it('creates a pending ask with a 128-bit id, at most 3 at once', () => {
@@ -376,35 +405,35 @@ describe('device approval', () => {
 describe('proxyHub to-do', () => {
   const todos = { '/p': { todo: [{ id: 'a', text: 'later', at: 1 }], ticked: [{ id: 'b', text: 'did', at: 2, by: 's1' }], sync: { state: 'synced', canSync: true } } }
   const hops: Array<{ method?: string; url?: string; body: string }> = []
+  const tokens: string[] = []
   let stamp = 0
   const up = http.createServer(async (req, res) => {
     let body = ''
     for await (const c of req) body += c
     hops.push({ method: req.method, url: req.url, body })
+    tokens.push(String(req.headers['x-switchboard-token']))
     if (req.url?.startsWith('/hub/holds')) res.writeHead(404).end()
     else if (req.url?.startsWith('/hub/state')) res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ chats: [], todos, ...(stamp ? { stamp } : {}) }))
     else res.writeHead(204).end()
   })
-  const lan = { host: '192.168.1.5', secret: 's', names: ['mac.tail1.ts.net'] }
   let port = 0
   // A second window on another project, opened later, so it is the newest.
   const other: string[] = []
   const up2 = http.createServer(async (req, res) => {
     let body = ''
     for await (const c of req) body += c
-    if (req.url?.startsWith('/hub/holds')) { res.writeHead(req.url.includes('session=s2&') ? 204 : 404).end(); return }
-    other.push(`${req.url} ${body}`)
+    if (req.url?.startsWith('/hub/holds')) { res.writeHead(req.url === '/hub/holds?session=s2' && req.headers['x-switchboard-token'] === 'tok2' ? 204 : 404).end(); return }
+    other.push(`${req.url} ${req.headers['x-switchboard-token']} ${body}`)
     res.writeHead(204).end()
   })
   const app = http.createServer((req, res) => {
-    const local = req.headers.host?.startsWith('127.') ? undefined : lan
-    void proxyHub(req, res, port, '/p', local, async () => [
+    void proxyHub(req, res, port, '/p', lanFor(req.headers, port, 's', ['mac.tail1.ts.net']), async () => [
       { port: (up.address() as AddressInfo).port, hubToken: 'tok', workspace: '/p', mtimeMs: 1, pid: process.pid },
       { port: (up2.address() as AddressInfo).port, hubToken: 'tok2', workspace: '/q', mtimeMs: 2, pid: process.pid },
     ])
   })
   const call = (host: string, method: string, path: string, body?: string) => new Promise<{ status: number; body: string }>((ok, fail) => {
-    const r = http.request({ host: '127.0.0.1', port, method, path, headers: { Host: host, 'X-Switchboard': '1', Origin: `http://${host}`, 'Content-Type': 'application/json' } }, x => {
+    const r = http.request({ host: '127.0.0.1', port, method, path, headers: { Host: host, 'X-Switchboard': '1', Origin: host.endsWith('.ts.net') ? `https://${host}` : `http://${host}`, 'Content-Type': 'application/json' } }, x => {
       let b = ''
       x.on('data', c => { b += c })
       x.on('end', () => ok({ status: x.statusCode ?? 0, body: b }))
@@ -413,7 +442,7 @@ describe('proxyHub to-do', () => {
     r.end(body)
   })
   const start = (s: http.Server) => new Promise<void>(ok => s.listen(0, '127.0.0.1', () => ok()))
-  const hosts = () => [`127.0.0.1:${port}`, `192.168.1.5:${port}`, `mac.tail1.ts.net:${port}`]
+  const hosts = () => [`127.0.0.1:${port}`, 'mac.tail1.ts.net']
 
   it('starts', async () => { await start(up); await start(up2); await start(app); port = (app.address() as AddressInfo).port })
 
@@ -423,6 +452,47 @@ describe('proxyHub to-do', () => {
       assert.equal(r.status, 200, host)
       assert.deepEqual(JSON.parse(r.body).todos, todos, host)
     }
+  })
+
+  it('refuses a spoken Jarvis question from the phone, and takes it from the Mac', async () => {
+    const body = JSON.stringify({ type: 'hub-jarvis', q: 'hi', voice: true })
+    assert.equal((await call('mac.tail1.ts.net', 'POST', '/hub/command', body)).status, 403)
+    assert.equal((await call('mac.tail1.ts.net', 'POST', '/hub/command', JSON.stringify({ type: 'hub-jarvis', q: 'hi' }))).status, 204)
+    assert.equal((await call(`127.0.0.1:${port}`, 'POST', '/hub/command', body)).status, 204)
+  })
+
+  it('passes the mic read on with the window token, and only to the page itself', async () => {
+    hops.length = 0; tokens.length = 0
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/voice?token=evil')).status, 204)
+    assert.deepEqual([hops.map(h => h.url), tokens], [['/hub/voice'], ['tok']])
+    const bare = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, path: '/hub/voice', headers: { Host: `127.0.0.1:${port}` } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end())
+    assert.equal(bare, 403)
+  })
+
+  it('passes the memory graph on with the window token in a header, and only to the page itself', async () => {
+    hops.length = 0; tokens.length = 0
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/graph')).status, 204)
+    assert.deepEqual([hops.map(h => h.url), tokens], [['/hub/graph'], ['tok']])
+    const bare = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, path: '/hub/graph', headers: { Host: `127.0.0.1:${port}` } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end())
+    assert.equal(bare, 403)
+  })
+
+  it("passes a role's runs on with only the chat and role, and the window token", async () => {
+    hops.length = 0
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/runs?session=s-1&role=qa&token=evil&x=1')).status, 204)
+    assert.deepEqual(hops.map(h => h.url), ['/hub/runs?session=s-1&role=qa'])
+    const bare = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, path: '/hub/runs?session=s&role=qa', headers: { Host: `127.0.0.1:${port}` } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end())
+    assert.equal(bare, 403)
+  })
+
+  it('passes the chat view reads on with only their own fields, GET only', async () => {
+    hops.length = 0
+    for (const q of ['/hub/chat/outputs?session=s-1&token=evil', '/hub/chat/transcript?session=s-1&before=99&x=1', '/hub/chat/shot?session=s-1&path=%2Fa%2Fb.png']) {
+      assert.equal((await call(`127.0.0.1:${port}`, 'GET', q)).status, 204, q)
+    }
+    assert.deepEqual(hops.map(h => h.url), ['/hub/chat/outputs?session=s-1', '/hub/chat/transcript?session=s-1&before=99', '/hub/chat/shot?session=s-1&path=%2Fa%2Fb.png'])
+    assert.equal((await call(`127.0.0.1:${port}`, 'POST', '/hub/chat/outputs?session=s-1', '{}')).status, 404)
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/chat/other?session=s-1')).status, 404)
   })
 
   it('passes every to-do command the panel sends, unchanged, with the window token added', async () => {
@@ -436,10 +506,10 @@ describe('proxyHub to-do', () => {
       { type: 'hub-todo-sync', path: '/p', on: true },
     ]
     for (const host of hosts()) for (const c of cmds) {
-      hops.length = 0
+      hops.length = 0; tokens.length = 0
       const r = await call(host, 'POST', '/hub/command', JSON.stringify(c))
       assert.equal(r.status, 204, `${host} ${c.type}`)
-      assert.deepEqual(hops, [{ method: 'POST', url: '/hub/command?token=tok', body: JSON.stringify(c) }], `${host} ${c.type}`)
+      assert.deepEqual([hops, tokens], [[{ method: 'POST', url: '/hub/command', body: JSON.stringify(c) }], ['tok']], `${host} ${c.type}`)
     }
   })
 
@@ -450,12 +520,27 @@ describe('proxyHub to-do', () => {
     assert.deepEqual([evil, bare, hops.length], [403, 403, 0])
   })
 
+  it('refuses Mac-only commands from the phone with a short reason, and runs them from the Mac', async () => {
+    const save = JSON.stringify({ type: 'hub-key-save', name: 'OPENAI_API_KEY', value: 'x' })
+    const ship = JSON.stringify({ type: 'hub-git', sessionId: 'nobody', op: 'ship' })
+    for (const c of [save, ship]) {
+      hops.length = 0
+      const r = await call('mac.tail1.ts.net', 'POST', '/hub/command', c)
+      assert.deepEqual([r.status, hops.filter(h => h.url === '/hub/command').length], [403, 0], c)
+      assert.match(r.body, /Mac/)
+      // tailscale serve comes in on loopback: its headers alone mark the phone.
+      const r2 = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hub/command', headers: { Host: `127.0.0.1:${port}`, 'X-Switchboard': '1', 'X-Forwarded-For': '100.1.2.3' } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end(c))
+      assert.equal(r2, 403, c)
+      assert.equal((await call(`127.0.0.1:${port}`, 'POST', '/hub/command', c)).status, 204, c)
+    }
+  })
+
   it('sends a command to the window holding its folder, on every path', async () => {
     const run = JSON.stringify({ type: 'hub-todo-run', path: '/q/web', ids: ['a'] })
     for (const host of hosts()) {
       hops.length = 0; other.length = 0
       assert.equal((await call(host, 'POST', '/hub/command', run)).status, 204, host)
-      assert.deepEqual([hops.length, other], [0, [`/hub/command?token=tok2 ${run}`]], host)
+      assert.deepEqual([hops.length, other], [0, [`/hub/command tok2 ${run}`]], host)
     }
   })
 
@@ -464,7 +549,7 @@ describe('proxyHub to-do', () => {
     for (const host of hosts()) {
       hops.length = 0; other.length = 0
       assert.equal((await call(host, 'POST', '/hub/command', send('s2'))).status, 204, host)
-      assert.deepEqual([hops.filter(h => h.url?.startsWith('/hub/command')).length, other], [0, [`/hub/command?token=tok2 ${send('s2')}`]], host)
+      assert.deepEqual([hops.filter(h => h.url?.startsWith('/hub/command')).length, other], [0, [`/hub/command tok2 ${send('s2')}`]], host)
       hops.length = 0; other.length = 0
       assert.equal((await call(host, 'POST', '/hub/command', send('s9'))).status, 204, host)
       assert.deepEqual([hops.filter(h => h.url?.startsWith('/hub/command')).map(h => h.body), other], [[send('s9')], []], host)
@@ -506,4 +591,97 @@ describe('proxyHub to-do', () => {
   })
 
   it('stops', () => { app.close(); up.close(); up2.close() })
+})
+
+describe('proxyHub upstream dying', () => {
+  it('ends the client instead of leaving it hanging when the window dies mid-body', async () => {
+    const up = http.createServer((req, res) => { req.resume(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.write('{"part'); setTimeout(() => res.socket?.destroy(), 50) })
+    await new Promise<void>(ok => up.listen(0, '127.0.0.1', ok))
+    const upPort = (up.address() as AddressInfo).port
+    const app = http.createServer((req, res) => {
+      void proxyHub(req, res, (app.address() as AddressInfo).port, '/tmp', undefined, async () => [{ port: upPort, hubToken: 't', workspace: '/tmp', mtimeMs: 1 }])
+    })
+    await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+    const port = (app.address() as AddressInfo).port
+    const done = await new Promise<string>(ok => {
+      const r = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hub/command', headers: { 'X-Switchboard': '1', Host: `127.0.0.1:${port}` } }, x => {
+        x.resume()
+        x.on('end', () => ok('end'))
+        x.on('error', () => ok('error'))
+        x.on('aborted', () => ok('aborted'))
+      })
+      r.on('error', () => ok('error'))
+      r.end('{"type":"x"}')
+      setTimeout(() => ok('hang'), 2000)
+    })
+    // Drop any held socket, so a regression fails the test instead of hanging the run.
+    app.closeAllConnections(); up.closeAllConnections(); app.close(); up.close()
+    assert.notEqual(done, 'hang')
+  })
+})
+
+describe('proxyHub upload', () => {
+  const got: Array<{ url?: string; body: Buffer; token?: string | string[] }> = []
+  let aborted = 0
+  const up = http.createServer(async (req, res) => {
+    const parts: Buffer[] = []
+    try { for await (const c of req) parts.push(c as Buffer) } catch { aborted++; return }
+    got.push({ url: req.url, body: Buffer.concat(parts), token: req.headers['x-switchboard-token'] })
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"path":"/u/x.bin"}')
+  })
+  up.on('clientError', () => { aborted++ })
+  let port = 0
+  const app = http.createServer((req, res) => {
+    void proxyHub(req, res, port, '/p', undefined, async () => [{ port: (up.address() as AddressInfo).port, hubToken: 'tok', workspace: '/p', mtimeMs: 1, pid: process.pid }])
+  })
+  const send = (headers: Record<string, string | number>, write: (r: http.ClientRequest) => void, path = '/hub/upload?cwd=%2Fp%2Fweb&name=x.bin&session=s1&token=evil') => new Promise<{ status: number; body: string }>(ok => {
+    const r = http.request({ host: '127.0.0.1', port, method: 'POST', path, headers: { Host: `127.0.0.1:${port}`, ...headers } }, x => {
+      let b = ''
+      x.on('data', c => { b += c })
+      x.on('end', () => ok({ status: x.statusCode ?? 0, body: b }))
+    })
+    r.on('error', () => ok({ status: 0, body: '' }))
+    write(r)
+  })
+  it('starts', async () => {
+    await new Promise<void>(ok => up.listen(0, '127.0.0.1', ok))
+    await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+    port = (app.address() as AddressInfo).port
+  })
+  it('streams the bytes through unchanged, with the window token in place of any the page sent', async () => {
+    const bytes = Buffer.from(Array.from({ length: 256 }, (_, i) => i))
+    got.length = 0
+    const r = await send({ 'X-Switchboard': '1' }, x => x.end(bytes))
+    assert.deepEqual([r.status, r.body], [200, '{"path":"/u/x.bin"}'])
+    assert.equal(got.length, 1)
+    assert.ok(got[0].body.equals(bytes))
+    const q = new URL(got[0].url!, 'http://x').searchParams
+    assert.deepEqual([q.get('cwd'), q.get('name'), q.get('session'), q.getAll('token'), got[0].token], ['/p/web', 'x.bin', 's1', [], 'tok'])
+  })
+  it('refuses an upload without the header or from another site', async () => {
+    got.length = 0
+    assert.equal((await send({}, x => x.end('x'))).status, 403)
+    assert.equal((await send({ 'X-Switchboard': '1', Origin: 'http://evil.test' }, x => x.end('x'))).status, 403)
+    assert.equal(got.length, 0)
+  })
+  it('answers 413 for a declared size over 100 MB without passing it on', async () => {
+    got.length = 0
+    const r = await send({ 'X-Switchboard': '1', 'Content-Length': 100 * 1024 * 1024 + 1 }, x => x.write('x'))
+    assert.equal(r.status, 413)
+    assert.equal(got.length, 0)
+  })
+  it('cuts a chunked upload off at 100 MB and the window never finishes it', async () => {
+    got.length = 0
+    const mb = Buffer.alloc(1024 * 1024)
+    const r = await send({ 'X-Switchboard': '1' }, x => {
+      let n = 0
+      const more = () => { while (n < 102) { n++; if (!x.write(mb)) { x.once('drain', more); return } } x.end() }
+      x.on('error', () => {})
+      more()
+    })
+    assert.equal(r.status, 413)
+    await new Promise(ok => setTimeout(ok, 100))
+    assert.equal(got.length, 0)
+  })
+  it('stops', () => { app.closeAllConnections(); up.closeAllConnections(); app.close(); up.close() })
 })

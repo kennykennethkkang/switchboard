@@ -13,14 +13,18 @@ import type { ChromeProfile, Links, WebApp, WebLogin } from './types'
 export const LOGINS = path.join(os.homedir(), '.claude', 'switchboard', 'logins.json')
 export const AUTH0: WebApp = { id: 'auth0', name: 'Auth0', url: 'https://manage.auth0.com/', logins: [] }
 
-const SECRET_PARAM = /token|secret|pass|key|code|session|auth/i
+// Short, ambiguous words only as whole words of the name (api_key, apiKey), so authuser=1 or keyword= pass;
+// unambiguous ones anywhere, so run-together names like authtoken or secretkey are still caught.
+const SECRET_WORDS = new Set(['pass', 'pwd', 'key', 'code', 'session', 'sid', 'auth', 'sig', 'jwt', 'otp'])
+const SECRET_PART = /token(?!iz)|secret|passw|passphrase|passcode|credential|signature|authoriz|verifier|apikey|privatekey|accesskey|secretkey|authkey|authcode|sessionid/i
+const secretParam = (k: string) => SECRET_PART.test(k) || k.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).some(w => SECRET_WORDS.has(w))
 
 /** The URL as given when it is http(s) and carries no credentials; undefined otherwise. */
 export function loginUrl(s: string): string | undefined {
   let u: URL
   try { u = new URL(s.trim()) } catch { return undefined }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return undefined
-  if (u.username || u.password || [...u.searchParams.keys()].some(k => SECRET_PARAM.test(k))) return undefined
+  if (u.username || u.password || [...u.searchParams.keys()].some(secretParam)) return undefined
   return u.href
 }
 
@@ -93,13 +97,15 @@ export const loginFor = (app: WebApp, links: Links, folder: string | undefined):
   (folder ? links[folder]?.[app.id] : undefined) ?? app.active
 
 /** One line for a new chat's system note naming the project's accounts; labels and Chrome profile names only. */
-export function accountsNote(apps: WebApp[], links: Links, folder: string, chrome: ChromeProfile[]): string | undefined {
+export function accountsNote(apps: WebApp[], links: Links, folder: string, chrome: ChromeProfile[], project?: string): string | undefined {
   const parts = Object.keys(links[folder] ?? {}).flatMap(id => {
     const app = apps.find(a => a.id === id)
     if (!app) return []
     const row = app.logins.find(l => l.id === loginFor(app, links, folder))
     if (!row) return [`${app.name} has no saved login`]
-    const browser = row.chrome ? `Chrome ${chrome.find(c => c.dir === row.chrome)?.name ?? row.chrome}` : 'system browser'
+    // Its own pick, else the project's browser, else Chrome's last used profile.
+    const dir = row.chrome || project
+    const browser = dir ? `Chrome ${chrome.find(c => c.dir === dir)?.name ?? dir}` : 'Chrome, last used profile'
     return [`${app.name} uses ${row.label} (${browser})`]
   })
   return parts.length ? `Web accounts for this project: ${parts.join('; ')}.` : undefined

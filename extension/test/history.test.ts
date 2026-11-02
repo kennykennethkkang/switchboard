@@ -60,6 +60,14 @@ describe('history', () => {
     assert.equal(again.sessions[0].calls, 3)
   })
 
+  it('counts each line once when scans overlap', async () => {
+    const { root } = fixture()
+    const scanner = new HistoryScanner(root)
+    const [a, b] = await Promise.all([scanner.scan(at('2026-10-23T12:00:00')), scanner.scan(at('2026-10-23T12:00:00'))])
+    assert.equal(a.sessions[0].calls, 2)
+    assert.equal(b.sessions[0].calls, 2)
+  })
+
   it("names a chat by its custom title, else by a slash command's arguments", async () => {
     const { root, file } = fixture()
     const other = path.join(path.dirname(file), 's2.jsonl')

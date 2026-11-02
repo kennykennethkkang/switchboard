@@ -1,5 +1,5 @@
 'use client'
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useHub } from '@/hooks/use-hub'
 import { chatProjects, hideIdle, inProjects, liveChats, projectName } from '@/lib/archive'
 import { switcherItems, type SwitchItem } from '@/lib/switcher'
@@ -12,17 +12,25 @@ import { ChatPicture } from './chat-picture'
 import { MessageBox } from './message-box'
 import { ChangesPanel } from './changes'
 import { GitPanel } from './git-panel'
+import { ShipCard } from './ship-card'
 import { TodoPanel, todoFolder } from './todo-panel'
+import { withHome } from '@/lib/todo'
+import { JevCard } from './jev-card'
 import { Switcher } from './switcher'
 import { TodayCard } from './today'
 import { NewChat } from './new-chat'
 import { Gear, type Layout, type Section } from './gear'
-import { SignIns } from './sign-ins'
 import { PhoneAddress, PhoneQr } from './phone-qr'
-import { DevRows } from './dev-rows'
+import { DevRows, onMac } from './dev-rows'
+import { StuckStrip } from './stuck-strip'
+import { Jarvis } from './jarvis'
 import { ChatMenu } from './chat-menu'
+import { ChatView } from './chat-view'
 import { Sheet } from './sheet'
 import { placeOf } from './look'
+import { useDismiss } from './use-popover'
+// Its own chunk with three in it, loaded on the first open.
+const MemoryView = lazy(() => import('./memory').then(m => ({ default: m.MemoryView })))
 
 const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); return true } catch { return false } }
 const PROJECTS_KEY = 'switchboard.projects'
@@ -43,6 +51,7 @@ const ICON = {
   chat: 'M8 8m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M8 8m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0',
   todo: 'M3 4h1.5M3 8h1.5M3 12h1.5M7 4h6M7 8h6M7 12h6',
   git: 'M5 2.5v7M5 9.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM11 6.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM11 6.5c0 3-6 2-6 4',
+  memory: 'M4 4.5a1.5 1.5 0 1 0 0-.01M12 3.5a1.5 1.5 0 1 0 0-.01M8 12.5a1.5 1.5 0 1 0 0-.01M5.3 5l1.9 6M10.8 4.6 8.8 11M5.5 4.2h5',
 }
 
 /** The URL's ?layout= wins, then this device's pick, else Desk. */
@@ -75,7 +84,10 @@ function useNarrow() {
 }
 
 export function Switchboard() {
-  const { hub, send, isDemo, isVSCode, isLive, problem, down } = useHub()
+  const { hub, send, upload, isDemo, isVSCode, isLive, problem, down } = useHub()
+  // location only exists in the browser; reading it during render made the server and client markup differ
+  const [mac, setMac] = useState(false)
+  useEffect(() => setMac(onMac()), [])
   const sendRef = useRef(send)
   sendRef.current = send
   const [layout, setLayout] = useLayout()
@@ -83,11 +95,14 @@ export function Switchboard() {
   const narrow = useNarrow()
   const [tab, setTab] = useState<Tab>('chat')
   const [pick, setPick] = useState<{ id?: string; key: boolean }>({ key: false })
-  const [panel, setPanel] = useState<'none' | 'new' | 'gear' | 'signins'>('none')
+  const [panel, setPanel] = useState<'none' | 'new' | 'gear' | 'memory'>('none')
   const [gearAt, setGearAt] = useState<{ at: Section; n: number }>({ at: 'Chats', n: 0 })
   const [finding, setFinding] = useState(false)
   const [phone, setPhone] = useState(false)
+  const phoneWrap = useRef<HTMLSpanElement>(null)
+  useDismiss(phone, phoneWrap, () => setPhone(false))
   const [reveal, setReveal] = useState<{ chain: string; at: number }>()
+  const [reading, setReading] = useState<{ id: string; name: string }>()
   // The project filter is this device's own, like the tool-calls toggle.
   const [projects, setProjects] = useState<string[]>([])
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? '[]'); if (Array.isArray(v)) setProjects(v.filter(p => typeof p === 'string')) } catch { /* no storage: show all */ } }, [])
@@ -129,8 +144,9 @@ export function Switchboard() {
     else { setReveal({ chain: item.chain, at: Date.now() }); if (desk) setTab('chats'); const cwd = item.chain.split('\n')[0]; if (!inProjects(hub.archive?.find(a => a.cwd === cwd) ?? { cwd }, projects)) pickProjects([]) }
   }
   const openGear = (at: Section = 'Chats') => { setGearAt(g => ({ at, n: g.n + 1 })); setPanel('gear') }
-  // The To-do lists follow the shown chat's project, else this window's.
-  const todoAt = todoFolder(Object.keys(hub.todos ?? {}), current?.chat.cwd, hub.thisWindow)
+  // The To-do lists follow the shown chat's project, else this window's. A project with none gets an empty one to add the first item to.
+  const todos = useMemo(() => withHome(hub.todos, current?.chat.cwd), [hub.todos, current?.chat.cwd])
+  const todoAt = todoFolder(Object.keys(todos), current?.chat.cwd, hub.thisWindow)
   const today = useMemo(() => todayView(cards, hub.history, hub.live, Date.now(), hub.jev), [cards, hub.history, hub.live, hub.jev])
   const tasks = useMemo(() => taskTotals(cards), [cards])
   const models = useMemo(() => roleModels(hub.installed, hub.controls.claude.model), [hub.installed, hub.controls.claude.model])
@@ -146,15 +162,15 @@ export function Switchboard() {
   // A project's window: the window holding any chat of that project.
   const projectTint = (name: string) => placeOf(cards.find(c => projectName(c.chat) === name)?.chat.cwd, windows)?.color
   const itemTint = (item: SwitchItem) => placeOf(item.kind === 'live' ? cards.find(c => c.chat.sessionId === item.id)?.chat.cwd : item.chain.split('\n')[0], windows)?.color
-  const menu = (chat: Card['chat']) => <ChatMenu chat={chat} starred={starred.includes(chat.sessionId)} send={send} onMac={isVSCode} />
+  const read = (chat: Card['chat']) => () => setReading({ id: chat.sessionId, name: chat.name || projectName(chat) })
+  const menu = (chat: Card['chat']) => <ChatMenu chat={chat} starred={starred.includes(chat.sessionId)} send={send} onMac={isVSCode} onRead={read(chat)} />
   const needs = cards.filter(c => c.progress?.state === 'needs-you').length
-  const todoCount = (todoAt && hub.todos?.[todoAt]?.todo.length) || 0
+  const todoCount = (todoAt && todos[todoAt]?.todo.length) || 0
   const files = hub.changes?.sessionId === currentId ? hub.changes?.files.length ?? 0 : 0
 
   const header = (
     <header className="hub-top">
-      <strong className="hub-brand"><i aria-hidden />Switchboard</strong>
-      <button type="button" className="hub-btn primary hub-new" aria-expanded={panel === 'new'} onClick={() => setPanel(panel === 'new' ? 'none' : 'new')}><Ic d={ICON.plus} />New chat</button>
+      <strong className="hub-brand"><i aria-hidden /><span className="hub-lbl">Switchboard</span></strong>
       <button type="button" className="hub-btn hub-find" aria-haspopup="dialog" aria-label="Find a chat" onClick={() => setFinding(true)} title="Find a chat, live or in History">
         <Ic d={ICON.find} /><span className="hub-lbl">Find</span> <kbd>{isMac() ? '⌘K' : 'Ctrl K'}</kbd>
       </button>
@@ -164,12 +180,13 @@ export function Switchboard() {
         {limit && <i aria-hidden><b style={{ width: `${Math.min(100, Math.round(limit.percentUsed))}%` }} /></i>}
         {limit ? `${LIMIT[limit.kind] ?? limit.kind.replace('_', ' ')} limit · ${Math.round(limit.percentUsed)}% used` : ''}
       </span>
+      <button type="button" className="hub-btn primary hub-new" aria-expanded={panel === 'new'} onClick={() => setPanel(panel === 'new' ? 'none' : 'new')}><Ic d={ICON.plus} />New chat</button>
       {isVSCode && <>
-        <span style={{ position: 'relative' }}>
+        <span ref={phoneWrap} style={{ position: 'relative' }}>
           {/* Asking for the link also starts the app when it is not running. */}
           <button type="button" className="hub-btn" aria-label="Phone" aria-haspopup="dialog" aria-expanded={phone} onClick={() => { if (!phone) send({ type: 'hub-web', phone: true }); setPhone(!phone) }}><Ic d={ICON.phone} /><span className="hub-lbl">Phone</span></button>
           {phone && (
-            <div role="dialog" aria-label="Open Switchboard on your phone" className="hub-pop" onKeyDown={e => { if (e.key === 'Escape') setPhone(false) }}>
+            <div role="dialog" aria-label="Open Switchboard on your phone" className="hub-pop">
               {phoneLinks.map(({ name, url, ip }) => <Fragment key={name}>
                 <PhoneQr url={url} label={`QR code that opens Switchboard on your phone (${name})`} />
                 <span style={{ font: '400 12px/1 var(--hub-sans)', color: 'var(--hub-mute)' }}>{name}</span>
@@ -179,9 +196,11 @@ export function Switchboard() {
                 <span style={{ font: '600 18px/1.2 var(--hub-mono)', color: 'var(--hub-ink)', letterSpacing: '0.08em' }}>Code {hub.phoneUrls.code.slice(0, 3)} {hub.phoneUrls.code.slice(3)}</span>
                 <span style={{ font: '400 12px/1.4 var(--hub-sans)', color: 'var(--hub-mute)' }}>Type an address, then this code</span>
               </span>}
+              {phoneLinks.some(l => l.url.startsWith('http:')) && <span style={{ font: '400 12px/1.5 var(--hub-sans)', color: 'var(--hub-ash)', maxWidth: 220 }}>
+                Copy buttons on the phone need HTTPS. Turn on HTTPS Certificates in the Tailscale admin console, DNS page.</span>}
               {!phoneLinks.length && <span style={{ font: '400 12px/1.5 var(--hub-sans)', color: 'var(--hub-ash)' }}>{
-                hub.phoneUrls ? 'This Mac has no Wi-Fi or Tailscale address right now.'
-                  : web ? 'The running browser app has no phone access (started without --lan). Stop it, then press Phone again.' : 'Starting the browser app...'}</span>}
+                hub.phoneUrls ? hub.phoneUrls.problem ?? 'Checking Tailscale on this Mac…'
+                  : web ? 'The running browser app has no phone access (started without --lan). Stop it, then press Phone again.' : 'Starting the browser app…'}</span>}
             </div>
           )}
         </span>
@@ -189,7 +208,8 @@ export function Switchboard() {
       {hub.awake !== undefined && <button type="button" className="hub-btn hub-awake" aria-label="Keep awake" aria-pressed={hub.awake} onClick={() => send({ type: 'hub-awake', on: !hub.awake })}
         title="Keeps this Mac awake so Switchboard and dev servers answer from anywhere. With the lid closed, only while on power.">
         <Ic d={ICON.awake} /><span className="hub-lbl">{hub.awake ? 'Awake' : 'Keep awake'}</span></button>}
-      <button type="button" className="hub-btn hub-gear" aria-label="Settings" title="Settings" aria-expanded={panel === 'gear' || panel === 'signins'} onClick={() => (panel === 'none' || panel === 'new' ? openGear() : setPanel('none'))}>
+      <button type="button" className="hub-btn" aria-label="Memory" title="Memory: what Claude remembers, as a graph" onClick={() => setPanel('memory')}><Ic d={ICON.memory} /><span className="hub-lbl">Memory</span></button>
+      <button type="button" className="hub-btn hub-gear" aria-label="Settings" title="Settings" aria-expanded={panel === 'gear'} onClick={() => (panel === 'none' || panel === 'new' || panel === 'memory' ? openGear() : setPanel('none'))}>
         <Ic d={ICON.gear} />
       </button>
     </header>
@@ -201,42 +221,50 @@ export function Switchboard() {
       <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-device', id: d.id, allow: false })}>Deny</button>
     </div>
   ))
-  const newChat = <NewChat hub={hub} send={send} onDone={() => setPanel('none')} />
-  const gear = <Gear key={gearAt.n} hub={hub} send={send} start={gearAt.at} layout={layout} onLayout={setLayout} onSignIns={() => setPanel('signins')} />
-  const signIns = <SignIns hub={hub} send={send} problem={problem} onClose={() => openGear('Accounts')} />
-  const filter = (projectChips.length > 1 || projects.length > 0) && <ProjectFilter projects={projectChips} picked={projects} tint={projectTint} onChange={pickProjects} />
+  const chatName = (id: string) => { const c = cards.find(x => x.chat.sessionId === id)?.chat; return c ? c.name || projectName(c) : 'A chat' }
+  const jarvis = <Jarvis reply={hub.jarvis} voice={hub.voice} heard={hub.heard} mic={isDemo || isVSCode || mac} demo={isDemo} send={send} />
+  const stuck = <StuckStrip stuck={hub.stuck} name={chatName} send={send} onCopy={copy} onJump={id => select(id, false)} />
+  const newChat = <NewChat hub={hub} send={send} upload={upload} onDone={() => setPanel('none')} />
+  const gear = <Gear key={gearAt.n} hub={hub} send={send} start={gearAt.at} layout={layout} onLayout={setLayout} problem={problem} />
+  const filter = (projectChips.length > 1 || projects.length > 0) && <ProjectFilter projects={projectChips} picked={projects} tint={projectTint} busy={name => cards.filter(c => c.progress?.state === 'working' && projectName(c.chat) === name).length} onChange={pickProjects} />
   const dev = <DevRows dev={(hub.dev ?? []).filter(d => inProjects({ cwd: d.folder, project: d.repo }, projects))} tailscale={hub.tailscale} isVSCode={isVSCode} send={send} />
-  const chatCards = <ChatCards cards={rail} waits={hub.waits} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
+  const chatCards = <ChatCards cards={rail} all={hub.progress} stuck={hub.stuck} waits={hub.waits} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
     empty={cards.length ? 'No chats in the picked projects.' : undefined} />
   const history = <History archive={(hub.archive ?? []).filter(a => inProjects(a, projects))} chats={cards.map(c => c.chat)} search={hub.search} reveal={reveal}
     onSearch={q => send({ type: 'hub-search', q })}
-    onNote={sessionId => send({ type: 'hub-open-note', sessionId })} onResume={(sessionId, ai) => send({ type: 'hub-resume', sessionId, ai })} />
+    onNote={sessionId => send({ type: 'hub-open-note', sessionId })} onResume={(sessionId, ai) => send({ type: 'hub-resume', sessionId, ai })} onRead={(id, name) => setReading({ id, name })} />
   const todayCard = <TodayCard today={today} tasks={tasks} />
-  const todo = todoAt && hub.todos?.[todoAt] && <TodoPanel key={todoAt} folder={todoAt} todos={hub.todos} chats={hub.chats} progress={hub.progress} windows={windows} send={send} />
+  const todo = todoAt && <TodoPanel key={todoAt} folder={todoAt} todos={todos} chats={hub.chats} progress={hub.progress} windows={windows} send={send} />
+  // The project the to-do follows gets its Jev card too.
+  const jev = todoAt && <JevCard key={`jev-${todoAt}`} folder={todoAt} jev={hub.jevProjects?.[todoAt]} send={send} />
   const place = placeOf(current?.chat.cwd, windows)
+  const message = current && <MessageBox key={current.chat.sessionId} chat={current.chat} send={send} upload={upload} problem={problem} />
   const picture = current
-    ? <ChatPicture chat={current.chat} progress={current.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models}
+    ? <ChatPicture chat={current.chat} progress={current.progress} all={hub.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models} demo={isDemo}
         profile={hub.tools?.chats[current.chat.sessionId]} flagged={hub.tools?.flagged} onProfile={tools => send({ type: 'hub-chat-tools', sessionId: current.chat.sessionId, tools })}
-        place={place} menu={<ChatMenu chat={current.chat} starred={starred.includes(current.chat.sessionId)} send={send} onMac={isVSCode} />}
+        place={place} message={message} menu={<><button type="button" className="hub-btn" onClick={read(current.chat)} title="What this chat produced, and its transcript">Outputs</button><ChatMenu chat={current.chat} starred={starred.includes(current.chat.sessionId)} send={send} onMac={isVSCode} inPicture /></>}
         installed={hub.installed} connections={hub.connections} toolsOpen={desk} onInstalled={() => openGear('Installed')}
         onFocus={() => send({ type: 'hub-focus-chat', sessionId: current.chat.sessionId })}
         onAnswer={(askId, choice) => send({ type: 'hub-answer', sessionId: current.chat.sessionId, askId, choice })} onCopy={copy}
         limits={hub.live.flatMap(l => l.limits)} autoContinue={hub.keep.autoContinue}
         onSend={text => send(boxNote(current.chat) ? { type: 'hub-new-chat', path: current.chat.cwd, text, remote: false } : { type: 'hub-send', sessionId: current.chat.sessionId, text })} />
     : <section style={{ padding: 20, color: 'var(--hub-ash)' }}>Pick a chat, or start one.</section>
-  const message = current && <MessageBox key={current.chat.sessionId} chat={current.chat} send={send} problem={problem} />
   const changes = current && <ChangesPanel key={current.chat.sessionId} changes={hub.changes} sessionId={current.chat.sessionId} cwd={current.chat.cwd} commit={current.progress?.commit}
     onCopy={copy} onOpen={file => send({ type: 'hub-open-diff', sessionId: current.chat.sessionId, file })} />
-  const git = current && <GitPanel key={`git-${current.chat.sessionId}`} repo={hub.repo} sessionId={current.chat.sessionId} chat={current.chat} commit={current.progress?.commit} isVSCode={isVSCode} send={send} />
+  const ship = current?.progress?.state === 'done' && <ShipCard key={`ship-${current.chat.sessionId}`} repo={hub.repo} progress={current.progress} sessionId={current.chat.sessionId} send={send} onCopy={copy} />
+  const git = current && <>{ship}<GitPanel key={`git-${current.chat.sessionId}`} repo={hub.repo} sessionId={current.chat.sessionId} chat={current.chat} commit={current.progress?.commit} isVSCode={isVSCode} send={send} shipping={!!ship} /></>
   const switcher = finding && <Switcher items={items} tint={itemTint} onPick={choose} onClose={() => setFinding(false)} />
+  const chatView = reading && <ChatView key={reading.id} sessionId={reading.id} name={reading.name} demo={isDemo ? hub : undefined} onCopy={copy} onClose={() => setReading(undefined)} />
+  const memory = panel === 'memory' && <Suspense fallback={null}><MemoryView isDemo={isDemo} onClose={() => setPanel('none')} /></Suspense>
 
   if (!desk) return (
     <div className="hub" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--hub-surface)', color: 'var(--hub-body)', font: '400 14px/1.6 var(--hub-sans)' }}>
       {header}
       {devices}
+      {jarvis}
+      {stuck}
       {panel === 'new' && <div style={{ padding: 16, borderBottom: '1px solid var(--hub-hair)' }}>{newChat}</div>}
       {panel === 'gear' && gear}
-      {panel === 'signins' && signIns}
       <main className="hub-app" style={{ flex: 1 }}>
         <aside className="hub-rail" aria-label="Chats" style={{ padding: 16, background: 'var(--hub-canvas)' }}>
           {filter}{dev}{chatCards}{history}
@@ -244,12 +272,14 @@ export function Switchboard() {
         <div style={{ minWidth: 0 }}>
           <div style={{ padding: '20px 20px 0' }}>{todayCard}</div>
           {todo && <div style={{ padding: '12px 20px 0' }}>{todo}</div>}
+          {jev && <div style={{ padding: '12px 20px 0' }}>{jev}</div>}
           {picture}
-          {message}
           {current && <div style={{ padding: '0 20px 20px', display: 'grid', gap: 12 }}>{changes}{git}</div>}
         </div>
       </main>
       {switcher}
+      {memory}
+      {chatView}
     </div>
   )
 
@@ -260,6 +290,8 @@ export function Switchboard() {
     <div className="hub desk" data-layout="desk" data-tab={tab}>
       {header}
       {devices}
+      {jarvis}
+      {stuck}
       <aside className="desk-rail" aria-label="Chats">
         {narrow && todayCard}
         {filter}
@@ -270,11 +302,10 @@ export function Switchboard() {
       </aside>
       <main className="desk-center" aria-label="This chat">
         {picture}
-        {message}
       </main>
       <aside className="desk-right" aria-label="Today and this project">
         {!narrow && <div className="desk-today">{todayCard}</div>}
-        <div className="desk-todo">{todo || <section className="desk-empty">No to-do list for this project yet.</section>}</div>
+        <div className="desk-todo">{todo}{jev && <div>{jev}</div>}</div>
         <div className="desk-git">{changes}{git}</div>
       </aside>
       <nav className="desk-tabs" aria-label="Sections">
@@ -286,8 +317,9 @@ export function Switchboard() {
       </nav>
       {panel === 'new' && <Sheet title="New chat" onClose={() => setPanel('none')}>{newChat}</Sheet>}
       {panel === 'gear' && <Sheet title="Settings" wide onClose={() => setPanel('none')}>{gear}</Sheet>}
-      {panel === 'signins' && <Sheet title="Accounts" wide onClose={() => setPanel('none')}>{signIns}</Sheet>}
       {switcher}
+      {memory}
+      {chatView}
     </div>
   )
 }

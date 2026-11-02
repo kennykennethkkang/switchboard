@@ -9,9 +9,10 @@ import * as os from 'os'
 import * as path from 'path'
 import type { ChangedFile, Connection, GitState, Installed, PhoneUrls, PlanView, Server } from './types'
 import { DEFAULT_RELAY_PORT } from '../constants'
+import { tryLock } from '../fs-utils'
 import { modelOf } from './roles'
 import { newerVersion } from './self-update'
-import { ipv4s, lanHosts, macNames, phoneCode, type MacNames } from './lan'
+import { macNames, phoneCode, type MacNames } from './lan'
 
 const HOME = os.homedir()
 const CLAUDE = path.join(HOME, '.claude')
@@ -37,7 +38,7 @@ export function parsePlan(name: string, text: string): PlanView {
   const decisions: string[] = []
   let inDecisions = false
   for (const row of text.split('\n')) {
-    // ponytail: a decision is a list item or table row under a "## Decisions" heading; other layouts are missed.
+    // A decision is a list item or table row under a "## Decisions" heading; other layouts are missed.
     if (/^##\s/.test(row)) { inDecisions = /^##\s+Decisions/i.test(row); continue }
     if (/^###\s+Task\s/.test(row)) inDecisions = false
     if (inDecisions) {
@@ -270,28 +271,26 @@ const SECRET_FILE = path.join(os.homedir(), '.claude', 'switchboard', 'phone.sec
 const port = (u: string) => { try { return new URL(u).port } catch { return '' } }
 const readTrim = (file: string) => async () => (await fs.promises.readFile(file, 'utf8').catch(() => '')).trim() || undefined
 
-/** A phone link per network from this Mac's current addresses and names, only when the running app was started with --lan
- * (web.lan names its port). Empty when there is no address yet, null when the app has no phone access. */
-export async function phoneUrls(web: string | null, read = readTrim(LAN_FILE), secret = readTrim(SECRET_FILE), ips = ipv4s, names: () => MacNames = macNames): Promise<PhoneUrls | null> {
+/** The phone link through tailscale serve (http while the tailnet has no certs), only when the running app was started with --lan (web.lan names its port).
+ * Only problem when tailscale cannot serve it, empty before the first read, null when the app has no phone access. */
+export async function phoneUrls(web: string | null, read = readTrim(LAN_FILE), secret = readTrim(SECRET_FILE), names: () => MacNames = macNames): Promise<PhoneUrls | null> {
   const lan = web ? await read() : undefined
   if (!lan || port(lan) !== port(web!)) return null
   const k = await secret()
   if (!k) return {}
-  const { wifi, tailscale } = lanHosts(ips())
-  const link = (host: string) => `http://${host}:${port(web!)}/?k=${k}`
   const n = names()
-  const links = { wifi, tailscale, wifiName: n.wifi, tailscaleName: n.tailscale }
-  if (!Object.values(links).some(Boolean)) return {}
-  return { ...Object.fromEntries(Object.entries(links).flatMap(([key, host]) => (host ? [[key, link(host)]] : []))), code: phoneCode(k) }
+  if (!n.tailscale) return n.problem ? { problem: n.problem } : {}
+  return { tailscaleName: `${n.https ? 'https' : 'http'}://${n.tailscale}/?k=${k}`, code: phoneCode(k) }
 }
 
 // VS Code's own binary runs as plain node (ELECTRON_RUN_AS_NODE), so no node on PATH is needed.
 // Detached so the app outlives VS Code.
 // The app's folder is its workspace; a computer with only the vsix has no checkout, so home then.
+// The keeper (keeper/app-keeper.mjs) starts it again from the same launch, recorded in app.args.
+const launchOf = (root: string, lan: boolean, app: string) => ({ cwd: fs.existsSync(root) ? root : HOME, args: [app, '-p', '3131', '--no-open', ...(lan ? ['--lan'] : [])] })
 function spawnApp(root: string, lan: boolean, app: string): number | undefined {
-  const child = spawn(process.execPath, [app, '-p', '3131', '--no-open', ...(lan ? ['--lan'] : [])], {
-    cwd: fs.existsSync(root) ? root : HOME, detached: true, stdio: 'ignore', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-  })
+  const { cwd, args } = launchOf(root, lan, app)
+  const child = spawn(process.execPath, args, { cwd, detached: true, stdio: 'ignore', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } })
   child.unref()
   return child.pid
 }
@@ -307,7 +306,7 @@ const sameTree = (a: string, b: string) => {
 
 /** The bundled app copied out of the versioned extension folder, which VS Code deletes after an update while the
  * detached app still serves its webview files from disk. Copied again only when the bundle differs.
- * ponytail: a running app keeps its old server code until it is restarted; only a fresh start picks up the copy. */
+ * A running app keeps its old server code until it is restarted; only a fresh start picks up the copy. */
 function stageApp(bundle: string, stage: string, version?: string): string {
   const src = path.dirname(bundle)
   // A window still on an older version never copies over a newer one.
@@ -322,14 +321,9 @@ function stageApp(bundle: string, stage: string, version?: string): string {
 const stagedVersion = (stage: string) => { try { return fs.readFileSync(`${stage}.version`, 'utf8').trim() || undefined } catch { return undefined } }
 
 /** One restart across windows: they all activate at once after an update. A lock older than a minute is left over. */
-function lockRestart(stage: string): (() => void) | undefined {
-  const lock = `${stage}.lock`
-  try { fs.mkdirSync(path.dirname(lock), { recursive: true }); fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }) } catch {
-    try { if (Date.now() - fs.statSync(lock).mtimeMs < 60_000) return undefined; fs.writeFileSync(lock, String(process.pid)) } catch { return undefined }
-  }
-  return () => fs.rmSync(lock, { force: true })
-}
+const lockRestart = (stage: string) => tryLock(`${stage}.lock`)
 
+const NOT_RUNNING = 'the browser app is not running'
 let starting: { p: Promise<{ url: string } | { problem: string }>; refresh: boolean } | undefined
 // The app this extension started, so Phone or an update may restart it. A file, so it survives reloads and every
 // window sees it. An app started by hand is never in it and is left alone.
@@ -386,15 +380,22 @@ export function ensureWeb(root: string, phone = false, deps: WebDeps = {}): Prom
       if (pid) { fs.mkdirSync(path.dirname(pidFile), { recursive: true }); fs.writeFileSync(pidFile, String(pid)) } else fs.rmSync(pidFile, { force: true })
     } catch { /* Phone then shows the stop message */ }
   }
+  const argsFile = path.join(path.dirname(pidFile), 'app.args')
+  const recorded = () => { try { return JSON.parse(fs.readFileSync(argsFile, 'utf8')) as { args?: string[] } } catch { return undefined } }
+  const record = (launch: { cwd: string; args: string[] }) => {
+    try { fs.mkdirSync(path.dirname(argsFile), { recursive: true }); fs.writeFileSync(argsFile, JSON.stringify(launch)) } catch { /* keeper waits for the next start */ }
+  }
   // A click never takes a refresh's answer: it waits for it, then asks again.
   if (starting?.refresh && !refresh) return starting.p.then(() => ensureWeb(root, phone, deps))
   if (starting) return starting.p
   let unlock: (() => void) | undefined
   const p = (async () => {
     let running = await find()
-    if (!running && refresh) return { problem: 'the browser app is not running' }
+    if (!running && refresh) return { problem: NOT_RUNNING }
     let restart: string | undefined
     const hasLan = !!running && !!(await lan(running))
+    // An app from before app.args existed: record it so the keeper can bring it back.
+    if (running && !recorded() && fs.existsSync(path.join(stage, 'app.js'))) record(launchOf(root, hasLan, path.join(stage, 'app.js')))
     let stale = false
     // Newer than the copy, or the same version reinstalled with rebuilt files.
     const staged = stagedVersion(stage)
@@ -406,7 +407,8 @@ export function ensureWeb(root: string, phone = false, deps: WebDeps = {}): Prom
     let pid = running && ((phone && !hasLan) || stale) ? await ours(running) : undefined
     if (pid && !(unlock = lockRestart(stage))) pid = undefined
     if (refresh && !pid) return { url: running! }
-    const lanNow = phone || hasLan
+    // Nothing running (a reboot, a crash): the last start's --lan still holds.
+    const lanNow = phone || hasLan || (!running && !!recorded()?.args?.includes('--lan'))
     if (pid) {
       try { stop(pid) } catch { /* already gone */ }
       remember(undefined)
@@ -423,14 +425,29 @@ export function ensureWeb(root: string, phone = false, deps: WebDeps = {}): Prom
     if (bundle && fs.existsSync(bundle)) try { app = stageApp(bundle, stage, version) } catch { /* checkout */ }
     if (!fs.existsSync(app)) return { problem: `the browser app is not built: ${built} is missing. Run pnpm build:app in ${root}` }
     const started = start(root, lanNow, app)
-    remember(started || undefined)
+    record(launchOf(root, lanNow, app))
     let url: string | null = null
     // After a restart, only our port counts.
-    if (await wait(async () => !!(url = await find()) && (!restart || port(url) === restart))) return { url: url! }
+    if (await wait(async () => !!(url = await find()) && (!restart || port(url) === restart))) {
+      // Several windows start at once after a reboot; only the one whose app got the port writes its pid.
+      if (started && (await listeners(port(url!))).includes(started)) remember(started)
+      return { url: url! }
+    }
     return { problem: 'the browser app did not start on port 3131' }
   })().finally(() => { starting = undefined; unlock?.() })
   starting = { p, refresh }
   return p
+}
+
+/** A refresh that also starts the app when it is down: after a reboot or a crash, and where launchd does not keep it up. */
+export async function keepWeb(root: string, deps: WebDeps & { installed?: boolean } = {}): Promise<{ url: string } | { problem: string }> {
+  const r = await ensureWeb(root, false, { ...deps, refresh: true })
+  if (!('problem' in r) || r.problem !== NOT_RUNNING) return r
+  // A dev host never starts it: that is the installed build's job, like the keeper.
+  if (deps.installed === false) return r
+  // Held but not answering as live (a window hub refusing): a second app would only die on EADDRINUSE.
+  if ((await (deps.listeners ?? portListeners)('3131')).length) return { problem: 'port 3131 is taken but does not answer' }
+  return ensureWeb(root, false, { ...deps, refresh: false })
 }
 
 // ─── Installed and connections ───────────────────────────────────────────────
@@ -571,8 +588,17 @@ export async function projectInventory(folder: string): Promise<Installed[]> {
 // The bundled design library (kit/design-md), copied here so chats can read it by absolute path.
 export const LIBRARY = path.join(CLAUDE, 'switchboard', 'design-md')
 
+// The running copy; libraryInventory waits on it, since a copy empties the folder first.
+let syncing: Promise<unknown> = Promise.resolve()
+
 /** Replaces dir with src when their VERSION stamps differ; true when it copied. Stamp written last, so a cut copy retries. */
-export async function syncLibrary(src: string, dir = LIBRARY): Promise<boolean> {
+export function syncLibrary(src: string, dir = LIBRARY): Promise<boolean> {
+  const run = copyLibrary(src, dir)
+  syncing = run.catch(() => false)
+  return run
+}
+
+async function copyLibrary(src: string, dir: string): Promise<boolean> {
   const stamp = (d: string) => fs.promises.readFile(path.join(d, 'VERSION'), 'utf8').catch(() => undefined)
   const v = await stamp(src)
   if (!v || await stamp(dir) === v) return false
@@ -584,6 +610,7 @@ export async function syncLibrary(src: string, dir = LIBRARY): Promise<boolean> 
 
 /** Library brands with a DESIGN.md, off by default in a chat's tool pick. */
 export async function libraryInventory(dir = LIBRARY): Promise<Installed[]> {
+  await syncing
   const out: Installed[] = []
   for (const brand of (await fs.promises.readdir(dir).catch(() => [] as string[])).sort()) {
     const file = path.join(dir, brand, 'DESIGN.md')

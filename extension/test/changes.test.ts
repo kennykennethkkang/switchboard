@@ -11,7 +11,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { phoneCode } from '../src/hub/lan'
-import { ensureWeb, insideCwd, parseChanges, phoneUrls, readChanges, safeFile, servesLive, webUrl } from '../src/hub/local'
+import { ensureWeb, insideCwd, keepWeb, parseChanges, phoneUrls, readChanges, safeFile, servesLive, webUrl } from '../src/hub/local'
 import { noteSnippet, searchNotes } from '../src/hub/chains'
 import { withSkipShell } from '../src/hub/controls'
 import type { ArchivedChat } from '../src/hub/types'
@@ -201,13 +201,23 @@ describe('browser link', () => {
     let up = false
     const find = async () => (up ? 'http://127.0.0.1:3131' : null)
     const start = (_r: string, lan: boolean) => { lans.push(lan); up = true; return 1234 }
+    const listeners = async () => (up ? [1234] : [])
     const file = pidFile()
-    await ensureWeb(appDir(), false, { find, start, tries: 3, waitMs: 1, pidFile: file })
+    await ensureWeb(appDir(), false, { find, start, listeners, tries: 3, waitMs: 1, pidFile: file })
     assert.equal(fs.readFileSync(file, 'utf8'), '1234')
     up = false
-    await ensureWeb(appDir(), true, { find, start, tries: 3, waitMs: 1, pidFile: file })
+    await ensureWeb(appDir(), true, { find, start, listeners, tries: 3, waitMs: 1, pidFile: file })
     assert.deepEqual(lans, [false, true])
     assert.equal(fs.readFileSync(file, 'utf8'), '1234')
+  })
+  it('keeps the pid of a start only once it holds the port, so another window winning it leaves no dead pid', async () => {
+    let up = false
+    const file = pidFile()
+    fs.writeFileSync(file, '42')
+    // Another window's app, 42, got the port; this start, 1234, dies on EADDRINUSE.
+    const r = await ensureWeb(appDir(), false, { find: async () => (up ? 'http://127.0.0.1:3131' : null), start: () => { up = true; return 1234 }, listeners: async () => [42], tries: 3, waitMs: 1, pidFile: file })
+    assert.deepEqual(r, { url: 'http://127.0.0.1:3131' })
+    assert.equal(fs.readFileSync(file, 'utf8'), '42')
   })
   it('restarts our app for a newer version than its copy, keeping --lan; an older window, a hand-run app or a held lock leave it', async () => {
     const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-ext-')), bundle = path.join(ext, 'dist', 'app', 'app.js')
@@ -338,9 +348,10 @@ describe('browser link', () => {
     let up = true
     const lans: boolean[] = [], stopped: number[] = []
     const file = pidFile()
-    const deps = (listening: number[]) => ({
+    let listening: number[] = []
+    const deps = (on: number[]) => (listening = on, {
       find: async () => (up ? 'http://127.0.0.1:3131' : null),
-      start: (_r: string, l: boolean) => { lans.push(l); up = true; return 43 },
+      start: (_r: string, l: boolean) => { lans.push(l); up = true; listening = [43]; return 43 },
       stop: (pid: number) => { stopped.push(pid); up = false },
       lan: async () => null, listeners: async (port: string) => (port === '3131' && up ? listening : []),
       tries: 3, waitMs: 1, pidFile: file,
@@ -371,36 +382,69 @@ describe('browser link', () => {
     })
     assert.deepEqual({ r, stopped, started }, { r: { url: 'http://127.0.0.1:3131' }, stopped: [42], started: [true] })
   })
+  it('records how it started the app next to the pid, and a later start keeps --lan', async () => {
+    let up = false
+    const lans: boolean[] = []
+    const find = async () => (up ? 'http://127.0.0.1:3131' : null)
+    const start = (_r: string, lan: boolean) => { lans.push(lan); up = true; return 5 }
+    const file = pidFile(), args = path.join(path.dirname(file), 'app.args'), root = appDir()
+    await ensureWeb(root, true, { find, start, tries: 3, waitMs: 1, pidFile: file })
+    assert.deepEqual(JSON.parse(fs.readFileSync(args, 'utf8')), { cwd: root, args: [path.join(root, 'app', 'dist', 'app.js'), '-p', '3131', '--no-open', '--lan'] })
+    // After a reboot nothing runs; a plain click starts it with --lan again.
+    up = false
+    await ensureWeb(root, false, { find, start, tries: 3, waitMs: 1, pidFile: file })
+    assert.deepEqual(lans, [true, true])
+  })
+  it('records a running app it never started, from the copy and its --lan, only when nothing is recorded', async () => {
+    const stage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-stage-')), 'app')
+    fs.mkdirSync(stage, { recursive: true })
+    fs.writeFileSync(path.join(stage, 'app.js'), '')
+    const file = pidFile(), args = path.join(path.dirname(file), 'app.args')
+    const deps = { find: async () => 'http://127.0.0.1:3131', lan: async () => ({}), stage, refresh: true, pidFile: file }
+    await ensureWeb(appDir(), false, deps)
+    assert.deepEqual(JSON.parse(fs.readFileSync(args, 'utf8')).args, [path.join(stage, 'app.js'), '-p', '3131', '--no-open', '--lan'])
+    fs.writeFileSync(args, '{"cwd":"/x","args":["kept"]}')
+    await ensureWeb(appDir(), false, deps)
+    assert.equal(fs.readFileSync(args, 'utf8'), '{"cwd":"/x","args":["kept"]}')
+  })
+  it('keepWeb starts a stopped app and leaves a running one', async () => {
+    let up = false, starts = 0
+    const deps = { find: async () => (up ? 'http://127.0.0.1:3131' : null), start: () => { starts++; up = true }, listeners: async () => [], tries: 3, waitMs: 1, pidFile: pidFile() }
+    assert.deepEqual(await keepWeb(appDir(), deps), { url: 'http://127.0.0.1:3131' })
+    assert.deepEqual(await keepWeb(appDir(), deps), { url: 'http://127.0.0.1:3131' })
+    assert.equal(starts, 1)
+    // Something holds 3131 but does not answer as live: a second app would only die on EADDRINUSE.
+    up = false
+    assert.ok('problem' in await keepWeb(appDir(), { ...deps, listeners: async () => [77] }))
+    assert.equal(starts, 1)
+  })
+  it('keepWeb on a dev host leaves a stopped app stopped: only the installed build starts it', async () => {
+    let starts = 0
+    const deps = { find: async () => null, start: () => { starts++ }, listeners: async () => [], tries: 3, waitMs: 1, pidFile: pidFile(), installed: false }
+    assert.ok('problem' in await keepWeb(appDir(), deps))
+    assert.equal(starts, 0)
+  })
   it('Phone leaves an app started by hand running', async () => {
     const stopped: number[] = []
     const r = await ensureWeb(appDir(), true, { find: async () => 'http://127.0.0.1:3131', start: () => 7, stop: p => { stopped.push(p) }, lan: async () => null, listeners: async () => [7], pidFile: pidFile() })
     assert.deepEqual(r, { url: 'http://127.0.0.1:3131' })
     assert.deepEqual(stopped, [])
   })
-  it('gives a phone link per network, from the current addresses, only for the running --lan app', async () => {
-    const lan = async () => 'http://0.0.0.0:3131', secret = async () => 'abc'
-    const ips = () => ['100.101.2.3', '192.168.1.103'], none = () => ({})
-    const code = phoneCode('abc')
-    assert.match(code, /^\d{6}$/)
-    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, ips, none), { wifi: 'http://192.168.1.103:3131/?k=abc', tailscale: 'http://100.101.2.3:3131/?k=abc', code })
-    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, () => ['192.168.1.103'], none), { wifi: 'http://192.168.1.103:3131/?k=abc', code })
-    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, () => [], none), {})
-    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, async () => undefined, ips, none), {})
-    assert.equal(await phoneUrls('http://127.0.0.1:3001', lan, secret, ips), null)
-    assert.equal(await phoneUrls(null, lan, secret, ips), null)
-    assert.equal(await phoneUrls('http://127.0.0.1:3131', async () => undefined, secret, ips), null)
-  })
-  it('adds the Mac names next to the addresses, which stay put when the IP changes', async () => {
+  it('gives the Tailscale link, http without certs, only for the running --lan app', async () => {
     const lan = async () => 'http://0.0.0.0:3131', secret = async () => 'abc', code = phoneCode('abc')
-    const ips = () => ['100.101.2.3', '192.168.1.103']
-    const names = () => ({ wifi: 'kennys-mbp.local', tailscale: 'kennys-mbp.tail1234.ts.net' })
-    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, ips, names), {
-      wifi: 'http://192.168.1.103:3131/?k=abc', tailscale: 'http://100.101.2.3:3131/?k=abc', code,
-      wifiName: 'http://kennys-mbp.local:3131/?k=abc', tailscaleName: 'http://kennys-mbp.tail1234.ts.net:3131/?k=abc',
-    })
-    // A name without its network's address is offered anyway: tailscale may be up before an address shows.
-    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, () => [], () => ({ wifi: 'kennys-mbp.local' })), { wifiName: 'http://kennys-mbp.local:3131/?k=abc', code })
-    assert.equal(await phoneUrls('http://127.0.0.1:3001', lan, secret, ips, names), null)
+    assert.match(code, /^\d{6}$/)
+    const names = () => ({ tailscale: 'kennys-mbp.tail1234.ts.net', https: true })
+    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, names), { tailscaleName: 'https://kennys-mbp.tail1234.ts.net/?k=abc', code })
+    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, () => ({ tailscale: 'kennys-mbp.tail1234.ts.net', https: false })), { tailscaleName: 'http://kennys-mbp.tail1234.ts.net/?k=abc', code })
+    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, () => ({})), {})
+    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, async () => undefined, names), {})
+    assert.equal(await phoneUrls('http://127.0.0.1:3001', lan, secret, names), null)
+    assert.equal(await phoneUrls(null, lan, secret, names), null)
+    assert.equal(await phoneUrls('http://127.0.0.1:3131', async () => undefined, secret, names), null)
+  })
+  it('says why there is no link', async () => {
+    const lan = async () => 'http://0.0.0.0:3131', secret = async () => 'abc'
+    assert.deepEqual(await phoneUrls('http://127.0.0.1:3131', lan, secret, () => ({ problem: 'Turn on HTTPS' })), { problem: 'Turn on HTTPS' })
   })
   it('answers the app the browser can use: the announced one, then 3001, never the dev web or 3000', async () => {
     const up = new Set(['http://127.0.0.1:3001'])

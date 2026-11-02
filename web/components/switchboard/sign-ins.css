@@ -1,0 +1,75 @@
+/* Settings > Accounts (sign-ins.tsx). One row shape everywhere: what it is and its state on the left, one action and a more menu on the right. */
+.si { display: grid; gap: 32px; min-width: 0; }
+.si-sec { display: grid; min-width: 0; }
+.si-sec > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.si-sec h3 { margin: 0; font: 600 14px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.si-sec h3 small { font: 400 12px/1 var(--hub-mono); color: var(--hub-mute); margin-left: 6px; }
+.si-help { margin: 4px 0 8px; font-size: 12px; line-height: 1.5; color: var(--hub-mute); max-width: 62ch; }
+.si-empty { margin: 0; padding: 12px 0; border-top: 1px solid var(--hub-hair); font-size: 12px; line-height: 1.5; color: var(--hub-mute); }
+
+/* This project: a card with the project's picks at a glance. */
+.si-card { border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-elev); padding: 4px 14px; min-width: 0; }
+.si-card > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; padding: 10px 0 8px; }
+.si-card > header strong { font: 600 14px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.si-card > header span { font: 400 12px/1.4 var(--hub-mono); color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.si-list { list-style: none; margin: 0; padding: 0; }
+.si-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: start; padding: 12px 0; border-top: 1px solid var(--hub-hair); min-width: 0; }
+.si-main { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+.si-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; max-width: 100%; }
+.si-title strong { font: 500 13px/1.4 var(--hub-sans); color: var(--hub-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.si-meta { font: 400 12px/1.5 var(--hub-mono); color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
+.si-note { font-size: 12px; line-height: 1.45; color: var(--hub-mute); }
+.si-err { font-size: 12px; line-height: 1.45; color: var(--hub-red); white-space: pre-wrap; overflow-wrap: anywhere; }
+.si-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+.si-acts .hub-select { width: 13rem; }
+.si .hub-btn { padding: 7px 12px; font-size: 12px; }
+.si .hub-more-btn { width: 30px; height: 30px; border: 1px solid var(--hub-hair); background: var(--hub-elev); color: var(--hub-body); }
+.si-card .hub-more-btn, .si-card .hub-btn:not(.primary) { background: var(--hub-surface); }
+.hub-menu > .si-danger { color: var(--hub-red); }
+
+/* Opens in [Chrome profile]: the same small select on every account. */
+.si-opens { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; font-size: 12px; color: var(--hub-mute); }
+.si-opens > span { flex: none; }
+.si-opens select {
+  appearance: none; min-width: 0; max-width: 100%; text-overflow: ellipsis; cursor: pointer;
+  font: 500 12px/1.2 var(--hub-sans); color: var(--hub-body); background-color: transparent;
+  border: 1px solid var(--hub-hair); border-radius: 6px; padding: 4px 24px 4px 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+  transition: border-color 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) { .si-opens select:hover { border-color: var(--hub-hair-strong); } }
+
+/* Inline delete check, across the whole row. */
+.si-confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--hub-red-soft); }
+.si-confirm > span { flex: 1 1 180px; font-size: 12px; line-height: 1.45; color: var(--hub-red); overflow-wrap: anywhere; }
+
+.si-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 12px 22px; min-width: 0; }
+.si-form > input, .si-rename > input {
+  font: 400 13px/1.2 var(--hub-sans); padding: 7px 10px; border-radius: 8px; border: 1px solid var(--hub-hair);
+  background: var(--hub-canvas); color: var(--hub-ink); min-width: 0; box-sizing: border-box;
+}
+.si-form > .si-wide { flex-basis: 100%; min-width: 0; }
+.si-rename { display: flex; gap: 6px; flex: 1 1 200px; min-width: 0; }
+.si-rename > input { flex: 1 1 140px; }
+.si-app { display: grid; min-width: 0; margin-top: 12px; }
+.si-app > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+.si-app h4 { margin: 0; font: 600 13px/1.4 var(--hub-sans); color: var(--hub-ink); }
+.si-app h4 small { font: 400 12px/1 var(--hub-mono); color: var(--hub-mute); margin-left: 6px; }
+.si-other summary > span:last-child { flex: 1; min-width: 0; text-align: right; font: 400 12px/1.5 var(--hub-mono); color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .si-row { grid-template-columns: minmax(0, 1fr); }
+  .si-acts { justify-content: flex-start; }
+  .si-acts .hub-select { flex: 1 1 160px; width: auto; }
+  .si-card { padding: 4px 12px; }
+  .si-form { margin-left: 0; }
+  .si-form > input { flex-basis: 100% !important; }
+  .si-other summary > span:last-child { display: none; }
+}
+@media (pointer: coarse) {
+  .si .hub-more-btn { width: 44px; height: 44px; }
+  .si-form > input, .si-rename > input { min-height: 44px; font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .si-opens select { transition: none; } }

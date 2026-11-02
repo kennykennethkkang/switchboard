@@ -10,10 +10,12 @@ import * as os from 'os'
 import { TypedEventEmitter } from '../typed-event-emitter'
 import { addAsk, dropAsk, finishedJobs, LIMITS, settle, step, TOOLS_MAX } from './progress'
 import { chainVersion } from './projects'
+import { snoozed } from './stuck'
 import { FLAGGED } from './tools'
 import { createLogger } from '../logger'
+import { foldPathCase } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
-import type { AiId, Ask, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, Limit, Server, SessionLive } from './types'
+import type { AiId, Ask, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, Limit, Server, SessionLive, StuckItem } from './types'
 
 const log = createLogger('Hub')
 
@@ -57,6 +59,8 @@ const str = (v: unknown) => (typeof v === 'string' ? v : undefined)
 export type Handoff = { sessionId: string; cwd: string; note: string; branch?: string; task?: string; name?: string; plan?: string; ai?: AiId; /** Subagents still running when the wait cap let it go: `<role> <id>`. */ running?: string[] }
 // The feed writes notes only here; anything else is refused before a terminal reads it.
 const HANDOFFS = `${os.homedir().replace(/\\/g, '/')}/.claude/handoffs/`
+// Forward slashes, no trailing slash, case folded on Windows.
+const pathKey = (p: string) => foldPathCase(p.replace(/\\/g, '/').replace(/\/+$/, ''))
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 
 const limitsOf = (v: unknown): Limit[] =>
@@ -113,6 +117,14 @@ export class HubService {
   onDevice?: (d: DeviceAsk & { port: number } | { id: string; done: true }) => void
   /** When the standalone app last read /hub/state; hub-panel.ts keeps chats fresh while it is recent. */
   stateReadAt = 0
+  /** The mic's last level, 0..1, for GET /hub/voice. */
+  voiceLevel = 0
+  // Everything the last sample found, before snoozes; the dismissed ids and when; the ids already notified.
+  private stuckAll: StuckItem[] = []
+  private readonly snoozes = new Map<string, number>()
+  private readonly told = new Set<string>()
+  // Chats whose hooks come here first, not as a mirror: this window notifies for them.
+  private readonly owned = new Set<string>()
 
   private retriesFile?: string
   /** One file per workspace, so only this window's own chats load back and no other window sends them. None: memory only. */
@@ -161,6 +173,8 @@ export class HubService {
     // A `claude -p` from outside a project (cwd /) or a payload with no folder is no chat.
     if (!id || typeof payload.cwd !== 'string' || !payload.cwd || payload.cwd === '/') return undefined
     const was = this.state.progress.find(p => p.sessionId === id)
+    if (payload.hook_event_name === 'SessionEnd') this.owned.delete(id)
+    else if (!mirror) this.owned.add(id)
     const input = payload.tool_input as Record<string, unknown> | undefined
     if (payload.hook_event_name === 'PreToolUse' && payload.tool_name === 'Bash' && String(input?.command ?? '').includes('jev.py')) this.jevAsked.set(id, now)
     const next = step(was, this.withEnded(payload, was), now)
@@ -182,9 +196,12 @@ export class HubService {
 
   /** On a Stop with background jobs pending, which ones the transcript says ended; no hook fires for that. */
   private withEnded(payload: Record<string, unknown>, was: ChatProgress | undefined): Record<string, unknown> {
-    const file = payload.transcript_path
-    if (payload.hook_event_name !== 'Stop' || !was?.jobs?.length || typeof file !== 'string') return payload
-    // ponytail: reads the whole transcript, only on a Stop with jobs pending; tail it from an offset if that gets slow.
+    // A subagent's jobs end in its own transcript, read once at its SubagentStop.
+    const agent = payload.hook_event_name === 'SubagentStop' && was?.subJobs?.some(j => j.agent === payload.agent_id)
+    const file = agent ? payload.agent_transcript_path : payload.transcript_path
+    if (!agent && (payload.hook_event_name !== 'Stop' || !was?.jobs?.length)) return payload
+    if (typeof file !== 'string') return payload
+    // Reads the whole transcript, but only on a Stop with jobs pending (or a SubagentStop with its own); read from an offset if that gets slow.
     try { return { ...payload, bg_finished: finishedJobs(fs.readFileSync(file, 'utf8')) } } catch { return payload }
   }
 
@@ -206,7 +223,7 @@ export class HubService {
         }
         this.state = { ...this.state, live: [next, ...this.state.live.filter(s => s.sessionId !== sessionId)] }
         // Only a session's first post is the fresh chat; one already open in the folder is not.
-        const ready = was ? [] : this.pendingClose.filter(p => p.sessionId !== sessionId && p.cwd === next.cwd.replace(/\\/g, '/') && now > p.at)
+        const ready = was ? [] : this.pendingClose.filter(p => p.sessionId !== sessionId && p.cwd === pathKey(next.cwd) && now > p.at)
         this.closing = [...this.closing, ...ready.map(p => ({ sessionId: p.sessionId, at: now }))]
         if (ready.length) this.pendingClose = this.pendingClose.filter(p => !ready.includes(p))
         break
@@ -248,6 +265,13 @@ export class HubService {
         this.devAsked.fire({ kind: b.kind === 'dev-start' ? 'start' : 'stop', folder })
         return true
       }
+      // Dismissed in another window: every window hides it.
+      case 'stuck-snooze': {
+        const id = str(b.id)
+        if (!id || id.length > 200) return false
+        this.snooze(id, now)
+        return true
+      }
       case 'close-failed': {
         const sessionId = str(b.sessionId)
         if (!sessionId) return false
@@ -259,6 +283,28 @@ export class HubService {
     }
     this.emit(now)
     return true
+  }
+
+  /** A sample's stuck items; the shown list leaves out the snoozed ones. */
+  setStuck(items: StuckItem[], now = Date.now()): void {
+    this.stuckAll = items
+    const stuck = snoozed(items, this.snoozes, now)
+    if (JSON.stringify(stuck) !== JSON.stringify(this.state.stuck ?? [])) this.set({ stuck }, now)
+  }
+
+  /** Dismiss: hidden for STUCK.snoozeMs. */
+  snooze(id: string, now = Date.now()): void {
+    this.snoozes.set(id, now)
+    this.setStuck(this.stuckAll, now)
+  }
+
+  /** Shown items not notified yet, of chats this window owns; each comes back once only. */
+  unseenStuck(): StuckItem[] {
+    const out = (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId) && !this.told.has(i.id))
+    for (const i of out) this.told.add(i.id)
+    // Ids of items gone for good are forgotten once the set grows.
+    if (this.told.size > 500) for (const id of this.told) if (!this.stuckAll.some(i => i.id === id)) this.told.delete(id)
+    return out
   }
 
   /** How many subagents of a chat still run. */
@@ -282,8 +328,8 @@ export class HubService {
     const preset = str(b.preset) && /^[\w.-]{1,40}$/.test(str(b.preset)!) ? str(b.preset) : undefined
     const progress = this.state.progress
     const asked = [...this.jevAsked].filter(([, at]) => now - at < JEV_MATCH_MS).sort((x, y) => y[1] - x[1])[0]?.[0]
-    const cwd = str(b.cwd)?.replace(/\\/g, '/').replace(/\/+$/, '')
-    const here = (p: ChatProgress) => !cwd || p.cwd === cwd || cwd.startsWith(`${p.cwd}/`) || p.cwd.startsWith(`${cwd}/`)
+    const cwd = str(b.cwd) && pathKey(str(b.cwd)!)
+    const here = (p: ChatProgress) => { const c = pathKey(p.cwd); return !cwd || c === cwd || cwd.startsWith(`${c}/`) || c.startsWith(`${cwd}/`) }
     const sessionId = [str(b.sessionId), asked].find(id => id && progress.some(p => p.sessionId === id && here(p)))
       ?? [...progress].filter(here).sort((x, y) => y.at - x.at)[0]?.sessionId
     const run: JevRun = { ...(sessionId ? { sessionId } : {}), ...(preset ? { preset } : {}), items, seconds, costUsd, at: now }
@@ -354,7 +400,7 @@ export class HubService {
   /** Called once the fresh chat's terminal is open: the old chat closes when a new chat first posts from its folder. */
   closeAfterFresh(sessionId: string, cwd: string, now = Date.now()): void {
     this.handedOff.add(sessionId)
-    this.pendingClose = [...this.pendingClose.filter(p => p.sessionId !== sessionId), { sessionId, cwd: cwd.replace(/\\/g, '/'), at: now }]
+    this.pendingClose = [...this.pendingClose.filter(p => p.sessionId !== sessionId), { sessionId, cwd: pathKey(cwd), at: now }]
   }
 
   queue(sessionId: string, item: InboxDraft & { id?: string }): InboxItem {

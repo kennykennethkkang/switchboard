@@ -9,7 +9,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
-import { board, brief, quickAskArgs, suggest, withBrief } from '../src/hub/brain'
+import { board, brief, quickAskArgs, redact, suggest, withBrief } from '../src/hub/brain'
 import { emptyHub } from '../src/hub/hub-service'
 import type { HubState, SessionLive, StarredChat } from '../src/hub/types'
 
@@ -119,6 +119,13 @@ describe('brain brief', () => {
     assert.doesNotMatch(text, /ff00ff00/)
   })
 
+  it('leaves Kenneth\'s own hand steps out of the open to-do', () => {
+    const todos = { '/w/Armasu': { todo: [{ id: 'ab12cd34', text: 'Add CSV export', at: 1 }, { id: 'cc00cc00', text: 'Reload the window', at: 1, why: 'you' as const }] } }
+    const text = brief(state([chat('me', '/w/Armasu')], { todos }), '/w/Armasu/app', 'me', NOW)
+    assert.match(text, /ab12cd34/)
+    assert.doesNotMatch(text, /cc00cc00/)
+  })
+
   it('stays under 1,200 characters', () => {
     const many = Array.from({ length: 40 }, (_, i) => chat(`s${i}`, '/w/Armasu', { prompt: 'x'.repeat(200), file: `/w/Armasu/f${i}.ts`, fileAt: NOW }))
     assert.ok(brief(state(many, { plan, servers }), '/w/Armasu', 'me', NOW).length <= 1200)
@@ -145,5 +152,45 @@ describe('withBrief', () => {
     const off = { ...s, controls: { ...s.controls, switchboard: { ...s.controls.switchboard, brief: false } } }
     assert.equal(withBrief(off, '/u/Armasu', 'fix it'), 'fix it')
     assert.equal(withBrief(off, '/u/Armasu', undefined), '')
+  })
+})
+
+describe('redact', () => {
+  it('survives a token millions of characters long and removes it', () => {
+    for (const s of ['a'.repeat(8e6), `sk-${'a'.repeat(8e6)}`, `eyJ${'a'.repeat(8e6)}`]) {
+      const out = redact(`before ${s} after`)
+      assert.equal(out, 'before [removed] after')
+    }
+  })
+
+  it('still removes ordinary keys', () => {
+    assert.equal(redact(`key sk-${'b'.repeat(20)} end`), 'key [removed] end')
+  })
+
+  it('removes AWS secrets and keeps their key names', () => {
+    const sec = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', tok = 'IQoJb3JpZ2luX2VjEXAMPLE+/=token'
+    assert.equal(redact(`aws_secret_access_key = ${sec}`), 'aws_secret_access_key = [removed]')
+    assert.equal(redact(`AWS_SECRET_ACCESS_KEY=${sec} next`), 'AWS_SECRET_ACCESS_KEY=[removed] next')
+    assert.equal(redact(`aws_session_token = ${tok}`), 'aws_session_token = [removed]')
+    assert.equal(redact(`export AWS_SESSION_TOKEN="${tok}"`), 'export AWS_SESSION_TOKEN="[removed]"')
+    assert.equal(redact('id ASIAABCDEFGHIJKLMNOP.'), 'id [removed].')
+    assert.equal(redact(`{"AccessKeyId":"ASIAABCDEFGHIJKLMNOP","SecretAccessKey":"${sec}", "SessionToken" : "${tok}"}`),
+      '{"AccessKeyId":"[removed]","SecretAccessKey":"[removed]", "SessionToken" : "[removed]"}')
+    assert.equal(redact('the aws_secret_access_key setting'), 'the aws_secret_access_key setting')
+    assert.equal(redact('Set aws_session_token: to refresh'), 'Set aws_session_token: to refresh')
+  })
+
+  it('stays fast on a long run of spaces', () => {
+    const text = `${' '.repeat(200_000)}x`
+    const t = performance.now()
+    assert.equal(redact(text), text)
+    assert.ok(performance.now() - t < 50, `took ${Math.round(performance.now() - t)} ms`)
+  })
+
+  it('removes a private key cut off before its END line', () => {
+    const body = Array.from({ length: 25 }, () => 'A'.repeat(64)).join('\n')
+    const pem = `-----BEGIN RSA PRIVATE KEY-----\n${body}\n-----END RSA PRIVATE KEY-----`
+    assert.equal(redact(`before ${pem.slice(0, 300)}`), 'before [removed]')
+    assert.equal(redact(`a ${pem} b`), 'a [removed] b')
   })
 })

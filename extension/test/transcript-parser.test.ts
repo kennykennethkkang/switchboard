@@ -225,6 +225,20 @@ describe('subagent model (#91)', () => {
   })
 })
 
+describe('prescan offset', () => {
+  it('leaves a half-written last line for the tail reader', () => {
+    const { session, parser } = setup()
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-parser-'))
+    const file = path.join(dir, 'session.jsonl')
+    const done = JSON.stringify(agentToolUse('toolu_a', 'Done')) + '\n'
+    const half = JSON.stringify(agentToolUse('toolu_b', 'Half')).slice(0, 30)
+    fs.writeFileSync(file, done + half)
+    parser.prescanExistingContent(file, Buffer.byteLength(done + half), session)
+    assert.equal(session.fileSize, Buffer.byteLength(done))
+    assert.ok(session.seenToolUseIds.has('toolu_a'))
+  })
+})
+
 describe('parseTaskNotification', () => {
   it('extracts the tool use id, status and result', () => {
     const text = taskNotification('toolu_9', 'killed', 'a &gt; b').message.content as string

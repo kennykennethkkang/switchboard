@@ -1,0 +1,93 @@
+/* The chat view (chat-view.tsx): a right side dialog, full screen under 760px. Same look as the node drawer. */
+dialog.cv { position: fixed; inset: 0 0 0 auto; width: min(600px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-left: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-body); font: 400 13px/1.5 var(--hub-sans); box-shadow: var(--hub-shadow-pop); animation: cv-in 260ms var(--hub-ease-out); overflow: hidden; }
+dialog.cv::backdrop { background: rgba(0, 0, 0, 0.45); animation: cv-fade 220ms ease; }
+@keyframes cv-in { from { transform: translateX(24px); opacity: 0; } }
+@keyframes cv-fade { from { opacity: 0; } }
+@media (max-width: 760px) { dialog.cv { width: 100vw; border-left: 0; box-shadow: none; } }
+
+.cv-in { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-width: 0; }
+.cv-h { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 14px 16px 10px; }
+.cv-h h2 { margin: 0; font: 600 15px/1.25 var(--hub-sans); color: var(--hub-ink); outline: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-h small { display: block; margin-top: 3px; font: 400 11px/1.3 var(--hub-mono); color: var(--hub-ash); }
+.cv-icon { width: 32px; height: 32px; border-radius: 8px; border: 0; background: none; color: var(--hub-mute); cursor: pointer; display: grid; place-items: center; flex: none; }
+.cv-icon:focus-visible, .cv-tabs button:focus-visible, .cv-fold > summary:focus-visible, .cv-b:focus-visible, .cv-shot a:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+
+.cv-tabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--hub-hair); }
+.cv-tabs button { all: unset; cursor: pointer; padding: 10px 10px 9px; font: 500 13px/1 var(--hub-sans); color: var(--hub-mute); border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 6px 6px 0 0; }
+.cv-tabs button[aria-selected='true'] { color: var(--hub-ink); border-bottom-color: var(--hub-ink); }
+
+.cv-b { overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; min-width: 0; }
+.cv-mute { margin: 0; color: var(--hub-mute); font-size: 12px; }
+.cv-outs { display: grid; gap: 6px; min-width: 0; }
+
+.cv-fold { border-radius: 8px; background: var(--hub-elev); min-width: 0; }
+.cv-fold[open] { box-shadow: inset 0 0 0 1px var(--hub-hair); }
+.cv-fold > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 12px; min-height: 40px; box-sizing: border-box; border-radius: 8px; font: 500 13px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.cv-fold > summary::-webkit-details-marker { display: none; }
+.cv-fold > summary small { font: 400 11px/1 var(--hub-mono); color: var(--hub-ash); font-variant-numeric: tabular-nums; }
+.cv-chev { width: 12px; height: 12px; fill: none; stroke: var(--hub-ash); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform 200ms var(--hub-ease-out); }
+.cv-fold[open] > summary .cv-chev { transform: rotate(90deg); }
+.cv-fold-b { padding: 0 12px 12px 34px; display: grid; gap: 8px; min-width: 0; }
+
+.cv-pre, .cv-err pre { margin: 0; max-height: 320px; overflow: auto; padding: 8px 10px; border-radius: 8px; background: var(--hub-canvas); box-shadow: inset 0 0 0 1px var(--hub-hair); font: 400 12px/1.55 var(--hub-mono); color: var(--hub-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cv-acts { display: flex; gap: 6px; }
+.cv-acts .hub-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; }
+
+.cv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.cv-report { display: grid; gap: 6px; min-width: 0; }
+.cv-report-h { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cv-report-h b { font: 500 13px/1.3 var(--hub-sans); color: var(--hub-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-report-h .cv-icon { margin-left: auto; width: 28px; height: 28px; }
+.cv-chip { flex: none; font: 500 11px/1 var(--hub-mono); padding: 4px 7px; border-radius: 999px; color: var(--hub-mute); background: color-mix(in srgb, var(--hub-mute) 14%, transparent); }
+
+.cv-rep, .cv-qs { margin: 0; display: grid; gap: 8px; }
+.cv-rep > div { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
+.cv-rep dt { font: 400 11px/1.7 var(--hub-mono); color: var(--hub-ash); }
+.cv-rep dd, .cv-qs dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.cv-rep ul { margin: 0; padding-left: 14px; display: grid; gap: 2px; }
+.cv-rep li::marker { color: var(--hub-ash); }
+.cv-qs dt { color: var(--hub-ink); font-weight: 500; overflow-wrap: anywhere; }
+.cv-qs dd { color: var(--hub-body); padding-left: 10px; border-left: 1px solid var(--hub-hair); margin-top: 2px; }
+
+.cv-tests li { display: grid; grid-template-columns: 8px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center; }
+.cv-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--hub-red); }
+.cv-tests li[data-ok] .cv-dot { background: var(--hub-green); }
+.cv-tests code { font: 400 12px/1.4 var(--hub-mono); color: var(--hub-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-tests small { grid-column: 2; font: 400 11px/1.4 var(--hub-mono); color: var(--hub-ash); overflow-wrap: anywhere; }
+.cv-err { display: grid; gap: 4px; }
+.cv-err b { font: 500 11px/1 var(--hub-mono); color: var(--hub-red); }
+.cv-err pre { max-height: 120px; }
+.cv-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 400 12px/1.45 var(--hub-mono); }
+/* Long paths keep their file name: cut from the left. */
+.cv-files li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; color: var(--hub-body); }
+
+.cv-shots { display: grid; gap: 10px; }
+.cv-shot { margin: 0; display: grid; gap: 4px; min-width: 0; }
+.cv-shot a { display: block; border-radius: 8px; overflow: hidden; box-shadow: 0 0 0 1px var(--hub-hair); background: var(--hub-canvas); }
+.cv-shot img { display: block; width: 100%; height: auto; max-height: 360px; object-fit: contain; }
+.cv-shot-ph { display: grid; place-items: center; height: 120px; border-radius: 8px; background: var(--hub-canvas); box-shadow: inset 0 0 0 1px var(--hub-hair); color: var(--hub-ash); font-size: 12px; }
+.cv-shot figcaption { font: 400 11px/1.4 var(--hub-mono); color: var(--hub-ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+
+.cv-tr { display: grid; gap: 10px; min-width: 0; }
+.cv-earlier { justify-self: center; padding: 6px 12px; font-size: 12px; }
+.cv-start { text-align: center; font: 400 11px/1 var(--hub-mono); color: var(--hub-ash); }
+.cv-msgs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; }
+.cv-msgs li { display: grid; gap: 3px; min-width: 0; padding: 8px 10px; border-radius: 8px; background: var(--hub-elev); }
+.cv-msgs li[data-r='you'] { background: color-mix(in srgb, var(--hub-blue) 9%, var(--hub-elev)); }
+.cv-msgs li[data-r='subagent'] { box-shadow: inset 0 0 0 1px var(--hub-hair); background: none; }
+.cv-msgs li[data-r='tool'] { padding: 2px 10px; background: none; }
+.cv-msgs b { font: 500 11px/1 var(--hub-mono); color: var(--hub-ash); }
+.cv-msgs li[data-r='you'] b { color: var(--hub-blue); }
+.cv-msgs p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--hub-body); max-width: 72ch; }
+.cv-msgs code { font: 400 12px/1.5 var(--hub-mono); color: var(--hub-ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cv-said { margin: 0; padding: 0 16px 10px; min-height: 1em; font: 400 12px/1.4 var(--hub-mono); color: var(--hub-green); }
+.cv-said:empty { display: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  .cv-icon:hover { background: var(--hub-hair); color: var(--hub-ink); }
+  .cv-tabs button:hover { color: var(--hub-ink); }
+  .cv-fold > summary:hover { background: color-mix(in srgb, var(--hub-ink) 4%, transparent); }
+}
+@media (pointer: coarse) { .cv-icon { width: 44px; height: 44px; } .cv-fold > summary, .cv-tabs button { min-height: 44px; box-sizing: border-box; } }
+@media (prefers-reduced-motion: reduce) { dialog.cv, dialog.cv::backdrop { animation: none; } .cv-chev { transition: none; } }

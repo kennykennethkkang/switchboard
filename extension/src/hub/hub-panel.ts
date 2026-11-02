@@ -9,24 +9,24 @@ import * as path from 'path'
 import { hub } from './hub-service'
 import { HistoryScanner } from './history'
 import { applyPatch, controlPatch, readControls } from './controls'
-import type { ChatRow, DeviceAsk, SwitchboardKey, WindowColor } from './types'
+import type { ChatRow, DeviceAsk, JarvisReply, SwitchboardKey, WindowColor } from './types'
 import { SHADES, titleBar, titleBarColors, windowColors } from './colors'
-import { FLAGGED, cleanName, readProfiles } from './tools'
-import { connections, ensureWeb, gitState, installed, listServers, newestPlan, newestPlanFile, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
-import { awsLogin, answerInTerminal, openLogin, bindCodexTerminals, startDev, stopDev, cloneProject, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, openProject, pickTools, rcServer, rcServers, resumeChat, saveChatTools } from './actions'
+import { FLAGGED, cleanName, readProfiles, withLibrary } from './tools'
+import { connections, ensureWeb, gitState, keepWeb, installed, libraryInventory, listServers, newestPlan, newestPlanFile, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
+import { awsLogin, answerInTerminal, openLogin, bindCodexTerminals, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools } from './actions'
 import { chatTerminal, closeChatTerminal, codexFiles, lastCodexPrompt, readAis, rolloutLines } from './ais'
 import { dueForHandoff, fullCodex, idleHandedOff, readArchive, readChains, removeArchive, searchNotes } from './chains'
 import { newestNotes, readStarred, starredRows, toggleStar, writeStarred } from './starred'
 import { rcTargets, readChats } from './sessions'
-import { chainVersion, cloneTarget, codexNote, handoffFile, mergeProjects, planLabel, projectName } from './projects'
-import { addAwsProfile, awsProfiles, deleteAwsProfile, makeDefault, parseAwsConfig, profileFor, readAwsConfig, readChrome, readLabels, readPrefs, validProfileName, writeAwsConfig, writeLabels, writeOpenChrome, writePrefs } from './aws'
+import { chainVersion, codexNote, handoffFile, mergeProjects, planLabel, projectName } from './projects'
+import { addAwsProfile, AWS_SESSION_MS, awsProfiles, browserEnv, cacheTimes, chromeChoice, OPEN_CHROME, openChromeScript, deleteAwsProfile, dueHeadsUps, makeDefault, parseAwsConfig, profileFor, readAwsConfig, readChrome, readLabels, readPrefs, readSessions, trackSessions, validProfileName, writeAwsConfig, writeLabels, writeOpenChrome, writePrefs, writeSessions } from './aws'
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import { hasAgentFlowHook, readSettingsFile, removeAgentFlowHooks, writeJsonAtomic } from '../hook-entries'
 import { configureClaudeHooks } from '../hooks-config'
 import { askKeys } from './progress'
 import { answerQuestion, choiceProblem, installAsk } from './questions'
-import { claudeCall } from './setup'
+import { claudeBinary, claudeCall } from './setup'
 import type { ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../protocol'
 import { createLogger } from '../logger'
 import { forgetAccessNote, syncAccessNote } from './access-note'
@@ -34,10 +34,18 @@ import { Posters, tickWork } from './posters'
 import { kitHash, rulesState, syncRules, type SyncResult } from './rules'
 import { LOGINS, applyLink, applyLogin, loginFor, pruneLinks, readLinks, readLogins, writeLogins, type LinkCommand, type LoginCommand } from './logins'
 import { setRoleModel } from './roles'
+import { keyStatus, keyStore, keyTest, reconcileKeys, removeKey, saveKey, testKey } from './keys'
 import { ghPath, gitOp, readRepo, repoRoot } from './git'
-import { addTodo, changeTodo, clearGoneChats, editTodo, finishItem, loadTodos, replaceRemoteTodo, restoreTicked, runMessage, runOrder, setTodoSync, startTodo, todoFolders } from './todo'
+import { jevProject } from './jev-project'
+import { jarvis } from './jarvis'
+import { installVoice, macVoice, voiceBox } from './voice'
+import { installKeeper } from './keeper'
+import { acceptSuggestion, addTodo, changeTodo, clearGoneChats, dismissSuggestion, editTodo, finishItem, loadTodos, replaceRemoteTodo, restoreTicked, runMessage, runOrder, projectOf, setTodoSync, startTodo, todoFolders } from './todo'
 import { randomUUID } from 'crypto'
-import { awakePid, devHome, devRows, knownDev, postCommand, postWindow, readDev, readWindows, serve, setAwake, tailnet } from './dev'
+import { notifyAwsExpiry, notifyStuck } from './notify'
+import { STUCK, sampleDue } from './stuck'
+import { psCost, sampleStuck, stopStuck } from './stuck-sampler'
+import { awakePid, devHome, devRows, knownDev, postCommand, postLocal, postWindow, readDev, readWindows, serve, setAwake, tailnet } from './dev'
 
 const log = createLogger('Hub')
 // Off stops updates; the note stays.
@@ -62,6 +70,19 @@ const statusLineCommand = () => (fs.existsSync(STATUS_LINE) ? `node "${STATUS_LI
 const posters = new Posters<ExtensionToWebviewMessage>()
 // Set in startHub; the bundled browser app lives under it.
 let extensionPath = ''
+let voice: ReturnType<typeof voiceBox> | undefined
+
+/** A box question, typed or spoken; undefined when a newer one replaced it. */
+function askJarvis(q: string): Promise<JarvisReply | undefined> {
+  const at = Date.now()
+  hub.set({ jarvis: { q, at, busy: true } })
+  // A newer question wins; a slow brain answer for an older one is dropped.
+  return jarvis(hub.get(), q, hub.stopped()).then(r => {
+    if (hub.get().jarvis?.at !== at) return undefined
+    hub.set({ jarvis: { ...r, at } })
+    return r
+  })
+}
 let extensionVersion = '', installedBuild = true
 // Kept across windows and restarts: the fresh-chat branch choice and Switchboard's own switches.
 let store: vscode.Memento | undefined
@@ -72,7 +93,7 @@ const HANDED_KEY = 'switchboard.codexHandedOff'
 // The kit hash last synced and what that sync found, so activation writes once per kit change.
 const RULES_KEY = 'switchboard.rulesSync'
 const handedOff = new Set<string>()
-// Handed-off Codex chats still open: each is closed once it is idle. ponytail: not kept across reloads; such a chat stays open (but in History) after one.
+// Handed-off Codex chats still open: each is closed once it is idle. Not kept across reloads: such a chat stays open (but in History) after one.
 const closingCodex = new Set<string>()
 // When each full Codex chat was first seen mid-turn; its handoff waits on the turn for at most 30 minutes.
 const codexBusySince = new Map<string, number>()
@@ -85,19 +106,38 @@ let windowStore: vscode.Memento | undefined
 const TITLE_KEY = 'switchboard.titleBar'
 let pending: NodeJS.Timeout | undefined
 const workspace = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-const refreshers: Array<() => void | Promise<void>> = []
+const refreshers: Array<(again?: boolean) => Promise<void>> = []
 let webAt = -Infinity
 let changesAt = 0
 let nearAt = 0
 let onShown = () => {}
 
-export function addRefresher(fn: () => void | Promise<void>): void {
-  refreshers.push(fn)
+/** fn, one run at a time: a call mid-run shares that run, and with again one more run follows it, so a change made mid-run is read. */
+function single(fn: () => void | Promise<void>): (again?: boolean) => Promise<void> {
+  let run: Promise<void> | undefined, rerun = false
+  const go = (again = false): Promise<void> => {
+    if (run) { rerun ||= again; return run }
+    run = Promise.resolve().then(fn).finally(() => {
+      run = undefined
+      if (rerun) { rerun = false; go().catch(err => log.warn('A hub refresh failed:', err)) }
+    })
+    return run
+  }
+  return go
+}
+
+/** Returns fn as refreshHub runs it, so other callers share its one run. */
+export function addRefresher(fn: () => void | Promise<void>): (again?: boolean) => Promise<void> {
+  const once = single(fn)
+  refreshers.push(once)
+  return once
 }
 
 export function refreshHub(): void {
-  for (const fn of refreshers) Promise.resolve().then(fn).catch(err => log.warn('A hub refresh failed:', err))
+  for (const fn of refreshers) fn(true).catch(err => log.warn('A hub refresh failed:', err))
 }
+
+const postState = () => { const h = hub.get(); posters.send({ type: 'hub-state', hub: h }, JSON.stringify(h)) }
 
 /** Adds an open view's sender (editor panel or sidebar), sends it the current state at once and refreshes. Returns the remover. visible: whether it is on screen. */
 export function addHubPoster(send: (m: ExtensionToWebviewMessage) => void, visible?: () => boolean): () => void {
@@ -107,10 +147,21 @@ export function addHubPoster(send: (m: ExtensionToWebviewMessage) => void, visib
   return remove
 }
 
+/** A reloaded webview lost its state; posters skip unchanged state, so send it directly. */
+export function resendHubState(send: (m: ExtensionToWebviewMessage) => void): void {
+  send({ type: 'hub-state', hub: hub.get() })
+}
+
 /** A hidden view was shown again: it gets the current state now, and fresh reads unless the last ones are under 15 s old. */
 export function hubViewShown(): void {
-  posters.send({ type: 'hub-state', hub: hub.get() })
+  postState()
   onShown()
+}
+
+/** After an update, our running browser app still serves the old copy: restart it on the new one; a stopped app is started.
+ * claude-runtime.ts calls it too when it sees a rebuild on disk, before this window reloads. */
+export function refreshWeb(): void {
+  void keepWeb(path.join(REPO_ROOTS[0], 'agent-flow'), { bundle: path.join(extensionPath, 'dist', 'app', 'app.js'), version: extensionVersion, rebuilds: installedBuild, installed: installedBuild })
 }
 
 export function startHub(context: vscode.ExtensionContext): void {
@@ -142,20 +193,31 @@ export function startHub(context: vscode.ExtensionContext): void {
   extensionPath = context.extensionPath
   extensionVersion = context.extension.packageJSON.version
   installedBuild = context.extensionMode === vscode.ExtensionMode.Production
-  // After an update, our running browser app still serves the old copy: restart it on the new one (never starts one).
-  void ensureWeb(path.join(REPO_ROOTS[0], 'agent-flow'), false, { bundle: path.join(extensionPath, 'dist', 'app', 'app.js'), version: context.extension.packageJSON.version, rebuilds: installedBuild, refresh: true })
+  refreshWeb()
+  // Installed build only: a dev host would take turns rewriting the agent.
+  if (process.platform === 'darwin' && installedBuild) installKeeper(path.join(extensionPath, 'keeper')).catch(err => log.warn('App keeper not installed:', err))
   syncKit()
   setupAsk(context.extensionPath)
+  try { installVoice(path.join(extensionPath, 'voice')) } catch (err) { log.warn('Voice scripts not copied:', err) }
+  voice = voiceBox(macVoice({ log: m => log.info(m) }), {
+    show: (v, problem) => hub.set({ voice: v, ...(problem ? { jarvis: { q: 'Voice', at: Date.now(), answer: problem } } : {}) }),
+    heard: text => hub.set({ heard: { text, at: Date.now() } }),
+    // Straight to the views, not through hub-state: about 12 a second.
+    level: level => { hub.voiceLevel = level; posters.send({ type: 'hub-voice-level', level }) },
+  })
+  context.subscriptions.push({ dispose: () => voice?.dispose() })
   syncLibrary(path.join(extensionPath, 'kit', 'design-md')).then(c => { if (c) log.info('Design library copied') }, err => log.warn(`Design library: could not copy (${(err as Error).message})`))
   envs = context.environmentVariableCollection
+  try { reconcileKeys(keys) } catch (err) { log.warn(`API keys: could not read the store (${(err as Error).message})`) }
   readSignIns()
   const history = new HistoryScanner()
   addRefresher(async () => hub.set(await history.scan()))
-  addRefresher(refreshNear)
-  addRefresher(async () => {
-    const [inv, conns] = [await installed(), await connections(REPO_ROOTS)]
+  const nearOnce = addRefresher(refreshNear)
+  const refreshInstalled = addRefresher(async () => {
+    const [inv, conns, lib] = [await installed(), await connections(REPO_ROOTS), await libraryInventory()]
     const s = hub.get()
-    const chats = readProfiles([...s.chats, ...s.starred].filter(c => (c.ai ?? 'claude') === 'claude').map(c => c.sessionId))
+    const saved = readProfiles([...s.chats, ...s.starred].filter(c => (c.ai ?? 'claude') === 'claude').map(c => c.sessionId))
+    const chats = Object.fromEntries(Object.entries(saved).map(([id, p]) => [id, withLibrary(p, lib)]))
     hub.set({ installed: inv, connections: conns, tools: { flagged: FLAGGED, pick: s.tools?.pick ?? null, chats: { ...s.tools?.chats, ...chats } } })
   })
   const refreshProjects = async () => {
@@ -183,23 +245,27 @@ export function startHub(context: vscode.ExtensionContext): void {
     hub.set({ starred: starredRows(stars, hub.get(), notes, readChains()) })
     await refreshChanges(true)
     await loadTodos(todoFolders(ws)).catch(err => log.warn('To-do lists failed:', err))
+    hub.set({ jevProjects: Object.fromEntries(todoFolders(ws).map(f => [f, jevProject(f)])) })
   }
-  const near = () => refreshNear().catch(err => log.warn('Plan, git or servers failed:', err))
+  const near = () => nearOnce().catch(err => log.warn('Plan, git or servers failed:', err))
   onShown = () => { if (Date.now() - nearAt >= LIVE_EVERY_MS) void near() }
   const slow = setInterval(() => { if (posters.shown) refreshHub() }, HISTORY_EVERY_MS)
   // Also while the standalone app reads /hub/state with no panel shown, so its chats stay current.
-  // Views open but hidden read only the chats, so Codex handoffs and closing still happen.
+  // Otherwise only the chats, even with no view open, so handoffs, closing and holds still work.
   const fast = setInterval(() => {
-    const work = tickWork(posters.shown, posters.size, Date.now() - hub.stateReadAt < WATCHED_MS)
+    const work = tickWork(posters.shown, Date.now() - hub.stateReadAt < WATCHED_MS)
     if (work === 'full') void near()
-    else if (work === 'essentials') refreshChats().catch(err => log.warn('Chats failed:', err))
+    else refreshChats().catch(err => log.warn('Chats failed:', err))
   }, LIVE_EVERY_MS)
-  context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast) } })
+  // ps has no -o on Windows; the stuck check runs on macOS and Linux only.
+  const stuck = process.platform === 'win32' ? undefined : setInterval(() => { void checkStuck() }, STUCK.sampleMs)
+  const heads = setInterval(awsHeadsUp, 5 * 60 * 1000)
+  context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); if (stuck) clearInterval(stuck) } })
   const sub = hub.onChange(() => {
     if (pending || !posters.shown) return
     pending = setTimeout(() => {
       pending = undefined
-      posters.send({ type: 'hub-state', hub: hub.get() })
+      postState()
     }, PUSH_MS)
   })
   context.subscriptions.push({ dispose: () => { sub.dispose(); if (pending) clearTimeout(pending) } })
@@ -239,6 +305,23 @@ export function startHub(context: vscode.ExtensionContext): void {
     try { process.kill(chat.pid, 'SIGTERM') } catch { /* already gone */ }
     setTimeout(refreshHub, 800)
   }))
+  // Chats and plugins once now too: handoff names, closing the old terminal, tool_on and holds need them with no panel open.
+  refreshChats().then(() => refreshInstalled()).catch(err => log.warn('Chats or plugins failed:', err))
+}
+
+let stuckBusy = false, stuckAt: number | undefined
+/** A stuck sample every 30 s while some chat works, every 5 min while all are idle; process hogs of idle chats stay listed. */
+// Every open window samples every chat, one ps each, so all panels agree. If that cost shows, let one window sample and share it.
+async function checkStuck(force = false): Promise<void> {
+  const now = Date.now()
+  if (stuckBusy || !(force || sampleDue(stuckAt, hub.get().progress.some(p => p.state === 'working'), now))) return
+  stuckBusy = true
+  stuckAt = now
+  try {
+    hub.setStuck(await sampleStuck())
+    if (psCost.runs === 1 || psCost.runs % 120 === 0) log.info(`Stuck check: ps took ${psCost.lastMs.toFixed(0)} ms (mean ${(psCost.ms / psCost.runs).toFixed(0)} ms over ${psCost.runs})`)
+    for (const i of hub.unseenStuck()) notifyStuck(i)
+  } catch (err) { log.warn('Stuck check failed:', err) } finally { stuckBusy = false }
 }
 
 /** The ask tool's server into ~/.claude/switchboard/ask, registered with claude once; never blocks activation. */
@@ -281,7 +364,25 @@ async function refreshAws(force = false): Promise<void> {
   readSignIns()
   if (!force && Date.now() - awsAt < AWS_EVERY_MS) return
   awsAt = Date.now()
-  hub.set({ aws: await awsProfiles() })
+  const rows = await awsProfiles()
+  const was = readSessions(), s = trackSessions(was, rows, Date.now(), cacheTimes(parseAwsConfig(readAwsConfig())))
+  if (JSON.stringify(s) !== JSON.stringify(was)) writeSessions(s)
+  hub.set({ aws: rows.map(r => (s[r.name] ? { ...r, expiresAt: s[r.name].at + AWS_SESSION_MS } : r)) })
+}
+
+/** This window's project browser, the fallback for sign-ins with no Chrome pick of their own. */
+const projectBrowser = () => profileFor(readPrefs().browsers, workspace() ?? '')
+
+/** One heads-up per AWS session, about 30 min before it ends, with Sign in again. The file stamp keeps other windows quiet. */
+function awsHeadsUp(): void {
+  const s = readSessions(), now = Date.now()
+  const due = dueHeadsUps(s, now).filter(n => { const r = hub.get().aws.find(a => a.name === n); return !r || r.status === 'signed-in' })
+  if (!due.length) return
+  writeSessions({ ...s, ...Object.fromEntries(due.map(n => [n, { ...s[n], warned: s[n].at }])) })
+  for (const name of due) notifyAwsExpiry(name, s[name].at + AWS_SESSION_MS - now, () => {
+    const why = validProfileName(name) ? awsLogin(name, undefined, () => { void refreshAws(true) }, projectBrowser()) : 'Not a profile name'
+    if (why) void vscode.window.showWarningMessage(`Switchboard: could not sign in to ${name}: ${why}`)
+  })
 }
 
 /** Every live window with its color, and this window's status bar item and title bar in its color. */
@@ -317,7 +418,8 @@ function paintWindow(own: string, color: WindowColor): void {
 /** Chrome profiles, the profile picked per project, and this window's AWS_PROFILE for its terminals. */
 function readSignIns(): void {
   const { projects, browsers } = readPrefs()
-  hub.set({ signIns: { chrome: readChrome(), projects, browsers, ...(workspace() ? { window: workspace() } : {}), apps: readLogins(), links: readLinks() } })
+  const { errors, notes } = hub.get().signIns ?? {}
+  hub.set({ signIns: { chrome: readChrome(), projects, browsers, ...(workspace() ? { window: workspace() } : {}), apps: readLogins(), links: readLinks(), keys: keyStatus(), ...(errors ? { errors } : {}), ...(notes ? { notes } : {}) } })
   applyWindowAws(projects, browsers)
 }
 
@@ -327,11 +429,11 @@ function applyWindowAws(projects: Record<string, string>, browsers: Record<strin
     const scoped = envs?.getScoped({ workspaceFolder: folder })
     const p = projects[folder.uri.fsPath]
     if (!scoped) continue
-    // CLI sign-ins (aws login, gh auth, vercel login) open the project's Chrome profile through BROWSER.
-    const b = browsers[folder.uri.fsPath]
-    if (b) {
-      if (scoped.get('SWITCHBOARD_CHROME_DIR')?.value !== b) { scoped.replace('BROWSER', writeOpenChrome()); scoped.replace('SWITCHBOARD_CHROME_DIR', b) }
-    } else if (scoped.get('SWITCHBOARD_CHROME_DIR')) { scoped.delete('BROWSER'); scoped.delete('SWITCHBOARD_CHROME_DIR') }
+    // CLI sign-ins (aws login, gh auth, vercel login) open in Chrome through BROWSER: the project's profile, else the last used.
+    const b = chromeChoice(undefined, browsers[folder.uri.fsPath], hub.get().signIns.chrome.map(c => c.dir)).dir
+    if (openChromeScript() && (scoped.get('BROWSER')?.value !== OPEN_CHROME || scoped.get('SWITCHBOARD_CHROME_DIR')?.value !== b)) {
+      for (const [k, v] of Object.entries(browserEnv(b, writeOpenChrome()))) scoped.replace(k, v)
+    }
     if (p && validProfileName(p)) {
       scoped.description = `Switchboard: AWS profile ${p} for this window`
       if (scoped.get('AWS_PROFILE')?.value !== p) scoped.replace('AWS_PROFILE', p)
@@ -347,9 +449,9 @@ function awsCommand(m: Extract<WebviewToExtensionMessage, { type: `hub-aws-${str
     case 'hub-aws-check': after(); return undefined
     case 'hub-aws-login':
       if (!known(m.profile)) return `no AWS profile named ${m.profile}`
-      return awsLogin(m.profile, m.chrome ?? profileFor(readPrefs().browsers, workspace() ?? ''), after)
+      return awsLogin(m.profile, m.chrome, after, projectBrowser())
     case 'hub-aws-add':
-      return addAwsProfile(m.profile, m.region, m.chrome, hub.get().signIns.chrome.map(c => c.dir)) ?? awsLogin(m.profile, m.chrome, after)
+      return addAwsProfile(m.profile, m.region, m.chrome, hub.get().signIns.chrome.map(c => c.dir)) ?? awsLogin(m.profile, m.chrome, after, projectBrowser())
     case 'hub-aws-default': {
       const next = known(m.profile) ? makeDefault(readAwsConfig(), m.profile) : undefined
       if (!next) return `no AWS profile named ${m.profile}`
@@ -407,14 +509,35 @@ function loginCommand(m: LoginCommand | LinkCommand): string | undefined {
   // Sign in with no id opens the project's pick for the app, else the app's active login.
   const app = m.type === 'hub-login-open' && m.id === undefined ? apps.find(a => a.id === m.app) : undefined
   const c = app && m.type === 'hub-login-open' ? { ...m, id: loginFor(app, links, m.folder) } : m
-  const next = applyLogin(apps, c, undefined, hub.get().signIns.chrome.map(x => x.dir))
+  const known = hub.get().signIns.chrome.map(x => x.dir)
+  // A pick of a Chrome profile since deleted is dropped from the login, then skipped with a note when it opens.
+  const dead = c.type === 'hub-login-open' && !!c.chrome && known.length > 0 && !known.includes(c.chrome) ? c.chrome : undefined
+  const next = applyLogin(apps, dead && c.type === 'hub-login-open' ? { ...c, chrome: '' } : c, undefined, known)
   if (typeof next === 'string') return next
   writeLogins(next, LOGINS, links)
   hub.set({ signIns: { ...hub.get().signIns, apps: next, links: pruneLinks(links, next) } })
   if (c.type !== 'hub-login-open') return undefined
   const row = next.find(a => a.id === c.app)?.logins.find(l => l.id === c.id)
-  // The login's own Chrome profile holds its account; without one, the project's browser.
-  return row ? openLogin(row.url, row.chrome ?? (c.folder ? profileFor(readPrefs().browsers, c.folder) : undefined)) : 'no such login'
+  // The login's own Chrome profile holds its account; without one, the project's browser ('' counts as none).
+  return row ? openLogin(row.url, dead ?? row.chrome, profileFor(readPrefs().browsers, c.folder ?? workspace() ?? ''), `login:${c.app}:${row.id}`) : 'no such login'
+}
+
+const keys = keyStore()
+
+/** Save, test or remove an API key; save tests it too. Only keyStatus (last four, last test) reaches the hub. */
+async function keyCommand(m: Extract<WebviewToExtensionMessage, { type: `hub-key-${string}` }>): Promise<string | undefined> {
+  const show = () => hub.set({ signIns: { ...hub.get().signIns, keys: keyStatus() } })
+  if (m.type === 'hub-key-remove') { removeKey(keys, m.name); show(); return undefined }
+  if (m.type === 'hub-key-save') {
+    const problem = saveKey(keys, m.name, m.value)
+    if (problem) return problem
+    show()
+  }
+  const key = keys.get(m.name)
+  if (!key) return `no ${m.name} saved`
+  keyTest(m.name, await testKey(m.name, key))
+  show()
+  return undefined
 }
 
 /** The browser a project's links and terminal sign-ins open in; null forgets it. */
@@ -473,7 +596,7 @@ async function codexHandoffs(chats: ChatRow[]): Promise<void> {
   }
 }
 
-// The chat whose changes a panel asked for; ponytail: one for all views, the last asked wins. Per view if two views ever disagree.
+// The chat whose changes a panel asked for: one for all views, the last asked wins. Make it per view if two views ever disagree.
 let watched: string | undefined
 
 /** The watched chat's uncommitted changes, read again with each near refresh (onTick); an idle chat's at most once a minute. */
@@ -524,12 +647,18 @@ async function runGit(m: Extract<WebviewToExtensionMessage, { type: 'hub-git' }>
 async function todoCommand(m: Extract<WebviewToExtensionMessage, { type: `hub-todo-${string}` }>): Promise<boolean | string> {
   if (m.type === 'hub-todo-run' && !m.to && await inHome(m.path, m)) return true
   const list = hub.get().todos?.[m.path]
+  // The panel offers an empty list before a chat's project has loaded one; the first item starts it.
+  if (!list && m.type === 'hub-todo-add' && todoFolders(workspace()).includes(projectOf(m.path))) {
+    try { await changeTodo(projectOf(m.path), d => addTodo(d, m.text)); return true } catch (err) { return refuse(`could not change the to-do list (${(err as Error).message})`) }
+  }
   if (!list) return refuse('that project has no to-do list here')
   try {
     if (m.type === 'hub-todo-add') await changeTodo(m.path, d => addTodo(d, m.text))
     else if (m.type === 'hub-todo-edit') await changeTodo(m.path, d => editTodo(d, m.id, m.text))
     else if (m.type === 'hub-todo-remove') await changeTodo(m.path, d => finishItem(d, m.id))
     else if (m.type === 'hub-todo-restore') await changeTodo(m.path, d => restoreTicked(d, m.id))
+    else if (m.type === 'hub-todo-accept') await changeTodo(m.path, d => acceptSuggestion(d, m.id))
+    else if (m.type === 'hub-todo-dismiss') await changeTodo(m.path, d => dismissSuggestion(d, m.id))
     else if (m.type === 'hub-todo-sync') await setTodoSync(m.path, m.on)
     else if (m.type === 'hub-todo-replace') {
       const why = await replaceRemoteTodo(m.path, m.remote)
@@ -652,12 +781,6 @@ function sendToChat(sessionId: string, message: string): true | string | Promise
 /** Handles the panel's hub messages; false for anything else, a string for why it was refused. */
 export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string | Promise<boolean | string> {
   switch (m.type) {
-    case 'hub-refresh':
-      // A manual refresh probes for the standalone app's page too.
-      webAt = -Infinity
-      refreshHub()
-      void loadTodos(todoFolders(workspace()), true).catch(err => log.warn('To-do lists failed:', err))
-      return true
     case 'hub-send':
       return sendToChat(m.sessionId, m.text)
     case 'hub-answer': {
@@ -710,9 +833,6 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
         if (!m.phone) void vscode.env.openExternal(vscode.Uri.parse(r.url))
       })
       return true
-    case 'hub-stop-server':
-      void stopServer(m.pid, m.confirmed === true)
-      return true
     case 'hub-toggle':
       void toggle(m.kind, m.name, m.enabled)
       return true
@@ -722,9 +842,6 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-switchboard':
       void setSwitchboard(m.key, m.value)
       return true
-    case 'hub-vscode':
-      void vscode.commands.executeCommand(m.action === 'reload' ? 'workbench.action.reloadWindow' : 'workbench.action.restartExtensionHost')
-      return true
     case 'hub-compact':
       hub.queue(m.sessionId, { kind: 'compact' })
       return true
@@ -733,14 +850,6 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       if (m.freshBranch === undefined) return true
       void store?.update(KEEP_KEY, { freshBranch: m.freshBranch })
       hub.set({ keep: { ...hub.get().keep, freshBranch: m.freshBranch } })
-      return true
-    }
-    case 'hub-open-project':
-      openProject(m.path, m.newWindow)
-      return true
-    case 'hub-clone': {
-      if (!cloneTarget(m.repo)) return refuse('give a GitHub repo as owner/repo or its github.com address')
-      void cloneProject(m.repo, m.newWindow, REPO_ROOTS[0])
       return true
     }
     case 'hub-new-chat':
@@ -795,6 +904,16 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       hub.set({ search: q ? { q, hits: searchNotes(hub.get().archive, q) } : null })
       return true
     }
+    case 'hub-jarvis': {
+      const q = m.q.trim()
+      if (!q) { hub.set({ jarvis: null }); return true }
+      const reply = askJarvis(q)
+      if (m.voice) voice?.answer(reply)
+      return true
+    }
+    case 'hub-voice':
+      voice?.toggle(m.on)
+      return true
     case 'hub-aws-login':
     case 'hub-aws-add':
     case 'hub-aws-default':
@@ -818,6 +937,10 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       try { problem = loginCommand(m) } catch (err) { problem = `could not save the login (${(err as Error).message})` }
       return problem ? refuse(problem) : true
     }
+    case 'hub-key-save':
+    case 'hub-key-test':
+    case 'hub-key-remove':
+      return keyCommand(m).then(p => (p ? refuse(p) : true), () => refuse(`could not change ${m.name}`))
     case 'hub-browser': {
       let problem: string | undefined
       try { problem = browserCommand(m) } catch (err) { problem = `could not save the browser (${(err as Error).message})` }
@@ -874,10 +997,23 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       })
     case 'hub-device':
       return answerDevice(m.id, m.allow)
+    case 'hub-stuck-stop':
+      return stopStuck(m.sessionId, m.id).then(problem => {
+        if (problem) return refuse(problem)
+        // Past the SIGKILL step, so the item goes once its process has.
+        setTimeout(() => { void checkStuck(true) }, STUCK.stopWaitMs + 1000)
+        return true
+      })
+    case 'hub-stuck-dismiss':
+      hub.snooze(m.id)
+      for (const w of readWindows()) if (w.pid !== process.pid) void postWindow(w, { kind: 'stuck-snooze', id: m.id })
+      return true
     case 'hub-todo-add':
     case 'hub-todo-edit':
     case 'hub-todo-remove':
     case 'hub-todo-restore':
+    case 'hub-todo-accept':
+    case 'hub-todo-dismiss':
     case 'hub-todo-run':
     case 'hub-todo-sync':
     case 'hub-todo-replace':
@@ -915,13 +1051,13 @@ async function answerDevice(id: string, allow: boolean): Promise<boolean | strin
   asking.delete(id)
   listDevices()
   try {
-    const r = await fetch(`http://127.0.0.1:${d.port}/device/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, allow, token: hub.token }), signal: AbortSignal.timeout(3000) })
+    const r = await postLocal(d.port, '/device/answer', { id, allow, token: hub.token }, 3000)
     return r.ok || refuse(r.status === 409 ? 'that device was already answered, or gave up' : 'the browser app did not take the answer')
   } catch { return refuse('the browser app is not answering') }
 }
 
 // Dev terminals this window started and the tailscale serve each got, by terminal name; turned off when either ends.
-// ponytail: lost on reload, so an entry outlives a reload until the same port is served again.
+// Lost on reload, so an entry outlives a reload until the same port is served again.
 const served = new Map<string, { port: number; https: boolean }>()
 const DEV_WAIT_MS = 60_000
 const devFolders = () => [...readWindows().map(w => w.workspace), ...hub.get().chats.map(c => c.cwd)]
@@ -962,14 +1098,11 @@ const inHome = async (folder: string | undefined, m: { type: string }) => {
 /** The folder of a dev command a request names: only a listed project's. */
 const devRequest = (folder: string) => knownDev(hub.get().dev, folder) ?? knownDev(devRows(devFolders(), readDev, [], null), folder)
 
-/** confirmed: already asked elsewhere, so the Mac asks nothing. */
-async function stopServer(pid: number, confirmed = false): Promise<void> {
+async function stopServer(pid: number): Promise<void> {
   const server = hub.get().servers.find(s => s.pid === pid)
   if (!server) return
-  if (!confirmed) {
-    const pick = await vscode.window.showWarningMessage(`Stop ${server.command} on :${server.port}${server.folder ? ` (${server.folder})` : ''}?`, { modal: true }, 'Stop it')
-    if (pick !== 'Stop it') return
-  }
+  const pick = await vscode.window.showWarningMessage(`Stop ${server.command} on :${server.port}${server.folder ? ` (${server.folder})` : ''}?`, { modal: true }, 'Stop it')
+  if (pick !== 'Stop it') return
   try { process.kill(pid) } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not stop it (${(err as Error).message}).`) }
   setTimeout(refreshHub, 800)
 }
@@ -992,10 +1125,4 @@ async function toggle(kind: 'mod' | 'plugin' | 'skill', name: string, enabled: b
     }))
   }
   refreshHub()
-}
-
-/** VS Code's PATH often lacks ~/.local/bin, where the claude CLI lives. */
-function claudeBinary(): string {
-  const local = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude')
-  return fs.existsSync(local) ? local : 'claude'
 }

@@ -5,9 +5,8 @@ import type { HubCommand } from '@/lib/vscode-bridge'
 import { caps } from './look'
 import { PhoneQr } from './phone-qr'
 
-const small = { padding: '6px 10px', fontSize: 12 } as const
 // This Mac opens localhost; a phone or another computer opens the tailnet link.
-const onMac = () => typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+export const onMac = () => typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
 
 /** A row per project with a dev script: Dev starts it in the window holding the project; running, it shows its port and links. */
 export function DevRows({ dev, tailscale, isVSCode, send }: { dev: DevProject[]; tailscale?: boolean; isVSCode: boolean; send: (c: HubCommand) => void }) {
@@ -32,12 +31,12 @@ export function DevRows({ dev, tailscale, isVSCode, send }: { dev: DevProject[];
                 {d.port
                   ? <>
                       <span className="hub-chip" style={{ color: 'var(--hub-green)', background: 'var(--hub-green-soft)' }}><i aria-hidden />:{d.port}</span>
-                      <button type="button" className="hub-btn" style={small} disabled={!openable} onClick={() => open(d)}
+                      <button type="button" className="hub-btn sm" disabled={!openable} onClick={() => open(d)}
                         title={openable ? undefined : 'Not on the tailnet yet: open it on the Mac'}>Open</button>
-                      {d.link && <button type="button" className="hub-btn" style={small} aria-expanded={qr === d.folder} onClick={() => setQr(qr === d.folder ? undefined : d.folder)}>Phone</button>}
-                      <button type="button" className="hub-btn" style={small} onClick={() => send({ type: 'hub-dev-stop', folder: d.folder })}>Stop</button>
+                      {d.link && <button type="button" className="hub-btn sm" aria-expanded={qr === d.folder} onClick={() => setQr(qr === d.folder ? undefined : d.folder)}>Phone</button>}
+                      <button type="button" className="hub-btn sm" onClick={() => send({ type: 'hub-dev-stop', folder: d.folder })}>Stop</button>
                     </>
-                  : <button type="button" className="hub-btn" style={small} title={`${d.command} in ${d.project}`} onClick={() => send({ type: 'hub-dev-start', folder: d.folder })}>
+                  : <button type="button" className="hub-btn sm" title={`${d.command} in ${d.project}`} onClick={() => send({ type: 'hub-dev-start', folder: d.folder })}>
                       <span aria-hidden>▶ </span>Dev
                     </button>}
               </span>

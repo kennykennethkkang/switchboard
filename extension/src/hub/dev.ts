@@ -4,6 +4,7 @@
  */
 import { spawn } from 'child_process'
 import * as fs from 'fs'
+import * as http from 'http'
 import * as os from 'os'
 import * as path from 'path'
 import { run } from './local'
@@ -14,7 +15,7 @@ import type { DevProject, Server } from './types'
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
 const SHIFT = 10000
 // The browser app (local.ts spawnApp) runs from the agent-flow folder; it is never that project's dev server.
-// ponytail: skipped by port, so a hand-run copy on another port shows as agent-flow's server; check the pid's args if that bites.
+// Skipped by port, so a hand-run copy on another port shows as agent-flow's server; check the pid's args if that bites.
 const APP_PORT = 3131
 
 /** `<pm> run dev` when package.json has a dev script; the lockfile names the package manager. */
@@ -85,20 +86,38 @@ export function readWindows(): Win[] {
   return out
 }
 
+/** A JSON POST to a loopback port on its own socket. fetch pools sockets, and when the window behind one dies,
+ * undici on macOS can throw an uncaught setTypeOfService EINVAL writing to it.
+ * Resolves the status and body; rejects when nothing answers, and with a TimeoutError after ms. */
+export function postLocal(port: number, path: string, body: unknown, ms: number, headers: Record<string, string> = {}): Promise<{ status: number; ok: boolean; text: string }> {
+  let timer: NodeJS.Timeout | undefined
+  return new Promise<{ status: number; ok: boolean; text: string }>((resolve, reject) => {
+    const data = JSON.stringify(body)
+    const req = http.request({ host: '127.0.0.1', port, path, method: 'POST', agent: false, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...headers } }, res => {
+      let text = ''
+      res.setEncoding('utf8')
+      res.on('data', c => { text += c })
+      res.on('end', () => { const status = res.statusCode ?? 0; resolve({ status, ok: status >= 200 && status < 300, text }) })
+      res.on('error', reject)
+      res.on('close', () => reject(new Error('closed mid-answer')))
+    })
+    req.on('error', reject)
+    timer = setTimeout(() => { reject(Object.assign(new Error('timed out'), { name: 'TimeoutError' })); req.destroy() }, ms)
+    req.end(data)
+  }).finally(() => clearTimeout(timer))
+}
+
 /** Posts to another window's hub; false when it did not take it. */
 export async function postWindow(w: Win, body: Record<string, unknown>): Promise<boolean> {
-  try {
-    const r = await fetch(`http://127.0.0.1:${w.port}/hub`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: w.hubToken, ...body }), signal: AbortSignal.timeout(2000) })
-    return r.ok
-  } catch { return false }
+  try { return (await postLocal(w.port, '/hub', { token: w.hubToken, ...body }, 2000)).ok } catch { return false }
 }
 
 /** Runs a hub-* command in another window, as its panel would; false when it did not take it.
  * A refusal with a reason was shown there, and a slow answer is still running there: both count as taken, or it would run twice. */
 export async function postCommand(w: Win, command: { type: string }, ms = 2000): Promise<boolean> {
   try {
-    const r = await fetch(`http://127.0.0.1:${w.port}/hub/command?token=${encodeURIComponent(w.hubToken)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command), signal: AbortSignal.timeout(ms) })
-    return r.ok || (r.status === 400 && !!(await r.text()))
+    const r = await postLocal(w.port, `/hub/command?token=${encodeURIComponent(w.hubToken)}`, command, ms)
+    return r.ok || (r.status === 400 && !!r.text)
   } catch (err) { return (err as Error).name === 'TimeoutError' }
 }
 

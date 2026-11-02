@@ -68,6 +68,18 @@ test('configureHooks replaces previous Agent Flow hooks instead of duplicating t
   ])
 })
 
+test('configureHooks writes through a settings.json symlink and keeps its mode', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-setup-'))
+  const real = path.join(dir, 'dotfiles-settings.json')
+  const link = path.join(dir, 'settings.json')
+  fs.writeFileSync(real, '{}\n', { mode: 0o600 })
+  fs.symlinkSync(real, link)
+  quietly(() => configureHooks(link, HOOK_CMD))
+  assert.ok(fs.lstatSync(link).isSymbolicLink())
+  assert.equal(fs.statSync(real).mode & 0o777, 0o600)
+  assert.ok(read(real).hooks)
+})
+
 test('configureHooks preserves unrelated settings', () => {
   const file = tmpSettings({ permissions: { allow: ['Bash(ls)'] }, env: { FOO: '1' } })
   quietly(() => configureHooks(file, HOOK_CMD))

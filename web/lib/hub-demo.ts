@@ -4,7 +4,9 @@
  */
 import type { HubCommand } from './vscode-bridge'
 import { runIds } from './todo'
-import type { ChangedFile, ChatProfile, HubState, RepoView, ToolCall } from './hub-types'
+import type { ChangedFile, ChatProfile, ChatProgress, HubState, RepoView, ToolCall } from './hub-types'
+import type { RunCall, RunDetail } from './runs'
+import type { ChatAnswer, ChatAsk, ChatMessage, ChatOutputs } from './chat-view'
 
 export const emptyHub = (): HubState => ({
   live: [], history: [], sessions: [], plan: null,
@@ -68,6 +70,15 @@ export function demoHub(now = Date.now()): HubState {
       { pid: 5, sessionId: 'd-wrap', takes: true, name: 'Accurate Done state', cwd: '/Users/k/GitHub/agent-flow', link: '', live: true, why: [] },
       { pid: 4, sessionId: 'd-idle', name: 'Kit cleanup', cwd: '/Users/k/GitHub/claude-mods', link: '', live: true, why: [] },
     ],
+    // Armasu has Jev set up with the AI-tell check off; agent-flow has none, so its card offers Set up Jev.
+    jevProjects: {
+      '/Users/k/GitHub/Armasu': { project: 'armasu', jobs: { done: true, gate: true, tells: false, route: true }, costUsd: 0.00081, runs: [
+        { job: 'gate', at: now - 2 * 60e3, items: 1, costUsd: 0.00002, result: 'ask' },
+        { job: 'gate', at: now - 9 * 60e3, items: 1, costUsd: 0.00002, result: 'pass' },
+        { job: 'done', at: now - 25 * 60e3, items: 4, costUsd: 0.00009 },
+        { job: 'route', at: now - 70 * 60e3, items: 8, costUsd: 0.0002 },
+      ] },
+    },
     // Several items, one prerequisite, one in progress, one from a finished chat, one whose chat ended; agent-flow's show as "in other projects".
     todos: {
       '/Users/k/GitHub/Armasu': { sync: { state: 'synced', canSync: true }, todo: [
@@ -76,12 +87,25 @@ export function demoHub(now = Date.now()): HubState {
         { id: 'dt3', text: 'Fix the login redirect on Safari', at: now - DAY, chat: 'd-work' },
         { id: 'dt4', text: 'Check the outfit picker on a real phone', at: now - 5 * 60e3, from: 'd-gone' },
         { id: 'dt5', text: 'Move the route release preset to the shared kit', at: now - 60 * 60e3, chat: 'd-gone' },
-      ], ticked: [{ id: 'dt6', text: 'Show the login error under the form', at: now - 20 * 60e3, by: 'd-done', from: 'd-work' }] },
+      ], ticked: [{ id: 'dt6', text: 'Show the login error under the form', at: now - 20 * 60e3, by: 'd-done', from: 'd-work' }],
+      // What finished chats left, waiting for Accept or Dismiss; d-old is gone from the chat list, so it reads by project and date.
+      suggested: [
+        { id: 'ds1', text: 'Add the Stripe webhook secret to the Vercel env', at: now - 40 * 60e3, from: 'd-done', name: 'Hub AIs and Starred', why: 'you' },
+        { id: 'ds2', text: 'Show tax lines on receipts once the API returns them', at: now - 40 * 60e3, from: 'd-done', why: 'blocked' },
+        { id: 'ds3', text: 'Move receipts to the new PDF library', at: now - 2 * DAY, from: 'd-old', why: 'scope' },
+      ] },
       '/Users/k/GitHub/agent-flow': { sync: { state: 'local', why: 'public repo', canSync: true }, todo: [
         { id: 'da1', text: 'Rebuild the vsix and reload VS Code', at: now - 4 * 60e3, from: 'd-almost' },
-        { id: 'da2', text: 'Check the phone layout on a real device', at: now - 4 * 60e3, from: 'd-almost' },
+      ], suggested: [
+        { id: 'da2', text: 'Check the phone layout on a real device', at: now - 4 * 60e3, from: 'd-almost', why: 'you' },
+        { id: 'da3', text: 'add dark mode to the settings page', at: now - 3 * 60e3, from: 'd-almost', why: 'missed' },
       ] },
     },
+    // The hung test run that started this check: a subagent's pnpm test, two hours on one core.
+    stuck: [
+      { id: 'job:d-wrap:t9', kind: 'job', sessionId: 'd-wrap', what: 'Subagent background job "Run the extension tests": no new output', since: now - 124 * 60e3, cpu: 98, rss: 1.4 * 1024 ** 3, pid: 48213, started: now - 131 * 60e3, command: 'pnpm test', last: 'Bash pnpm test' },
+      { id: 'agent:d-work:q2', kind: 'agent', sessionId: 'd-work', what: 'qa subagent: no tool call', since: now - 12 * 60e3, last: 'Read src/auth/session.ts' },
+    ],
     progress: [
       { sessionId: 'd-work', cwd: '/Users/k/GitHub/Armasu', state: 'working', startedAt: now - 30 * 60e3, at: now,
         roles: [...demoRuns(11_000, now), JEV_ROLE],
@@ -104,7 +128,8 @@ export function demoHub(now = Date.now()): HubState {
       { sessionId: 'd-done', cwd: '/Users/k/GitHub/agent-flow', state: 'done', startedAt: now - 42 * 60e3, at: now - 60e3,
         roles: (['researcher', 'engineer', 'qa'] as const).map((role, i) => ({ id: `${role[0]}1`, role, state: 'done' as const, startedAt: now - (40 - i * 10) * 60e3 })),
         tasks: [{ id: '1', subject: 'Types', status: 'completed' }, { id: '2', subject: 'AI registry', status: 'completed' }],
-        commit: 'feat(hub): multi-AI chats and Starred chats', finishedAt: now - 60e3, finishing: true,
+        commit: 'feat(hub): multi-AI chats and Starred chats\n\n- Codex chats beside Claude in one list\n- Star a chat and resume it later\n\nCo-Authored-By: Claude <noreply@anthropic.com>', finishedAt: now - 60e3, finishing: true,
+        tests: { command: 'pnpm run lint && pnpm test', ok: true, at: now - 2 * 60e3, total: 538 },
         asked: ['Add Codex to the hub next to Claude', 'Let me star chats and resume them later'], covered: [0.95, 0.91],
         report: { done: ['Chats from Claude and Codex in one list', 'Starred chats with a resume command', 'Tests and build pass'], left: [] },
         tools: [
@@ -121,8 +146,11 @@ export function demoHub(now = Date.now()): HubState {
         tools: [{ tool: 'Bash', target: 'npm test', role: 'qa', at: now - 5 * 60e3 }] },
       // The lead stopped with a commit block, but an engineer and a test run still go, so it is not finished.
       { sessionId: 'd-wrap', cwd: '/Users/k/GitHub/agent-flow', state: 'working', waiting: true, finishing: true, startedAt: now - 25 * 60e3, at: now - 20e3,
-        roles: [{ id: 'r1', role: 'researcher', state: 'done', startedAt: now - 24 * 60e3 }, { id: 'e1', role: 'engineer', state: 'active', startedAt: now - 9 * 60e3 }],
-        running: ['e1'], jobs: [{ id: 'toolu_demo', label: 'Run root and extension test suites', startedAt: now - 3 * 60e3 }],
+        // Three past engineer runs give the time left a range.
+        roles: [{ id: 'r1', role: 'researcher', state: 'done', startedAt: now - 24 * 60e3, at: now - 20 * 60e3 },
+          ...[[24, 12], [22, 8], [20, 10]].map(([from, len], i) => ({ id: `e0${i}`, role: 'engineer', state: 'done' as const, startedAt: now - from * 60e3, at: now - (from - len) * 60e3 })),
+          { id: 'e1', role: 'engineer', state: 'active', startedAt: now - 4 * 60e3 }, { id: 'e2', role: 'engineer', state: 'active', startedAt: now - 3 * 60e3 }, { id: 'e3', role: 'engineer', state: 'active', startedAt: now - 2 * 60e3 }],
+        running: ['e1', 'e2', 'e3'], jobs: [{ id: 'toolu_demo', label: 'Run root and extension test suites', startedAt: now - 3 * 60e3 }],
         tasks: [
           { id: '1', subject: 'Trace the Stop handling', status: 'completed', role: 'researcher' },
           { id: '2', subject: 'Done waits for background work', status: 'completed', role: 'engineer' },
@@ -181,7 +209,7 @@ export function demoHub(now = Date.now()): HubState {
     ],
     tailscale: true,
     awake: false,
-    tools: { flagged: DEMO_FLAGGED, pick: null, chats: { 'd-work': { plugins: { 'superpowers@superpowers-dev': true, 'aws-core@claude-plugins-official': false, 'stitch-design@google-labs-code-stitch-skills': false }, skills: { 'claude-x-jev': false, phone: false }, assets: { 'docs/design/raycast-DESIGN.md': true } } } },
+    tools: { flagged: DEMO_FLAGGED, pick: null, chats: { 'd-work': { plugins: { 'superpowers@superpowers-dev': true, 'aws-core@claude-plugins-official': false, 'stitch-design@google-labs-code-stitch-skills': false }, skills: { 'claude-x-jev': false, phone: false }, assets: { 'docs/design/raycast-DESIGN.md': true, ...Object.fromEntries(['airbnb', 'apple', 'linear', 'notion', 'raycast', 'stripe', 'vercel'].map(b => [`/Users/demo/.claude/switchboard/design-md/${b}/DESIGN.md`, false])) } } } },
     installed: [
       { kind: 'mod', name: 'usage-meter@kenneth-mods', enabled: true }, { kind: 'mod', name: 'repo-rules@kenneth-mods', enabled: true }, { kind: 'mod', name: 'paid-guard@kenneth-mods', enabled: true },
       { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, skills: ['brainstorming', 'test-driven-development', 'writing-plans'], description: 'Planning, test-first coding and review habits for every chat.' }, { kind: 'plugin', name: 'aws-core@claude-plugins-official', enabled: true, description: 'AWS docs, CLI help and account checks.' }, { kind: 'plugin', name: 'stitch-design@google-labs-code-stitch-skills', enabled: false },
@@ -196,18 +224,24 @@ export function demoHub(now = Date.now()): HubState {
       { kind: 'window', name: 'Armasu', status: 'on', detail: 'Switchboard window' }, { kind: 'repo', name: 'Gemini-Test', status: 'on', detail: 'GitHub' },
     ],
     aws: [
-      { name: 'default', isDefault: true, account: '111122223333', label: 'k@example.com', region: 'us-west-1', status: 'signed-in', chrome: 'Default', checkedAt: now },
-      { name: 'live', isDefault: false, account: '111122223333', label: 'k@example.com', region: 'us-west-1', status: 'signed-in', chrome: 'Default', checkedAt: now },
+      { name: 'default', isDefault: true, account: '111122223333', label: 'k@example.com', region: 'us-west-1', status: 'signed-in', chrome: 'Default', checkedAt: now, expiresAt: now + 9 * 3_600_000 },
+      { name: 'live', isDefault: false, account: '111122223333', label: 'k@example.com', region: 'us-west-1', status: 'signed-in', chrome: 'Default', checkedAt: now, expiresAt: now + 3 * 3_600_000 + 20 * 60e3 },
       { name: 'yo', isDefault: false, account: '444455556666', label: 'Work sandbox', region: 'us-east-1', status: 'expired', chrome: 'Profile 2', checkedAt: now },
       { name: 'scratch', isDefault: false, region: 'eu-central-1', status: 'never', checkedAt: now },
-      { name: 'owner', isDefault: false, account: '777788889999', label: 'Main account root', region: 'us-east-1', status: 'signed-in', checkedAt: now, root: true },
+      { name: 'owner', isDefault: false, account: '777788889999', label: 'Main account root', region: 'us-east-1', status: 'signed-in', checkedAt: now, root: true, expiresAt: now + 40 * 60e3 },
       { name: 'previous-default-20261029-073925', isDefault: false, account: '444455556666', region: 'us-west-1', status: 'expired', checkedAt: now, stale: true },
       { name: 'previous-default-20261029-073933', isDefault: false, account: '444455556666', region: 'us-west-1', status: 'expired', checkedAt: now, stale: true },
     ],
     signIns: {
       chrome: [{ dir: 'Default', name: 'Personal', email: 'k@example.com' }, { dir: 'Profile 2', name: 'Work', email: 'k@work.example' }],
-      projects: { '/Users/k/GitHub/Armasu': 'live' },
-      window: '/Users/k/GitHub/Armasu',
+      projects: { '/Users/k/Documents/GitHub/Armasu': 'live' },
+      window: '/Users/k/Documents/GitHub/Armasu',
+      browsers: { '/Users/k/Documents/GitHub/Armasu': 'Default' },
+      errors: {
+        'aws:yo': 'aws login: the device code expired before it was approved. Sign in again and approve it in Chrome within 10 minutes.',
+        'login:auth0:a-me': 'Chrome could not open profile "Personal": it is in use by another Chrome window.',
+      },
+      keys: [{ name: 'GEMINI_API_KEY', saved: true, last4: 'q7Xk', checked: { ok: true, at: now - 3_600_000 } }, { name: 'OPENROUTER_API_KEY', saved: false }],
       apps: [{
         id: 'auth0', name: 'Auth0', url: 'https://manage.auth0.com/', active: 'a-work',
         logins: [
@@ -219,7 +253,7 @@ export function demoHub(now = Date.now()): HubState {
         id: 'vercel', name: 'Vercel', url: 'https://vercel.com/login', active: 'v-me',
         logins: [{ id: 'v-me', label: 'k@example.com personal team', url: 'https://vercel.com/login', chrome: 'Default' }],
       }],
-      links: { '/Users/k/GitHub/Armasu': { auth0: 'a-dev', vercel: null }, '/Users/k/Documents/GitHub/Gemini-Test': { auth0: 'a-me' } },
+      links: { '/Users/k/Documents/GitHub/Armasu': { auth0: 'a-dev', vercel: null }, '/Users/k/Documents/GitHub/Gemini-Test': { auth0: 'a-me' } },
     },
     jev: [
       { sessionId: 'd-work', preset: 'triage-comments', items: 24, costUsd: 0.0061, seconds: 7.2, at: now - 8 * 60e3 },
@@ -248,7 +282,12 @@ const CALLS_BY_ROLE: Record<string, [string, string][]> = {
 }
 
 /** One more tool call on the working demo chat; the calling role turns researcher, engineer, qa every 20 s, and subagents start and stop on RUNS. */
+// When the demo mic started listening; it stops on a made-up pause.
+let listenAt = 0
+const DEMO_HEARD = 'what is running'
+
 export function demoTick(h: HubState, now: number): HubState {
+  if (h.voice === 'listening' && now - listenAt > 3500) h = { ...h, voice: null, heard: { text: DEMO_HEARD, at: now } }
   const i = Math.floor((now % 20_000) / (20_000 / 3)), role = ROLES[i]
   const pick = CALLS_BY_ROLE[role][Math.floor(now / 900) % 4]
   const call: ToolCall = Math.floor(now / 900) % 6 === 0 ? { ...JEV_CALL, at: now } : { tool: pick[0], target: pick[1], role, at: now }
@@ -293,11 +332,24 @@ const demoRepo = (h: HubState, sessionId: string): RepoView => {
   const files = (CHANGES[sessionId] ?? []).map(f => ({ path: f.path, status: f.status }))
   const branch = sessionId === 'd-done' ? 'main' : 'fix/login-redirect'
   return {
-    sessionId, name: cwd.split('/').pop() ?? '', branch, upstream: `origin/${branch}`, ahead: 2, behind: 0, files,
+    sessionId, name: cwd.split('/').pop() ?? '', branch, upstream: `origin/${branch}`, ahead: 2, behind: 0, files, ship: { files: files.map(f => f.path), kept: [] },
     branches: [branch, 'main', 'design/outfit-copy'].filter((b, i, a) => a.indexOf(b) === i), sync: { kind: 'push', label: 'Push 2' },
     log: [{ hash: 'a41c9e2', subject: 'Wrote the failing redirect test', when: '12 minutes ago' }, { hash: '7d03b18', subject: 'Read the session cookie on Safari', when: '40 minutes ago' }, { hash: '1f9e0aa', subject: 'Add login page hero', when: '2 days ago' }],
     stashes: 0, github: `https://github.com/kennykennethkkang/${cwd.split('/').pop()}`, at: Date.now(),
     ...(sessionId === 'd-work' ? demoMerge(Date.now()) : {}),
+    ...(sessionId === 'd-done' ? demoLanes(Date.now()) : {}),
+  }
+}
+
+/** The ship card's lanes: two local commits on main, one from Sam already on origin. */
+const demoLanes = (now: number): Pick<RepoView, 'lanes' | 'outgoing'> => {
+  const ago = (m: number) => now - m * 60e3
+  return {
+    lanes: { against: 'origin/main', fork: { hash: '1f9e0aa', author: 'You', at: ago(2880), subject: 'Add login page hero', side: 'fork' }, commits: [
+      { hash: 'a41c9e2', author: 'You', at: ago(12), subject: 'Starred chats with a resume command', side: 'head' },
+      { hash: '7d03b18', author: 'You', at: ago(40), subject: 'Codex chats in the hub list', side: 'head' },
+    ] },
+    outgoing: [{ path: 'extension/src/hub/ais.ts', added: 142, removed: 8 }, { path: 'extension/src/hub/starred.ts', added: 96, removed: 0 }, { path: 'web/components/switchboard/chat-cards.tsx', added: 31, removed: 12 }],
   }
 }
 
@@ -377,6 +429,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const r = h.repo?.sessionId === c.sessionId ? h.repo : demoRepo(h, c.sessionId)
       const done = (text: string, patch: Partial<RepoView> = {}) => ({ ...h, repo: { ...r, ...patch, result: { text: `Demo: ${text}`, ok: true, at: Date.now() } } })
       if (c.op === 'commit') return done(`committed ${c.files?.length ?? 0} files to ${r.branch}`, { files: r.files.filter(f => !c.files?.includes(f.path)), ahead: r.ahead + 1, sync: { kind: 'push', label: `Push ${r.ahead + 1}` } })
+      if (c.op === 'ship') return done(`committed ${r.files.length} files and pushed to ${r.upstream}`, { files: [], ship: { files: [], kept: [] }, ahead: 0, outgoing: [], lanes: r.lanes && { ...r.lanes, commits: [] }, sync: { kind: 'fetch', label: 'Fetch' } })
       if (c.op === 'sync') return done(`pushed ${r.ahead} commits to ${r.upstream}`, { ahead: 0, sync: { kind: 'fetch', label: 'Fetch' } })
       if (c.op === 'rerun' && r.ci) return done(`re-running the failed jobs in ${r.ci.workflow}`, { ci: { ...r.ci, status: 'in_progress', conclusion: undefined, jobs: r.ci.jobs.map(j => j.conclusion === 'success' ? j : { name: j.name, status: 'queued' }) } })
       return done(`git ${c.op} would run here`)
@@ -389,6 +442,19 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
         return at < 0 ? [] : [{ sessionId: a.sessionId, snippet: `${at > 30 ? '...' : ''}${text.slice(Math.max(0, at - 30), at + q.length + 50)}...` }]
       })
       return { ...h, search: { q, hits } }
+    }
+    case 'hub-voice':
+      if (c.on) { listenAt = Date.now(); return { ...h, voice: 'listening' } }
+      return h.voice === 'listening' ? { ...h, voice: null, heard: { text: DEMO_HEARD, at: Date.now() } } : h
+    case 'hub-jarvis': {
+      // The extension runs jarvis.ts; the demo only tells a start from a question.
+      const q = c.q.trim(), at = Date.now()
+      if (!q) return { ...h, jarvis: null }
+      const goal = /^(?:start|open)\s+(?:a\s+)?(?:new\s+)?chat\s+(?:to\s+)?(.+)$/i.exec(q)?.[1]
+      const open = h.projects.find(p => p.isOpen)
+      if (goal && open) return { ...h, jarvis: { q, at, start: { folder: open.path, project: open.name, goal } } }
+      const working = h.progress.filter(p => p.state === 'working').map(p => h.chats.find(x => x.sessionId === p.sessionId)?.name ?? p.sessionId)
+      return { ...h, jarvis: { q, at, answer: working.length ? `Working: ${working.join(', ')}.` : 'No chat is working right now.' } }
     }
     case 'hub-aws-default': {
       const to = h.aws.find(a => a.name === c.profile), was = h.aws.find(a => a.isDefault)
@@ -404,8 +470,10 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     }
     case 'hub-aws-add':
       return h.aws.some(a => a.name === c.profile) ? h : { ...h, aws: [...h.aws, { name: c.profile, isDefault: false, region: c.region, status: 'never', chrome: c.chrome ?? '', checkedAt: Date.now() }] }
-    case 'hub-aws-login':
-      return { ...h, aws: h.aws.map(a => a.name === c.profile ? { ...a, status: 'signed-in', chrome: c.chrome ?? '' } : a) }
+    case 'hub-aws-login': {
+      const { [`aws:${c.profile}`]: _err, ...errors } = h.signIns.errors ?? {}
+      return { ...h, signIns: { ...h.signIns, errors }, aws: h.aws.map(a => a.name === c.profile ? { ...a, status: 'signed-in', chrome: c.chrome ?? '', expiresAt: Date.now() + 12 * 3_600_000 } : a) }
+    }
     case 'hub-aws-window': {
       const w = h.signIns.window
       if (!w) return h
@@ -419,6 +487,15 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const apps = h.signIns.apps ?? []
       if (!c.name.trim() || apps.some(a => a.name.toLowerCase() === c.name.trim().toLowerCase())) return h
       return { ...h, signIns: { ...h.signIns, apps: [...apps, { id: `app-${Date.now()}`, name: c.name.trim(), url: c.url, logins: [] }] } }
+    }
+    case 'hub-key-save':
+    case 'hub-key-test':
+    case 'hub-key-remove': {
+      const keys = (h.signIns.keys ?? []).map(k => k.name !== c.name ? k
+        : c.type === 'hub-key-remove' ? { name: k.name, saved: false }
+        : c.type === 'hub-key-save' ? { name: k.name, saved: true, last4: c.value.trim().slice(-4), checked: { ok: true, at: Date.now() } }
+        : { ...k, checked: { ok: true, at: Date.now() } })
+      return { ...h, signIns: { ...h.signIns, keys } }
     }
     case 'hub-login-app-delete':
       return { ...h, signIns: { ...h.signIns, apps: (h.signIns.apps ?? []).filter(a => a.id !== c.app) } }
@@ -449,7 +526,9 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
         }
         return { ...a, logins: a.logins.map(l => l.id !== c.id ? l : c.type === 'hub-login-rename' ? { ...l, label: c.label.trim() || l.label } : { ...l, chrome: c.chrome ?? l.chrome }) }
       })
-      return { ...h, signIns: { ...h.signIns, apps } }
+      if (c.type !== 'hub-login-open') return { ...h, signIns: { ...h.signIns, apps } }
+      const { [`login:${c.app}:${c.id}`]: _err, ...errors } = h.signIns.errors ?? {}
+      return { ...h, signIns: { ...h.signIns, apps, errors } }
     }
     case 'hub-dev-start':
     case 'hub-dev-stop': {
@@ -463,16 +542,25 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     case 'hub-todo-edit':
     case 'hub-todo-remove':
     case 'hub-todo-restore':
+    case 'hub-todo-accept':
+    case 'hub-todo-dismiss':
     case 'hub-todo-run': {
-      const list = h.todos?.[c.path]
+      // Like the extension, the first item for a project with no list starts one.
+      const list = h.todos?.[c.path] ?? (c.type === 'hub-todo-add' ? { todo: [] } : undefined)
       if (!list) return h
       const set = (l: typeof list) => ({ ...h, todos: { ...h.todos, [c.path]: l } })
       const now = Date.now(), id = `dt-${now.toString(36)}`
       if (c.type === 'hub-todo-add') return c.text.trim() ? set({ ...list, todo: [...list.todo, { id, text: c.text.trim(), at: now }] }) : h
       if (c.type === 'hub-todo-edit') return set({ ...list, todo: list.todo.map(t => (t.id === c.id ? { ...t, text: c.text.trim() || t.text, at: now } : t)) })
       if (c.type === 'hub-todo-remove') {
-        const t = list.todo.find(x => x.id === c.id)
-        return t ? set({ ...list, todo: list.todo.filter(x => x !== t), ticked: [{ id: t.id, text: t.text, at: now }, ...list.ticked ?? []].slice(0, 10) }) : h
+        const t = list.todo.find(x => x.id === c.id) ?? list.suggested?.find(x => x.id === c.id)
+        return t ? set({ ...list, todo: list.todo.filter(x => x !== t), suggested: list.suggested?.filter(x => x !== t), ticked: [{ id: t.id, text: t.text, at: now }, ...list.ticked ?? []].slice(0, 10) }) : h
+      }
+      if (c.type === 'hub-todo-accept' || c.type === 'hub-todo-dismiss') {
+        const t = list.suggested?.find(x => x.id === c.id)
+        if (!t) return h
+        const rest = list.suggested!.filter(x => x !== t)
+        return set({ ...list, suggested: rest, ...(c.type === 'hub-todo-accept' ? { todo: [...list.todo, { ...t, id, at: now }] } : {}) })
       }
       if (c.type === 'hub-todo-restore') {
         const t = list.ticked?.find(x => x.id === c.id)
@@ -487,7 +575,108 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       return { ...started, todos: { ...h.todos, [c.path]: { ...list, todo: list.todo.map(t => (run.has(t.id) ? { ...t, chat, at: now } : t)) } } }
     }
     case 'hub-awake': return { ...h, awake: c.on }
+    // The demo has no processes: Stop and Dismiss both take the item off.
+    case 'hub-stuck-stop':
+    case 'hub-stuck-dismiss': return { ...h, stuck: h.stuck?.filter(i => i.id !== c.id) }
     case 'hub-rc-server': return { ...h, rcServers: h.rcServers.map(r => (r.folder === c.folder ? { ...r, on: c.on } : r)) }
     default: return h
   }
+}
+
+/** Where a demo upload says it went, laid out like the real uploads folder. */
+export function demoUpload(name: string, cwd: string, now = new Date()): string {
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return `~/.claude/switchboard/uploads/${cwd.split('/').filter(Boolean).pop() ?? 'misc'}/${day}/${name.split(/[/\\]/).pop()}`
+}
+
+const DEMO_JOBS: Record<string, { title: string; brief: string; files: Array<[string, number, number]>; changed: string[]; checked: string[]; open: string[]; tools: Array<[string, string]> }> = {
+  researcher: { title: 'Find where the redirect loops', brief: 'Goal: find why Safari loops on /login after sign in.\nKnown: auth/middleware.ts redirects on no session.\nReport: Status, Found, Checked, Open.',
+    files: [], changed: ['auth/middleware.ts:14 redirects to /login even on /login', 'lib/session.ts:42 drops the cookie for Safari'], checked: ['Read both files and the Safari cookie notes'], open: ['Not reproduced on a real iPhone'],
+    tools: [['Grep', 'redirect'], ['Read', 'auth/middleware.ts'], ['Read', 'lib/session.ts'], ['Grep', 'Safari'], ['WebFetch', 'webkit.org']] },
+  engineer: { title: 'Fix the cookie check', brief: 'Goal: stop the login redirect loop.\nKnown: middleware.ts:14 and session.ts:42 (from researcher).\nRuled out: new auth library.\nUse: superpowers:test-driven-development.\nReport: Status, Changed, Checked, Open.',
+    files: [['auth/middleware.ts', 18, 6], ['auth/redirect.test.ts', 41, 0], ['lib/session.ts', 0, 3]], changed: ['auth/middleware.ts:12-24 no redirect on /login itself', 'lib/session.ts:40 drops the Safari special case', 'auth/redirect.test.ts new, 4 cases'], checked: ['npx tsx --test auth/*.test.ts, 538 pass', 'tsc --noEmit clean'], open: ['Safari on a real phone not tried'],
+    tools: [['Read', 'auth/middleware.ts'], ['Write', 'auth/redirect.test.ts'], ['Bash', 'npx tsx --test auth'], ['Edit', 'auth/middleware.ts'], ['Edit', 'lib/session.ts'], ['Bash', 'npx tsx --test auth'], ['Bash', 'tsc --noEmit']] },
+  qa: { title: 'Run tests and review', brief: 'Review the redirect fix. Run the auth tests and tsc. Report only verified problems.', files: [], changed: ['auth/middleware.ts:18 /login?next= still loops'], checked: ['npx tsx --test auth, 2 fail', 'tsc clean'], open: [],
+    tools: [['Bash', 'git diff'], ['Read', 'auth/middleware.ts'], ['Bash', 'npx tsx --test auth']] },
+  designer: { title: 'Card states', brief: 'Draw the picker labels in the existing tokens. Light and dark.', files: [['app/picker.tsx', 22, 9], ['app/globals.css', 6, 2]], changed: ['app/picker.tsx labels and empty state'], checked: ['Looked at 375px and 1280px, both themes'], open: [],
+    tools: [['Read', 'app/picker.tsx'], ['Edit', 'app/picker.tsx'], ['Edit', 'app/globals.css']] },
+}
+
+/** Run details for the demo's drawer, one per run the demo chat shows for that role. */
+export function demoRunDetails(p: ChatProgress | undefined, role: string, now = Date.now()): RunDetail[] {
+  const job = DEMO_JOBS[role] ?? DEMO_JOBS.designer
+  const steps = [...(p?.roles ?? [])].filter(r => r.role === role).sort((a, b) => a.startedAt - b.startedAt)
+  return steps.map((r, i): RunDetail => {
+    const done = r.state === 'done', end = done ? r.at ?? Math.min(now, r.startedAt + (8 + i * 3) * 60e3) : now
+    const span = Math.max(1000, end - r.startedAt)
+    const calls: RunCall[] = job.tools.map(([tool, target], k) => ({ tool, target, at: r.startedAt + ((k + 1) / (job.tools.length + 1)) * span }))
+    const sentBack = role === 'engineer' && i === steps.length - 1 && steps.length > 1
+    const cached = 180_000 + i * 90_000
+    return {
+      id: r.id, role, title: steps.length > 1 && i < steps.length - 1 ? `${job.title}, round ${i + 1}` : job.title, model: 'claude-opus-5-5',
+      startedAt: r.startedAt, endedAt: end, finished: done, brief: job.brief,
+      ...(done || i < steps.length - 1 ? { report: { status: role === 'qa' ? 'done with concerns' : 'done', changed: job.changed, checked: job.checked, open: job.open }, reportText: `Status: done\nChanged:\n${job.changed.map(c => `- ${c}`).join('\n')}` } : {}),
+      files: job.files.map(([path, added, removed]) => ({ path, added, removed })), calls, callCount: calls.length,
+      loops: sentBack ? [{ at: r.startedAt + span * 0.6, by: 'qa', text: 'qa found /login?next= still loops: middleware.ts:18 checks the path before stripping the query. Fix it and add a test.' }] : [],
+      tokens: { input: 1200 + i * 300, output: 9_000 + i * 2_000, cacheRead: cached, cacheWrite: 24_000 }, costUsd: 0.4 + i * 0.35, file: '',
+    }
+  })
+}
+
+const DEMO_SHOT = '/Users/k/GitHub/agent-flow/.playwright-mcp/hub-1440.png'
+// A small drawn page, so the demo shows an image without shipping one.
+const SHOT_SVG = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" fill="#0d0d0d"/><rect x="0" y="0" width="640" height="40" fill="#121212"/><circle cx="24" cy="20" r="6" fill="#59d499"/><rect x="40" y="14" width="120" height="12" rx="6" fill="#434345"/><rect x="16" y="56" width="180" height="328" rx="8" fill="#101111" stroke="#242728"/><rect x="28" y="72" width="156" height="44" rx="6" fill="#121212" stroke="#242728"/><rect x="28" y="124" width="156" height="44" rx="6" fill="#121212" stroke="#242728"/><rect x="212" y="56" width="412" height="328" rx="8" fill="#101111" stroke="#242728"/><rect x="232" y="80" width="200" height="14" rx="7" fill="#f4f4f6"/><rect x="232" y="108" width="360" height="10" rx="5" fill="#434345"/><rect x="232" y="128" width="300" height="10" rx="5" fill="#434345"/><rect x="232" y="168" width="96" height="28" rx="14" fill="#ffffff"/></svg>')}`
+const DEMO_LINES: ChatMessage[] = [
+  { role: 'you', text: 'Add Codex to the hub next to Claude. Let me star chats and resume them later.' },
+  { role: 'claude', text: 'Goal: Codex chats beside Claude ones, plus Starred chats with a resume command. Researcher first, then engineer, then qa.' },
+  { role: 'tool', text: 'Agent researcher' },
+  { role: 'subagent', text: 'Agent "Find the session sources" completed\nStatus: done. Codex writes ~/.codex/sessions/<date>/*.jsonl.' },
+  { role: 'tool', text: 'Read hub/types.ts' },
+  { role: 'tool', text: 'result: export type ChatRow = {' },
+  { role: 'tool', text: 'Edit hub/types.ts' },
+  { role: 'tool', text: 'Bash pnpm test' },
+  { role: 'tool', text: 'error: 1 failing: ais.test.ts lists both AIs' },
+  { role: 'claude', text: 'One test fails on the AI order. Sending it back to the engineer.' },
+]
+
+/** The demo's answers to the chat view's three reads; transcript before counts messages, not bytes. */
+export function demoChat(h: HubState, session: string, what: 'outputs' | 'transcript' | 'shot', ask: ChatAsk = {}): ChatAnswer {
+  const p = h.progress.find(x => x.sessionId === session)
+  if (!p) return {}
+  if (what === 'shot') return ask.path === DEMO_SHOT ? { shot: SHOT_SVG } : {}
+  if (what === 'transcript' && session !== 'd-done') {
+    // A short script from the chat's own name, role and first task, so each chat reads as itself.
+    const goal = (h.chats.find(c => c.sessionId === session)?.name ?? 'This chat').replace(/ v\d+$/, '')
+    const role = p.roles.find(r => r.state === 'active')?.role ?? 'engineer', task = p.tasks[0]?.subject
+    const messages: ChatMessage[] = [
+      { role: 'you', text: `${goal}, please.` },
+      { role: 'claude', text: `Goal: ${goal}. Handing it to the ${role}.` },
+      { role: 'tool', text: `Agent ${role}` },
+      ...(task ? [{ role: 'tool' as const, text: `TaskCreate ${task}` }] : []),
+      { role: 'claude', text: p.question ?? (p.state === 'done' ? `${goal} is done.` : `Still on ${goal}.`) },
+    ]
+    return { transcript: { messages, before: null } }
+  }
+  if (what === 'transcript') {
+    // d-done: 80 messages, the script above repeated with a round number.
+    const all = Array.from({ length: 80 }, (_, i) => { const m = DEMO_LINES[i % DEMO_LINES.length]; return i < DEMO_LINES.length ? m : { ...m, text: `${m.text} (round ${Math.floor(i / DEMO_LINES.length) + 1})` } })
+    const end = Math.min(all.length, ask.before ?? all.length), start = Math.max(0, end - 50)
+    return { transcript: { messages: all.slice(start, end), before: start > 0 ? start : null } }
+  }
+  const outputs: ChatOutputs = {
+    final: `${p.report ? `Done:\n${p.report.done.map(d => `- ${d}`).join('\n')}` : 'Still working.'}${p.commit ? `\n\nCommit message:\n\`\`\`\n${p.commit}\n\`\`\`` : ''}`,
+    ...(p.report ? { standup: p.report } : {}),
+    ...(p.commit ? { commit: p.commit } : {}),
+    questions: [{ question: 'Should Codex chats share the Claude list or get their own?', answer: 'One list, with an AI chip' }],
+    reports: [
+      { id: 'r1', label: 'Find the session sources', role: 'researcher', text: 'Status: done\nFound:\n- Codex sessions live in ~/.codex/sessions/<date>/*.jsonl\n- Each line is one event; the first holds the cwd' },
+      { id: 'e1', label: 'Codex chats and Starred', role: 'engineer', text: 'Status: done\nChanged:\n- extension/src/hub/ais.ts: a registry of AIs\n- extension/src/hub/starred.ts: star and resume\nChecked:\n- pnpm test, 538 passed' },
+      { id: 'q1', label: 'Review the AI registry', role: 'qa', text: 'Status: done\nFound: nothing blocking. The Resume command quotes the folder.' },
+    ],
+    tests: [{ command: 'pnpm test', ok: false, failed: 1, total: 538, first: 'ais.test.ts lists both AIs' }, { command: 'pnpm run lint && pnpm test', ok: true, total: 538 }],
+    errors: [{ tool: 'Bash', text: 'Exit code 1\n1 failing: ais.test.ts lists both AIs' }],
+    files: ['/Users/k/GitHub/agent-flow/extension/src/hub/ais.ts', '/Users/k/GitHub/agent-flow/extension/src/hub/starred.ts', '/Users/k/GitHub/agent-flow/extension/src/hub/types.ts'],
+    shots: [DEMO_SHOT],
+  }
+  return { outputs }
 }

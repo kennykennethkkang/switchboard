@@ -4,7 +4,7 @@ import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
 import * as http from 'http'
-import { awakeArgs, devCommand, devHome, devLink, devRows, knownDev, offArgs, postCommand, serveArgs, servedPorts } from '../src/hub/dev'
+import { awakeArgs, devCommand, devHome, devLink, devRows, knownDev, offArgs, postCommand, postWindow, serveArgs, servedPorts } from '../src/hub/dev'
 import { HubService } from '../src/hub/hub-service'
 import { handleHub } from '../src/hub/routes'
 
@@ -129,6 +129,46 @@ describe('postCommand', () => {
       server.closeAllConnections()
       await new Promise(r => server.close(r))
     }
+    // A gone window on a port fetch never pooled: a reset socket left in the pool makes undici throw an uncaught EINVAL on macOS.
+    const gone = http.createServer()
+    await new Promise<void>(r => gone.listen(0, '127.0.0.1', r))
+    const gonePort = (gone.address() as { port: number }).port
+    await new Promise(r => gone.close(r))
+    assert.equal(await postCommand({ ...w, port: gonePort }, chat), false)
+  })
+})
+
+describe('window posts', () => {
+  it('use a fresh socket each time, and a window that resets or is gone is false, not an uncaught error', async () => {
+    const seen: Array<string | undefined> = []
+    const uncaught: unknown[] = []
+    const onUncaught = (e: unknown) => { uncaught.push(e) }
+    process.on('uncaughtException', onUncaught)
+    let reset = false
+    const server = http.createServer((req, res) => {
+      seen.push(req.headers.connection)
+      if (reset) { req.socket.destroy(); return }
+      req.resume()
+      req.on('end', () => res.writeHead(200).end())
+    })
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+    const w = { pid: 1, port: (server.address() as { port: number }).port, hubToken: 't', workspace: '/r' }
+    const chat = { type: 'hub-new-chat' }
+    try {
+      assert.equal(await postWindow(w, { kind: 'dev-stop' }), true)
+      assert.equal(await postCommand(w, chat), true)
+      assert.deepEqual(seen, ['close', 'close'])
+      reset = true
+      assert.equal(await postWindow(w, { kind: 'dev-stop' }), false)
+      assert.equal(await postCommand(w, chat), false)
+    } finally {
+      server.closeAllConnections()
+      await new Promise(r => server.close(r))
+    }
+    assert.equal(await postWindow(w, { kind: 'dev-stop' }), false)
     assert.equal(await postCommand(w, chat), false)
+    await new Promise(r => setTimeout(r, 20))
+    process.off('uncaughtException', onUncaught)
+    assert.deepEqual(uncaught, [])
   })
 })

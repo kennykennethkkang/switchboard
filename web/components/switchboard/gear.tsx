@@ -7,7 +7,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
-import { gearRows } from '@/lib/gear-rows'
+import { gearRows, keywordHit } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
 import { label } from './look'
@@ -56,7 +56,7 @@ function Line({ row }: { row: Row }) {
 const sub = { ...label, lineHeight: 1, margin: '16px 0 4px' } as const
 
 /** start: the section to open on. layout: this device's own pick, kept in its browser storage. */
-export function Gear({ hub, send, start = 'Chats', layout, onLayout }: { hub: HubState; send: (c: HubCommand) => void; onSignIns?: () => void; start?: Section; layout?: Layout; onLayout?: (l: Layout) => void }) {
+export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number } | null; start?: Section; layout?: Layout; onLayout?: (l: Layout) => void }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState<Section>(start)
   const c = hub.controls.claude
@@ -85,7 +85,7 @@ export function Gear({ hub, send, start = 'Chats', layout, onLayout }: { hub: Hu
     { section: 'Chats', label: 'Push to your phone', hint: 'When a chat finishes.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
     { section: 'Chats', label: 'Keep phone access in Apple Notes', hint: 'One private note, "Switchboard access", with the code and links; updated when they change. Off stops updates.',
       control: <Switch label="Keep phone access in Apple Notes" on={sb.accessNote} onChange={next => own('accessNote', next)} /> },
-    { section: 'Chats', label: 'Notify when a chat needs input', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
+    { section: 'Chats', label: 'Notify when a chat needs input', hint: 'When a chat stops to ask you something.', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
 
     { section: 'Models', label: 'Lead model', hint: 'The main chat, and every role set to Inherit.',
       control: <Pick label="Lead model" options={MODELS} value={lead} onChange={v => set('model', v === 'default' ? null : v)} /> },
@@ -120,7 +120,7 @@ export function Gear({ hub, send, start = 'Chats', layout, onLayout }: { hub: Hu
 
   const lists = gearRows(hub, query)
   const hits = query ? rows.filter(row => `${row.label} ${row.hint ?? ''} ${row.section}`.toLowerCase().includes(query)) : []
-  const accountsHit = query && 'accounts sign-ins logins aws web apps chrome projects'.includes(query)
+  const accountsHit = keywordHit('accounts sign-ins logins aws web apps chrome projects', query)
   const listHits = query ? lists.filter(l => l.match) : []
 
   const installed = (only = lists) => (
@@ -142,7 +142,7 @@ export function Gear({ hub, send, start = 'Chats', layout, onLayout }: { hub: Hu
   )
 
   const body = (s: Section) => {
-    if (s === 'Accounts') return <SignIns hub={hub} send={send} />
+    if (s === 'Accounts') return <SignIns hub={hub} send={send} problem={problem} />
     if (s === 'Installed') return (
       <>
         <Line row={{ section: 'Installed', label: 'Set up', hint: 'Installs the plugins, mods, MCP servers, rules and roles Switchboard works with. Skips what you have.',
@@ -168,13 +168,13 @@ export function Gear({ hub, send, start = 'Chats', layout, onLayout }: { hub: Hu
     <section aria-label="Settings" className="hub-settings">
       <nav aria-label="Settings sections" className="hub-set-nav">
         <input type="search" className="hub-search" aria-label="Find a setting" placeholder="Find a setting" value={q} onChange={e => setQ(e.target.value)} />
-        <div role="tablist" aria-orientation="vertical">
+        <div>
           {SECTIONS.map(s => (
-            <button key={s} type="button" role="tab" aria-selected={!query && at === s} onClick={() => { setAt(s); setQ('') }}>{s}</button>
+            <button key={s} type="button" aria-current={!query && at === s ? 'page' : undefined} onClick={() => { setAt(s); setQ('') }}>{s}</button>
           ))}
         </div>
       </nav>
-      <div role="tabpanel" aria-label={query ? 'Search results' : at} style={{ minWidth: 0 }}>
+      <div role="region" aria-label={query ? 'Search results' : at} className="hub-set-panel" style={{ minWidth: 0 }}>
         {query
           ? <>
               {hits.map(r => <Line key={r.label} row={{ ...r, hint: [r.section, r.hint].filter(Boolean).join('. ') }} />)}

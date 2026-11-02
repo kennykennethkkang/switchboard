@@ -6,14 +6,13 @@ import * as fs from 'fs'
 import * as http from 'http'
 import * as os from 'os'
 import * as path from 'path'
-import { exec, execFile } from 'child_process'
+import { exec, execFile, execFileSync } from 'child_process'
 
 import { createRelay } from '../../scripts/relay'
-import { createTelemetryClient } from '../../scripts/telemetry'
 import { serveStatic } from './static'
 import { portTaken } from './port'
-import { codeLogin, deniedAs, deviceAsks, lanCookie, lanFor, lanGate, lanHosts, liveToken, macNames, phoneSecret, proxyHub, signInPage, tellWindows, uaSummary, waitPage, windows, type Lan } from './hub-proxy'
-import { ipv4s } from '../../extension/src/hub/lan'
+import { codeLogin, deniedAs, deviceAsks, forwardedIp, lanFor, lanGate, lanSetCookie, liveToken, macNames, phoneSecret, proxyHub, signInPage, tellWindows, uaSummary, waitPage, windows, type Lan } from './hub-proxy'
+import { phoneServeArgs, readMacNames, tailscaleBin } from '../../extension/src/hub/lan'
 
 interface ServerOptions {
   port: number
@@ -35,20 +34,13 @@ export async function startServer(options: ServerOptions) {
     process.exit(1)
   }
 
-  const configDir = path.join(os.homedir(), '.agent-flow')
-  const telemetry = createTelemetryClient({
-    logDir: path.join(configDir, 'telemetry'),
-    installIdPath: path.join(configDir, 'installation-id'),
-  })
-  await telemetry.init()
-
-  const relay = await createRelay({ workspace, verbose: options.verbose, telemetry })
+  const relay = await createRelay({ workspace, verbose: options.verbose })
 
   const secret = options.lan ? phoneSecret(path.join(os.homedir(), '.claude', 'switchboard', 'phone.secret')) : ''
 
   const checkCode = codeLogin()
   const login = (res: http.ServerResponse, lan: Lan) =>
-    res.writeHead(302, { Location: '/', 'Set-Cookie': `${lanCookie(port)}=${lan.secret}; HttpOnly; SameSite=Strict; Path=/`, 'Cache-Control': 'no-store' }).end()
+    res.writeHead(302, { Location: '/', 'Set-Cookie': lanSetCookie(port, lan.secret, !lan.plain), 'Cache-Control': 'no-store' }).end()
   const html = (res: http.ServerResponse, status: number, body: string) =>
     res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'" }).end(body)
   const page = (res: http.ServerResponse, status: number, note?: string) => html(res, status, signInPage(note))
@@ -73,7 +65,7 @@ export async function startServer(options: ServerOptions) {
   const asks = deviceAsks()
   const askMac = (req: http.IncomingMessage, res: http.ServerResponse, lan: Lan) => {
     req.resume()
-    const a = asks.ask({ ip: (req.socket.remoteAddress ?? '').replace(/^::ffff:/, ''), ua: uaSummary(req.headers['user-agent']), host: String(req.headers.host), network: lanHosts([lan.host]).tailscale ? 'Tailscale' : 'Wi-Fi' })
+    const a = asks.ask({ ip: forwardedIp(req.headers), ua: uaSummary(req.headers['user-agent']), host: String(req.headers.host), network: 'Tailscale' })
     if (!a) { page(res, 429, 'Too many devices are waiting. Try again in a few minutes, or use the code.'); return }
     void tellWindows({ id: a.id, ip: a.ip, ua: a.ua, network: a.network, port })
     res.writeHead(303, { Location: `/device/wait?id=${a.id}`, 'Cache-Control': 'no-store' }).end()
@@ -97,7 +89,9 @@ export async function startServer(options: ServerOptions) {
     res.writeHead(204).end()
   }
 
-  // lan: undefined for loopback, else the address the request came in on; only that Host is accepted.
+  // What tailscale serve puts the app on: https, http (no tailnet certs) or nothing yet.
+  let serving: 'https' | 'http' | undefined
+  // lan: undefined for the Mac itself (lanFor), else the phone through tailscale serve; only the ts.net Host is accepted.
   const handle = (lan: Lan | undefined, req: http.IncomingMessage, res: http.ServerResponse) => {
     const gate = lanGate(req.headers, req.url ?? '/', port, lan)
     if (gate === 'deny') {
@@ -138,22 +132,26 @@ export async function startServer(options: ServerOptions) {
     res.writeHead(404)
     res.end('Not found')
   }
-  // One bad request must not take the app down: with --lan the socket is open to anyone on the network.
+  // One bad request must not take the app down: with --lan the tailnet reaches it.
   // Kicks off the first read now; each call after reuses it and rereads in the background every few minutes.
   if (options.lan) macNames()
-  const names = () => Object.values(macNames()).filter((n): n is string => !!n)
+  const names = () => { const n = macNames().tailscale; return n ? [n] : [] }
   const server = http.createServer((req, res) => {
-    try { handle(options.lan ? lanFor(req.socket.localAddress, secret, names()) : undefined, req, res) } catch { if (!res.headersSent) res.writeHead(400); res.end() }
+    try {
+      // A rebound name (DNS rebinding) or a proxy the app did not set up is never the Mac; without --lan there is no phone.
+      const lan = lanFor(req.headers, port, secret, names(), serving === 'http')
+      if (lan && !options.lan) { res.writeHead(403).end(); return }
+      handle(lan, req, res)
+    } catch { if (!res.headersSent) res.writeHead(400); res.end() }
   })
-  // 0.0.0.0 covers 127.0.0.1 too, and any address this Mac picks up later.
-  const host = options.lan ? '0.0.0.0' : '127.0.0.1'
+  // Loopback only, --lan too: the phone comes in through tailscale serve, never straight to this socket.
+  const host = '127.0.0.1'
   const up = await new Promise<boolean>(done => {
     server.once('error', err => { console.log(`Could not listen on ${host}:${port}: ${err.message}`); done(false) })
     server.listen(port, host, () => done(true))
   })
   if (!up) {
     relay.dispose()
-    await telemetry.dispose()
     process.exit(1)
   }
 
@@ -164,39 +162,52 @@ export async function startServer(options: ServerOptions) {
   const lanMark = `http://0.0.0.0:${port}`
   if (options.lan) {
     try { fs.writeFileSync(LAN_FILE, lanMark) } catch { /* no phone link */ }
-    const { wifi, tailscale } = lanHosts(ipv4s())
-    if (wifi) console.log(`Phone access on http://${wifi}:${port} (Wi-Fi; secret link in the Switchboard panel)`)
-    if (tailscale) console.log(`Phone access on http://${tailscale}:${port} (Tailscale; secret link in the Switchboard panel)`)
-    if (!wifi && !tailscale) console.log('No Wi-Fi or Tailscale address yet; the phone links appear once there is one')
+    // Tailscale signed in or HTTPS turned on later: try again each minute until it serves https.
+    let told = ''
+    const servePhone = async () => {
+      const n = await readMacNames()
+      const bin = tailscaleBin()
+      if (n.problem || !bin || !n.tailscale) { if (n.problem && n.problem !== told) console.log(`No phone access yet: ${told = n.problem}`); return }
+      const want = n.https ? 'https' : 'http'
+      if (want === serving) return
+      try {
+        if (serving) execFileSync(bin, phoneServeArgs(port, false, serving === 'https'), { timeout: 5000, stdio: 'ignore' })
+        execFileSync(bin, phoneServeArgs(port, true, !!n.https), { timeout: 15000, stdio: 'ignore' })
+      } catch (err) { console.log(`tailscale serve failed: ${(err as Error).message}`); return }
+      serving = want
+      if (n.https) clearInterval(retry)
+      console.log(`Phone access on ${want}://${n.tailscale}/ (Tailscale; secret link in the Switchboard panel)${n.https ? '' : '. Phone copy buttons need HTTPS on the tailnet.'}`)
+    }
+    const retry = setInterval(() => void servePhone(), 60_000)
+    retry.unref()
+    void servePhone()
   }
   console.log(`Server running at ${url}`)
   console.log('Waiting for agent events...\n')
   if (openBrowser) openURL(url)
 
-  // Cleanup on exit. Idempotent — repeat signals (Ctrl+C spam, SIGTERM+SIGHUP,
-  // etc.) would otherwise emit duplicate session_end events and race the
-  // telemetry sync loop against itself.
+  // Cleanup on exit. Idempotent: repeat signals (Ctrl+C spam, SIGTERM+SIGHUP) run it once.
   let shuttingDown = false
   function cleanup() {
     if (shuttingDown) return
     shuttingDown = true
     // web.url stays: the extension probes it before use, and deleting it once cost the phone its link.
     try { if (options.lan && fs.readFileSync(LAN_FILE, 'utf8') === lanMark) fs.unlinkSync(LAN_FILE) } catch { /* gone */ }
+    try { if (serving) execFileSync(tailscaleBin()!, phoneServeArgs(port, false, serving === 'https'), { timeout: 5000, stdio: 'ignore' }) } catch { /* tailscale gone */ }
     server.close()
     relay.dispose()
-    void telemetry.dispose().finally(() => process.exit(0))
+    process.exit(0)
   }
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
   // SIGHUP fires when the controlling terminal closes (SSH session drops, tmux
-  // pane killed). Without a handler, Node's default behavior is to terminate
-  // without running cleanup — so session_end never flushes.
+  // pane killed). Without a handler, Node terminates without running cleanup.
   process.on('SIGHUP', cleanup)
 }
 
 function openURL(url: string) {
   if (process.platform === 'win32') {
-    // 'start' is a shell builtin on Windows — must use exec, not execFile
+    // 'start' is a shell builtin on Windows; must use exec, not execFile
     exec(`start "" "${url}"`)
   } else {
     const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'

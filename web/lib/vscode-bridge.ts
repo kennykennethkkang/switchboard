@@ -8,7 +8,11 @@
 
 export type { AgentEvent, SessionInfo, ConnectionStatus } from './bridge-types'
 import type { AgentEvent, SessionInfo, ConnectionStatus } from './bridge-types'
-import type { AiId, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub-types'
+import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub-types'
+import { sendSlices } from './attach'
+import type { MemoryGraph } from './memory-graph'
+import type { RunDetail } from './runs'
+import type { ChatAnswer, ChatAsk } from './chat-view'
 
 type InitCallback = () => void
 type EventCallback = (event: AgentEvent) => void
@@ -19,20 +23,15 @@ type HubCallback = (hub: HubState) => void
 
 /** What the Hub sends back to the extension. */
 export type HubCommand =
-  | { type: 'hub-refresh' }
   | { type: 'hub-send'; sessionId: string; text: string }
   | { type: 'hub-answer'; sessionId: string; askId: string; choice: Choice }
   | { type: 'hub-rc'; on: boolean; sessionId?: string }
   | { type: 'hub-open-url'; url: string }
   | { type: 'hub-web'; phone: boolean }
-  | { type: 'hub-stop-server'; pid: number; confirmed?: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
   | { type: 'hub-switchboard'; key: SwitchboardKey; value: boolean | number | string | null }
-  | { type: 'hub-vscode'; action: 'reload' | 'restart' }
   | { type: 'hub-compact'; sessionId: string }
-  | { type: 'hub-open-project'; path: string; newWindow: boolean }
-  | { type: 'hub-clone'; repo: string; newWindow: boolean }
   | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
@@ -58,6 +57,9 @@ export type HubCommand =
   | { type: 'hub-login-rename'; app: string; id: string; label: string }
   | { type: 'hub-login-delete'; app: string; id: string }
   | { type: 'hub-login-app-delete'; app: string }
+  | { type: 'hub-key-save'; name: ApiKeyName; value: string }
+  | { type: 'hub-key-test'; name: ApiKeyName }
+  | { type: 'hub-key-remove'; name: ApiKeyName }
   | { type: 'hub-kit-export' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
@@ -68,19 +70,35 @@ export type HubCommand =
   | { type: 'hub-dev-stop'; folder: string }
   | { type: 'hub-awake'; on: boolean }
   | { type: 'hub-device'; id: string; allow: boolean }
+  | { type: 'hub-stuck-stop'; sessionId: string; id: string }
+  | { type: 'hub-stuck-dismiss'; sessionId: string; id: string }
   | { type: 'hub-changes'; sessionId: string }
   | { type: 'hub-open-diff'; sessionId: string; file: string }
   | { type: 'hub-search'; q: string }
+  | { type: 'hub-jarvis'; q: string; voice?: boolean }
+  | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
   | { type: 'hub-todo-add'; path: string; text: string }
   | { type: 'hub-todo-edit'; path: string; id: string; text: string }
   | { type: 'hub-todo-remove'; path: string; id: string }
-  /** Puts back an item a finished chat ticked off. */
+  /** Puts back an item a chat ticked off. */
   | { type: 'hub-todo-restore'; path: string; id: string }
+  /** A suggestion a finished chat left: into the to-do, or gone. */
+  | { type: 'hub-todo-accept'; path: string; id: string }
+  | { type: 'hub-todo-dismiss'; path: string; id: string }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
   | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
   | { type: 'hub-todo-replace'; path: string; remote: string }
+
+/** An attached file in slices; same shapes as extension/src/protocol.ts. */
+export type UploadToExtension =
+  | { type: 'upload-start'; id: string; cwd: string; name: string; session?: string }
+  | { type: 'upload-chunk'; id: string; data: ArrayBuffer }
+  | { type: 'upload-end'; id: string }
+  | { type: 'upload-abort'; id: string }
+/** upload-progress: one chunk is on disk. upload-done: the end, saved or not, possibly before the last chunk. */
+export type UploadAck = { type: 'upload-progress'; id: string } | { type: 'upload-done'; id: string; path?: string; problem?: string }
 
 class VSCodeBridge {
   private _isVSCode = false
@@ -95,6 +113,11 @@ class VSCodeBridge {
   private hubListeners: HubCallback[] = []
   private lastHub: HubState | null = null
   private shownListeners: Array<() => void> = []
+  private levelListeners: Array<(level: number) => void> = []
+  private uploads = new Map<string, (m: UploadAck) => void>()
+  private graphs = new Map<string, (m: { graph?: MemoryGraph; problem?: string }) => void>()
+  private runLists = new Map<string, (m: { runs?: RunDetail[]; problem?: string }) => void>()
+  private chatReads = new Map<string, (m: ChatAnswer) => void>()
   /** False while VS Code keeps this view alive but hidden (sidebar collapsed, tab in the background). */
   shown = true
 
@@ -177,6 +200,22 @@ class VSCodeBridge {
         this.lastHub = data.hub
         for (const cb of this.hubListeners) cb(data.hub)
         break
+      case 'upload-progress':
+      case 'upload-done':
+        this.uploads.get(data.id)?.(data)
+        break
+      case 'graph':
+        this.graphs.get(data.id)?.(data)
+        break
+      case 'runs':
+        this.runLists.get(data.id)?.(data)
+        break
+      case 'chat':
+        this.chatReads.get(data.id)?.(data)
+        break
+      case 'hub-voice-level':
+        for (const cb of this.levelListeners) cb(data.level)
+        break
       case 'hub-visible':
         this.shown = data.visible !== false
         for (const cb of this.shownListeners) cb()
@@ -205,6 +244,11 @@ class VSCodeBridge {
       return () => {} // already fired, nothing to unsubscribe
     }
     return this.subscribe(this.initListeners, callback)
+  }
+
+  /** The mic's level, 0..1, while hub-voice listens. */
+  onVoiceLevel(callback: (level: number) => void): () => void {
+    return this.subscribe(this.levelListeners, callback)
   }
 
   onEvent(callback: EventCallback): () => void {
@@ -242,6 +286,43 @@ class VSCodeBridge {
 
   sendHub(command: HubCommand): void {
     this.postToExtension(command)
+  }
+
+  /** Hands one file to the extension in slices (sendSlices); each crosses as an ArrayBuffer, which VS Code 1.57+ passes as is. */
+  upload(file: File, cwd: string, session: string | undefined, onProgress: (f: number) => void, signal?: AbortSignal): Promise<{ path: string } | { problem: string }> {
+    const id = Math.random().toString(36).slice(2)
+    const listen = (cb: (m: UploadAck) => void) => { this.uploads.set(id, cb); return () => { this.uploads.delete(id) } }
+    return sendSlices(file, { id, cwd, session }, m => this.postToExtension(m), listen, onProgress, signal)
+  }
+
+  /** The Memory view's graph from the extension, or why not. */
+  graph(): Promise<MemoryGraph | string> {
+    const id = Math.random().toString(36).slice(2)
+    return new Promise(done => {
+      const t = setTimeout(() => { this.graphs.delete(id); done('VS Code did not answer') }, 20_000)
+      this.graphs.set(id, m => { clearTimeout(t); this.graphs.delete(id); done(m.graph ?? m.problem ?? 'no graph') })
+      this.postToExtension({ type: 'graph-get', id })
+    })
+  }
+
+  /** A role's runs in a chat, for the node drawer, or why not. */
+  runs(sessionId: string, role: string): Promise<RunDetail[] | string> {
+    const id = Math.random().toString(36).slice(2)
+    return new Promise(done => {
+      const t = setTimeout(() => { this.runLists.delete(id); done('VS Code did not answer') }, 20_000)
+      this.runLists.set(id, m => { clearTimeout(t); this.runLists.delete(id); done(m.runs ?? m.problem ?? 'no runs') })
+      this.postToExtension({ type: 'runs-get', id, sessionId, role })
+    })
+  }
+
+  /** A chat's outputs, a transcript page or one screenshot, for the chat view. */
+  chat(sessionId: string, what: 'outputs' | 'transcript' | 'shot', ask: ChatAsk = {}): Promise<ChatAnswer> {
+    const id = Math.random().toString(36).slice(2)
+    return new Promise(done => {
+      const t = setTimeout(() => { this.chatReads.delete(id); done({ problem: 'VS Code did not answer' }) }, 30_000)
+      this.chatReads.set(id, m => { clearTimeout(t); this.chatReads.delete(id); done(m) })
+      this.postToExtension({ type: 'chat-get', id, sessionId, what, ...ask })
+    })
   }
 
   private postToExtension(message: Record<string, unknown>): void {

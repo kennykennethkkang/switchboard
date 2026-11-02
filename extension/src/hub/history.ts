@@ -52,13 +52,19 @@ function textOf(content: unknown): string {
 
 export class HistoryScanner {
   private readonly tallies = new Map<string, Tally>()
+  private running?: Promise<{ history: DayUsage[]; sessions: SessionRow[] }>
 
   constructor(
     private readonly root = path.join(os.homedir(), '.claude', 'projects'),
     private readonly days = 14,
   ) {}
 
-  async scan(now = Date.now()): Promise<{ history: DayUsage[]; sessions: SessionRow[] }> {
+  // Overlapping scans share tally offsets, so they share one run.
+  scan(now = Date.now()): Promise<{ history: DayUsage[]; sessions: SessionRow[] }> {
+    return this.running ??= this.doScan(now).finally(() => { this.running = undefined })
+  }
+
+  private async doScan(now: number): Promise<{ history: DayUsage[]; sessions: SessionRow[] }> {
     const since = now - this.days * DAY_MS
     for (const file of await this.files()) {
       let stat: fs.Stats

@@ -7,11 +7,13 @@
  * mock (switchboard-orbit-live.html); colors come from the --hub-* tokens, re-read on a theme change.
  * The canvas is a picture only: the cards and panels around it carry the same facts as text.
  */
+import { busyLine } from '@/lib/eta'
 import { useEffect, useRef } from 'react'
 import type { ChatProgress, ChatState, SessionLive } from '@/lib/hub-types'
 import { ALMOST, ORDER, STATE, almostDone } from './look'
 import { PILL_MS, SAT_ROW, TAU as TW, approach, groupRoles, orbitMoves, satSlot } from '@/lib/orbit-motion'
 import { vscodeBridge } from '@/lib/vscode-bridge'
+import { NodeButtons, placeNodes, type Hit, type ViewProps } from './orbits/parts'
 
 /** models: each role's model, drawn under its bubble. */
 export type OrbitChat = { id: string; name: string; state: ChatState; ago: string; progress?: ChatProgress; live?: SessionLive; models?: Record<string, string> }
@@ -42,8 +44,10 @@ type Scene = {
   v: Map<string, number>; seen: Set<string>; moving: boolean; glide: boolean; snap: boolean; dt: number
   spin: number; ring: Map<string, RoleOn>; sats: Map<string, string>; badge: Map<string, number>
   sub?: { text: string; prev?: string; at: number }; q?: string
+  /** Where each role's bubble is this frame, for its node button. */
+  hits: Map<string, Hit>
 }
-export const newScene = (): Scene => ({ v: new Map(), seen: new Set(), moving: false, glide: false, snap: true, dt: 0, spin: 0, ring: new Map(), sats: new Map(), badge: new Map() })
+export const newScene = (): Scene => ({ v: new Map(), seen: new Set(), moving: false, glide: false, snap: true, dt: 0, spin: 0, ring: new Map(), sats: new Map(), badge: new Map(), hits: new Map() })
 
 const KEYS = ['canvas', 'card', 'elev', 'hair', 'ink', 'body', 'mute', 'ash', 'blue', 'red', 'green', 'yellow', 'violet', 'teal'] as const
 type Pal = Record<(typeof KEYS)[number], string> & { sans: string; mono: string }
@@ -203,7 +207,10 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     if (lx > 16 && lx + lw - 15 > w - 8) { rows.push([]); lx = 16 }
     rows[rows.length - 1].push([l, col, lx]); lx += lw
   }
-  const lift = (rows.length - 1) * 16
+  // Under ~420px a role name no longer fits its bubble.
+  const narrow = w < 420
+  // Narrow, the names hang under the bubbles, so the bottom one needs room above the legend.
+  const lift = (rows.length - 1) * 16 + (narrow ? 20 : 0)
   const m = Math.min(w, h - lift), live = c.state === 'working', finished = c.state === 'done', needs = c.state === 'needs-you'
   const dim = tw('dim', c.state === 'idle' ? 0.45 : 1, TW.color)
   const fin = almostDone(c.progress) ? C.teal : C.green
@@ -324,25 +331,34 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   ctx.font = `500 12px ${C.sans}`
   const qShown = S.q ? fit(S.q, w * 0.55) : '', qBox = qText ? pillBox(cx, cy - lr - 30, qShown, { size: 12, mono: false }) : undefined
 
+  S.hits.clear()
   for (const p of pos.values()) {
     const { r, wA, wD, wU } = p
+    if (order.has(r.role) && p.on > 0.5) S.hits.set(r.role, { x: p.x, y: p.y, r: rr })
     const accent = ACCENT[r.role] ? C[ACCENT[r.role]] : undefined, quiet = r.state === 'unused' || r.state === 'waiting'
     pop(p.x, p.y, 0.6 + 0.4 * p.on, p.on, () => {
       bubble(p.x, p.y, rr, p.color, { wash: lerp(0.14, accent ? 0.06 : 0.03, wU), ring: lerp(1, 0.35, wU), glow: 14 * wA, dim, accent, tint: quiet && accent ? accent : p.color })
       // No per-role progress exists, so the active role gets a slow turning arc instead of a filling one.
       if (wA > 0.01) arc(p.x, p.y, rr - 5, -Math.PI / 2 + (still ? 0 : t * 1.6), 0.28, rgba(C.blue, 0.9 * wA), 2)
-      // Shrinks to fit the bubble, down to 9px, before it cuts the name.
-      // The fitted size is kept per name and bubble size, so a frame does not re-measure it.
-      const key = `${r.role}|${Math.round(rr)}|${C.sans}`
-      let size = labelSize.get(key) ?? Math.max(11, rr * 0.28)
-      if (!labelSize.has(key)) {
-        for (ctx.font = `500 ${size}px ${C.sans}`; size > 9 && ctx.measureText(r.role).width > rr * 1.7; size -= 0.5) ctx.font = `500 ${size - 0.5}px ${C.sans}`
-        if (labelSize.size > 200) labelSize.clear()
-        labelSize.set(key, size)
-      }
-      ctx.font = `500 ${size}px ${C.sans}`
+      const model = c.models?.[r.role]
       // An unused role reads quieter in mute, not in a faded ink that fails contrast.
-      text(fit(r.role, rr * 1.7), p.x, p.y, { size, color: mix(C.ink, C.mute, wU), alpha: dim })
+      const ink = mix(C.ink, C.mute, wU)
+      if (narrow) {
+        // Too small for the name: the model goes in the bubble and the name under it.
+        if (model) { ctx.font = `400 10px ${C.mono}`; text(fit(model, rr * 1.8), p.x, p.y, { size: 10, color: C.mute, mono: true, weight: 400, alpha: dim }) }
+      } else {
+        // Shrinks to fit the bubble, down to 9px, before it cuts the name.
+        // The fitted size is kept per name and bubble size, so a frame does not re-measure it.
+        const key = `${r.role}|${Math.round(rr)}|${C.sans}`
+        let size = labelSize.get(key) ?? Math.max(11, rr * 0.28)
+        if (!labelSize.has(key)) {
+          for (ctx.font = `500 ${size}px ${C.sans}`; size > 9 && ctx.measureText(r.role).width > rr * 1.7; size -= 0.5) ctx.font = `500 ${size - 0.5}px ${C.sans}`
+          if (labelSize.size > 200) labelSize.clear()
+          labelSize.set(key, size)
+        }
+        ctx.font = `500 ${size}px ${C.sans}`
+        text(fit(r.role, rr * 1.7), p.x, p.y, { size, color: ink, alpha: dim })
+      }
       const bx = p.x + rr * 0.72, by = p.y - rr * 0.72
       const ok = wD * (1 - wA)
       if (ok > 0.01) pop(bx, by, 0.6 + 0.4 * ok, ok, () => check(bx, by))
@@ -351,13 +367,14 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
       const kb = tw(`kb:${r.role}`, r.running.length > 1 ? 1 : 0, TW.enter, 0)
       if (kb > 0.01 && S.badge.has(r.role)) pop(bx, by, 0.7 + 0.3 * kb, kb, () => pill(bx + 4, by, `×${S.badge.get(r.role)}`, C.blue, 1, { size: 10, fg: C.ink }))
       else if (kb === 0) S.badge.delete(r.role)
-      const model = c.models?.[r.role]
-      if (model) {
-        ctx.font = `400 11px ${C.mono}`
-        const label = fit(model, rr * 2.4), half = ctx.measureText(label).width / 2 + 8
+      if (narrow || model) {
+        ctx.font = narrow ? `500 11px ${C.sans}` : `400 11px ${C.mono}`
+        const label = narrow ? r.role : fit(model!, rr * 2.4), half = ctx.measureText(label).width / 2 + 8
         let ly = p.y + rr + 11 + p.band * Math.max(0, Math.sin(p.a))
         if (qBox && p.x + half > qBox.l && p.x - half < qBox.l + qBox.pw && ly + 14 > qBox.top && ly - 14 < qBox.top + qBox.ph) ly = p.y - rr - 11 - p.band * Math.max(0, -Math.sin(p.a))
-        text(label, p.x, tw(`ly:${r.role}`, ly, TW.move), { size: 11, color: C.mute, mono: true, weight: 400, alpha: dim })
+        // never onto the legend, even with a satellite row below
+        ly = Math.min(ly, h - 34 - (rows.length - 1) * 16)
+        text(label, p.x, tw(`ly:${r.role}`, ly, TW.move), narrow ? { size: 11, color: ink, alpha: dim } : { size: 11, color: C.mute, mono: true, weight: 400, alpha: dim })
       }
     })
   }
@@ -374,7 +391,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   }
   text('Lead', cx, cy - lr * 0.16, { size: Math.max(12, lr * 0.25), weight: 600, alpha: dim })
   // The line under Lead crossfades when it changes.
-  const sub = live ? (active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : 'planning') : needs ? 'waiting on you' : finished ? (almostDone(c.progress) ? 'almost done' : 'finished') : `idle ${c.ago}`
+  const sub = live ? (active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning') : needs ? 'waiting on you' : finished ? (almostDone(c.progress) ? 'almost done' : 'finished') : `idle ${c.ago}`
   if (S.snap || !S.sub) S.sub = { text: sub, at: -1e9 }
   else if (S.sub.text !== sub) S.sub = { text: sub, prev: S.sub.text, at: now }
   const fade = Math.min(1, (now - S.sub.at) / 180)
@@ -383,8 +400,10 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   const subAt = (s: string, a: number) => {
     const size = Math.max(11, lr * 0.13)
     ctx.font = `400 ${size}px ${C.mono}`
-    const inside = ctx.measureText(s).width <= lr * 1.7
-    text(s, cx, inside ? cy + lr * 0.26 : cy + lr + 18, { size, color: C.mute, mono: true, weight: 400, alpha: dim * a })
+    const w = ctx.measureText(s).width, inside = w <= lr * 1.7, y = inside ? cy + lr * 0.26 : cy + lr + 18
+    // Outside the bubble it crosses the ring and links, so it gets a canvas-colored backing.
+    if (!inside) { ctx.beginPath(); ctx.roundRect(cx - w / 2 - 4, y - size * 0.75, w + 8, size * 1.5, 4); ctx.fillStyle = rgba(C.canvas, a); ctx.fill() }
+    text(s, cx, y, { size, color: C.mute, mono: true, weight: 400, alpha: dim * a })
   }
   if (S.sub.prev && fade < 1) subAt(S.sub.prev, 1 - fade)
   subAt(S.sub.text, fade)
@@ -409,7 +428,8 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
 }
 
 /** instant: the chat was picked from the keyboard, so it swaps with no crossfade. */
-export function Orbit({ chat, showTools, instant }: { chat: OrbitChat; showTools: boolean; instant?: boolean }) {
+export function Orbit(props: ViewProps) {
+  const { chat, showTools, instant } = props
   const stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null)
   const shown = useRef(chat), tools = useRef(showTools), born = useRef(new Map<string, number>()), redraw = useRef(() => {})
   const scene = useRef(newScene())
@@ -447,6 +467,7 @@ export function Orbit({ chat, showTools, instant }: { chat: OrbitChat; showTools
       ctx.clearRect(0, 0, W, H)
       scene.current.dt = Math.min(50, Math.max(0, dt)); last = now
       if (W && H) draw(ctx, W, H, (now - t0) / 1000, now, shown.current, tools.current, born.current, pal, motion.matches, dpr, scene.current)
+      placeNodes(stage.current, scene.current.hits)
     }
     // The loop runs only while the picture moves and can be seen; otherwise one frame is drawn and it sleeps until something changes.
     const moves = (now: number) => orbitMoves(shown.current, [...born.current.values()].map(b => now - b), tools.current, scene.current.moving)
@@ -488,6 +509,7 @@ export function Orbit({ chat, showTools, instant }: { chat: OrbitChat; showTools
   return (
     <div ref={stage} className="hub-stage" style={{ position: 'relative', width: '100%', maxWidth: '100%', minWidth: 0, borderRadius: 12, border: '1px solid var(--hub-hair)', background: 'var(--hub-canvas)', overflow: 'hidden' }}>
       <canvas ref={canvas} role="img" aria-label={describe(chat)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
+      <NodeButtons v={props} roles={ringRoles(chat.progress)} />
     </div>
   )
 }

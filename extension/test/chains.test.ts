@@ -6,9 +6,32 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { spawn } from 'child_process'
 import { dueForHandoff, idleHandedOff, matchCodexStarts, readArchive, readChains, recordArchive, recordChain, removeArchive, withChains } from '../src/hub/chains'
 
+/** Another window: holds file's lock for ms, writes body at the end, then lets go. Resolves once it holds the lock. */
+async function otherWindow(file: string, body: string, ms = 50) {
+  const lock = `${file}.lock`
+  const child = spawn(process.execPath, ['-e', `const fs=require('fs');const [l,f,b,ms]=process.argv.slice(1);fs.writeFileSync(l,'x',{flag:'wx'});setTimeout(()=>{fs.writeFileSync(f,b);fs.rmSync(l)},+ms)`, lock, file, body, String(ms)])
+  while (!fs.existsSync(lock)) await new Promise(r => setTimeout(r, 5))
+  return { exited: new Promise(r => child.on('exit', r)) }
+}
+
 describe('chains', () => {
+  it('waits for another window\'s write instead of losing it', async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'chains-')), 'chains.json')
+    const { exited: done } = await otherWindow(file, JSON.stringify({ a: 'A' }))
+    recordChain('b', 'B', file)
+    await done
+    assert.deepEqual(readChains(file), { a: 'A', b: 'B' })
+    const archive = path.join(path.dirname(file), 'archive.json')
+    const row = (id: string) => ({ sessionId: id, name: id, origin: id, version: 1, cwd: '/x', project: 'x', archivedAt: 1, ai: 'claude' as const })
+    const { exited: other } = await otherWindow(archive, JSON.stringify([row('a')]))
+    recordArchive(row('b'), archive)
+    await other
+    assert.deepEqual(readArchive(archive).map(r => r.sessionId), ['a', 'b'])
+  })
+
   it('records each old chat under its chain and reads them back', () => {
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'chains-')), 'chains.json')
     assert.deepEqual(readChains(file), {})

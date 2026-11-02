@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gearRows, roleModels } from './gear-rows'
+import { gearRows, keywordHit, roleModels } from './gear-rows'
 import type { Connection, Installed } from './hub-types'
 import { demoHub } from './hub-demo'
 
@@ -61,4 +61,14 @@ test('the demo roles carry models', () => {
   const m = roleModels(h.installed, h.controls.claude.model)
   assert.equal(m.engineer, 'opus')
   assert.ok(Object.keys(m).length >= 5)
+})
+
+test('keywordHit matches a word start, not any letter inside', () => {
+  const words = 'accounts sign-ins logins aws'
+  assert.equal(keywordHit(words, 'acc'), true)
+  assert.equal(keywordHit(words, 'aws'), true)
+  assert.equal(keywordHit(words, 'sign'), true)
+  assert.equal(keywordHit(words, 'o'), false)
+  assert.equal(keywordHit(words, 'ins'), false)
+  assert.equal(keywordHit(words, ''), false)
 })

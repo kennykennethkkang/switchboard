@@ -1,6 +1,7 @@
 <!-- The design reference for the Switchboard page (web/components/switchboard).
      Copied from Armasu's design-md folder: design-md/raycast/DESIGN.md.
-     The page keeps these values as its dark theme and derives a light one in web/app/globals.css. -->
+     The page keeps these values as its dark theme and derives a light one in web/app/globals.css.
+     The hub sets type in Hanken Grotesk, not Inter, on purpose. -->
 
 ---
 version: alpha

@@ -4,7 +4,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { Installed } from '../src/hub/types'
-import { FLAGGED, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, fallbackProfile, startProfile, parsePick, pickProfile, pickPrompt, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, TOOLS_NOTE, PROMPT_MAX } from '../src/hub/tools'
+import { FLAGGED, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, fallbackProfile, startProfile, parsePick, pickProfile, pickPrompt, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE, PROMPT_MAX } from '../src/hub/tools'
 
 const inv: Installed[] = [
   { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, description: 'TDD and plans' },
@@ -26,12 +26,33 @@ test('defaultProfile: every plugin on, mods and archived skills left out', () =>
   })
 })
 
-test('defaultProfile: nothing flagged, so auth0 and Stitch start on', () => {
-  assert.deepEqual(FLAGGED, [])
+test('defaultProfile: auth0 and Stitch start on, the audited duplicates start off', () => {
   const all = defaultProfile(['auth0@claude-plugins-official', 'stitch-design@google-labs-code-stitch-skills'].map(name => ({ kind: 'plugin' as const, name, enabled: false })))
   assert.ok(Object.values(all.plugins).every(Boolean))
-  const d = defaultProfile(FLAGGED.map(name => ({ kind: 'plugin' as const, name, enabled: true })))
-  for (const name of FLAGGED) assert.equal(d.plugins[name], false, name)
+  for (const name of ['security-guidance@claude-code-plugins', 'code-simplifier@claude-plugins-official', 'github@claude-plugins-official', 'image-to-code-skill', 'gsap-greensock']) assert.ok(FLAGGED.includes(name), name)
+  const d = defaultProfile(FLAGGED.map(name => ({ kind: name.includes('@') ? 'plugin' as const : 'skill' as const, name, enabled: true })))
+  for (const name of FLAGGED) assert.equal((name.includes('@') ? d.plugins : d.skills)[name], false, name)
+})
+
+test('flagged skills: a pick never turns one on or lists it, a hand toggle and tool_on still can', () => {
+  const withFlagged: Installed[] = [...inv, { kind: 'skill', name: 'gsap-greensock', enabled: true }, { kind: 'plugin', name: 'code-simplifier@claude-plugins-official', enabled: true }]
+  const p = parsePick('{"plugins":[],"skills":[]}', withFlagged)!
+  assert.equal(p.skills['gsap-greensock'], false)
+  assert.equal(p.plugins['code-simplifier@claude-plugins-official'], false)
+  assert.doesNotMatch(pickPrompt('animate the hero', withFlagged), /gsap-greensock|code-simplifier/)
+  assert.equal(fallbackProfile('use gsap here', withFlagged).skills['gsap-greensock'], false)
+  assert.equal(cleanProfile({ plugins: {}, skills: { 'gsap-greensock': true } }, withFlagged).skills['gsap-greensock'], true)
+  assert.equal(turnOn(p, withFlagged, 'gsap-greensock')?.profile.skills['gsap-greensock'], true)
+})
+
+test('fallbackProfile: platform kits (codex, Expo, Swift, image generation) off unless the goal names them', () => {
+  const more: Installed[] = [{ kind: 'plugin', name: 'codex@openai-codex', enabled: true }, ...['animate-expo', 'write-swift', 'imagegen-frontend-web'].map(name => ({ kind: 'skill' as const, name, enabled: true }))]
+  const p = fallbackProfile('fix the window routing', more)
+  assert.equal(p.plugins['codex@openai-codex'], false)
+  assert.deepEqual(p.skills, { 'animate-expo': false, 'write-swift': false, 'imagegen-frontend-web': false })
+  assert.equal(fallbackProfile('ask Codex to review', more).plugins['codex@openai-codex'], true)
+  assert.equal(fallbackProfile('port the sheet to Swift', more).skills['write-swift'], true)
+  assert.equal(fallbackProfile('Expo screen transitions', more).skills['animate-expo'], true)
 })
 
 test('startProfile: no goal is the defaults with no model call; nothing installed is none', async () => {
@@ -386,4 +407,12 @@ test('turnOn: a plugin by id, short name or plugin:skill, or a skill, and the fi
   assert.equal(turnOn(off, withDir, '/phone')?.profile.skills.phone, true)
   assert.equal(turnOn(off, withDir, 'local-one', proj)?.use, path.join(proj, '.agents', 'skills', 'local-one', 'SKILL.md'))
   assert.equal(turnOn(off, withDir, 'nope'), undefined)
+})
+
+test('withLibrary: a profile saved before the library gets every look, off; ones it has stay as set', () => {
+  const lib: Installed[] = ['airbnb', 'stripe'].map(b => ({ kind: 'asset', name: b, enabled: true, source: 'library', path: `/l/${b}/DESIGN.md` }))
+  assert.deepEqual(withLibrary({ plugins: {}, skills: {} }, lib).assets, { '/l/airbnb/DESIGN.md': false, '/l/stripe/DESIGN.md': false })
+  const p = { plugins: {}, skills: {}, assets: { 'x.md': true, '/l/stripe/DESIGN.md': true } }
+  assert.deepEqual(withLibrary(p, lib).assets, { '/l/airbnb/DESIGN.md': false, 'x.md': true, '/l/stripe/DESIGN.md': true })
+  assert.equal(withLibrary({ plugins: {}, skills: {} }, []).assets, undefined)
 })

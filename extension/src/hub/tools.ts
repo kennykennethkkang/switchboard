@@ -16,8 +16,13 @@ import type { HubService } from './hub-service'
 import { libraryInventory, projectInventory } from './local'
 
 export const PROFILES = path.join(os.homedir(), '.claude', 'switchboard', 'chat-profiles')
-// A pick never turns these on; Kenneth can, per chat. Empty since auth0 and Stitch were audited; paid-guard asks before a Stitch upload.
-export const FLAGGED: string[] = []
+// Plugin ids and skill names a pick never turns on; Kenneth can, per chat, and tool_on can. auth0 and Stitch stay off this list.
+// Duplicates or noise: the second security-guidance, code-simplifier (ponytail and /simplify), github MCP (gh CLI),
+// image-to-code (written for Codex), gsap-greensock (gsap-scrolltrigger covers GSAP).
+export const FLAGGED: string[] = [
+  'security-guidance@claude-code-plugins', 'code-simplifier@claude-plugins-official', 'github@claude-plugins-official',
+  'image-to-code-skill', 'gsap-greensock',
+]
 // Plugins every chat keeps, by the name before the @.
 export const ALWAYS = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
 export const PICK_MS = 20000
@@ -46,13 +51,13 @@ const fix = (id: string, on: boolean) => (ALWAYS.includes(short(id)) ? true : FL
 export function defaultProfile(inv: Installed[]): ChatProfile {
   return {
     plugins: Object.fromEntries(plugins(inv).map(p => [p.name, fix(p.name, true)])),
-    skills: Object.fromEntries(skills(inv).map(s => [s.name, true])),
+    skills: Object.fromEntries(skills(inv).map(s => [s.name, !FLAGGED.includes(s.name)])),
     ...assetMap(inv, a => !isLib(a)),
   }
 }
 
 // Tool-specific kits a failed pick still turns off unless the goal names them, the pick prompt's own rule.
-const NICHE = ['aws', 'bland', 'marketing', 'jev']
+const NICHE = ['aws', 'bland', 'marketing', 'jev', 'codex', 'expo', 'swift', 'imagegen']
 const niche = (name: string, goal: string) => NICHE.some(k => short(name).includes(k) && !new RegExp(`\\b${k}`, 'i').test(goal))
 
 /** A pick that failed or was slow: the defaults minus the NICHE kits the goal does not name. */
@@ -70,6 +75,12 @@ export function cleanProfile(p: ChatProfile, inv: Installed[]): ChatProfile {
   return { plugins: pick(p.plugins ?? {}, d.plugins), skills: pick(p.skills ?? {}, d.skills), ...(d.assets ? { assets: pick(p.assets ?? {}, d.assets) } : {}) }
 }
 
+/** Library looks a saved profile lacks (saved before the library shipped), added off so the panel can list them. */
+export function withLibrary(p: ChatProfile, lib: Installed[]): ChatProfile {
+  const add = library(lib).filter(a => !(a.path! in (p.assets ?? {})))
+  return add.length ? { ...p, assets: { ...Object.fromEntries(add.map(a => [a.path!, false])), ...p.assets } } : p
+}
+
 /** context: projectContext() of the chat's folder. Past PROMPT_MAX, library then asset descriptions go first, then the rest. */
 export function pickPrompt(goal: string, inv: Installed[], context = ''): string {
   const build = (desc: number, assetDesc: number, libDesc: number) => {
@@ -78,7 +89,7 @@ export function pickPrompt(goal: string, inv: Installed[], context = ''): string
     return [
       'Every Claude Code plugin, skill and design reference below starts on. Name the ones to turn off because this coding task clearly will not use them; everything left on costs context in every turn. When unsure, keep it on.',
       'For UI, styling or visual work, keep the design plugins and skills (impeccable, frontend-design, design and animation skills) and every design reference on.',
-      'Turn off tool-specific plugins and skills (claude-x-jev and jev-*, aws-*, voice or phone agents, marketing) unless the task names that tool or job.',
+      'Turn off tool-specific plugins and skills (claude-x-jev and jev-*, aws-*, voice or phone agents, marketing, codex, Expo, Swift, image generation) unless the task names that tool or job.',
       'Turn off design references for work with no UI.',
       ...(lib.length
         ? [`The design library starts off. For UI work that names or fits one of those looks, turn on up to ${MAX_LIBRARY} in "library"; else leave it empty.`,
@@ -87,7 +98,7 @@ export function pickPrompt(goal: string, inv: Installed[], context = ''): string
       '', `Task: ${goal.slice(0, 600)}`,
       ...(context ? ['', 'Project:', context.slice(0, 2000)] : []),
       '', 'Plugins:', ...plugins(inv).filter(p => !FLAGGED.includes(p.name) && !ALWAYS.includes(short(p.name))).map(line(desc)),
-      '', 'Skills:', ...skills(inv).map(line(desc)),
+      '', 'Skills:', ...skills(inv).filter(s => !FLAGGED.includes(s.name)).map(line(desc)),
       ...(as.length ? ['', 'Design references:', ...as.map(line(assetDesc))] : []),
       ...(lib.length ? ['', 'Design library:', ...lib.map(line(libDesc))] : []),
     ].join('\n')
@@ -110,7 +121,7 @@ export function parsePick(answer: string, inv: Installed[]): ChatProfile | undef
   const off = new Set(paths(j.assets, assets(inv))), on = new Set(paths(j.library, library(inv)).slice(0, MAX_LIBRARY))
   return {
     plugins: Object.fromEntries(plugins(inv).map(p => [p.name, fix(p.name, !ps.has(p.name) && !ps.has(short(p.name)))])),
-    skills: Object.fromEntries(skills(inv).map(s => [s.name, !ss.has(s.name)])),
+    skills: Object.fromEntries(skills(inv).map(s => [s.name, !ss.has(s.name) && !FLAGGED.includes(s.name)])),
     ...assetMap(inv, a => (isLib(a) ? on.has(a.path!) : !off.has(a.path!))),
   }
 }
@@ -170,16 +181,16 @@ const NO_REMOTE_ARG = JSON.stringify(NO_REMOTE)
 /** A chat that must never connect to Remote Control (a To-do run) has an empty <id>.noremote here; every writer and reader checks it. */
 export const isNoRemote = (id: string, dir = PROFILES) => ID.test(id) && fs.existsSync(fileOf(id, dir, 'noremote'))
 function markNoRemote(id: string, dir: string): void {
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(fileOf(id, dir, 'noremote'), '')
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
+  fs.writeFileSync(fileOf(id, dir, 'noremote'), '', { mode: 0o600 })
 }
 
 /** Writes the profile and the settings file made from it, Remote Control off for a no-remote chat; returns the settings file's path. */
 export function saveProfile(id: string, p: ChatProfile, dir = PROFILES): string {
   const file = fileOf(id, dir, 'settings.json')
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(fileOf(id, dir), `${JSON.stringify(p, null, 2)}\n`)
-  fs.writeFileSync(file, `${JSON.stringify({ ...profileSettings(p), ...(isNoRemote(id, dir) ? NO_REMOTE : {}) }, null, 2)}\n`)
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
+  fs.writeFileSync(fileOf(id, dir), `${JSON.stringify(p, null, 2)}\n`, { mode: 0o600 })
+  fs.writeFileSync(file, `${JSON.stringify({ ...profileSettings(p), ...(isNoRemote(id, dir) ? NO_REMOTE : {}) }, null, 2)}\n`, { mode: 0o600 })
   return file
 }
 

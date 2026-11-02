@@ -162,6 +162,24 @@ describe('writeJsonAtomic', () => {
     assert.equal(fs.readFileSync(file, 'utf-8'), '{\n  "a": 1\n}\n')
     assert.deepEqual(fs.readdirSync(path.dirname(file)), ['settings.json'])
   })
+
+  it('makes a new file owner-only', () => {
+    const file = path.join(tmpDir(), 'new.json')
+    writeJsonAtomic(file, {})
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600)
+  })
+
+  it('writes through a symlink and keeps the file mode', () => {
+    const dir = tmpDir()
+    const real = path.join(dir, 'dotfiles-settings.json')
+    const link = path.join(dir, 'settings.json')
+    fs.writeFileSync(real, '{}\n', { mode: 0o600 })
+    fs.symlinkSync(real, link)
+    writeJsonAtomic(link, { a: 1 })
+    assert.ok(fs.lstatSync(link).isSymbolicLink())
+    assert.equal(fs.readFileSync(real, 'utf-8'), '{\n  "a": 1\n}\n')
+    assert.equal(fs.statSync(real).mode & 0o777, 0o600)
+  })
 })
 
 describe('HOOK_EVENTS', () => {

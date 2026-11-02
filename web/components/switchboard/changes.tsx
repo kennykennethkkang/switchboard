@@ -22,7 +22,7 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen }
         <span>Changes{mine ? ` · ${files.length} ${files.length === 1 ? 'file' : 'files'}` : ''}</span>
         {files.length > 0 && <Counts a={files.reduce((n, f) => n + f.added, 0)} r={files.reduce((n, f) => n + f.removed, 0)} />}
       </h3>
-      {!mine && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading the changes in {repoOf(cwd)}...</p>}
+      {!mine && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading the changes in {repoOf(cwd)}…</p>}
       {mine && !files.length && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No uncommitted changes in {repoOf(cwd)}.</p>}
       {files.length > 0 && <>
         <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 12 }}>Uncommitted in {repoOf(cwd)}: other chats in this folder may have made some of these.</p>
@@ -52,7 +52,7 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen }
       </>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {commit && <CopyCommit small text={commit} onCopy={onCopy} />}
-        {target && <button type="button" className="hub-btn" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => onOpen(target.path)}
+        {target && <button type="button" className="hub-btn sm" onClick={() => onOpen(target.path)}
           title={`Opens ${target.path} against the last commit`}>Open in VS Code diff</button>}
       </div>
     </section>

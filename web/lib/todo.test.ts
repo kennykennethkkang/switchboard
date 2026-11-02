@@ -1,11 +1,24 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { inside, openElsewhere, ordered, runCount, runIds, runLanded, runTargets } from './todo'
+import { finishUp, inside, openElsewhere, ordered, runCount, runIds, runLanded, runTargets, withHome } from './todo'
 import type { ChatRow, TodoItem } from './hub-types'
 
 const t = (id: string, before?: string): TodoItem => ({ id, text: id, at: 1, ...(before ? { before } : {}) })
 
 describe('todo panel helpers', () => {
+  it('adds an empty list for the chat\'s folder only when no listed project holds it', () => {
+    const lists = { '/r/a': { todo: [t('x')] } }
+    assert.equal(withHome(lists, '/r/a/web'), lists)
+    assert.deepEqual(withHome(lists, '/r/b'), { ...lists, '/r/b': { todo: [] } })
+    assert.deepEqual(withHome(undefined, '/r/b'), { '/r/b': { todo: [] } })
+    assert.deepEqual(withHome(undefined), {})
+  })
+  it('groups Kenneth\'s hand steps by chat, from the tray and from older accepted items', () => {
+    const you = (id: string, name?: string): TodoItem => ({ id, text: id, at: 1, why: 'you', ...(name ? { name } : {}) })
+    const groups = finishUp({ todo: [t('a'), you('old', 'Fix login')], suggested: [you('s1', 'Fix login'), you('s2'), { ...t('s3'), why: 'later' }] })
+    assert.deepEqual(groups.map(([n, xs]) => [n, xs.map(x => x.id)]), [['Fix login', ['s1', 'old']], ['a chat', ['s2']]])
+    assert.deepEqual(finishUp({ todo: [t('a')] }), [])
+  })
   it('puts each prerequisite indented directly above its item; one whose item is gone stands alone', () => {
     const rows = ordered([t('a'), t('b'), t('p', 'b'), t('pp', 'p'), t('q', 'gone')])
     assert.deepEqual(rows.map(r => [r.t.id, r.depth]), [['a', 0], ['pp', 2], ['p', 1], ['b', 0], ['q', 0]])

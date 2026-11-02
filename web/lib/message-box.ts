@@ -1,4 +1,5 @@
 import type { ChatRow } from './hub-types'
+import type { HubCommand } from './vscode-bridge'
 
 /** Why the message box cannot reach a chat, shown in place of it; none when it can. */
 export function boxNote(chat: ChatRow): string | undefined {
@@ -7,4 +8,9 @@ export function boxNote(chat: ChatRow): string | undefined {
   return chat.ai === 'codex'
     ? 'This Codex chat was not started or resumed from Switchboard in this window, or has quit, so messages cannot reach it. Type in its terminal.'
     : 'This chat is not collecting messages: it is not running, or the usage-meter mod is not on in it. Type in its terminal.'
+}
+
+/** The failure text for this send only: a late failure of an earlier send is not this one's. */
+export function sendFailure(sent: HubCommand | undefined, problem: { text: string; at: number; for?: HubCommand } | null): string | undefined {
+  return sent && problem?.for === sent ? problem.text : undefined
 }

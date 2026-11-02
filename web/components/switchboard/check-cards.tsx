@@ -6,7 +6,7 @@ import { short } from '@/lib/pr-card'
 import { usePopover } from './use-popover'
 
 const mono = { font: '400 12px/1.5 var(--hub-mono)' } as const
-const pillStyle = { marginLeft: 'auto', padding: '6px 14px', fontSize: 12, borderRadius: 99 } as const
+const pillStyle = { marginLeft: 'auto' } as const
 const CI: Record<string, { color: string; word: string }> = {
   running: { color: 'var(--hub-yellow)', word: 'Running' }, failed: { color: 'var(--hub-red)', word: 'Failed' },
   passed: { color: 'var(--hub-green)', word: 'Passed' }, other: { color: 'var(--hub-ash)', word: 'Ended' },
@@ -19,18 +19,18 @@ const Dot = ({ color, size = 8 }: { color: string; size?: number }) => <i aria-h
 function Hint({ label, color, children }: { label: ReactNode; color: string; children: ReactNode }) {
   const p = usePopover()
   return (
-    <span {...p.wrap} style={{ position: 'relative', minWidth: 0 }}>
+    <span {...p.wrap} className="hub-tip-at">
       <button type="button" className="hub-link" {...p.button}
         style={{ padding: '2px 0', fontSize: 12, color, textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'color-mix(in srgb, currentColor 45%, transparent)' }}>{label}</button>
-      {p.open && <div id={p.id} role="tooltip" style={{ position: 'absolute', left: 0, top: '100%', paddingTop: 6, zIndex: 5, width: 'min(520px, 86vw)' }}><div style={{ display: 'grid', gap: 8, padding: 12, borderRadius: 10,
-        background: 'var(--hub-elev)', border: '1px solid var(--hub-hair-strong)', boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)' }}>{children}</div></div>}
+      {p.open && <div id={p.id} role="tooltip" className="hub-tip"><div style={{ display: 'grid', gap: 8, padding: 12, borderRadius: 10,
+        background: 'var(--hub-elev)', border: '1px solid var(--hub-hair-strong)', boxShadow: 'var(--hub-shadow-pop)' }}>{children}</div></div>}
     </span>
   )
 }
 
 const Shell = ({ head, foot, line }: { head: ReactNode; foot: ReactNode; line: string }) => (
   <div style={{ display: 'grid', gap: 8 }}>
-    <div style={{ border: '1px solid var(--hub-hair)', borderRadius: 10, background: 'var(--hub-canvas)', minWidth: 0 }}>
+    <div className="hub-tip-box" style={{ border: '1px solid var(--hub-hair)', borderRadius: 10, background: 'var(--hub-canvas)', minWidth: 0 }}>
       <div style={{ display: 'grid', gap: 4, padding: 12 }}>{head}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: '1px solid var(--hub-hair)' }}>{foot}</div>
     </div>
@@ -53,7 +53,7 @@ export function TestsCard({ run: t, onSend }: { run: TestRun; onSend?: () => voi
       {t.tail?.length ? <Hint label="Last lines of output" color="var(--hub-red)">
         <pre style={{ ...mono, margin: 0, color: 'var(--hub-body)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{t.tail.join('\n')}</pre>
       </Hint> : <span style={{ fontSize: 12, color: 'var(--hub-ash)' }}>No output</span>}
-      {onSend && <button type="button" className="hub-btn primary" onClick={onSend} title="Sends the command and its last lines to this chat" style={pillStyle}>Send to chat</button>}
+      {onSend && <button type="button" className="hub-btn primary sm" onClick={onSend} title="Sends the command and its last lines to this chat" style={pillStyle}>Send to chat</button>}
     </>} />
 }
 
@@ -82,6 +82,6 @@ export function CiCard({ run: c, busy, onOpen, onRerun }: { run: CiRun; busy: bo
         </div>)}
       </Hint>}
       <button type="button" className="hub-link" onClick={onOpen} style={{ padding: '2px 0', fontSize: 12, marginLeft: failed ? undefined : 'auto' }}>Open run ↗</button>
-      {failed && <button type="button" className="hub-btn primary" disabled={busy} onClick={onRerun} title={`gh run rerun ${c.id} --failed`} style={pillStyle}>Re-run failed</button>}
+      {failed && <button type="button" className="hub-btn primary sm" disabled={busy} onClick={onRerun} title={`gh run rerun ${c.id} --failed`} style={pillStyle}>Re-run failed</button>}
     </>} />
 }

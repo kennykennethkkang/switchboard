@@ -6,16 +6,20 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 export function Sheet({ title, wide, onClose, children }: { title: string; wide?: boolean; onClose: () => void; children: ReactNode }) {
   const [was] = useState(() => typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null)
   const box = useRef<HTMLDialogElement>(null)
+  // An Escape a menu or field inside already used (preventDefault) only backs out of that, not the sheet.
+  const used = useRef(false)
   useEffect(() => {
     const d = box.current
     if (!d) return
     if (!d.open) d.showModal()
-    if (!d.contains(document.activeElement) || document.activeElement === d) d.querySelector<HTMLElement>('[autofocus], input, textarea, select, button:not([data-close])')?.focus()
+    // showModal lands on Close; the first field is what a sheet is opened for.
+    d.querySelector<HTMLElement>('[autofocus], input, textarea, select, button:not([data-close])')?.focus()
     return () => { d.close(); was?.focus?.() }
   }, [was])
   return (
     <dialog ref={box} aria-label={title} className={`hub-sheet${wide ? ' wide' : ''}`}
-      onCancel={e => { e.preventDefault(); onClose() }}
+      onKeyDown={e => { if (e.key === 'Escape' && e.defaultPrevented) { used.current = true; setTimeout(() => { used.current = false }) } }}
+      onCancel={e => { e.preventDefault(); if (!used.current) onClose() }}
       // A press on the dialog itself, not its content, is on the backdrop.
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="hub-sheet-in">

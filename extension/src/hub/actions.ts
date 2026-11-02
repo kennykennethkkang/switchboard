@@ -15,8 +15,8 @@ import { AIS, chatTerminal, cliPath, codexPaste, codexReady } from './ais'
 import { quickAsk, withBrief } from './brain'
 import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
-import { awsBinary, chromeCall, profileFor, readPrefs, validProfileName, writeOpenChrome, writePrefs } from './aws'
-import { SHELL, chainBase, scriptBody, scriptLine, chainVersion, cloneTarget, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
+import { awsBinary, browserEnv, chromeCall, chromeChoice, loginError, rowText, profileFor, readPrefs, readSessions, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
+import { SHELL, chainBase, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
 import { insideCwd, libraryInventory, projectContext, projectInventory, safeFile } from './local'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
@@ -34,7 +34,7 @@ const OWN_CHAT = { CLAUDE_CODE_CHILD_SESSION: null }
 /** A chat terminal's env: no child marker, and the AWS profile picked for its folder (Sign-ins). */
 const chatEnv = (cwd: string): Record<string, string | null> => {
   const p = profileFor(hub.get().signIns.projects, cwd), b = profileFor(hub.get().signIns.browsers ?? {}, cwd)
-  return { ...OWN_CHAT, ...(p && validProfileName(p) ? { AWS_PROFILE: p } : {}), ...(b ? { BROWSER: writeOpenChrome(), SWITCHBOARD_CHROME_DIR: b } : {}) }
+  return { ...OWN_CHAT, ...(p && validProfileName(p) ? { AWS_PROFILE: p } : {}), ...browserEnv(chromeChoice(undefined, b, knownChrome()).dir, writeOpenChrome()) }
 }
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
 // A Codex chat has no pid to stop: the terminal Switchboard started it in, by session id. A terminal waits in
@@ -90,30 +90,6 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
   return t
 }
 
-export function openProject(folder: string, newWindow: boolean): void {
-  if (!hub.get().projects.some(p => p.path === folder)) return
-  void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folder), { forceNewWindow: newWindow })
-}
-
-export async function cloneProject(repo: string, newWindow: boolean, root: string): Promise<void> {
-  // hub-panel.ts refuses a repo with no target before this runs.
-  const target = cloneTarget(repo)
-  if (!target) return
-  const dest = path.join(root, target.name)
-  if (!fs.existsSync(dest)) {
-    const ok = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Cloning ${target.name}` }, () =>
-      new Promise<boolean>(resolve => execFile('git', ['clone', '--', target.url, dest],
-        // No prompt to hang on: a private repo without saved credentials fails and says so.
-        { timeout: 10 * 60_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } },
-        err => {
-          if (err) void vscode.window.showWarningMessage(`Switchboard: git clone failed (${err.message.split('\n')[0]}).`)
-          resolve(!err)
-        })))
-    if (!ok) return
-  }
-  void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dest), { forceNewWindow: newWindow })
-}
-
 /**
  * A chat in its own terminal, named by a short title made from the goal (the project's name
  * with no goal). Remote Control gets the same title: its name outranks --name. Answers why it could not start.
@@ -145,7 +121,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
     const sessionId = id ?? (profile ? crypto.randomUUID() : undefined)
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, profileFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
@@ -161,7 +137,7 @@ const devTerminal = (project: string) => vscode.window.terminals.find(t => t.nam
 /**
  * A project's dev server as its terminal's own process, like a Codex chat: Ctrl+C, a crash or Stop ends the
  * terminal too. A second press brings the running one up. False when it was already running.
- * ponytail: found by name, so two projects with one folder name share a terminal.
+ * Found by name, so two projects with one folder name share a terminal.
  */
 export function startDev(folder: string, project: string, command: string): boolean {
   const open = devTerminal(project)
@@ -263,7 +239,7 @@ export function openNote(sessionId: string): string | undefined {
 
 /** Shows the terminal a chat runs in, found by its name; false when none matches. */
 export function focusChat(sessionId: string): boolean {
-  // ponytail: name matching misses chats not started from Switchboard; match by pid (the chat is a child of the terminal's shell) if that matters.
+  // Name matching misses chats not started from Switchboard; match by pid (the chat is a child of the terminal's shell) if that matters.
   const name = hub.get().chats.find(c => c.sessionId === sessionId)?.name
   const t = name ? vscode.window.terminals.find(x => x.name.endsWith(`: ${name}`)) : undefined
   t?.show()
@@ -402,7 +378,7 @@ export async function runSetup(ext: string): Promise<void> {
   const key = await vscode.window.showInputBox({ title: 'Switchboard setup', prompt: '21st.dev API key for Magic (from 21st.dev/mcp). Leave empty to skip.', password: true, ignoreFocusOut: true })
   if (key === undefined) return
   const kit = JSON.parse(fs.readFileSync(path.join(ext, 'kit', 'setup.json'), 'utf8')) as SetupKit
-  const steps = setupSteps(kit, { ...setupState(os.homedir()), key21st: !!key.trim(), modsDir: path.join(ext, 'kit', 'mods') })
+  const steps = setupSteps(kit, { ...setupState(os.homedir()), key21st: !!key.trim(), modsDir: path.join(ext, 'kit', 'mods'), keys: hub.get().signIns.keys })
   const plan = path.join(os.tmpdir(), 'switchboard-setup.json')
   fs.writeFileSync(plan, JSON.stringify(steps))
   vscode.window.terminals.find(t => t.name === 'Switchboard setup')?.dispose()
@@ -437,43 +413,76 @@ export const rcServers = () => [{ folder: RC_ROOT(), name: RC_NAME, on: vscode.w
 
 const LOGIN_MS = 5 * 60 * 1000
 
+/** A sign-in's failure or fallback note on its row (aws:<profile>, login:<app>:<id>); no text clears it. */
+function rowSet(slot: 'errors' | 'notes', key: string, text?: string): void {
+  const si = hub.get().signIns
+  const next = rowText(si[slot], key, text)
+  if (next) hub.set({ signIns: { ...si, [slot]: next } })
+}
+export const signInError = (key: string, text?: string) => rowSet('errors', key, text)
+const signInNote = (key: string, text?: string) => rowSet('notes', key, text)
+
+/** Chrome's profile folders, and the row note when a pick was skipped for being deleted from Chrome. */
+const knownChrome = () => hub.get().signIns.chrome.map(c => c.dir)
+function goneNote(gone: string[], dir: string): string | undefined {
+  if (!gone.length) return undefined
+  const to = dir ? `Chrome: ${hub.get().signIns.chrome.find(c => c.dir === dir)?.name ?? dir}` : 'Chrome, last used profile'
+  return `Chrome no longer has ${gone.join(' or ')}, so this opened in ${to}.`
+}
+
 /**
- * `aws login --profile <p>` with no stdin, opened in the picked Chrome profile (or the system browser when chrome is '').
- * Python's webbrowser runs BROWSER, a fixed script; the Chrome folder rides in the env and must be one Chrome lists.
- * The choice is kept per profile. done: called when it ends, signed in or not.
+ * `aws login --profile <p>` with no stdin, opened in Chrome: the profile's own pick (chrome, else the saved one),
+ * else the project's browser, else Chrome's last used profile; a pick Chrome no longer lists is skipped, with a note.
+ * Python's webbrowser runs BROWSER, a fixed script; the Chrome folder rides in the env. The own pick is kept per
+ * profile, a deleted one dropped. done: called when it ends, signed in or not.
  */
-export function awsLogin(profile: string, chrome: string | undefined, done: () => void): string | undefined {
+export function awsLogin(profile: string, chrome: string | undefined, done: () => void, project?: string): string | undefined {
   if (!validProfileName(profile)) return 'Not a profile name'
-  const dir = chrome || ''
-  if (dir && !hub.get().signIns.chrome.some(c => c.dir === dir)) return 'That Chrome profile is not in Chrome\'s list'
   const prefs = readPrefs()
-  writePrefs({ ...prefs, chrome: { ...prefs.chrome, [profile]: dir } })
+  const own = chrome ?? prefs.chrome[profile] ?? ''
+  const { dir, gone } = chromeChoice(own, project, knownChrome())
+  writePrefs({ ...prefs, chrome: { ...prefs.chrome, [profile]: gone.includes(own) ? '' : own } })
+  const key = `aws:${profile}`
+  signInError(key)
+  signInNote(key, goneNote(gone, dir))
   const env: NodeJS.ProcessEnv = { ...process.env }
-  if (dir) { env.BROWSER = writeOpenChrome(); env.SWITCHBOARD_CHROME_DIR = dir }
+  // A script that fails (no Chrome) makes webbrowser fall back to the default browser.
+  const script = writeOpenChrome()
+  if (script) { env.BROWSER = script; env.SWITCHBOARD_CHROME_DIR = dir }
   const child = spawn(awsBinary(), ['login', '--profile', profile], { stdio: ['ignore', 'pipe', 'pipe'], env, windowsHide: true })
   let out = ''
   const keep = (b: Buffer) => { out = (out + b.toString()).slice(-4000) }
   child.stdout.on('data', keep); child.stderr.on('data', keep)
   const timer = setTimeout(() => child.kill(), LOGIN_MS)
-  child.on('error', err => { clearTimeout(timer); void vscode.window.showWarningMessage(`Switchboard: aws login could not start (${err.message}).`); done() })
+  child.on('error', err => { clearTimeout(timer); signInError(key, `aws login could not start: ${err.message}`); done() })
   child.on('close', code => {
     clearTimeout(timer)
-    if (code === 0) void vscode.window.showInformationMessage(`Switchboard: signed in to AWS as ${profile}.`)
-    else void vscode.window.showWarningMessage(`Switchboard: aws login --profile ${profile} did not finish${out.trim() ? ` (${out.trim().split('\n').pop()?.slice(0, 200)})` : ''}.`)
+    if (code === 0) {
+      writeSessions({ ...readSessions(), [profile]: { at: Date.now() } })
+      void vscode.window.showInformationMessage(`Switchboard: signed in to AWS as ${profile}.`)
+    } else {
+      const why = code === null ? `No sign-in within ${LOGIN_MS / 60_000} minutes, so aws login was stopped.` : loginError(out) || `aws login exited with code ${code}.`
+      signInError(key, why)
+      void vscode.window.showWarningMessage(`Switchboard: aws login --profile ${profile} did not finish: ${why.split('\n').pop()}`)
+    }
     done()
   })
   return undefined
 }
 
-/** A saved web login's URL in its Chrome profile, through the same helper aws login uses, or the system browser. */
-export function openLogin(url: string, chrome: string | undefined): string | undefined {
+/** A saved web login's URL in Chrome, picked as awsLogin picks (own, project, last used). key: its row for notes and errors. */
+export function openLogin(url: string, own: string | undefined, project: string | undefined, key?: string): string | undefined {
   if (!/^https?:\/\//.test(url)) return 'Not a web address'
-  if (!chrome) { void vscode.env.openExternal(vscode.Uri.parse(url)); return undefined }
-  if (!hub.get().signIns.chrome.some(c => c.dir === chrome)) return 'That Chrome profile is not in Chrome\'s list'
-  const c = chromeCall(url, chrome)
-  if (!c) return 'Chrome not found'
-  execFile(c.cmd, c.args, { timeout: 10_000, windowsHide: true }, err => {
-    if (err) void vscode.window.showWarningMessage(`Switchboard: could not open Chrome (${err.message}).`)
+  const known = knownChrome()
+  const { dir, gone } = chromeChoice(own, project, known)
+  const c = known.length ? chromeCall(url, dir) : undefined
+  if (!c) { void vscode.env.openExternal(vscode.Uri.parse(url)); return undefined }
+  if (key) { signInError(key); signInNote(key, goneNote(gone, dir)) }
+  execFile(c.cmd, c.args, { timeout: 10_000, windowsHide: true }, (err, _out, stderr) => {
+    if (!err) return
+    const why = `Could not open Chrome: ${loginError(String(stderr)) || err.message}`
+    if (key) signInError(key, why)
+    else void vscode.window.showWarningMessage(`Switchboard: ${why}`)
   })
   return undefined
 }

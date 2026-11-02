@@ -5,7 +5,7 @@
  * Key files beside them are never opened. Called from hub-panel.ts.
  */
 import * as fs from 'fs'
-import { execFile, execFileSync } from 'child_process'
+import { execFile } from 'child_process'
 import * as os from 'os'
 import * as path from 'path'
 import type { ChatRow } from './types'
@@ -68,24 +68,23 @@ export const rcInList = (ps: string, name = RC_NAME) => new RegExp(rcPattern(nam
 const psList = () => new Promise<string>((resolve, reject) =>
   execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', PS_LIST], { windowsHide: true, timeout: 15_000, maxBuffer: 8 << 20 }, (err, out) => (err ? reject(err) : resolve(String(out)))))
 
+const pgrep = () => new Promise<boolean>(resolve => execFile('pgrep', ['-f', rcPattern(RC_NAME)], { timeout: 2000 }, err => resolve(!err)))
+
 let rcSeen = false, listing = false
 /** The Remote Control server running as a process, whoever started it. */
 export function rcRunning(platform: NodeJS.Platform = process.platform): boolean {
-  if (platform === 'win32') {
-    // Answers the last listing, since powershell takes a second and this runs on every refresh; rcRunningNow waits.
-    if (!listing) {
-      listing = true
-      psList().then(out => { rcSeen = rcInList(out) }, () => {}).finally(() => { listing = false })
-    }
-    return rcSeen
+  // Answers the last listing, since powershell takes a second and this runs on every refresh; rcRunningNow waits.
+  if (!listing) {
+    listing = true
+    const now = platform === 'win32' ? psList().then(out => rcInList(out)) : pgrep()
+    now.then(on => { rcSeen = on }, () => {}).finally(() => { listing = false })
   }
-  try { execFileSync('pgrep', ['-f', rcPattern(RC_NAME)], { stdio: 'ignore', timeout: 2000 }); return true } catch { return false }
+  return rcSeen
 }
 
 /** rcRunning from a fresh listing, for the on/off switch. */
 export async function rcRunningNow(platform: NodeJS.Platform = process.platform, list = psList): Promise<boolean> {
-  if (platform !== 'win32') return rcRunning(platform)
-  try { rcSeen = rcInList(await list()) } catch { /* keep the last answer */ }
+  try { rcSeen = platform === 'win32' ? rcInList(await list()) : await pgrep() } catch { /* keep the last answer */ }
   return rcSeen
 }
 

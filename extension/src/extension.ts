@@ -6,11 +6,16 @@ import { startClaudeRuntime } from './claude-runtime'
 import { startCodexRuntime } from './codex-runtime'
 import { promptHookSetupIfNeeded, configureClaudeHooks, isDisable1MContext } from './hooks-config'
 import { createLogger } from './logger'
-import { startHub, addHubPoster, handleHubMessage, bindStatusBar, hubViewShown, KIT_DIR } from './hub/hub-panel'
+import { startHub, addHubPoster, handleHubMessage, bindStatusBar, hubViewShown, resendHubState, KIT_DIR } from './hub/hub-panel'
 import { startSelfUpdate } from './hub/self-update'
 import type { AgentRuntime, AgentRuntimeMode } from './session-runtime'
 import { withSkipShell } from './hub/controls'
 import { orphanTab } from './orphan-tab'
+import { hub } from './hub/hub-service'
+import { SliceUploads, chatLabel } from './hub/uploads'
+import { readGraph } from './hub/graph'
+import { readRuns } from './hub/runs'
+import { chatOutputs, chatShot, chatTranscript, progressOutputs } from './hub/chat-view'
 
 const log = createLogger('Extension')
 
@@ -89,14 +94,14 @@ export async function activate(context: vscode.ExtensionContext) {
   runtimes = started
   log.info(`Active runtimes: ${runtimes.map(r => r.mode).join(', ') || 'none'}`)
 
-  // Surface startup failures to the user — the log-only path leaves them
+  // Surface startup failures to the user; the log-only path leaves them
   // staring at a "disconnected" visualizer with no explanation.
   if (runtimes.length === 0 && failures.length > 0) {
     vscode.window.showWarningMessage(
       `Switchboard: ${failures.join(' and ')} runtime${failures.length > 1 ? 's' : ''} failed to start. See the Output panel for details.`,
     )
   } else if (failures.length > 0) {
-    log.info(`Partial startup — ${failures.join(', ')} failed but ${runtimes.map(r => r.mode).join(', ')} active`)
+    log.info(`Partial startup: ${failures.join(', ')} failed but ${runtimes.map(r => r.mode).join(', ')} active`)
   }
 
   // On screen unless turned off in Controls, so the panel never has to be found through the palette.
@@ -201,7 +206,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(replaceOrphan), { dispose: () => clearTimeout(check) })
 }
 
-/** Only prompt for Claude hook setup if a Claude runtime is active —
+/** Only prompt for Claude hook setup if a Claude runtime is active:
  *  otherwise a Codex-only user would see an irrelevant prompt. */
 function promptHookSetupIfNeededForClaude(context: vscode.ExtensionContext): void {
   if (runtimes.some(r => r.mode === 'claude')) {
@@ -233,13 +238,16 @@ function wirePanel(panel: VisualizerPanel): void {
   if (panel.isWired) { return }
   panel.markWired()
   let readyHandled = false
+  // Closing the panel mid-upload drops the partial files.
+  const uploads = new SliceUploads()
+  panel.onDidDispose(() => uploads.abortAll())
   panel.onCommand((message: WebviewToExtensionMessage) => {
     switch (message.type) {
       case 'ready':
-        if (readyHandled) { return }
+        if (readyHandled) { resendHubState(m => panel.postMessage(m)); return }
         readyHandled = true
         log.info('Webview ready')
-        // Allow events to flow before replay — replay emits through the
+        // Allow events to flow before replay; replay emits through the
         // same onEvent listener, and it's synchronous so no live events
         // can interleave. Events before this point were gated (dropped),
         // and replayExistingContent covers them from the JSONL file.
@@ -287,6 +295,51 @@ function wirePanel(panel: VisualizerPanel): void {
           : message.level === 'warn' ? webviewLog.warn
           : webviewLog.info
         logFn(message.message)
+        break
+      }
+
+      case 'upload-start': {
+        const { id, cwd, name, session } = message
+        void uploads.start(id, { cwd, name, chat: chatLabel(hub.get().chats, session) })
+          .then(p => panel.postMessage({ type: 'upload-done', id, path: p }), err => panel.postMessage({ type: 'upload-done', id, problem: (err as Error).message }))
+        break
+      }
+
+      case 'upload-chunk': {
+        const { id, data } = message
+        // A failed chunk is answered by upload-done from upload-start.
+        void uploads.chunk(id, data instanceof Uint8Array ? data : new Uint8Array(data)).then(() => panel.postMessage({ type: 'upload-progress', id }), () => {})
+        break
+      }
+
+      case 'upload-end':
+        uploads.end(message.id)
+        break
+
+      case 'upload-abort':
+        uploads.abort(message.id)
+        break
+
+      case 'graph-get': {
+        const { id } = message
+        void readGraph(hub.get()).then(graph => panel.postMessage({ type: 'graph', id, graph }), err => panel.postMessage({ type: 'graph', id, problem: (err as Error).message }))
+        break
+      }
+
+      case 'runs-get': {
+        const { id, sessionId, role } = message
+        void readRuns(sessionId, role).then(runs => panel.postMessage({ type: 'runs', id, runs }), err => panel.postMessage({ type: 'runs', id, problem: (err as Error).message }))
+        break
+      }
+
+      case 'chat-get': {
+        const { id, sessionId, what, before, path: file } = message
+        // A Codex chat has no Claude transcript; its outputs come from hook progress.
+        const codex = () => hub.get().progress.find(p => p.sessionId === sessionId)
+        const read = what === 'outputs' ? chatOutputs(sessionId).then(o => { const p = o ? undefined : codex(); return { outputs: o ?? (p && progressOutputs(p)) } })
+          : what === 'transcript' ? chatTranscript(sessionId, before).then(t => ({ transcript: t ?? (codex() ? { messages: [], before: null, transcript: 'unsupported' as const } : undefined) }))
+          : chatOutputs(sessionId).then(o => o ? chatShot(o.shots, file ?? '') : undefined).then(s => ({ shot: s && `data:${s.type};base64,${s.bytes.toString('base64')}` }))
+        void read.then(r => panel.postMessage({ type: 'chat', id, ...r }), err => panel.postMessage({ type: 'chat', id, problem: (err as Error).message }))
         break
       }
 
