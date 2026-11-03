@@ -39,6 +39,13 @@
    "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
    "at": 1793534677696,
    "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
+  },
+  {
+   "id": "d6bdfb41",
+   "text": "Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Slack/Notion/Drive/Figma/Linear). Each needs Kenneth's API key; wire into kit setup mcps list.",
+   "at": 1793667505292,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt"
   }
  ],
  "removed": {
