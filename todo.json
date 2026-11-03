@@ -285,6 +285,38 @@
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt",
    "why": "missed"
+  },
+  {
+   "id": "5163ff0d",
+   "text": "Commit both repos. claude-mods also holds older uncommitted work from other chats, and several 0.19.x vsix files that other chats built.",
+   "at": 1793732657430,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
+  },
+  {
+   "id": "6a529d52",
+   "text": "Type `/remote-control` in this chat to reconnect it. The drop was a network edge refusal, and the network looks fine now.",
+   "at": 1793732657430,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
+  },
+  {
+   "id": "9012d400",
+   "text": "Claude for OSS: your agent-flow repo is a fork, and your own public repos have no license, so nothing qualifies to be listed. Add an MIT license to claude-mods,",
+   "at": 1793732657430,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
+  },
+  {
+   "id": "007e9f0f",
+   "text": "To-do d6bdfb41: the Perplexity, Firecrawl, PostHog and Composio connectors, which need your API keys.",
+   "at": 1793732657430,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
   }
  ]
 }
