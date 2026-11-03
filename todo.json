@@ -46,6 +46,13 @@
    "at": 1793667505292,
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt"
+  },
+  {
+   "id": "6b74570d",
+   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
+   "at": 1793750129601,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard"
   }
  ],
  "removed": {
