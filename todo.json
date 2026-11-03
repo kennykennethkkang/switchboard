@@ -324,6 +324,22 @@
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt",
    "why": "you"
+  },
+  {
+   "id": "88264666",
+   "text": "Commit `claude-mods` and `agent-flow`. Both already had uncommitted changes from earlier chats, and the rebuild copied some of those into `agent-flow/extension/",
+   "at": 1793750153186,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
+  },
+  {
+   "id": "edbea6e1",
+   "text": "Approve or drop the to-do this chat's AAR filed: a Gemini fallback line in the gemini skill.",
+   "at": 1793750153186,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
   }
  ]
 }
