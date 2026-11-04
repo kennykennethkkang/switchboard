@@ -89,7 +89,8 @@
   "5163ff0d": 1793813600531,
   "6a529d52": 1793813600531,
   "9012d400": 1793813600531,
-  "ec818f9a": 1793818472516
+  "ec818f9a": 1793818472516,
+  "2c03159b": 1793818505174
  },
  "suggested": [
   {
@@ -114,14 +115,6 @@
    "at": 1793533000918,
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
-   "why": "you"
-  },
-  {
-   "id": "2c03159b",
-   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
-   "at": 1793533417564,
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
    "why": "you"
   },
   {
@@ -279,12 +272,20 @@
  ],
  "ticked": [
   {
+   "id": "2c03159b",
+   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "you",
+   "at": 1793818505174
+  },
+  {
    "id": "ec818f9a",
    "text": "Reload the agent-flow window.",
+   "at": 1793818472516,
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
-   "why": "you",
-   "at": 1793818472516
+   "why": "you"
   },
   {
    "id": "6b74570d",
@@ -340,13 +341,6 @@
    "id": "54dd3840-ok",
    "text": "the memory vault proposal, which needs your approval before anything changes",
    "at": 1793526777224,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "3c9b30a4",
-   "text": "Jarvis follow-up: build the Jev command box (3 tiers: saved data, Haiku, start chat or skill) and local Whisper + Kokoro voice inside the Switchboard dashboard; research mic access in the VS Code webview and on iPhone over Tailscale first",
-   "at": 1793508661192,
-   "by": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "from": "8846e195-934e-46f1-845f-35d4b664c54b"
   }
  ]
