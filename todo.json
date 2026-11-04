@@ -70,6 +70,14 @@
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2",
    "why": "later"
+  },
+  {
+   "id": "dfd937e0-ok",
+   "text": "Clear shell and start running since other chat is finished. After run is finished put full commit message in for me to push.",
+   "at": 1793818594876,
+   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
+   "name": "UI UX Site Audit Redesign",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -119,7 +127,8 @@
   "bc3ce8c9": 1793818537511,
   "6a3650aa": 1793818553451,
   "1ecbfca1": 1793818571445,
-  "33d75d3a": 1793818581719
+  "33d75d3a": 1793818581719,
+  "dfd937e0": 1793818594876
  },
  "ticked": [
   {
@@ -203,14 +212,6 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "you"
-  },
-  {
-   "id": "dfd937e0",
-   "text": "Clear shell and start running since other chat is finished. After run is finished put full commit message in for me to push.",
-   "at": 1793572324473,
-   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
-   "name": "UI UX Site Audit Redesign",
-   "why": "missed"
   },
   {
    "id": "c15c87ca",
