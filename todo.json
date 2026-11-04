@@ -62,6 +62,14 @@
    "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
    "name": "Security Audit Application",
    "why": "later"
+  },
+  {
+   "id": "1ecbfca1-ok",
+   "text": "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.",
+   "at": 1793818571445,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "later"
   }
  ],
  "removed": {
@@ -109,7 +117,8 @@
   "2c03159b": 1793818505174,
   "4f43f74a": 1793818515307,
   "bc3ce8c9": 1793818537511,
-  "6a3650aa": 1793818553451
+  "6a3650aa": 1793818553451,
+  "1ecbfca1": 1793818571445
  },
  "ticked": [
   {
@@ -193,14 +202,6 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "you"
-  },
-  {
-   "id": "1ecbfca1",
-   "text": "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.",
-   "at": 1793554696152,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "later"
   },
   {
    "id": "33d75d3a",
