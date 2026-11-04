@@ -85,7 +85,10 @@
   "d16fa4d2-ok": 1793527102566,
   "ed188d8a": 1793527102970,
   "3b20130f": 1793533000918,
-  "6b74570d": 1793786201684
+  "6b74570d": 1793786201684,
+  "5163ff0d": 1793813600531,
+  "6a529d52": 1793813600531,
+  "9012d400": 1793813600531
  },
  "ticked": [
   {
@@ -289,30 +292,6 @@
    "why": "missed"
   },
   {
-   "id": "5163ff0d",
-   "text": "Commit both repos. claude-mods also holds older uncommitted work from other chats, and several 0.19.x vsix files that other chats built.",
-   "at": 1793732657430,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "6a529d52",
-   "text": "Type `/remote-control` in this chat to reconnect it. The drop was a network edge refusal, and the network looks fine now.",
-   "at": 1793732657430,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "9012d400",
-   "text": "Claude for OSS: your agent-flow repo is a fork, and your own public repos have no license, so nothing qualifies to be listed. Add an MIT license to claude-mods,",
-   "at": 1793732657430,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
    "id": "007e9f0f",
    "text": "To-do d6bdfb41: the Perplexity, Firecrawl, PostHog and Composio connectors, which need your API keys.",
    "at": 1793732657430,
@@ -343,6 +322,38 @@
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt",
    "why": "missed"
+  },
+  {
+   "id": "79ecf3f4",
+   "text": "Reload VS Code. That picks up the new extension: the Collision Guard hook, the clickable lead, the cache chip and the all-on plugins. Collision Guard has passin",
+   "at": 1793813600531,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
+  },
+  {
+   "id": "804eab86",
+   "text": "Commit both repos. claude-mods also holds older uncommitted work from other chats.",
+   "at": 1793813600531,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
+  },
+  {
+   "id": "51c6cde0",
+   "text": "Reconnect Remote Control in this chat by typing `/remote-control`.",
+   "at": 1793813600531,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
+  },
+  {
+   "id": "8276f15e",
+   "text": "Claude for OSS: add a license to claude-mods (MIT is the usual choice), then apply through the Ecosystem Impact track.",
+   "at": 1793813600531,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "you"
   }
  ]
 }
