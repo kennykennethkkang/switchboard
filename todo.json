@@ -87,6 +87,78 @@
   "3b20130f": 1793533000918,
   "6b74570d": 1793786201684
  },
+ "ticked": [
+  {
+   "id": "6b74570d",
+   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
+   "at": 1793786201684,
+   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard"
+  },
+  {
+   "id": "ed188d8a",
+   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
+   "at": 1793527102970,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
+  },
+  {
+   "id": "d16fa4d2-ok",
+   "text": "your Gemini key, then a live test of image, video and notebooks",
+   "at": 1793527102566,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
+  {
+   "id": "f1634e88",
+   "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
+   "at": 1793527102198,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
+  {
+   "id": "7bed044f",
+   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
+   "at": 1793527101859,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "921edabf",
+   "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
+   "at": 1793527101539,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "e462a05d",
+   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
+   "at": 1793527101142,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "54dd3840-ok",
+   "text": "the memory vault proposal, which needs your approval before anything changes",
+   "at": 1793526777224,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
+  {
+   "id": "3c9b30a4",
+   "text": "Jarvis follow-up: build the Jev command box (3 tiers: saved data, Haiku, start chat or skill) and local Whisper + Kokoro voice inside the Switchboard dashboard; research mic access in the VS Code webview and on iPhone over Tailscale first",
+   "at": 1793508661192,
+   "by": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
+  {
+   "id": "6e12e12b",
+   "text": "Memory vault: deep research (Karpathy raw/wiki/outputs, Claude Code + Obsidian, fit with existing ~/.claude memory and the 3D Memory graph), then propose a design to Kenneth and get approval before changing anything",
+   "at": 1793506277707,
+   "by": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  }
+ ],
  "suggested": [
   {
    "id": "4f43f74a",
@@ -263,78 +335,14 @@
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
    "why": "you"
-  }
- ],
- "ticked": [
-  {
-   "id": "6b74570d",
-   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "at": 1793786201684,
-   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a"
   },
   {
-   "id": "ed188d8a",
-   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
-   "at": 1793527102970,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
-  },
-  {
-   "id": "d16fa4d2-ok",
-   "text": "your Gemini key, then a live test of image, video and notebooks",
-   "at": 1793527102566,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "f1634e88",
-   "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
-   "at": 1793527102198,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "7bed044f",
-   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
-   "at": 1793527101859,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "921edabf",
-   "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
-   "at": 1793527101539,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "e462a05d",
-   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
-   "at": 1793527101142,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "54dd3840-ok",
-   "text": "the memory vault proposal, which needs your approval before anything changes",
-   "at": 1793526777224,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "3c9b30a4",
-   "text": "Jarvis follow-up: build the Jev command box (3 tiers: saved data, Haiku, start chat or skill) and local Whisper + Kokoro voice inside the Switchboard dashboard; research mic access in the VS Code webview and on iPhone over Tailscale first",
-   "at": 1793508661192,
-   "by": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "6e12e12b",
-   "text": "Memory vault: deep research (Karpathy raw/wiki/outputs, Claude Code + Obsidian, fit with existing ~/.claude memory and the 3D Memory graph), then propose a design to Kenneth and get approval before changing anything",
-   "at": 1793506277707,
-   "by": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+   "id": "54272d3a",
+   "text": "Is everything completed if not finish everything and risks",
+   "at": 1793813595831,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "missed"
   }
  ]
 }
