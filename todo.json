@@ -78,6 +78,14 @@
    "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
    "name": "UI UX Site Audit Redesign",
    "why": "missed"
+  },
+  {
+   "id": "1478322a-ok",
+   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
+   "at": 1793818613630,
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -128,7 +136,8 @@
   "6a3650aa": 1793818553451,
   "1ecbfca1": 1793818571445,
   "33d75d3a": 1793818581719,
-  "dfd937e0": 1793818594876
+  "dfd937e0": 1793818594876,
+  "1478322a": 1793818613630
  },
  "ticked": [
   {
@@ -244,14 +253,6 @@
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on",
    "why": "you"
-  },
-  {
-   "id": "1478322a",
-   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
-   "at": 1793732653513,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "missed"
   },
   {
    "id": "1d72717b",
