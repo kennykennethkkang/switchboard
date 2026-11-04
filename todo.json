@@ -139,7 +139,8 @@
   "dfd937e0": 1793818594876,
   "1478322a": 1793818613630,
   "1d72717b": 1793818668926,
-  "0b89c17e": 1793818970498
+  "0b89c17e": 1793818970498,
+  "54272d3a": 1793818977795
  },
  "ticked": [
   {
@@ -279,14 +280,6 @@
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
    "why": "you"
-  },
-  {
-   "id": "54272d3a",
-   "text": "Is everything completed if not finish everything and risks",
-   "at": 1793813595831,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "missed"
   },
   {
    "id": "79ecf3f4",
