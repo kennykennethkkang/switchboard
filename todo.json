@@ -137,7 +137,8 @@
   "1ecbfca1": 1793818571445,
   "33d75d3a": 1793818581719,
   "dfd937e0": 1793818594876,
-  "1478322a": 1793818613630
+  "1478322a": 1793818613630,
+  "1d72717b": 1793818668926
  },
  "ticked": [
   {
@@ -253,14 +254,6 @@
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on",
    "why": "you"
-  },
-  {
-   "id": "1d72717b",
-   "text": "Also issue with repository not showing up on https://claude.com/contact-sales/claude-for-oss. I want to gain acces in turn for accessing and making contributions proper to the program.",
-   "at": 1793732653513,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "missed"
   },
   {
    "id": "0b89c17e",
