@@ -54,6 +54,14 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "later"
+  },
+  {
+   "id": "6a3650aa-ok",
+   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
+   "at": 1793818553451,
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "later"
   }
  ],
  "removed": {
@@ -100,7 +108,8 @@
   "ec818f9a": 1793818472516,
   "2c03159b": 1793818505174,
   "4f43f74a": 1793818515307,
-  "bc3ce8c9": 1793818537511
+  "bc3ce8c9": 1793818537511,
+  "6a3650aa": 1793818553451
  },
  "ticked": [
   {
@@ -184,14 +193,6 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "you"
-  },
-  {
-   "id": "6a3650aa",
-   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
-   "at": 1793533417564,
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
-   "why": "later"
   },
   {
    "id": "1ecbfca1",
