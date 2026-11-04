@@ -103,6 +103,7 @@
   }
  ],
  "removed": {
+  "88264666": 1793822810406,
   "4323189c": 1793339057827,
   "2af925c8": 1793349145205,
   "1690da63": 1793349332652,
@@ -155,7 +156,8 @@
   "1d72717b": 1793818668926,
   "0b89c17e": 1793818970498,
   "54272d3a": 1793818977795,
-  "5288baed": 1793822583941
+  "5288baed": 1793822583941,
+  "edbea6e1": 1793822810406
  },
  "ticked": [
   {
@@ -273,22 +275,6 @@
    "why": "you"
   },
   {
-   "id": "88264666",
-   "text": "Commit `claude-mods` and `agent-flow`. Both already had uncommitted changes from earlier chats, and the rebuild copied some of those into `agent-flow/extension/",
-   "at": 1793750153186,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "edbea6e1",
-   "text": "Approve or drop the to-do this chat's AAR filed: a Gemini fallback line in the gemini skill.",
-   "at": 1793750153186,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
    "id": "79ecf3f4",
    "text": "Reload VS Code. That picks up the new extension: the Collision Guard hook, the clickable lead, the cache chip and the all-on plugins. Collision Guard has passin",
    "at": 1793813600531,
@@ -367,6 +353,22 @@
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
    "why": "missed"
+  },
+  {
+   "id": "1aca550a",
+   "text": "Reload the VS Code windows (or rebuild Switchboard's extension) so the new auto-start and trust code loads, then check that \"Auto-start chats\" shows under Chats",
+   "at": 1793822810406,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
+  },
+  {
+   "id": "cf1e77c0",
+   "text": "Commit `claude-mods` and `agent-flow`. Both also hold uncommitted changes from earlier chats, so review before committing.",
+   "at": 1793822810406,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
   }
  ]
 }
