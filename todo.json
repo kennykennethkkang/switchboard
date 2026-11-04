@@ -93,6 +93,13 @@
    "at": 1793822517720,
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on"
+  },
+  {
+   "id": "b673a51e",
+   "text": "Kit experiment: delegation costs 3x to 4x with no correctness gain on tasks up to about 5 files (vault ecc-vs-switchboard-kit). Try a rules.md line telling the lead to work solo below a size threshold, and A/B it.",
+   "at": 1793822518602,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on"
   }
  ],
  "removed": {
