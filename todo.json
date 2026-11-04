@@ -46,6 +46,14 @@
    "at": 1793667505292,
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt"
+  },
+  {
+   "id": "bc3ce8c9-ok",
+   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
+   "at": 1793818537511,
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "later"
   }
  ],
  "removed": {
@@ -91,7 +99,8 @@
   "9012d400": 1793813600531,
   "ec818f9a": 1793818472516,
   "2c03159b": 1793818505174,
-  "4f43f74a": 1793818515307
+  "4f43f74a": 1793818515307,
+  "bc3ce8c9": 1793818537511
  },
  "ticked": [
   {
@@ -168,14 +177,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "bc3ce8c9",
-   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
-   "at": 1793533000918,
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "later"
-  },
   {
    "id": "67a37850",
    "text": "Commit `../claude-mods` for the `rules.md` change.",
