@@ -90,17 +90,84 @@
   "6a529d52": 1793813600531,
   "9012d400": 1793813600531,
   "ec818f9a": 1793818472516,
-  "2c03159b": 1793818505174
+  "2c03159b": 1793818505174,
+  "4f43f74a": 1793818515307
  },
- "suggested": [
+ "ticked": [
   {
-   "id": "4f43f74a",
-   "text": "The standup shown on the chat page still lists only Done and Left. That's `chat-view.ts:340`, which another chat is editing, so I left it alone.",
-   "at": 1793533000918,
+   "id": "2c03159b",
+   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
+   "at": 1793818505174,
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "you"
+  },
+  {
+   "id": "ec818f9a",
+   "text": "Reload the agent-flow window.",
+   "at": 1793818472516,
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
-   "why": "later"
+   "why": "you"
   },
+  {
+   "id": "6b74570d",
+   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
+   "at": 1793786201684,
+   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard"
+  },
+  {
+   "id": "ed188d8a",
+   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
+   "at": 1793527102970,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
+  },
+  {
+   "id": "d16fa4d2-ok",
+   "text": "your Gemini key, then a live test of image, video and notebooks",
+   "at": 1793527102566,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
+  {
+   "id": "f1634e88",
+   "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
+   "at": 1793527102198,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  },
+  {
+   "id": "7bed044f",
+   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
+   "at": 1793527101859,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "921edabf",
+   "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
+   "at": 1793527101539,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "e462a05d",
+   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
+   "at": 1793527101142,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
+  },
+  {
+   "id": "54dd3840-ok",
+   "text": "the memory vault proposal, which needs your approval before anything changes",
+   "at": 1793526777224,
+   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  }
+ ],
+ "suggested": [
   {
    "id": "bc3ce8c9",
    "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
@@ -268,80 +335,6 @@
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt",
    "why": "you"
-  }
- ],
- "ticked": [
-  {
-   "id": "2c03159b",
-   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
-   "why": "you",
-   "at": 1793818505174
-  },
-  {
-   "id": "ec818f9a",
-   "text": "Reload the agent-flow window.",
-   "at": 1793818472516,
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "you"
-  },
-  {
-   "id": "6b74570d",
-   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
-   "at": 1793786201684,
-   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard"
-  },
-  {
-   "id": "ed188d8a",
-   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
-   "at": 1793527102970,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
-  },
-  {
-   "id": "d16fa4d2-ok",
-   "text": "your Gemini key, then a live test of image, video and notebooks",
-   "at": 1793527102566,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "f1634e88",
-   "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
-   "at": 1793527102198,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "7bed044f",
-   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
-   "at": 1793527101859,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "921edabf",
-   "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
-   "at": 1793527101539,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "e462a05d",
-   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
-   "at": 1793527101142,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "54dd3840-ok",
-   "text": "the memory vault proposal, which needs your approval before anything changes",
-   "at": 1793526777224,
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
   }
  ]
 }
