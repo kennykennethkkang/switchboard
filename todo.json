@@ -118,7 +118,8 @@
   "4f43f74a": 1793818515307,
   "bc3ce8c9": 1793818537511,
   "6a3650aa": 1793818553451,
-  "1ecbfca1": 1793818571445
+  "1ecbfca1": 1793818571445,
+  "33d75d3a": 1793818581719
  },
  "ticked": [
   {
@@ -202,14 +203,6 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "you"
-  },
-  {
-   "id": "33d75d3a",
-   "text": "Earlier to-do items: the phone voice over Tailscale and the Codex transcript are still open.",
-   "at": 1793554696152,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "later"
   },
   {
    "id": "dfd937e0",
