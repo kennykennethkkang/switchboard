@@ -154,7 +154,8 @@
   "1478322a": 1793818613630,
   "1d72717b": 1793818668926,
   "0b89c17e": 1793818970498,
-  "54272d3a": 1793818977795
+  "54272d3a": 1793818977795,
+  "5288baed": 1793822583941
  },
  "ticked": [
   {
@@ -264,14 +265,6 @@
    "why": "you"
   },
   {
-   "id": "5288baed",
-   "text": "the optional larger test on Opus, if you want it.",
-   "at": 1793714128718,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "you"
-  },
-  {
    "id": "007e9f0f",
    "text": "To-do d6bdfb41: the Perplexity, Firecrawl, PostHog and Composio connectors, which need your API keys.",
    "at": 1793732657430,
@@ -342,6 +335,22 @@
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on",
    "why": "missed"
+  },
+  {
+   "id": "12b45760",
+   "text": "To-do `0e849084`: T10 and T11 only have bare-Claude runs. Your kit and ECC still need runs on both.",
+   "at": 1793822583941,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "why": "you"
+  },
+  {
+   "id": "9fa18238",
+   "text": "To-do `b673a51e`: test a rule telling the lead to work alone on tasks under about 5 files, since delegation there costs 3 to 4x with no accuracy gain.",
+   "at": 1793822583941,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "why": "later"
   }
  ]
 }
