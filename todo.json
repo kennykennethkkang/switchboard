@@ -103,6 +103,7 @@
   }
  ],
  "removed": {
+  "60191406": 1793870136284,
   "88264666": 1793822810406,
   "4323189c": 1793339057827,
   "2af925c8": 1793349145205,
@@ -161,9 +162,21 @@
   "12b45760": 1793851366427,
   "9fa18238": 1793851366427,
   "1aca550a": 1793851808280,
-  "cf1e77c0": 1793852083672
+  "cf1e77c0": 1793852083672,
+  "3644d6ca": 1793870136284,
+  "36e61464": 1793870136284,
+  "1085d409": 1793870136284
  },
  "ticked": [
+  {
+   "id": "3644d6ca",
+   "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you",
+   "at": 1793870136284,
+   "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb"
+  },
   {
    "id": "1aca550a",
    "text": "Reload the VS Code windows (or rebuild Switchboard's extension) so the new auto-start and trust code loads, then check that \"Auto-start chats\" shows under Chats",
@@ -228,13 +241,6 @@
    "id": "921edabf",
    "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
    "at": 1793527101539,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "e462a05d",
-   "text": "The agent-flow window hasn't been reloaded, since this chat runs in it, so it's still on 0.18.0. Reload it after this chat; until then, chats in it won't take m",
-   "at": 1793527101142,
    "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
   }
@@ -401,36 +407,12 @@
    "why": "you"
   },
   {
-   "id": "60191406",
-   "text": "Install the rebuilt vsix and reload. `hub_recall` only reaches chats once usage-meter reloads.",
-   "at": 1793853414633,
+   "id": "6cd8e6f2",
+   "text": "Say go once \"Add these functions into switchboard\" finishes. I'll install 0.21.1, reload, and check the app copy on port 3131. `hub_recall` reaches chats after",
+   "at": 1793870136284,
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you"
-  },
-  {
-   "id": "3644d6ca",
-   "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
-   "at": 1793853414633,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "36e61464",
-   "text": "Recall searches every project and doesn't put the chat's own project first.",
-   "at": 1793853414633,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "later"
-  },
-  {
-   "id": "1085d409",
-   "text": "One test in `test/chains.test.ts` belongs to another chat and is flaky: it failed once in five runs.",
-   "at": 1793853414633,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "later"
   }
  ]
 }
