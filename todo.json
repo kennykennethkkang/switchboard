@@ -157,7 +157,9 @@
   "0b89c17e": 1793818970498,
   "54272d3a": 1793818977795,
   "5288baed": 1793822583941,
-  "edbea6e1": 1793822810406
+  "edbea6e1": 1793822810406,
+  "12b45760": 1793851366427,
+  "9fa18238": 1793851366427
  },
  "ticked": [
   {
@@ -323,22 +325,6 @@
    "why": "missed"
   },
   {
-   "id": "12b45760",
-   "text": "To-do `0e849084`: T10 and T11 only have bare-Claude runs. Your kit and ECC still need runs on both.",
-   "at": 1793822583941,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "you"
-  },
-  {
-   "id": "9fa18238",
-   "text": "To-do `b673a51e`: test a rule telling the lead to work alone on tasks under about 5 files, since delegation there costs 3 to 4x with no accuracy gain.",
-   "at": 1793822583941,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "later"
-  },
-  {
    "id": "04db5ce6",
    "text": "<pasted_content id=\"afb4\"> Chat: Add these functions into switchboard Stuck: Subagent background job \"Serve the skill folder on port 8766\": no new output Since: 04:50 (5 h) Use: CPU 0% · 6 MB Process:",
    "at": 1793822804468,
@@ -377,6 +363,30 @@
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on",
    "why": "missed"
+  },
+  {
+   "id": "f73d81df",
+   "text": "commit the two `claude-mods` edits, rebuild the kit and reload VS Code.",
+   "at": 1793851366427,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "why": "you"
+  },
+  {
+   "id": "ff9f8346",
+   "text": "To-do `0e849084`: run your kit and ECC on T10 and T11.",
+   "at": 1793851366427,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "why": "you"
+  },
+  {
+   "id": "25c2000a",
+   "text": "To-do `b673a51e`: test a rule telling the lead to work alone on tasks under about 5 files.",
+   "at": 1793851366427,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "why": "you"
   }
  ]
 }
