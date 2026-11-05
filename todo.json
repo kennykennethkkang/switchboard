@@ -168,7 +168,10 @@
   "1085d409": 1793870136284,
   "665c8acc": 1793888155505,
   "199dbbee": 1793888155505,
-  "edc1cc71": 1793888155505
+  "edc1cc71": 1793888155505,
+  "ec369d9c": 1793905602864,
+  "7ad76de0": 1793905602864,
+  "5303737b": 1793905602864
  },
  "ticked": [
   {
@@ -394,36 +397,20 @@
    "why": "you"
   },
   {
-   "id": "ec369d9c",
-   "text": "0.21.1 is shared. The memory-graph chat had already claimed that version and its work is in the build, so the commit carries both. I added my changes under the",
-   "at": 1793888155505,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "7ad76de0",
-   "text": "The same leftovers from earlier chats as before: leave out `agent-flow/ck-collision-test.txt`, the 0.19.x vsix files and `.vscode/` in claude-mods.",
-   "at": 1793888155505,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "5303737b",
-   "text": "One test file from the graph chat still has a type error (`extension/test/hub.test.ts:234`). It doesn't affect the build or the tests, but that chat should fini",
-   "at": 1793888155505,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "later"
-  },
-  {
    "id": "6a630c49",
    "text": "Do what is left",
    "at": 1793905596165,
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
    "why": "missed"
+  },
+  {
+   "id": "77dc8fdb",
+   "text": "Commit and push both repos. Leave out the leftovers from earlier chats: `agent-flow/ck-collision-test.txt`, and the 0.19.x vsix files and `.vscode/` in claude-m",
+   "at": 1793905602864,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
   }
  ]
 }
