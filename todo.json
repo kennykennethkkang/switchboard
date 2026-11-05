@@ -165,17 +165,20 @@
   "cf1e77c0": 1793852083672,
   "3644d6ca": 1793870136284,
   "36e61464": 1793870136284,
-  "1085d409": 1793870136284
+  "1085d409": 1793870136284,
+  "665c8acc": 1793888155505,
+  "199dbbee": 1793888155505,
+  "edc1cc71": 1793888155505
  },
  "ticked": [
   {
    "id": "3644d6ca",
    "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
+   "at": 1793870136284,
+   "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
-   "why": "you",
-   "at": 1793870136284,
-   "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb"
+   "why": "you"
   },
   {
    "id": "1aca550a",
@@ -383,36 +386,36 @@
    "why": "you"
   },
   {
-   "id": "665c8acc",
-   "text": "`agent-flow/ck-collision-test.txt`, a test leftover from the collision-guard chat.",
-   "at": 1793852083672,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "199dbbee",
-   "text": "The untracked `kit/switchboard-0.19.0.vsix` through `0.19.4.vsix` in claude-mods. Only 0.21.0 needs committing.",
-   "at": 1793852083672,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "edc1cc71",
-   "text": "`claude-mods/.vscode/`, editor settings.",
-   "at": 1793852083672,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
    "id": "6cd8e6f2",
    "text": "Say go once \"Add these functions into switchboard\" finishes. I'll install 0.21.1, reload, and check the app copy on port 3131. `hub_recall` reaches chats after",
    "at": 1793870136284,
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you"
+  },
+  {
+   "id": "ec369d9c",
+   "text": "0.21.1 is shared. The memory-graph chat had already claimed that version and its work is in the build, so the commit carries both. I added my changes under the",
+   "at": 1793888155505,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
+  },
+  {
+   "id": "7ad76de0",
+   "text": "The same leftovers from earlier chats as before: leave out `agent-flow/ck-collision-test.txt`, the 0.19.x vsix files and `.vscode/` in claude-mods.",
+   "at": 1793888155505,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
+  },
+  {
+   "id": "5303737b",
+   "text": "One test file from the graph chat still has a type error (`extension/test/hub.test.ts:234`). It doesn't affect the build or the tests, but that chat should fini",
+   "at": 1793888155505,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "later"
   }
  ]
 }
