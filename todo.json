@@ -399,6 +399,38 @@
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
    "why": "you"
+  },
+  {
+   "id": "60191406",
+   "text": "Install the rebuilt vsix and reload. `hub_recall` only reaches chats once usage-meter reloads.",
+   "at": 1793853414633,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "3644d6ca",
+   "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
+   "at": 1793853414633,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "36e61464",
+   "text": "Recall searches every project and doesn't put the chat's own project first.",
+   "at": 1793853414633,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "later"
+  },
+  {
+   "id": "1085d409",
+   "text": "One test in `test/chains.test.ts` belongs to another chat and is flaky: it failed once in five runs.",
+   "at": 1793853414633,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "later"
   }
  ]
 }
