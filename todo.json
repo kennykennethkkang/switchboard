@@ -172,7 +172,10 @@
   "ec369d9c": 1793905602864,
   "7ad76de0": 1793905602864,
   "5303737b": 1793905602864,
-  "6cd8e6f2": 1793905729689
+  "6cd8e6f2": 1793905729689,
+  "f7cc785a": 1794080384174,
+  "23e9c8dd": 1794080384174,
+  "133ffc78": 1794080384174
  },
  "ticked": [
   {
@@ -414,28 +417,60 @@
    "why": "missed"
   },
   {
-   "id": "f7cc785a",
-   "text": "Commit both repos, staging by file.",
-   "at": 1793906942793,
+   "id": "7bd3478d",
+   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "at": 1794080384174,
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you"
   },
   {
-   "id": "23e9c8dd",
-   "text": "In agent-flow, include the new `extension/kit/skills/` folder.",
-   "at": 1793906942793,
+   "id": "baeb9e5f",
+   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
+   "at": 1794080384174,
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you"
   },
   {
-   "id": "133ffc78",
-   "text": "In claude-mods, include `usage-meter`, `kit/rules.md`, `kit/skills/aar` and the whole of `kit/skills/animation-styles`, plus `kit/switchboard-0.21.2.vsix`.",
-   "at": 1793906942793,
+   "id": "745daf50",
+   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
+   "at": 1794080384174,
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you"
+  },
+  {
+   "id": "1a5a8fd1",
+   "text": "A new top-level `LICENSE`.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "ebaf29ee",
+   "text": "New `accessibility`, `click-path-audit` and `e2e-testing` skills.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "6416d8f9",
+   "text": "First commit: check that the claude-mods box filled. It's the one part only a real window can show.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "13867d1e",
+   "text": "\"Couple of issues to bring\" goes in the next version. It hasn't changed any files, so it isn't in these messages.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "later"
   }
  ]
 }
