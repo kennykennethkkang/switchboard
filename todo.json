@@ -68,6 +68,22 @@
    "at": 1793822518602,
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on"
+  },
+  {
+   "id": "1ecbfca1-r-ok",
+   "text": "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.",
+   "at": 1793818571445,
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "why": "later"
+  },
+  {
+   "id": "dfd937e0-r-ok",
+   "text": "Clear shell and start running since other chat is finished. After run is finished put full commit message in for me to push.",
+   "at": 1793818594876,
+   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
+   "name": "UI UX Site Audit Redesign",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -169,73 +185,15 @@
   "6a3650aa-ok": 1794082120416,
   "bc3ce8c9-ok": 1794082320992
  },
- "suggested": [
-  {
-   "id": "7bd3478d",
-   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "baeb9e5f",
-   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "745daf50",
-   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "1a5a8fd1",
-   "text": "A new top-level `LICENSE`.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "ebaf29ee",
-   "text": "New `accessibility`, `click-path-audit` and `e2e-testing` skills.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "6416d8f9",
-   "text": "First commit: check that the claude-mods box filled. It's the one part only a real window can show.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "13867d1e",
-   "text": "\"Couple of issues to bring\" goes in the next version. It hasn't changed any files, so it isn't in these messages.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "bc3ce8c9-ok",
    "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
+   "at": 1794082320992,
+   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
-   "why": "later",
-   "at": 1794082320992,
-   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10"
+   "why": "later"
   },
   {
    "id": "6a3650aa-ok",
@@ -307,6 +265,80 @@
    "at": 1793527102198,
    "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "from": "8846e195-934e-46f1-845f-35d4b664c54b"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "7bd3478d",
+   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "baeb9e5f",
+   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "745daf50",
+   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "1a5a8fd1",
+   "text": "A new top-level `LICENSE`.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "ebaf29ee",
+   "text": "New `accessibility`, `click-path-audit` and `e2e-testing` skills.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "6416d8f9",
+   "text": "First commit: check that the claude-mods box filled. It's the one part only a real window can show.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "13867d1e",
+   "text": "\"Couple of issues to bring\" goes in the next version. It hasn't changed any files, so it isn't in these messages.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "later"
+  },
+  {
+   "id": "f73d81df-r",
+   "text": "commit the two `claude-mods` edits, rebuild the kit and reload VS Code.",
+   "at": 1793851366427,
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "why": "you"
+  },
+  {
+   "id": "77dc8fdb-r",
+   "text": "Commit and push both repos. Leave out the leftovers from earlier chats: `agent-flow/ck-collision-test.txt`, and the 0.19.x vsix files and `.vscode/` in claude-m",
+   "at": 1793905602864,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
   }
  ]
 }
