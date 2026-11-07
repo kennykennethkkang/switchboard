@@ -56,14 +56,6 @@
    "why": "later"
   },
   {
-   "id": "6a3650aa-ok",
-   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
-   "at": 1793818553451,
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
-   "why": "later"
-  },
-  {
    "id": "1478322a-ok",
    "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
    "at": 1793818613630,
@@ -181,9 +173,77 @@
   "25c2000a": 1794082082744,
   "6a630c49": 1794082082744,
   "77dc8fdb": 1794082082744,
-  "c217d01c": 1794082082744
+  "c217d01c": 1794082082744,
+  "6a3650aa-ok": 1794082120416
  },
+ "suggested": [
+  {
+   "id": "7bd3478d",
+   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "baeb9e5f",
+   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "745daf50",
+   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "1a5a8fd1",
+   "text": "A new top-level `LICENSE`.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "ebaf29ee",
+   "text": "New `accessibility`, `click-path-audit` and `e2e-testing` skills.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "6416d8f9",
+   "text": "First commit: check that the claude-mods box filled. It's the one part only a real window can show.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "13867d1e",
+   "text": "\"Couple of issues to bring\" goes in the next version. It hasn't changed any files, so it isn't in these messages.",
+   "at": 1794080384174,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "6a3650aa-ok",
+   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "later",
+   "at": 1794082120416,
+   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10"
+  },
   {
    "id": "3644d6ca",
    "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
@@ -252,71 +312,6 @@
    "at": 1793527101859,
    "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  },
-  {
-   "id": "921edabf",
-   "text": "Upload inside the VS Code panel itself (as opposed to the browser app) still needs one click-through from you. That to-do item stays open.",
-   "at": 1793527101539,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
-  }
- ],
- "suggested": [
-  {
-   "id": "7bd3478d",
-   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "baeb9e5f",
-   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "745daf50",
-   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "1a5a8fd1",
-   "text": "A new top-level `LICENSE`.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "ebaf29ee",
-   "text": "New `accessibility`, `click-path-audit` and `e2e-testing` skills.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "6416d8f9",
-   "text": "First commit: check that the claude-mods box filled. It's the one part only a real window can show.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "13867d1e",
-   "text": "\"Couple of issues to bring\" goes in the next version. It hasn't changed any files, so it isn't in these messages.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "later"
   }
  ]
 }
