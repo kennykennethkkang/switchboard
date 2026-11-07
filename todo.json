@@ -395,6 +395,30 @@
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring",
    "why": "you"
+  },
+  {
+   "id": "9a73acad",
+   "text": "Rebuild and reload the extension, then try archiving a chat and bringing it back.",
+   "at": 1794090092278,
+   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
+   "name": "Switchboard chat archive controls",
+   "why": "you"
+  },
+  {
+   "id": "e8aad6e8",
+   "text": "A qa review, the full test suite, and a look at the change in the running app.",
+   "at": 1794090092278,
+   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
+   "name": "Switchboard chat archive controls",
+   "why": "later"
+  },
+  {
+   "id": "5642110c",
+   "text": "Sweeping the changed files for em dashes. The Python edits added none.",
+   "at": 1794090092278,
+   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
+   "name": "Switchboard chat archive controls",
+   "why": "later"
   }
  ]
 }
