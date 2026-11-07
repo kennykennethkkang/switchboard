@@ -48,14 +48,6 @@
    "name": "Fix Switchboard plugin access prompt"
   },
   {
-   "id": "bc3ce8c9-ok",
-   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
-   "at": 1793818537511,
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "later"
-  },
-  {
    "id": "1478322a-ok",
    "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
    "at": 1793818613630,
@@ -174,7 +166,8 @@
   "6a630c49": 1794082082744,
   "77dc8fdb": 1794082082744,
   "c217d01c": 1794082082744,
-  "6a3650aa-ok": 1794082120416
+  "6a3650aa-ok": 1794082120416,
+  "bc3ce8c9-ok": 1794082320992
  },
  "suggested": [
   {
@@ -236,13 +229,22 @@
  ],
  "ticked": [
   {
+   "id": "bc3ce8c9-ok",
+   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "later",
+   "at": 1794082320992,
+   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10"
+  },
+  {
    "id": "6a3650aa-ok",
    "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
+   "at": 1794082120416,
+   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
    "name": "Security Audit Application",
-   "why": "later",
-   "at": 1794082120416,
-   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10"
+   "why": "later"
   },
   {
    "id": "3644d6ca",
@@ -305,13 +307,6 @@
    "at": 1793527102198,
    "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "7bed044f",
-   "text": "`../claude-mods` needs its own commit: the rules, AWS guard and usage-meter changes live there. It also has an untracked `kit/switchboard-0.18.0.vsix`; decide w",
-   "at": 1793527101859,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "cf0a51b2-4733-4c72-9a88-e9386f2b15ad"
   }
  ]
 }
