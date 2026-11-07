@@ -346,6 +346,22 @@
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
    "why": "you"
+  },
+  {
+   "id": "3ecc36b7",
+   "text": "Once this is finished please check all changes made so far and give the git message to my mobile device on kennys tailscale or put it in notes for me to copy and commit through switchboard on my phone",
+   "at": 1794085704444,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "missed"
+  },
+  {
+   "id": "071668ac",
+   "text": "Give me a phone call if anything comes up",
+   "at": 1794085704444,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "missed"
   }
  ]
 }
