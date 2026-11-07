@@ -362,6 +362,46 @@
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring",
    "why": "missed"
+  },
+  {
+   "id": "4af72bfe",
+   "text": "Commit both repos (messages below; agent-flow's also covers the earlier 0.21.0 to 0.21.3 work).",
+   "at": 1794085711184,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "fd0c8d29",
+   "text": "Sign in to Cloudflare once: type `/mcp` in any chat.",
+   "at": 1794085711184,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "4fd3f17f",
+   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
+   "at": 1794085711184,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "e20f200e",
+   "text": "Log out of Instagram in Chrome if you don't want to stay signed in.",
+   "at": 1794085711184,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "5bb830e8",
+   "text": "To-do `86d2ea6b`: approve a kit rule giving every subagent a tool-call budget.",
+   "at": 1794085711184,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
   }
  ]
 }
