@@ -84,6 +84,13 @@
    "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
    "name": "UI UX Site Audit Redesign",
    "why": "missed"
+  },
+  {
+   "id": "86d2ea6b",
+   "text": "Approve kit rule edit (from AAR 2026-11-07): in claude-mods/kit/rules.md under \"Hand any job that spans several files\", add \"End every brief with a tool-call budget (about 25 to 35) and 'send the Report before the budget runs out'.\" Three subagents hit their turn cap this chat without one.",
+   "at": 1794085674006,
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring"
   }
  ],
  "removed": {
