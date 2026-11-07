@@ -64,22 +64,6 @@
    "why": "later"
   },
   {
-   "id": "1ecbfca1-ok",
-   "text": "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.",
-   "at": 1793818571445,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "later"
-  },
-  {
-   "id": "dfd937e0-ok",
-   "text": "Clear shell and start running since other chat is finished. After run is finished put full commit message in for me to push.",
-   "at": 1793818594876,
-   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
-   "name": "UI UX Site Audit Redesign",
-   "why": "missed"
-  },
-  {
    "id": "1478322a-ok",
    "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
    "at": 1793818613630,
@@ -175,7 +159,29 @@
   "6cd8e6f2": 1793905729689,
   "f7cc785a": 1794080384174,
   "23e9c8dd": 1794080384174,
-  "133ffc78": 1794080384174
+  "133ffc78": 1794080384174,
+  "1ecbfca1-ok": 1794082082744,
+  "dfd937e0-ok": 1794082082744,
+  "67a37850": 1794082082744,
+  "c15c87ca": 1794082082744,
+  "cc17341f": 1794082082744,
+  "c1835040": 1794082082744,
+  "007e9f0f": 1794082082744,
+  "79ecf3f4": 1794082082744,
+  "804eab86": 1794082082744,
+  "51c6cde0": 1794082082744,
+  "8276f15e": 1794082082744,
+  "a72afeed": 1794082082744,
+  "5dc49910": 1794082082744,
+  "04db5ce6": 1794082082744,
+  "233f3562": 1794082082744,
+  "c8bde79e": 1794082082744,
+  "f73d81df": 1794082082744,
+  "ff9f8346": 1794082082744,
+  "25c2000a": 1794082082744,
+  "6a630c49": 1794082082744,
+  "77dc8fdb": 1794082082744,
+  "c217d01c": 1794082082744
  },
  "ticked": [
   {
@@ -256,166 +262,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "67a37850",
-   "text": "Commit `../claude-mods` for the `rules.md` change.",
-   "at": 1793533000918,
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "you"
-  },
-  {
-   "id": "c15c87ca",
-   "text": "Reload VS Code so 0.20.1 is the version keeping the note current.",
-   "at": 1793612619804,
-   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
-   "name": "UI UX Site Audit Redesign",
-   "why": "you"
-  },
-  {
-   "id": "cc17341f",
-   "text": "Delete the old note called just \"Switchboard\" in your Notes folder. It still has the dead `:3131` links, and I didn't want to delete your notes myself.",
-   "at": 1793612619804,
-   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
-   "name": "UI UX Site Audit Redesign",
-   "why": "you"
-  },
-  {
-   "id": "c1835040",
-   "text": "Optional: turn on HTTPS in the Tailscale admin console (DNS page) so the copy buttons work on the phone.",
-   "at": 1793612619804,
-   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
-   "name": "UI UX Site Audit Redesign",
-   "why": "you"
-  },
-  {
-   "id": "007e9f0f",
-   "text": "To-do d6bdfb41: the Perplexity, Firecrawl, PostHog and Composio connectors, which need your API keys.",
-   "at": 1793732657430,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "79ecf3f4",
-   "text": "Reload VS Code. That picks up the new extension: the Collision Guard hook, the clickable lead, the cache chip and the all-on plugins. Collision Guard has passin",
-   "at": 1793813600531,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "804eab86",
-   "text": "Commit both repos. claude-mods also holds older uncommitted work from other chats.",
-   "at": 1793813600531,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "51c6cde0",
-   "text": "Reconnect Remote Control in this chat by typing `/remote-control`.",
-   "at": 1793813600531,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "8276f15e",
-   "text": "Claude for OSS: add a license to claude-mods (MIT is the usual choice), then apply through the Ecosystem Impact track.",
-   "at": 1793813600531,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "you"
-  },
-  {
-   "id": "a72afeed",
-   "text": "Your claude.ai usage limit has reset. Continue the task you were working on when the limit was reached; do not repeat work that is already complete.",
-   "at": 1793822579271,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "missed"
-  },
-  {
-   "id": "5dc49910",
-   "text": "Is everything done if not do them. Fix risks and add anything that will help imrpove switchboard that is include in ecc. Please do a more extensive test",
-   "at": 1793822579271,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "missed"
-  },
-  {
-   "id": "04db5ce6",
-   "text": "<pasted_content id=\"afb4\"> Chat: Add these functions into switchboard Stuck: Subagent background job \"Serve the skill folder on port 8766\": no new output Since: 04:50 (5 h) Use: CPU 0% · 6 MB Process:",
-   "at": 1793822804468,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "missed"
-  },
-  {
-   "id": "233f3562",
-   "text": "<pasted_content id=\"afb4\"> Chat: Add these functions into switchboard Stuck: designer subagent: no tool call Since: 04:49 (5 h) Last tool call: mcp__plugin_playwright_playwright__browser_run_code_unsa",
-   "at": 1793822804468,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "missed"
-  },
-  {
-   "id": "c8bde79e",
-   "text": "Is there anything else?",
-   "at": 1793851356442,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "missed"
-  },
-  {
-   "id": "f73d81df",
-   "text": "commit the two `claude-mods` edits, rebuild the kit and reload VS Code.",
-   "at": 1793851366427,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "you"
-  },
-  {
-   "id": "ff9f8346",
-   "text": "To-do `0e849084`: run your kit and ECC on T10 and T11.",
-   "at": 1793851366427,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "you"
-  },
-  {
-   "id": "25c2000a",
-   "text": "To-do `b673a51e`: test a rule telling the lead to work alone on tasks under about 5 files.",
-   "at": 1793851366427,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "you"
-  },
-  {
-   "id": "6a630c49",
-   "text": "Do what is left",
-   "at": 1793905596165,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "missed"
-  },
-  {
-   "id": "77dc8fdb",
-   "text": "Commit and push both repos. Leave out the leftovers from earlier chats: `agent-flow/ck-collision-test.txt`, and the 0.19.x vsix files and `.vscode/` in claude-m",
-   "at": 1793905602864,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "c217d01c",
-   "text": "After all subagents and tasks are done make full commit message including everything that was done in the chats here and on the other chat. One chat isn't finished thats for the next version",
-   "at": 1793906935668,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "missed"
-  },
   {
    "id": "7bd3478d",
    "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
