@@ -190,7 +190,8 @@
   "77dc8fdb": 1794082082744,
   "c217d01c": 1794082082744,
   "6a3650aa-ok": 1794082120416,
-  "bc3ce8c9-ok": 1794082320992
+  "bc3ce8c9-ok": 1794082320992,
+  "5bb830e8": 1794085712525
  },
  "ticked": [
   {
@@ -390,14 +391,6 @@
   {
    "id": "e20f200e",
    "text": "Log out of Instagram in Chrome if you don't want to stay signed in.",
-   "at": 1794085711184,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "you"
-  },
-  {
-   "id": "5bb830e8",
-   "text": "To-do `86d2ea6b`: approve a kit rule giving every subagent a tool-call budget.",
    "at": 1794085711184,
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring",
