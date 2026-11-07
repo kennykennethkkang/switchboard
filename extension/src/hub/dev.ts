@@ -37,7 +37,7 @@ export function servedPorts(json: string): Set<number> {
   try { return new Set(Object.keys(JSON.parse(json).TCP ?? {}).map(Number)) } catch { return new Set() }
 }
 
-export type Win = { pid: number; port: number; hubToken: string; workspace: string }
+export type Win = { pid: number; port: number; hubToken: string; workspace: string; /** VS Code trusts its workspace; an older window writes none. */ trusted?: boolean }
 const inside = (dir: string, folder: string) => folder === dir || folder.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep)
 
 /** The window whose workspace is or holds the folder (the deepest one); undefined when that is this window or none holds it. */
@@ -72,12 +72,12 @@ export function readDev(folder: string): { command: string } | undefined {
 }
 
 /** Every live window's discovery file. */
-export function readWindows(): Win[] {
+export function readWindows(dir = DIR): Win[] {
   const out: Win[] = []
-  for (const n of fs.existsSync(DIR) ? fs.readdirSync(DIR) : []) {
+  for (const n of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
     if (!n.endsWith('.json') || n === 'workspaces.json') continue
     try {
-      const w = JSON.parse(fs.readFileSync(path.join(DIR, n), 'utf8'))
+      const w = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'))
       if (typeof w.port !== 'number' || typeof w.pid !== 'number' || typeof w.hubToken !== 'string' || typeof w.workspace !== 'string') continue
       process.kill(w.pid, 0)
       out.push(w)

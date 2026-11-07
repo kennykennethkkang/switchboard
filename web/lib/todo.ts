@@ -36,9 +36,12 @@ export function ordered(todo: TodoItem[]): Array<{ t: TodoItem; depth: number }>
   return out
 }
 
+/** Items the to-do list shows: hand steps (why 'you') show under Finish up instead. */
+export const openCount = (l?: TodoList) => l?.todo.filter(t => t.why !== 'you').length ?? 0
+
 /** Open items in every project but this one. */
 export const openElsewhere = (todos: Record<string, TodoList> | undefined, folder: string) =>
-  Object.entries(todos ?? {}).reduce((n, [f, l]) => n + (f === folder ? 0 : l.todo.length), 0)
+  Object.entries(todos ?? {}).reduce((n, [f, l]) => n + (f === folder ? 0 : openCount(l)), 0)
 
 /** Running chats in the project that the panel can send a message to. */
 export const runTargets = (chats: ChatRow[], folder: string) => chats.filter(c => c.live && c.takes && inside(folder, c.cwd))
@@ -58,9 +61,5 @@ export const runCount = (todo: TodoItem[], ids: string[]) => runIds(todo, ids).s
 export const runLanded = (todo: TodoItem[], ids: string[], was: Map<string, string | undefined>, to?: string) =>
   ids.every(id => { const t = todo.find(x => x.id === id); return !t || (to ? t.chat === to : !!t.chat && t.chat !== was.get(id)) })
 
-/** Finish up: Kenneth's own hand steps (why 'you'), from the tray or accepted before, grouped by the chat's name. */
-export function finishUp(list: TodoList): Array<[string, TodoItem[]]> {
-  const g = new Map<string, TodoItem[]>()
-  for (const t of [...list.suggested ?? [], ...list.todo]) if (t.why === 'you') g.set(t.name ?? 'a chat', [...g.get(t.name ?? 'a chat') ?? [], t])
-  return [...g]
-}
+/** Finish up: Kenneth's own hand steps (why 'you'), from the tray, then accepted before. */
+export const finishUp = (list: TodoList) => [...list.suggested ?? [], ...list.todo].filter(t => t.why === 'you')

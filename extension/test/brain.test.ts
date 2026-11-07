@@ -9,9 +9,9 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
-import { board, brief, quickAskArgs, redact, suggest, withBrief } from '../src/hub/brain'
+import { board, brief, editGuard, noteEdit, quickAskArgs, redact, suggest, withBrief } from '../src/hub/brain'
 import { emptyHub } from '../src/hub/hub-service'
-import type { HubState, SessionLive, StarredChat } from '../src/hub/types'
+import type { ChatProgress, HubState, SessionLive, StarredChat } from '../src/hub/types'
 
 const NOW = 10_000_000
 const chat = (sessionId: string, cwd: string, extra: Partial<SessionLive> = {}): SessionLive =>
@@ -192,5 +192,48 @@ describe('redact', () => {
     const pem = `-----BEGIN RSA PRIVATE KEY-----\n${body}\n-----END RSA PRIVATE KEY-----`
     assert.equal(redact(`before ${pem.slice(0, 300)}`), 'before [removed]')
     assert.equal(redact(`a ${pem} b`), 'a [removed] b')
+  })
+})
+
+describe('edit guard', () => {
+  const MIN = 60_000
+  const prog = (sessionId: string, extra: Partial<ChatProgress> = {}): ChatProgress =>
+    ({ sessionId, cwd: '/w/Armasu', state: 'working', roles: [], tasks: [], startedAt: NOW - 3600_000, at: NOW - 1000, ...extra })
+  const st = (progress = [prog('them'), prog('me')]) => state([chat('them', '/w/Armasu', { label: 'Bag fix' })], { progress })
+  // them edited src/x.ts three minutes ago
+  const edited = (at = NOW - 3 * MIN) => { const m = new Map<string, number>(); noteEdit(m, 'them', '/w/Armasu', '/w/Armasu/src/x.ts', at); return m }
+
+  it('stops the first edit of a file another open chat in the project edited lately', () => {
+    const why = editGuard(st(), edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW)
+    assert.equal(why, 'Another open chat (Bag fix) edited src/x.ts 3 min ago. Re-read the file before changing it, keep your edit from clobbering theirs, or use a worktree. Retry this edit to go ahead.')
+  })
+
+  it('lets a retry through within two minutes, and stops it again after', () => {
+    const tried = new Map<string, number>(), edits = edited(NOW - MIN)
+    assert.ok(editGuard(st(), edits, tried, 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW))
+    assert.equal(editGuard(st(), edits, tried, 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW + MIN), undefined)
+    assert.ok(editGuard(st(), edits, tried, 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW + 3 * MIN))
+  })
+
+  it('lets the chat with the newest edit keep going', () => {
+    const edits = edited()
+    noteEdit(edits, 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW - MIN)
+    assert.equal(editGuard(st(), edits, new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW), undefined)
+  })
+
+  it('takes a relative path from the chat folder', () => {
+    assert.ok(editGuard(st(), edited(), new Map(), 'me', '/w/Armasu/src', 'x.ts', NOW))
+  })
+
+  it('lets the edit through otherwise', () => {
+    const go = (progress?: ChatProgress[], self = 'me', file = '/w/Armasu/src/x.ts', edits = edited()) =>
+      editGuard(st(progress), edits, new Map(), self, '/w/Armasu', file, NOW)
+    assert.equal(go(undefined, 'them'), undefined, 'own edit')
+    assert.equal(go([prog('them', { cwd: '/w/agent-flow' }), prog('me')]), undefined, 'other project')
+    assert.equal(go(undefined, 'me', '/w/Armasu/src/x.ts', edited(NOW - 11 * MIN)), undefined, 'too old')
+    assert.equal(go(undefined, 'me', '/w/Armasu/src/y.ts'), undefined, 'other file')
+    assert.equal(go(undefined, 'me', '/w/Armasu/lib/src/x.ts'), undefined, 'same last two parts')
+    assert.equal(go([prog('them', { state: 'done' }), prog('me')]), undefined, 'done chat')
+    assert.equal(go([prog('me')]), undefined, 'closed chat')
   })
 })

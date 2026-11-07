@@ -30,7 +30,7 @@ import {
 } from './discovery'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
-import { dailySummary, notify } from './hub/notify'
+import { dailySummary, fillBoxes, notify } from './hub/notify'
 import { onSwitchboard, pendingReload, readBuild } from './hub/self-update'
 import { refreshWeb } from './hub/hub-panel'
 import { checkAsked } from './hub/coverage'
@@ -86,7 +86,8 @@ export async function startClaudeRuntime(
     // The hook script reads this at invocation time; no port in settings.json.
     if (workspace) {
       ensureHookScript()
-      writeDiscoveryFile(hookPort, workspace)
+      writeDiscoveryFile(hookPort, workspace, vscode.workspace.isTrusted)
+      context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => writeDiscoveryFile(hookPort, workspace, true)))
       hub.keepRetries(path.join(os.homedir(), '.claude', 'switchboard', `retries-${hashWorkspace(workspace)}.json`))
       migrateHttpHooks()
     }
@@ -108,6 +109,8 @@ export async function startClaudeRuntime(
     context.subscriptions.push(hub.onEnded(p => { chatEnded(p).catch(err => log.warn('To-do update failed:', err)) }))
     hookServer.onRaw(({ payload, mirror }) => {
       const change = hub.hook(payload, Date.now(), mirror)
+      // Every window, mirror or not: each fills the Source Control boxes of the repos it has open.
+      fillBoxes(hub.get().progress.find(p => p.sessionId === payload.session_id))
       if (!change) return
       // Only the owning window gets a change, so one window updates the project's To-do and Left lists.
       if (change.to.state === 'done' && change.from !== 'done') chatFinished(change.to).catch(err => log.warn('To-do update failed:', err))

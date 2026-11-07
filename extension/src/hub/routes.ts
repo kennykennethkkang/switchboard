@@ -8,6 +8,7 @@
  * GET  /hub/ask     ?cwd=&q=: one paid Haiku answer from that project's board (token in the x-switchboard-token header or the query)
  * GET  /hub/holds   204 when this window holds the chat's terminal, so the app routes its commands here
  * GET  /hub/graph   the Memory view's graph (graph.ts), redacted (token in the x-switchboard-token header or the query)
+ * GET  /hub/recall  ?q=&cwd=: what memory knows about q, from that graph (graph.ts recall), free (token in the x-switchboard-token header or the query)
  * GET  /hub/runs    ?session=&role=: that role's runs in that chat for the node drawer (runs.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/outputs     ?session=: what that chat produced (chat-view.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/transcript  ?session=&before=: 50 messages ending before byte before (token in the x-switchboard-token header or the query)
@@ -20,6 +21,7 @@
  *      /hub/question/done  ?id=: answered in the terminal (token in the x-switchboard-token header or the query)
  * POST /hub/todo    the ask server's todo_add or todo_done {op, cwd, text?, id?, before?, session?}; answers a line for the chat (token in the x-switchboard-token header or the query)
  * POST /hub/tool-on the ask server's tool_on {session, name}: a plugin or skill on for that chat; answers a line for it (token in the x-switchboard-token header or the query)
+ * POST /hub/sweep   the ask server's sweep {name?}: rescan one tool, or start Sweep all; answers a line. Never approves: that is hub-sweep-approve, Kenneth's click (token in the x-switchboard-token header or the query)
  * POST /hub/upload  ?cwd=&name=&session=: the body streamed to uploads/ (handleUpload, not handleHub); answers {path} (token in the x-switchboard-token header or the query)
  * Anything outside /hub answers undefined and stays with the hook handler.
  */
@@ -34,7 +36,7 @@ import { questionAsk } from './progress'
 import { closeQuestion, openQuestion, questionOf, waitQuestion } from './questions'
 import { todoTool, type TodoCall } from './todo'
 import { toolOn } from './tools'
-import { readGraph, type MemoryGraph } from './graph'
+import { projectId, readGraph, recall, recentGraph, type MemoryGraph } from './graph'
 import { readRuns, type RunDetail } from './runs'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs, type ChatOutputs, type ChatTranscript } from './chat-view'
 import { chatLabel, saveUpload, UploadRefused } from './uploads'
@@ -71,7 +73,7 @@ const MAX_PATHS = 1000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 300 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'name']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'name']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -117,6 +119,10 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-role-model': { role: str, model: oneOf(...ROLE_MODELS) },
   'hub-rc-server': { folder: str, on: bool },
   'hub-handoff': { sessionId: str },
+  'hub-sweep': { name: opt(str) },
+  'hub-sweep-approve': { name: str },
+  'hub-sweep-fix': { name: str },
+  'hub-tool-add': { repo: v => typeof v === 'string' && v.length <= 200 },
   'hub-changes': { sessionId: str },
   'hub-open-diff': { sessionId: str, file: str },
   'hub-search': { q: str },
@@ -161,7 +167,7 @@ export const handleHubRequest = (hub: HubService, req: { method?: string; url?: 
 /** The runner's answer as a reply: a string is the reason it refused. */
 export const ranReply = (r: boolean | string): HubReply => (typeof r === 'string' ? { status: 400, body: r } : { status: r ? 204 : 400, body: '' })
 
-/** Only /hub/ask, /hub/holds, /hub/graph and /hub/runs answer later; `ask`, `todo`, `graph` and `runs` are swapped in tests so none spends, writes or reads ~/.claude. */
+/** Only /hub/ask, /hub/holds, /hub/graph, /hub/recall and /hub/runs answer later; `ask`, `todo`, `graph` and `runs` are swapped in tests so none spends, writes or reads ~/.claude. */
 export function handleHub(hub: HubService, method: string | undefined, url: string | undefined, body: string, ask = askBrain, todo: (c: TodoCall & { cwd: string }) => Promise<string> = todoTool, graph: (s: ReturnType<HubService['get']>) => Promise<MemoryGraph> = readGraph, runs: (session: string, role: string) => Promise<RunDetail[]> = readRuns, chat: ChatReads = CHAT, token?: string): HubReply | Promise<HubReply> | undefined {
   const u = new URL(url ?? '/', 'http://127.0.0.1')
   const sent = tokenOf(u, token)
@@ -210,6 +216,15 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
   if (method === 'GET' && u.pathname === '/hub/graph') {
     if (!hub.isToken(sent)) return { status: 403, body: '' }
     return graph(hub.get()).then(g => ({ status: 200, body: JSON.stringify(g), contentType: 'application/json' }), err => ({ status: 500, body: (err as Error).message }))
+  }
+
+  // cwd only breaks ties toward the chat's own project; memory from every project still answers.
+  if (method === 'GET' && u.pathname === '/hub/recall') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    const q = u.searchParams.get('q')?.trim().slice(0, 500)
+    if (!q) return { status: 400, body: '' }
+    const cwd = u.searchParams.get('cwd')
+    return recentGraph(hub.get(), graph).then(g => text(recall(g, q, 2, cwd ? projectId(hub.get(), cwd) : undefined)), err => ({ status: 500, body: (err as Error).message }))
   }
 
   if (method === 'GET' && u.pathname === '/hub/runs') {
@@ -309,6 +324,17 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     try { b = JSON.parse(body) } catch { return { status: 400, body: '' } }
     if (!obj(b) || typeof b.session !== 'string' || typeof b.name !== 'string' || !b.name.trim() || b.name.length > 200) return { status: 400, body: 'session and name only' }
     return toolOn(hub, b.session, b.name).then(text, err => ({ status: 400, body: (err as Error).message }))
+  }
+
+  if (method === 'POST' && u.pathname === '/hub/sweep') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    if (!hub.sweep) return { status: 503, body: '' }
+    let b: unknown
+    try { b = JSON.parse(body) } catch { return { status: 400, body: '' } }
+    // A chat may rescan, never approve its own gate.
+    if (obj(b) && 'approve' in b) return { status: 400, body: 'approve is Kenneth\'s, in Switchboard; this only rescans' }
+    if (!obj(b) || Object.keys(b).some(k => k !== 'name') || (b.name !== undefined && (typeof b.name !== 'string' || !b.name.trim() || b.name.length > 200))) return { status: 400, body: 'name only' }
+    return hub.sweep(b.name as string | undefined).then(text, err => ({ status: 400, body: (err as Error).message }))
   }
 
   if (method === 'POST' && u.pathname === '/hub/todo') {

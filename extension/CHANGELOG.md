@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.21.4
+
+- To-do redesigned as a compact list: one line per item, a round tick to finish, click the text to edit, one short note per row, counts as badges, no hint paragraphs
+- Picking items to run is a "Select to run" mode whose run bar takes the add field's place, so the list no longer jumps
+- Finish up and Suggested are compact groups at the top; every Finish up step, older accepted ones included, has Dismiss
+- Project, "elsewhere" and tab counts leave out Needs you steps that only show under Finish up; long items no longer push the page wider than the window
+- Suggestions skip pasted blocks, other chats' messages, usage-limit prompts and follow-up nudges; real requests, questions included, stay
+- A suggestion that points at an open to-do item or repeats one is dropped, matched on whole words, and every device keeps the same copy
+- For you steps expire after 3 days and a project keeps one of each hand step, matched on verb and object
+- Lists are cleaned when the hub loads them; accepted and typed items are never removed, only a chat's exact repeat
+- A test no longer writes temp repos into the real todo-sync.json, and temp paths there are ignored
+- Sweep: plugins and skills Set up installs are scanned with NVIDIA SkillSpector (no LLM) and badged; anything added from outside the kit that the sweep flags, or that cannot be scanned, stays off until you approve it in a VS Code dialog
+- Settings, Installed: Add a plugin or skill from a GitHub repo, swept on the way in; a repo holding a symlink is refused
+- Settings, Installed: Sweep all runs in the background with progress, badges on swept plugins and skills, and Rescan, Approve and Fix in a chat for flagged ones; turning a flagged tool on asks first
+- New `sweep` tool for chats: rescan one tool or start Sweep all; approving stays with you
+- Set up adds the improve-system and awwwards skills and the Cloudflare MCP (https://mcp.cloudflare.com/mcp, OAuth on first use)
+- Header shows both the 5-hour and the weekly limit, each with % used and when it resets; yellow from 80%, red only at a real 100%, "no data" when no chat reports a window; meters show on phone too
+- Limit reset times read from ISO, epoch seconds or epoch ms, so auto-continue waits for the real reset instead of falling back to 30 minutes
+- The usage-limit card's reset line uses the same 12-hour wording as the header
+- Sweep: a tool held at intake stays off in every chat and in tool_on until you approve it, and an approval lapses if its files change
+- Chats can no longer run any Switchboard git button (commit, undo, discard, stash, branch ops) through /hub/command; only you press them
+- On the phone, the Git tab and Ship card hide the ops only the Mac may run (push, sync, commit and push, discard, PR, ship, delete branch); Commit stays
+- The API key error states the real rule: 16 to 128 characters, letters, digits, '.', '-' or '_'
+- The Classic layout's Settings has a heading and a Close button
+- Demo: New chat Tools loads, and Put back keeps a Finish up step in Finish up
+
+## 0.21.3
+
+- A chat's Done fills Source Control in every repo it names: `Commit message (<repo folder>):` blocks go to that repo in whichever window has it open (claude-mods in its own window too), the plain `Commit message:` block to the chat's own repo
+- A new message is merged into one Switchboard wrote that is not committed yet: the new summary line, then its lines and the old ones it lacks; your own text in the box is still never touched, and after a commit the box starts fresh
+- Kit skills: a UTF-16 text file is scanned for keys too, and a skill folder that is a symlink is refused before the bundled copy is touched
+
+## 0.21.2
+
+- A window opened on a repo subfolder or a worktree trusts that repo's root for Claude, so chats there start without the trust dialog; matched by the repository's git dir, so a nested repo, a submodule or an unrelated parent repo is never trusted this way
+- Memory graph route test fixture carries the health field
+- Switchboard's own skills ship in the vsix (kit/skills): aar, and animation-styles with its gallery, 20 reel clips and 20 frames
+- Set up copies each one to ~/.claude/skills when it is missing, and replaces an older copy Switchboard put there; a symlinked skill folder or one you wrote yourself is never touched
+- The build takes them from claude-mods/kit/skills, keeps the bundled copy when claude-mods is missing, scans text files for keys and leaves clips and frames byte for byte
+
+## 0.21.1
+
+- Memory is a knowledge graph: notes can say `supersedes`, `depends-on`, `part-of`, `contradicts` and `related` (comma, `[a, b]` or `- a` lists, at the top or under metadata), take `aliases`, and link to the chat that wrote them; links resolve by name, then alias, ignoring case
+- Frontmatter is read only at the top level and directly under metadata, so a `description: |` block or a nested key can no longer set a note's name, type or relations
+- Memory health: broken links, unlinked notes, names shared within a folder or the vault, contradictions, superseded, invalid (no description or type) and stale project notes (90 days, by modified or the file's time); counted in the list view
+- Memory view colors edges by relation, fades superseded notes, lists typed relations in the details and finds notes by alias
+- `hub_recall` tool: a chat searches memory and the vault before researching, free and local; the best three notes and how they relate within two hops, the chat's own project first on a tie, superseded notes only by name, any script, about 1500 characters; the graph is read at most once per 30 s and kept in memory only
+- Lock tests for chains and window colors no longer race a timer under the full suite
+- Auto-start claims on a git-synced to-do are confirmed by the remote before a chat starts, so two machines cannot start the same item; an offline or rejected claim starts nothing and that project waits 5 minutes
+- A Run press during an auto-start claim wins cleanly instead of both launching
+- Trust is written on the repo root (the main checkout for a worktree), which is what Claude checks, so chats started in a repo subfolder no longer stop at the trust dialog
+- A folder open in any trusted Switchboard window can be trusted from another window, so resumes and handoffs into other projects start without the dialog
+
+## 0.21.0
+
+- Auto-start chats (Settings, Chats, on by default): an idle project with no usage limit hit starts a chat for its next ready to-do item, one chat per project, only from the window that owns the project
+- A chat that hit a usage limit and then closed is resumed after the reset with the continue prompt; ending it with clear or logout drops the retry
+- Folders are marked trusted in Claude before a chat starts there, so the trust dialog no longer stops new chats, resumes, handoffs or the RC server; only inside a workspace VS Code already trusts
+- To-do claims are checked against the file before a chat starts, so Run and auto-start cannot put one item in two chats; Run can take over another machine's claim after 2 minutes
+- After an update the browser app keeps retrying its restart for about 2 minutes, so it no longer stays on the old version when every window reloads at once
+- Kit: aar skill (After Action Review into memory, the vault and proposed to-do edits) runs on handoff and before the standup when installed; animation-styles skill with 20 styles and a live gallery; gemini skill falls back to ffmpeg contact sheets
+
 ## 0.20.1
 
 - Apple Notes access note is "Switchboard Access", tagged #SwitchboardAccess, with the address to type and the one-tap link; it is checked against the live address every 30 minutes and fixed when stale

@@ -547,7 +547,7 @@ function KeyRow({ k, send }: { k: ApiKey; send: Send }) {
           <input type="password" autoComplete="off" spellCheck={false} aria-label={`${label} API key`} placeholder={k.saved ? 'Paste a new key to replace it' : 'Paste the key'}
             value={v} maxLength={128} onChange={e => setV(e.target.value)} style={{ flex: '1 1 180px' }} />
           <button type="submit" className="hub-btn primary" disabled={!value || bad}>Save</button>
-          {bad && <span role="alert" className="si-err si-wide">That does not look like a key: letters, digits, - and _ only.</span>}
+          {bad && <span role="alert" className="si-err si-wide">That does not look like a key: 16 to 128 characters, letters, digits, '.', '-' or '_'.</span>}
         </form>
       </span>
       <span className="si-acts">

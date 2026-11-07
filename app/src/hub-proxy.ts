@@ -59,14 +59,13 @@ export function commandFolder(body: string): string | undefined {
 
 // The mic records the room, and a spoken reply (hub-jarvis with voice) plays in it; the rest reach keys, sign-ins, AWS, setup, links opened on the Mac, dev servers and pushes.
 const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser'])
-const MAC_ONLY_GIT = new Set(['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch'])
 
 /** A command that only this Mac may send, never the phone. */
 export function macOnly(body: string): boolean {
   try {
     const c = JSON.parse(body) as { type?: unknown; op?: unknown; voice?: unknown }
     if (typeof c?.type !== 'string') return false
-    return MAC_ONLY.has(c.type) || (c.type === 'hub-jarvis' && c.voice !== undefined) || /^hub-(key|login|aws)-/.test(c.type) || (c.type === 'hub-git' && MAC_ONLY_GIT.has(c.op as string))
+    return MAC_ONLY.has(c.type) || (c.type === 'hub-jarvis' && c.voice !== undefined) || /^hub-(key|login|aws)-/.test(c.type) || (c.type === 'hub-git' && MAC_ONLY_GIT.has(c.op as GitOp))
   } catch { return false }
 }
 
@@ -106,6 +105,7 @@ export function hostOk(h: http.IncomingHttpHeaders, port: number, lan?: Lan): bo
 /** names: this Mac's MagicDNS name, the only Host a phone may use. plain: served over http (no tailnet certs). */
 export type Lan = { secret: string; names: string[]; plain?: boolean }
 import { phoneCode } from '../../extension/src/hub/lan'
+import { MAC_ONLY_GIT, type GitOp } from '../../web/lib/hub-types'
 export { macNames, phoneCode, tailscaleName, tailscaleProblem } from '../../extension/src/hub/lan'
 
 const PROXIED = ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-host', 'tailscale-user-login']

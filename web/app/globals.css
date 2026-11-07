@@ -381,18 +381,57 @@ html { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 .hub-pick > input[type='checkbox']:indeterminate::after { width: 8px; height: 2px; border-radius: 1px; transform: scale(1); }
 .hub-pick > input[type='checkbox']:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .hub-pick > input[type='checkbox']::after { transition: none; } }
-/* To-do rows sit in a ruled box; task rows stay bare tick lists. */
+/* To-do: one-line rows in a ruled box, a round tick at the start, one short fragment at the end. */
 .hub-todo { list-style: none; margin: 0; padding: 0; border: 1px solid var(--hub-hair); border-radius: 8px; background: var(--hub-surface); }
-.hub-todo > li { padding: 6px 10px; min-height: 40px; box-sizing: border-box; }
+.hub-todo > li { display: flex; align-items: center; gap: 10px; padding: 3px 6px 3px 10px; min-height: 36px; min-width: 0; box-sizing: border-box; }
 .hub-todo > li + li { border-top: 1px solid var(--hub-hair); }
 .hub-todo > li[data-picked] { background: var(--hub-blue-soft); }
+.hub-todo[data-ticked] { margin-bottom: 4px; }
+.hub-todo[data-ticked] .hub-todo-text { color: var(--hub-mute); }
+.hub-todo-text {
+  flex: 1 1 auto; min-width: 0; display: block; padding: 4px 0; background: none; border: 0; border-radius: 4px; text-align: left;
+  font: 400 13px/1.4 var(--hub-sans); color: var(--hub-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+button.hub-todo-text { cursor: text; }
+.hub-todo-meta { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 400 12px/1.2 var(--hub-sans); color: var(--hub-ash); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub-link.hub-todo-meta { padding: 6px; }
+.hub-todo-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; }
+.hub-todo .hub-link { flex: none; white-space: nowrap; }
+.hub-todo-acts { flex: none; display: flex; align-items: center; gap: 2px; }
+.hub-todo-pick { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.hub-todo-pick > input { margin: 0 5px !important; }
+/* Done: a ring whose tick shows under the pointer; the button is the 28px (44px on touch) target around it. */
+.hub-done { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: -4px -5px; padding: 0; background: none; border: 0; border-radius: 50%; color: var(--hub-mute); cursor: pointer; }
+.hub-done > span { width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid currentColor; display: grid; place-items: center; transition: border-color 120ms ease, transform 120ms var(--hub-ease-out); }
+.hub-done > span > svg { opacity: 0; transition: opacity 120ms ease; }
+span.hub-done { cursor: default; }
+button.hub-done:active > span { transform: scale(0.9); }
+.hub-done:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 0; }
+.hub-todo-group { min-width: 0; container-type: inline-size; }
+/* A narrow column (the desk rail, a phone): two lines before the cut, so the item still reads. */
+@container (max-width: 360px) { .hub-todo-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
+@container (max-width: 300px) { .hub-todo > li:has(.hub-todo-acts) { flex-wrap: wrap; row-gap: 0; } li:has(.hub-todo-acts) > .hub-todo-text { flex: 1 1 0; } li > .hub-todo-acts { flex: 0 0 calc(100% - 38px); margin: -4px 0 4px 28px; } }
+.hub-todo-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.hub-todo-sub { display: flex; align-items: center; gap: 8px; min-height: 28px; margin-bottom: 4px; }
+.hub-todo-sub > h4 { margin: 0; font: 500 12px/1 var(--hub-sans); color: var(--hub-mute); }
+.hub-todo-n { font: 500 11px/1 var(--hub-mono); font-variant-numeric: tabular-nums; color: var(--hub-ash); padding: 3px 7px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--hub-hair); white-space: nowrap; }
+.hub-todo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 34px; min-width: 0; }
+.hub-todo-edit { font: 400 13px/1.4 var(--hub-sans); padding: 4px 8px; border-radius: 6px; min-width: 0; flex: 1 1 auto; background: var(--hub-canvas); color: var(--hub-ink); border: 1px solid var(--hub-hair); }
+.hub-todo-sync { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; font-size: 12px; color: var(--hub-ash); min-width: 0; }
 @media (hover: hover) and (pointer: fine) {
   .hub-todo > li:not([data-picked]):hover { background: var(--hub-elev); }
-  /* Edit and Done float over the row end under the mouse or focus, so the text keeps the full width; touch keeps them in the row. */
-  .hub-todo > li { position: relative; }
-  .hub-todo-acts { position: absolute; top: 8px; right: 6px; border-radius: 6px; background: var(--hub-elev); box-shadow: -10px 0 8px -2px var(--hub-elev); opacity: 0; transition: opacity 120ms ease; }
-  .hub-todo > li:hover .hub-todo-acts, .hub-todo > li:focus-within .hub-todo-acts { opacity: 1; }
+  .hub-done:hover > span { border-color: var(--hub-green); }
+  .hub-done:hover > span > svg { opacity: 1; color: var(--hub-green); }
+  button.hub-todo-text:hover { color: var(--hub-ink); text-decoration: underline dotted var(--hub-ash); text-underline-offset: 3px; }
 }
+@media (pointer: coarse) {
+  .hub-todo > li { min-height: 44px; }
+  .hub-done { width: 44px; height: 44px; margin: -8px -13px; }
+  /* No hover title on touch, so long items wrap to two lines instead of hiding. */
+  .hub-todo-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  button.hub-todo-text { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .hub-done > span, .hub-done > span > svg { transition: none; } button.hub-done:active > span { transform: none; } }
 @media (pointer: coarse) { .hub-check { min-height: 44px; align-items: center !important; padding-top: 0 !important; } .hub-check > input[type='checkbox'] { width: 20px; height: 20px; margin: 0 !important; } }
 
 .hub-app { display: grid; grid-template-columns: 300px minmax(0, 1fr); }
@@ -500,8 +539,12 @@ html { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 .hub-brand > i { width: 10px; height: 10px; border-radius: 50%; background: var(--hub-blue); box-shadow: 0 0 0 3px var(--hub-blue-soft); }
 .hub-find kbd { font: 400 12px/1 var(--hub-mono); color: var(--hub-ash); margin-left: 4px; }
 .hub-note { color: var(--hub-ash); font-size: 13px; }
-.hub-limit { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font: 400 12px/1 var(--hub-mono); color: var(--hub-mute); white-space: nowrap; }
+.hub-limits { margin-left: auto; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-width: 0; }
+.hub-limit { display: inline-flex; align-items: center; gap: 8px; font: 400 12px/1 var(--hub-mono); color: var(--hub-mute); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hub-limit > i { display: none; }
+.hub .hub-limit[data-level='none'] { color: var(--hub-ash); }
+.hub .hub-limit[data-level='high'] { color: var(--hub-yellow); }
+.hub .hub-limit[data-level='out'] { color: var(--hub-red); }
 .hub-awake[aria-pressed='true'] { border-color: var(--hub-green); color: var(--hub-ink); }
 .hub:not(.desk) .hub-gear { display: inline-flex; align-items: center; padding: 8px 10px; }
 .hub:not(.desk) .hub-btn:not(.hub-gear) .hub-ic { display: none; }
@@ -670,9 +713,13 @@ body.vscode-light .hub.desk, body.vscode-high-contrast-light .hub.desk {
 .desk .hub-find { min-width: 220px; justify-content: flex-start; color: var(--hub-ash); background: var(--hub-surface); }
 .desk .hub-find kbd { margin-left: auto; font: 500 11px/1 var(--hub-sans); color: var(--hub-ash); border: 1px solid var(--hub-hair-strong); border-radius: 4px; padding: 2px 5px; }
 .desk .hub-note { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* Stacked, so both fit beside the buttons; the buttons keep their size. */
+.desk .hub-limits { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 6px; }
+.desk .hub-top .hub-btn { flex-shrink: 0; white-space: nowrap; }
 .desk .hub-limit { font: 400 12px/1 var(--hub-sans); color: var(--hub-ash); }
 .desk .hub-limit > i { display: block; width: 44px; height: 4px; border-radius: 2px; background: var(--hub-hair-strong); overflow: hidden; }
-.desk .hub-limit > i > b { display: block; height: 100%; background: var(--hub-mute); }
+.desk .hub-limit > i > b { display: block; height: 100%; background: var(--hub-mute); transform-origin: left; transition: transform 300ms var(--hub-ease-out); }
+.desk .hub-limit:is([data-level='high'], [data-level='out']) > i > b { background: currentColor; }
 .desk .hub-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 12px; box-sizing: border-box;
   border-radius: 6px; font: 500 13px/1.2 var(--hub-sans); letter-spacing: 0; border-color: var(--hub-hair-strong); background: var(--hub-elev);
@@ -735,7 +782,8 @@ body.vscode-light .hub.desk, body.vscode-high-contrast-light .hub.desk {
 @media (max-width: 760px) {
   .hub.desk { display: block; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
   .desk .hub-top { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-  .desk .hub-top .hub-lbl, .desk .hub-find kbd, .desk .hub-limit { display: none; }
+  .desk .hub-top .hub-lbl, .desk .hub-find kbd { display: none; }
+  .desk .hub-limits { order: 10; flex-basis: 100%; flex-direction: row; flex-wrap: wrap; margin-left: 0; }
   .desk .hub-find { min-width: 0; width: 36px; padding: 0; justify-content: center; }
   .desk .hub-new { margin-left: auto; }
   .desk .hub-note { order: 9; flex-basis: 100%; white-space: normal; }
@@ -830,6 +878,7 @@ body.vscode-light .hub.desk, body.vscode-high-contrast-light .hub.desk {
 .mem-canvas canvas { display: block; outline: none; }
 .mem-list { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; display: grid; align-content: start; gap: 24px; scrollbar-width: thin; scrollbar-color: var(--hub-hair) transparent; }
 .mem-list > section { width: 100%; max-width: 720px; margin: 0 auto; }
+.mem-health { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 12px; box-sizing: border-box; font: 400 13px/1.4 var(--hub-sans); color: var(--hub-mute); font-variant-numeric: tabular-nums; }
 .mem-list h3 { padding: 0 12px; }
 .mem-list h3 span, .mem-side h4 span { color: var(--hub-ash); font-variant-numeric: tabular-nums; }
 .mem-list ul { border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-surface); overflow: hidden; }

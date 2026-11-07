@@ -1,5 +1,6 @@
 /** The tests, CI and usage-limit cards' words, from hub data alone. */
 import type { CiRun, Limit, TestRun } from './hub-types'
+import { resetAt, resetText } from './limits'
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 const FAILED = new Set(['failure', 'timed_out', 'startup_failure'])
@@ -29,13 +30,9 @@ export function ciLine(c: CiRun): string {
   return bad ? `${on('failed')}: ${bad.name} broke${bad.step ? ` at "${bad.step}"` : ''}. Re-run the failed jobs, or ask the chat to fix it.` : `${on('failed')}.`
 }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const hhmm = (d: Date) => d.toTimeString().slice(0, 5)
-
 /** When the used-up limit resets, and who continues the chat then (hub-service.ts retries unless Claude Code's own auto-continue is on). */
 export function limitLine(limits: Limit[], autoContinue: boolean, now = Date.now()): string {
-  const at = Math.max(...limits.filter(l => l.percentUsed >= 100).map(l => Date.parse(l.resetsAt ?? '')).filter(Number.isFinite))
-  const d = new Date(at), today = Number.isFinite(at) && d.toDateString() === new Date(now).toDateString()
-  const when = Number.isFinite(at) ? `Resets ${today ? 'at' : DAYS[d.getDay()]} ${hhmm(d)}. ` : ''
+  const at = Math.max(...limits.filter(l => l.percentUsed >= 100).map(l => resetAt(l.resetsAt) ?? NaN).filter(Number.isFinite))
+  const when = Number.isFinite(at) ? `Resets ${resetText(at, now)}. ` : ''
   return when + (autoContinue ? 'Auto-continue is on, so Claude Code picks it up then.' : `Auto-continue is off; Switchboard sends it again a minute after${when ? '' : ' the reset'}.`)
 }

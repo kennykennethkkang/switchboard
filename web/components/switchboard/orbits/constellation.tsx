@@ -158,6 +158,7 @@ function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, no
     g.addColorStop(0, rgba(lc, 0.18 * b * halo)); g.addColorStop(1, rgba(lc, 0))
     ctx.beginPath(); ctx.arc(L.cx, L.cy, lr + 16, 0, TAU); ctx.fillStyle = g; ctx.fill()
   }
+  S.hits.set('lead', { x: L.cx, y: L.cy, r: lr })
   disc(L.cx, L.cy, lr, lc, { alpha: 0.95 * dim, tint: 0.06 })
   const tokens = c.live?.tokens, cap = c.live?.compactAt
   if (tokens && cap) {

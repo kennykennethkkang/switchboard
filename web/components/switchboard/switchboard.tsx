@@ -6,6 +6,7 @@ import { switcherItems, type SwitchItem } from '@/lib/switcher'
 import { todayView } from '@/lib/today'
 import { byNeed, taskTotals } from '@/lib/progress'
 import { roleModels } from '@/lib/gear-rows'
+import { limitMeters } from '@/lib/limits'
 import { boxNote } from '@/lib/message-box'
 import { ChatCards, History, ProjectFilter, type Card } from './chat-cards'
 import { ChatPicture } from './chat-picture'
@@ -14,7 +15,7 @@ import { ChangesPanel } from './changes'
 import { GitPanel } from './git-panel'
 import { ShipCard } from './ship-card'
 import { TodoPanel, todoFolder } from './todo-panel'
-import { withHome } from '@/lib/todo'
+import { openCount, withHome } from '@/lib/todo'
 import { JevCard } from './jev-card'
 import { Switcher } from './switcher'
 import { TodayCard } from './today'
@@ -35,7 +36,6 @@ const MemoryView = lazy(() => import('./memory').then(m => ({ default: m.MemoryV
 const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); return true } catch { return false } }
 const PROJECTS_KEY = 'switchboard.projects'
 const LAYOUT_KEY = 'switchboard.layout'
-const LIMIT: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iP/.test(navigator.platform)
 const NARROW = '(max-width: 760px)'
 type Tab = 'chats' | 'chat' | 'todo' | 'git'
@@ -88,6 +88,8 @@ export function Switchboard() {
   // location only exists in the browser; reading it during render made the server and client markup differ
   const [mac, setMac] = useState(false)
   useEffect(() => setMac(onMac()), [])
+  // The proxy refuses Mac-only git ops from the phone, so their buttons stay off there.
+  const onPhone = !isDemo && !isVSCode && !mac
   const sendRef = useRef(send)
   sendRef.current = send
   const [layout, setLayout] = useLayout()
@@ -150,8 +152,7 @@ export function Switchboard() {
   const today = useMemo(() => todayView(cards, hub.history, hub.live, Date.now(), hub.jev), [cards, hub.history, hub.live, hub.jev])
   const tasks = useMemo(() => taskTotals(cards), [cards])
   const models = useMemo(() => roleModels(hub.installed, hub.controls.claude.model), [hub.installed, hub.controls.claude.model])
-  // Limits ride on each live chat's feed; the first one that has them is as fresh as any.
-  const limit = hub.live.find(l => l.limits.length)?.limits[0]
+  const meters = limitMeters(hub.live)
   const web = hub.webUrl
   // The QR takes the Mac's name when there is one, since it outlasts an IP change; the IP stays listed below it.
   const pu = hub.phoneUrls
@@ -165,7 +166,7 @@ export function Switchboard() {
   const read = (chat: Card['chat']) => () => setReading({ id: chat.sessionId, name: chat.name || projectName(chat) })
   const menu = (chat: Card['chat']) => <ChatMenu chat={chat} starred={starred.includes(chat.sessionId)} send={send} onMac={isVSCode} onRead={read(chat)} />
   const needs = cards.filter(c => c.progress?.state === 'needs-you').length
-  const todoCount = (todoAt && todos[todoAt]?.todo.length) || 0
+  const todoCount = (todoAt && todos[todoAt] && openCount(todos[todoAt])) || 0
   const files = hub.changes?.sessionId === currentId ? hub.changes?.files.length ?? 0 : 0
 
   const header = (
@@ -176,9 +177,11 @@ export function Switchboard() {
       </button>
       {isDemo && <span className="hub-note">Sample data: no VS Code window is connected</span>}
       {down && !isDemo && <span role="status" className="hub-note" style={{ color: 'var(--hub-yellow)' }}>Not live, retrying: {down}</span>}
-      <span className="hub-limit" title={limit?.resetsAt ? `Resets ${limit.resetsAt}` : undefined}>
-        {limit && <i aria-hidden><b style={{ width: `${Math.min(100, Math.round(limit.percentUsed))}%` }} /></i>}
-        {limit ? `${LIMIT[limit.kind] ?? limit.kind.replace('_', ' ')} limit · ${Math.round(limit.percentUsed)}% used` : ''}
+      <span className="hub-limits">
+        {meters.map(m => <span key={m.kind} className="hub-limit" data-level={m.level}>
+          <i aria-hidden><b style={{ transform: `scaleX(${Math.min(100, m.percent ?? 0) / 100})` }} /></i>
+          {m.label} {m.percent === undefined ? 'no data' : `${m.percent}%`}{m.reset && ` · ${m.reset}`}
+        </span>)}
       </span>
       <button type="button" className="hub-btn primary hub-new" aria-expanded={panel === 'new'} onClick={() => setPanel(panel === 'new' ? 'none' : 'new')}><Ic d={ICON.plus} />New chat</button>
       {isVSCode && <>
@@ -228,7 +231,7 @@ export function Switchboard() {
   const gear = <Gear key={gearAt.n} hub={hub} send={send} start={gearAt.at} layout={layout} onLayout={setLayout} problem={problem} />
   const filter = (projectChips.length > 1 || projects.length > 0) && <ProjectFilter projects={projectChips} picked={projects} tint={projectTint} busy={name => cards.filter(c => c.progress?.state === 'working' && projectName(c.chat) === name).length} onChange={pickProjects} />
   const dev = <DevRows dev={(hub.dev ?? []).filter(d => inProjects({ cwd: d.folder, project: d.repo }, projects))} tailscale={hub.tailscale} isVSCode={isVSCode} send={send} />
-  const chatCards = <ChatCards cards={rail} all={hub.progress} stuck={hub.stuck} waits={hub.waits} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
+  const chatCards = <ChatCards cards={rail} all={hub.progress} stuck={hub.stuck} cache={hub.cache} waits={hub.waits} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
     empty={cards.length ? 'No chats in the picked projects.' : undefined} />
   const history = <History archive={(hub.archive ?? []).filter(a => inProjects(a, projects))} chats={cards.map(c => c.chat)} search={hub.search} reveal={reveal}
     onSearch={q => send({ type: 'hub-search', q })}
@@ -251,8 +254,8 @@ export function Switchboard() {
     : <section style={{ padding: 20, color: 'var(--hub-ash)' }}>Pick a chat, or start one.</section>
   const changes = current && <ChangesPanel key={current.chat.sessionId} changes={hub.changes} sessionId={current.chat.sessionId} cwd={current.chat.cwd} commit={current.progress?.commit}
     onCopy={copy} onOpen={file => send({ type: 'hub-open-diff', sessionId: current.chat.sessionId, file })} />
-  const ship = current?.progress?.state === 'done' && <ShipCard key={`ship-${current.chat.sessionId}`} repo={hub.repo} progress={current.progress} sessionId={current.chat.sessionId} send={send} onCopy={copy} />
-  const git = current && <>{ship}<GitPanel key={`git-${current.chat.sessionId}`} repo={hub.repo} sessionId={current.chat.sessionId} chat={current.chat} commit={current.progress?.commit} isVSCode={isVSCode} send={send} shipping={!!ship} /></>
+  const ship = current?.progress?.state === 'done' && <ShipCard key={`ship-${current.chat.sessionId}`} repo={hub.repo} progress={current.progress} sessionId={current.chat.sessionId} send={send} onCopy={copy} phone={onPhone} />
+  const git = current && <>{ship}<GitPanel key={`git-${current.chat.sessionId}`} repo={hub.repo} sessionId={current.chat.sessionId} chat={current.chat} commit={current.progress?.commit} isVSCode={isVSCode} send={send} shipping={!!ship} phone={onPhone} /></>
   const switcher = finding && <Switcher items={items} tint={itemTint} onPick={choose} onClose={() => setFinding(false)} />
   const chatView = reading && <ChatView key={reading.id} sessionId={reading.id} name={reading.name} demo={isDemo ? hub : undefined} onCopy={copy} onClose={() => setReading(undefined)} />
   const memory = panel === 'memory' && <Suspense fallback={null}><MemoryView isDemo={isDemo} onClose={() => setPanel('none')} /></Suspense>
@@ -264,7 +267,16 @@ export function Switchboard() {
       {jarvis}
       {stuck}
       {panel === 'new' && <div style={{ padding: 16, borderBottom: '1px solid var(--hub-hair)' }}>{newChat}</div>}
-      {panel === 'gear' && gear}
+      {panel === 'gear' && <div style={{ background: 'var(--hub-surface)' }}>
+        {/* Same head as Desk's Settings sheet. */}
+        <div className="hub-sheet-h">
+          <h2>Settings</h2>
+          <button type="button" className="hub-btn icon" aria-label="Close Settings" onClick={() => setPanel('none')}>
+            <svg aria-hidden width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+          </button>
+        </div>
+        {gear}
+      </div>}
       <main className="hub-app" style={{ flex: 1 }}>
         <aside className="hub-rail" aria-label="Chats" style={{ padding: 16, background: 'var(--hub-canvas)' }}>
           {filter}{dev}{chatCards}{history}

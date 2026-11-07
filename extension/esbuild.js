@@ -59,8 +59,8 @@ function bundleKit() {
   console.log(`kit: bundled rules.md (${rulesVersion}) and ${files.length - 1} role agents`)
 }
 
-// The three mods and their marketplace manifest ship too (kit/mods), for Set up on a machine without claude-mods.
-const MODS = ['usage-meter', 'repo-rules', 'paid-guard']
+// The mods and their marketplace manifest ship too (kit/mods), for Set up on a machine without claude-mods.
+const MODS = ['usage-meter', 'repo-rules', 'paid-guard', 'cache-keeper']
 const MODS_OUT = path.join(KIT_OUT, 'mods')
 
 function bundleMods() {
@@ -82,6 +82,41 @@ function bundleMods() {
     fs.writeFileSync(p, p.endsWith('.json') ? text.replace(/"description": "[^"]*"/g, genericRules) : genericRules(text))
   }
   console.log(`mods: bundled ${MODS.join(', ')}`)
+}
+
+// Switchboard's own skills (setup.json "own") ship in kit/skills; Set up copies them to ~/.claude/skills.
+const SKILLS_OUT = path.join(KIT_OUT, 'skills')
+const ownSkills = () => JSON.parse(fs.readFileSync(path.join(KIT_OUT, 'setup.json'), 'utf8')).own ?? []
+// A name becomes a path under kit/skills and ~/.claude/skills: one folder, nothing that climbs out.
+const plainName = n => typeof n === 'string' && n !== '' && n !== '.' && n !== '..' && !/[\\/]/.test(n)
+// UTF-16 text has NUL bytes too: its decoded text, else '' for what does not decode (a clip or a frame).
+const utf16 = buf => { try { return new TextDecoder(buf[0] === 0xfe && buf[1] === 0xff ? 'utf-16be' : 'utf-16le', { fatal: true }).decode(buf) } catch { return '' } }
+
+function bundleSkills(kitSrc = KIT_SRC, out = SKILLS_OUT, own = ownSkills()) {
+  for (const n of own) if (!plainName(n)) throw new Error(`skills: ${JSON.stringify(n)} is not a plain folder name`)
+  // Checked before anything is removed, so a refused build keeps the old bundle.
+  for (const n of own) if (fs.lstatSync(path.join(kitSrc, 'skills', n), { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error(`skills: ${n} is a symlink in ${kitSrc}/skills; bundle a real folder`)
+  fs.mkdirSync(out, { recursive: true })
+  for (const n of fs.readdirSync(out)) if (!own.includes(n)) fs.rmSync(path.join(out, n), { recursive: true, force: true })
+  for (const name of own) {
+    const src = path.join(kitSrc, 'skills', name), to = path.join(out, name)
+    if (!fs.existsSync(path.join(src, 'SKILL.md'))) { console.warn(`skills: ${src} not found, keeping the bundled copy`); continue }
+    fs.rmSync(to, { recursive: true, force: true })
+    // No symlinks: the name swap below would write through one into the file it points at.
+    fs.cpSync(src, to, { recursive: true, filter: s => !/[\\/](\.DS_Store|__pycache__)$/.test(s) && !fs.lstatSync(s).isSymbolicLink() })
+    for (const f of fs.readdirSync(to, { recursive: true })) {
+      const p = path.join(to, f)
+      if (!fs.lstatSync(p).isFile()) continue
+      const buf = fs.readFileSync(p)
+      // A NUL byte means a clip, a frame or UTF-16 text: copied as is, never renamed; UTF-16 is still scanned.
+      if (buf.includes(0)) { if (SECRET.test(utf16(buf))) throw new Error(`skills: ${p} looks like it holds a secret; not bundled`); continue }
+      const text = buf.toString('utf8')
+      if (SECRET.test(text)) throw new Error(`skills: ${p} looks like it holds a secret; not bundled`)
+      // SKILL.md carries GENERIC, so Set up knows an installed copy is ours to refresh.
+      fs.writeFileSync(p, f === 'SKILL.md' ? marked(text) : genericRules(text))
+    }
+  }
+  console.log(`skills: bundled ${own.join(', ')}`)
 }
 
 // The browser app (app/dist: app.js and webview/) ships in dist/app, so Open in browser and Phone work from the vsix alone.
@@ -119,6 +154,7 @@ function writeStamp() {
 async function main() {
   bundleKit()
   bundleMods()
+  bundleSkills()
   bundleApp()
   if (watch) {
     const ctx = await esbuild.context(config)
@@ -131,7 +167,7 @@ async function main() {
   }
 }
 
-module.exports = { genericRules, GENERIC, stamp, stampFiles }
+module.exports = { genericRules, GENERIC, stamp, stampFiles, bundleSkills }
 
 if (require.main === module) main().catch((e) => {
   console.error(e)

@@ -8,7 +8,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, dropped } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -819,5 +819,270 @@ describe('dropped', () => {
     const mine: TodoDoc = { ...emptyDoc(), ticked: [{ ...row, why: 'you', name: 'Chat A' }] }
     assert.equal(dropped(mine, { ...emptyDoc(), ticked: [row] }), true)
     assert.equal(dropped(mine, mine), false)
+  })
+})
+
+describe('autoStartPlan', () => {
+  const now = 10 * 60_000
+  const item = (id: string, more: Partial<TodoDoc['todo'][number]> = {}) => ({ id, text: `do ${id}`, at: 0, ...more })
+  const base = { on: true, folder: '/p', todo: [item('a'), item('b')], busy: false, limited: false, tried: new Set<string>(), now }
+  const ids = (p: ReturnType<typeof autoStartPlan>) => p?.items.map(t => t.id)
+
+  it('an idle project starts its first ready item', () => {
+    assert.deepEqual(autoStartPlan(base), { folder: '/p', items: [base.todo[0]] })
+  })
+
+  it('starts nothing while busy, limited, switched off, or in a window that does not own a project', () => {
+    for (const s of [{ busy: true }, { limited: true }, { on: false }, { folder: undefined }]) assert.equal(autoStartPlan({ ...base, ...s }), undefined, JSON.stringify(s))
+  })
+
+  it('an open prerequisite runs first, with the item it unlocks', () => {
+    assert.deepEqual(ids(autoStartPlan({ ...base, todo: [item('a'), item('p', { before: 'a' })] })), ['p', 'a'])
+  })
+
+  it('skips hand steps, items already tried, and items whose prerequisite is the user\'s', () => {
+    assert.deepEqual(ids(autoStartPlan({ ...base, todo: [item('y', { why: 'you' }), item('a'), item('b')], tried: new Set(['a']) })), ['b'])
+    assert.equal(autoStartPlan({ ...base, todo: [item('a'), item('y', { why: 'you', before: 'a' })] }), undefined)
+  })
+
+  it('a second evaluation right after the claim starts nothing', () => {
+    const first = autoStartPlan(base)!
+    const claimed = first.items.reduce((d, t) => startTodo(d, t.id, 'chat-1', now), { ...emptyDoc(), todo: base.todo })
+    assert.equal(autoStartPlan({ ...base, todo: claimed.todo }), undefined)
+    // Past the grace a claim whose chat never showed is cleared by clearGone; the next item waits for that.
+    assert.deepEqual(ids(autoStartPlan({ ...base, todo: claimed.todo, now: now + 3 * 60_000 })), ['b'])
+  })
+})
+
+describe('auto-start around a usage limit and claims', () => {
+  const limit = { session_id: 'x1', cwd: '/p', hook_event_name: 'StopFailure', error: 'rate_limit', last_assistant_message: 'API Error: Rate limit reached' }
+
+  it('a limited chat that ended keeps its item through the reset, and its project waits for the resume', () => {
+    const h = new HubService()
+    h.hook(limit, 0)
+    h.hook({ session_id: 'x1', cwd: '/p', hook_event_name: 'SessionEnd', reason: 'other' }, 1000)
+    const reset = 30 * 60_000
+    let d: TodoDoc = { ...emptyDoc(), todo: [{ id: 'a', text: 'do a', at: 0, chat: 'x1', host: hostId() }, { id: 'b', text: 'do b', at: 0 }] }
+    d = clearGone(d, new Set(h.retryIds()), reset)
+    assert.equal(d.todo[0].chat, 'x1')
+    const resumed = h.goneDue(() => false, reset)
+    assert.deepEqual(resumed.map(r => r.sessionId), ['x1'])
+    const s = { on: true, folder: '/p', busy: false, limited: h.retrying(), tried: new Set<string>(), resumed: reset }
+    assert.equal(autoStartPlan({ ...s, todo: d.todo, now: reset }), undefined)
+    // The next pass, before the resumed chat shows as live: still its item, still no second chat.
+    d = clearGone(d, new Set(resumed.map(r => r.sessionId)), reset + 15_000)
+    assert.equal(d.todo[0].chat, 'x1')
+    assert.equal(autoStartPlan({ ...s, todo: d.todo, now: reset + 15_000 }), undefined)
+    assert.deepEqual(autoStartPlan({ ...s, todo: d.todo, now: reset + 3 * 60_000 })?.items.map(t => t.id), ['b'])
+  })
+
+  it('claims only items still free: not running, not claimed in the last grace, not on another machine', () => {
+    const d: TodoDoc = { ...emptyDoc(), todo: [
+      { id: 'a', text: 'A', at: 0 },
+      { id: 'dead', text: 'D', at: 0, chat: 'old', host: hostId() },
+      { id: 'run', text: 'R', at: 0, chat: 'live', host: hostId() },
+      { id: 'new', text: 'N', at: 9 * 60_000, chat: 'fresh', host: hostId() },
+      { id: 'far', text: 'F', at: 0, chat: 'x', host: 'otherhost' },
+    ] }
+    const now = 10 * 60_000, live = new Set(['live'])
+    const got = claimItems(d, ['a', 'dead'], 'c1', live, now)
+    assert.deepEqual(got.todo.slice(0, 2).map(t => t.chat), ['c1', 'c1'])
+    for (const id of ['run', 'new', 'far', 'gone']) assert.equal(claimItems(d, ['a', id], 'c1', live, now), d, id)
+  })
+})
+
+describe('claimItems on another machine\'s claim', () => {
+  const d: TodoDoc = { ...emptyDoc(), todo: [{ id: 'o', text: 'O', at: 0, chat: 'x', host: 'other' }] }
+  const day = 24 * 60 * 60_000
+
+  it('Run takes over one past the grace; auto-start never does; Run within the grace refuses', () => {
+    assert.equal(claimItems(d, ['o'], 'c1', new Set(), 10 * day, true).todo[0].chat, 'c1')
+    assert.equal(claimItems(d, ['o'], 'c1', new Set(), 10 * day), d)
+    assert.equal(claimItems(d, ['o'], 'c1', new Set(), 60_000, true), d)
+  })
+})
+
+describe('auto-start claims on a synced list wait for origin', () => {
+  const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  let root = '', a = '', b = ''
+  const claim = (chat: string) => (d: TodoDoc) => claimItems(d, ['x'], chat, new Set())
+  const remoteChat = () => parseDoc(sh(path.join(root, 'remote.git'), 'cat-file', 'blob', `${TODO_REF}:todo.json`)).todo.find(t => t.id === 'x')?.chat
+  before(async () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-claim-'))
+    sh(root, 'init', '-q', '--bare', '-b', 'main', 'remote.git')
+    for (const name of ['a', 'b']) sh(root, 'clone', '-q', 'remote.git', name)
+    a = path.join(root, 'a'); b = path.join(root, 'b')
+    await updateDoc({ root: a }, d => addTodo(d, 'X', 1, 'x'))
+    await syncDoc({ root: a }); await syncDoc({ root: b })
+  })
+  after(() => fs.rmSync(root, { recursive: true, force: true }))
+
+  it('two machines race: only the one whose push wins gets the claim; the loser fetches, sees it and skips', async () => {
+    let won: TodoDoc | undefined
+    // b claims and pushes after a has fetched but before a pushes, so a's push is rejected.
+    const lost = await claimRemote(a, claim('a1'), { beforePush: async () => { won ??= await claimRemote(b, claim('b1')) } })
+    assert.equal(lost, undefined)
+    assert.equal(won?.todo.find(t => t.id === 'x')?.chat, 'b1')
+    assert.equal(remoteChat(), 'b1')
+    assert.equal((await readDoc({ root: b })).todo[0].chat, 'b1')
+  })
+
+  it('a Run claim that lands while auto-start fetches wins: auto-start re-checks and refuses', async () => {
+    await updateDoc({ root: a }, d => addTodo(d, 'Y', 2, 'y'))
+    await syncDoc({ root: a })
+    const remote = () => parseDoc(sh(path.join(root, 'remote.git'), 'cat-file', 'blob', `${TODO_REF}:todo.json`)).todo.find(t => t.id === 'y')?.chat
+    let run: TodoDoc | undefined
+    const auto = await claimRemote(a, d => claimItems(d, ['y'], 'auto1', new Set()), { beforeClaim: async () => { run ??= await updateDoc({ root: a }, d => claimItems(d, ['y'], 'run1', new Set(), Date.now(), true)) } })
+    assert.equal(auto, undefined)
+    assert.equal(run?.todo.find(t => t.id === 'y')?.chat, 'run1')
+    assert.equal((await readDoc({ root: a })).todo.find(t => t.id === 'y')?.chat, 'run1')
+    assert.notEqual(remote(), 'auto1')
+  })
+
+  it('offline: auto-start skips the item; Run still claims it locally', async () => {
+    const c = path.join(root, 'c')
+    sh(root, 'clone', '-q', 'remote.git', 'c')
+    await syncDoc({ root: c })
+    await updateDoc({ root: c }, d => startTodo(d, 'x', undefined, 0))
+    sh(c, 'remote', 'set-url', 'origin', path.join(root, 'gone.git'))
+    // Opted in, as if private on GitHub; passed in, so the real ~/.claude opt-in file is never written.
+    const optIn = { [fs.realpathSync(c)]: true as const }
+    assert.equal(await claimRemote(c, claim('c1')), undefined)
+    const tried = new Set<string>()
+    assert.equal(await claimTodo(fs.realpathSync(c), ['x'], 'c1', new Set(), false, optIn, tried), false)
+    assert.deepEqual([...tried], [], 'an unconfirmed claim leaves the item for a later pass')
+    assert.equal((await readDoc({ root: c })).todo[0].chat, undefined)
+    assert.equal(await claimTodo(fs.realpathSync(c), ['x'], 'c2', new Set(), true, optIn, tried), true)
+    assert.deepEqual([...tried], ['x'], 'a claimed item is never auto-started again')
+    assert.equal((await readDoc({ root: c })).todo[0].chat, 'c2')
+  })
+})
+
+describe('autoStartPlan backs off after an unconfirmed claim', () => {
+  const s = { on: true, folder: '/p', todo: [{ id: 'a', text: 'A', at: 0 }], busy: false, limited: false, tried: new Set<string>() }
+  it('plans nothing for 5 minutes after a failed claim, then tries again; no failure, no wait', () => {
+    assert.equal(autoStartPlan({ ...s, now: 60_000 + 4 * 60_000, failedAt: 60_000 }), undefined)
+    assert.deepEqual(autoStartPlan({ ...s, now: 60_000 + 5 * 60_000, failedAt: 60_000 })?.items.map(t => t.id), ['a'])
+    assert.deepEqual(autoStartPlan({ ...s, now: 61_000 })?.items.map(t => t.id), ['a'])
+  })
+})
+
+describe('suggestion quality', () => {
+  const day = 24 * 60 * 60_000
+  const sug = (id: string, text: string, why: TodoDoc['todo'][0]['why'], from: string, at: number) => ({ id, text, at, from, why })
+  const doc = (over: Partial<TodoDoc>): TodoDoc => ({ ...emptyDoc(), ...over })
+
+  it('drops pasted wrappers, harness prompts and follow-up nudges from missed requests; keeps real ones', () => {
+    const asked = [
+      '<pasted_content id="afb4"> Chat: Add these functions into switchboard Stuck: designer subagent',
+      '<cross-session-message from="uds:/tmp/x.sock" from-name="Video"> Agreed, holding all edits',
+      'Your claude.ai usage limit has reset. Continue the task you were working on when the limit was reached.',
+      'Is there anything else?',
+      'Do what is left',
+      'Is everything done if not do them. Fix risks and add anything that will help',
+      'Seems like engineer is stuck please fix',
+      'After all subagents and tasks are done make full commit message including everything',
+      'ok',
+      'Add the Transcript tab for Codex chats',
+      'add dark mode',
+      '<pasted_content id="a1">log lines</pasted_content> Fix the crash in this log',
+      'Show when the usage limit resets in the header',
+      'Looks like the build gets stuck on Windows, look into it',
+      'Add tests',
+      'Fix the commit message prefill for the second repo',
+      'Can you also add a logout button to settings?',
+    ]
+    const d = addMissed(emptyDoc(), chat({ asked, covered: asked.map(() => 0) }), 5)
+    assert.deepEqual(d.suggested?.map(t => t.text), ['Add the Transcript tab for Codex chats', 'add dark mode', 'Fix the crash in this log', 'Show when the usage limit resets in the header',
+      'Looks like the build gets stuck on Windows, look into it', 'Add tests', 'Fix the commit message prefill for the second repo', 'Can you also add a logout button to settings?'])
+  })
+
+  it('drops wrapper-only and nudge Left lines too; an unknown tag is plain text', () => {
+    const d = afterFinish(emptyDoc(), chat({ report: { done: ['x'], left: ['<system-reminder>be terse</system-reminder>', '<command-name>/clear', 'Your claude.ai usage limit has reset.', 'Add rate limits', 'Wrap <todo-panel> in a dialog so it can close'] } }), [], 1)
+    assert.deepEqual(d.suggested?.map(t => t.text), ['Add rate limits', 'Wrap <todo-panel> in a dialog so it can close'])
+  })
+
+  it('a line that only points at an open to-do item is dropped', () => {
+    const d = doc({ todo: [{ id: 'd6bdfb41', text: 'Add MCP connectors', at: 1 }] })
+    const out = afterFinish(d, chat({ report: { done: ['x'], left: [], you: ['To-do `d6bdfb41`: the connectors, which need your API keys.'] } }), [], 2)
+    assert.equal(out.suggested, undefined)
+  })
+
+  it('dedupes hand steps across chats by verb and object: one Reload VS Code, but each repo\'s commit', () => {
+    const d = doc({ suggested: [sug('a1', 'Reload VS Code so 0.20.1 keeps the note current.', 'you', 'c1', 1), sug('m1', 'Commit claude-mods', 'you', 'c1', 1)] })
+    const out = afterFinish(d, chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Reload VS Code. That picks up the new hook.', 'Commit agent-flow'] } }), [], 2)
+    assert.deepEqual(out.suggested?.map(t => `${t.from} ${t.text}`).sort(), ['c1 Commit claude-mods', 'c2 Commit agent-flow', 'c2 Reload VS Code. That picks up the new hook.'])
+    assert.ok(out.removed.a1)
+    // Words after in/to/for are the object: each repo keeps its own step.
+    const repos = afterFinish(doc({ suggested: [sug('i1', 'Commit in claude-mods', 'you', 'c1', 1), sug('t1', 'Push to origin', 'you', 'c1', 1)] }),
+      chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Commit in agent-flow', 'Push to the fork'] } }), [], 2)
+    assert.equal(repos.suggested?.length, 4)
+    // A leading "Optional:" or "First," is not the whole step.
+    const pre = afterFinish(doc({ suggested: [sug('o1', 'Optional: reload VS Code', 'you', 'c1', 1)] }),
+      chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['First, commit in claude-mods'] } }), [], 2)
+    assert.equal(pre.suggested?.length, 2)
+  })
+
+  it('a Left line saying what an open item or another chat\'s suggestion says is not added', () => {
+    const d = doc({ todo: [{ id: 't1', text: 'Add the Transcript tab for Codex chats', at: 1 }], suggested: [sug('s9', 'Write the deploy docs for staging', 'later', 'c1', 1)] })
+    const out = afterFinish(d, chat({ sessionId: 'c2', report: { done: ['x'], left: ['Add the Transcript tab for Codex chats', 'Write the deploy docs for staging'] } }), [], 2)
+    assert.deepEqual(out.suggested?.map(t => t.id), ['s9'])
+  })
+
+  it('prune matches whole words: an open "CI" item never drops "Decide pricing tiers"', () => {
+    const d = doc({ todo: [{ id: 't1', text: 'CI', at: 1 }], suggested: [sug('s1', 'Decide pricing tiers for teams', 'later', 'c1', 1)] })
+    assert.equal(prune(d, 2), d)
+  })
+
+  it('prune: For you steps expire after 3 days; others stay', () => {
+    const d = doc({ suggested: [sug('y1', 'Reconnect Remote Control in this chat', 'you', 'c1', 0), sug('l1', 'Add rate limits to export', 'later', 'c1', 0)] })
+    assert.equal(prune(d, 2 * day), d)
+    const out = prune(d, 3 * day + 1)
+    assert.deepEqual(out.suggested?.map(t => t.id), ['l1'])
+    assert.equal(out.removed.y1, 3 * day + 1)
+  })
+
+  it('prune picks the same duplicate on every machine, whatever the list order', () => {
+    const A = doc({ suggested: [sug('bb', 'Write the deploy docs for staging', 'later', 'c1', 5)], todo: [{ id: 'x2', text: 'Add rate limits to export', at: 3, from: 'c1' }] })
+    const B = doc({ suggested: [sug('aa', 'Write the deploy docs for staging', 'later', 'c2', 5)], todo: [{ id: 'x1', text: 'Add rate limits to export', at: 3, from: 'c2' }] })
+    const out = mergeDocs(prune(mergeDocs(A, B, 10), 10), prune(mergeDocs(B, A, 10), 10), 10)
+    assert.deepEqual(out.suggested?.map(t => t.id), ['aa'])
+    assert.deepEqual(out.todo.map(t => t.id), ['x1'])
+  })
+
+  it('prune never touches accepted or typed items; only a chat-made exact duplicate goes', () => {
+    const now = 10 * day
+    const d = doc({
+      todo: [
+        { id: '8133346b', text: 'Switchboard app keeper: add a way to turn the 3131 keep-alive off', at: 1, from: 'c1' },
+        { id: '1ecbfca1-ok', text: "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.", at: 2, from: 'c2', why: 'later' },
+        { id: 'k1', text: 'Create mod instructions', at: 1 },
+        { id: 'k2', text: 'Create mod instructions', at: 1 },
+        { id: 'c9', text: 'Create mod instructions.', at: 2, from: 'c9' },
+        { id: 'dfd937e0-ok', text: 'Clear shell and start running. After run is finished put full commit message in for me to push.', at: 3, from: 'c3', why: 'missed' },
+        { id: 'a1-ok', text: 'Is there anything else?', at: 3, from: 'c3', why: 'missed' },
+      ],
+      suggested: [
+        sug('w1', '<pasted_content id="afb4"> Chat: Add these functions', 'missed', 'c4', now),
+        sug('h1', 'Is there anything else?', 'missed', 'c4', now),
+        sug('r1', 'Reload VS Code so 0.20.1 is current.', 'you', 'c5', now - 2),
+        sug('r2', 'Reload VS Code. That picks up the hook.', 'you', 'c6', now - 1),
+        sug('p1', 'To-do 8133346b: turn it off.', 'you', 'c6', now - 1),
+        sug('ok', 'Add the Transcript tab for Codex chats', 'later', 'c6', now - 1),
+      ],
+    })
+    const out = prune(d, now)
+    assert.deepEqual(out.todo.map(t => t.id), ['8133346b', '1ecbfca1-ok', 'k1', 'k2', 'dfd937e0-ok', 'a1-ok'])
+    assert.deepEqual(out.suggested?.map(t => t.id), ['r2', 'ok'])
+    for (const id of ['c9', 'w1', 'h1', 'r1', 'p1']) assert.equal(out.removed[id], now, id)
+    assert.equal(prune(out, now), out)
+  })
+
+  it('reads the opt-in file under HOME at call time, and drops temp folders from it', () => {
+    assert.ok(optInFile().startsWith(HOME), optInFile())
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-optin-')), 'todo-sync.json')
+    fs.writeFileSync(file, JSON.stringify({ '/repo': true, [path.join(os.tmpdir(), 'sb-claim-x', 'c')]: true, [path.join(fs.realpathSync(os.tmpdir()), 'sb-claim-y', 'c')]: true }))
+    assert.deepEqual(readOptIn(file), { '/repo': true })
+    fs.rmSync(path.dirname(file), { recursive: true })
   })
 })

@@ -4,7 +4,7 @@
  */
 import type { HubCommand } from './vscode-bridge'
 import { runIds } from './todo'
-import type { ChangedFile, ChatProfile, ChatProgress, HubState, RepoView, ToolCall } from './hub-types'
+import type { ChangedFile, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, ToolCall } from './hub-types'
 import type { RunCall, RunDetail } from './runs'
 import type { ChatAnswer, ChatAsk, ChatMessage, ChatOutputs } from './chat-view'
 
@@ -15,7 +15,7 @@ export const emptyHub = (): HubState => ({
   projects: [],
   controls: {
     claude: { tui: 'default', statusLine: false, push: false, needInput: false },
-    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, name: '' },
+    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, name: '' },
     statusLineReady: false,
   },
   chats: [], rcServers: [], ais: [], starred: [], progress: [], archive: [],
@@ -48,7 +48,7 @@ export function demoHub(now = Date.now()): HubState {
     ...emptyHub(),
     controls: {
       claude: { model: 'opus', tui: 'fullscreen', statusLine: false, push: true, needInput: true },
-      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, name: '' },
+      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, name: '' },
       statusLineReady: true,
     },
     projects: [
@@ -418,7 +418,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
         ...(h.tools ? { tools: { ...h.tools, pick: null, chats: { ...h.tools.chats, [sessionId]: c.tools ?? demoPick(h, c.text ?? '') } } } : {}),
       }
     }
-    case 'hub-pick-tools': return h.tools ? { ...h, tools: { ...h.tools, pick: { goal: c.text, profile: demoPick(h, c.text) } } } : h
+    case 'hub-pick-tools': return h.tools ? { ...h, tools: { ...h.tools, pick: { goal: c.text, folder: c.path, profile: demoPick(h, c.text) } } } : h
     case 'hub-chat-tools': return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.tools } } } : h
     case 'hub-focus-chat': return h
     case 'hub-changes': {
@@ -554,7 +554,10 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       if (c.type === 'hub-todo-edit') return set({ ...list, todo: list.todo.map(t => (t.id === c.id ? { ...t, text: c.text.trim() || t.text, at: now } : t)) })
       if (c.type === 'hub-todo-remove') {
         const t = list.todo.find(x => x.id === c.id) ?? list.suggested?.find(x => x.id === c.id)
-        return t ? set({ ...list, todo: list.todo.filter(x => x !== t), suggested: list.suggested?.filter(x => x !== t), ticked: [{ id: t.id, text: t.text, at: now }, ...list.ticked ?? []].slice(0, 10) }) : h
+        if (!t) return h
+        // Keeps why and from like the extension's tickRow, so Put back brings a Finish up step back as one.
+        const { chat: _c, host: _h, at: _a, ...row } = t as TodoItem
+        return set({ ...list, todo: list.todo.filter(x => x !== t), suggested: list.suggested?.filter(x => x !== t), ticked: [{ ...row, at: now }, ...list.ticked ?? []].slice(0, 10) })
       }
       if (c.type === 'hub-todo-accept' || c.type === 'hub-todo-dismiss') {
         const t = list.suggested?.find(x => x.id === c.id)
@@ -604,6 +607,7 @@ const DEMO_JOBS: Record<string, { title: string; brief: string; files: Array<[st
 
 /** Run details for the demo's drawer, one per run the demo chat shows for that role. */
 export function demoRunDetails(p: ChatProgress | undefined, role: string, now = Date.now()): RunDetail[] {
+  if (role === 'lead') return p ? [demoLead(p, now)] : []
   const job = DEMO_JOBS[role] ?? DEMO_JOBS.designer
   const steps = [...(p?.roles ?? [])].filter(r => r.role === role).sort((a, b) => a.startedAt - b.startedAt)
   return steps.map((r, i): RunDetail => {
@@ -621,6 +625,21 @@ export function demoRunDetails(p: ChatProgress | undefined, role: string, now = 
       tokens: { input: 1200 + i * 300, output: 9_000 + i * 2_000, cacheRead: cached, cacheWrite: 24_000 }, costUsd: 0.4 + i * 0.35, file: '',
     }
   })
+}
+
+// The lead: the chat's own transcript, its Agent calls carrying each role's brief.
+function demoLead(p: ChatProgress, now: number): RunDetail {
+  const steps = [...p.roles].filter(r => r.role !== 'jev').sort((a, b) => a.startedAt - b.startedAt)
+  const start = Math.min(p.startedAt, ...steps.map(r => r.startedAt))
+  const dispatches = steps.map(r => { const job = DEMO_JOBS[r.role] ?? DEMO_JOBS.designer; return { at: r.startedAt, role: r.role, title: job.title, brief: job.brief } })
+  const calls: RunCall[] = [{ at: start + 2000, tool: 'TaskCreate', target: 'Find the cause' }, ...dispatches.map(d => ({ at: d.at, tool: 'Agent', target: d.role })), ...(p.tools ?? []).filter(t => t.role === 'lead').map(t => ({ at: t.at, tool: t.tool, target: t.target }))].sort((a, b) => a.at - b.at)
+  const working = p.state === 'working'
+  return {
+    id: p.sessionId, role: 'lead', model: 'claude-opus-5-5', startedAt: start, endedAt: working ? now : p.at, finished: !working,
+    brief: p.asked?.[0] ?? '', reportText: p.state === 'done' ? 'Done. The redirect loop is fixed and qa passed.' : 'Researcher found the loop in middleware.ts. Sending the engineer to fix it, then qa.',
+    files: [], calls, callCount: calls.length, loops: [], dispatches,
+    tokens: { input: 2400, output: 31_000, cacheRead: 920_000, cacheWrite: 64_000 }, costUsd: 1.9, file: '',
+  }
 }
 
 const DEMO_SHOT = '/Users/k/GitHub/agent-flow/.playwright-mcp/hub-1440.png'

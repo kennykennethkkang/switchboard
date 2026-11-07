@@ -4,6 +4,8 @@
  * Pure, so the tests drive it with recorded payloads; hub-service.ts keeps the results.
  */
 import { createHash } from 'crypto'
+import * as path from 'path'
+import { foldPathCase } from '../fs-utils'
 import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall } from './types'
 
 type Payload = Record<string, unknown>
@@ -74,10 +76,46 @@ function testRun(event: string, payload: Payload, now: number): TestRun | undefi
 /** Nothing runs any more: Done if the lead's last turn finished the work, else idle. */
 const settled = (p: ChatProgress, now: number): ChatProgress => p.finishing ? { ...p, state: 'done', finishedAt: now } : { ...p, state: 'idle' }
 
-/** The fenced block after a "Commit message" heading in the chat's last message. */
+// A "Commit message:" heading, or "Commit message (<repo folder>):" for another repo, then its fenced block.
+// Only a plain folder name counts as a repo; "(Other Repo)" or "(a/b)" leaves the block a plain one.
+const COMMIT = /commit message(?:\s*\(([^)\s/\\]+)\))?[^\n]*\n+```[^\n]*\n([\s\S]*?)```/gi
+const blocks = (text: string) => [...text.matchAll(COMMIT)].map(m => ({ repo: m[1]?.toLowerCase(), body: m[2].trim() })).filter(b => b.body)
+
+/** The last plain "Commit message" block in the chat's last message: the chat's own repo. */
 export function commitMessage(text: string): string | undefined {
-  const m = /commit message[^\n]*\n+```[^\n]*\n([\s\S]*?)```/i.exec(text)
-  return m?.[1].trim() || undefined
+  return blocks(text).filter(b => !b.repo).pop()?.body
+}
+
+/** The "Commit message (<repo folder>)" blocks, by lowercased folder name; a later one for the same folder wins. */
+export function commitMessages(text: string): Record<string, string> {
+  return Object.fromEntries(blocks(text).flatMap(b => (b.repo ? [[b.repo, b.body]] : [])))
+}
+
+/** Which of this window's open repos get which message: each named one to the repo of that folder name (any case),
+ * the plain one to the deepest repo holding cwd. */
+export function commitTargets(roots: string[], p: { cwd: string; commit?: string; commits?: Record<string, string> }): [string, string][] {
+  const out: [string, string][] = []
+  const base = (r: string) => path.basename(r).toLowerCase()
+  const c = foldPathCase(p.cwd)
+  const home = roots.filter(r => { const root = foldPathCase(r); return c === root || c.startsWith(root + path.sep) }).sort((a, b) => b.length - a.length)[0]
+  // A block named for the chat's own repo is its plain one, for that repo only, never a namesake elsewhere.
+  for (const [name, msg] of Object.entries(p.commits ?? {})) if (!home || name !== base(home)) for (const r of roots) if (base(r) === name) out.push([r, msg])
+  const own = p.commit ?? (home ? p.commits?.[base(home)] : undefined)
+  if (home && own) out.push([home, own])
+  return out
+}
+
+/** Two commit messages as one: the new summary, the new body lines, the old summary as a bullet, then the old lines it lacks
+ * (by trimmed text), in order. */
+export function mergeCommit(old: string, add: string): string {
+  const body = (m: string) => m.split('\n').slice(1).map(l => l.trimEnd()).filter(l => l.trim())
+  const summary = add.split('\n')[0].trim(), was = old.split('\n')[0].trim()
+  const lines = body(add)
+  const have = new Set([summary, ...lines.map(l => l.trim())])
+  const keep = (l: string) => { if (!have.has(l.trim())) { lines.push(l); have.add(l.trim()) } }
+  if (was && !have.has(was)) keep(`- ${was}`)
+  for (const l of body(old)) keep(l)
+  return lines.length ? `${summary}\n\n${lines.join('\n')}` : summary
 }
 
 /**
@@ -463,10 +501,15 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       delete p.covered
       // An older block stays for Copy and Source Control, but only this turn's own block counts toward Done.
       const own = commitMessage(String(payload.last_assistant_message ?? ''))
+      const named = commitMessages(String(payload.last_assistant_message ?? ''))
+      // A block named for a folder the chat sits in is its own plain one; the plain block wins when both are there.
+      const mine = String(payload.cwd ?? p.cwd).split(/[\\/]/).reverse().map(x => x.toLowerCase()).find(x => named[x])
+      const self = mine ? named[mine] : undefined
+      if (mine) delete named[mine]
       const open = p.tasks.some(t => t.status !== 'completed')
       const report = standup(String(payload.last_assistant_message ?? ''))
       // A standup with Done items counts too: a chat with nothing to change has no commit block.
-      const finishing = !open && (!!own || p.tasks.length > 0 || !!report?.done.length) ? true as const : undefined
+      const finishing = !open && (!!(own ?? self) || p.tasks.length > 0 || !!report?.done.length) ? true as const : undefined
       const fresh = (at: number) => now - at <= RUNNING_CAP_MS
       // Fresh by its last call, so a long busy subagent is not dropped an hour after it started.
       const bg = new Set(p.running?.filter(id => { const r = p.roles.find(r => r.id === id); return !!r && fresh(r.at ?? r.startedAt) }))
@@ -475,7 +518,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const jobs = p.jobs?.filter(j => !ended.has(j.id) && fresh(j.startedAt))
       const subJobs = p.subJobs?.filter(j => fresh(j.startedAt))
       const roles = trim(p.roles.map(r => bg.has(r.id) ? r : finish(r)))
-      const q: ChatProgress = { ...p, roles, commit: own ?? p.commit, report, running: bg.size ? [...bg] : undefined, jobs: jobs?.length ? jobs : undefined, subJobs: subJobs?.length ? subJobs : undefined, finishing, ...NO_ASK }
+      const q: ChatProgress = { ...p, roles, commit: own ?? self ?? p.commit, commits: Object.keys(named).length ? named : p.commits, report, running: bg.size ? [...bg] : undefined, jobs: jobs?.length ? jobs : undefined, subJobs: subJobs?.length ? subJobs : undefined, finishing, ...NO_ASK }
       // Anything still running keeps the chat working, wrapping up, whatever the message said.
       if (q.running || q.jobs) return { ...q, state: 'working', waiting: true }
       // A turn that ends asking in plain text waits on Kenneth like a prompt does.
@@ -512,7 +555,23 @@ export function settle(p: ChatProgress, now: number): ChatProgress {
 /** At or under this Jev score, a request counts as not covered (coverage.ts). */
 export const MISSED = 0.2
 /** Requests Jev says the Done list does not cover; scores for another set of asks count for nothing. */
-export const missed = (p: ChatProgress) => p.covered?.length !== p.asked?.length ? [] : (p.asked ?? []).filter((_, i) => { const s = p.covered?.[i]; return s !== null && s !== undefined && s <= MISSED })
+export const missed = (p: ChatProgress) => p.covered?.length !== p.asked?.length ? [] : (p.asked ?? []).flatMap((a, i) => { const s = p.covered?.[i]; const t = s !== null && s !== undefined && s <= MISSED ? workText(a, true) : undefined; return t ? [t] : [] })
+
+// Pasted blocks, other chats' messages and harness text arrive wrapped; only these tags, closed or not.
+const WRAPPED = /<(pasted_content|cross-session-message|system-reminder|task-notification|command-[\w-]+)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi
+// Harness prompts and nudges to the chat itself, on lowercased words, anchored so a real task that mentions them stays.
+const NUDGE = /^your claude ai usage limit has reset\b|^(is there )?anything else$|^(please )?(do|finish) (what is|what s|whatever is) left$|^is (everything|it all|that all|it) (done|finished)\b|^(it )?(seems|looks) like (the )?\w+ (is|got) stuck( please fix( it)?)?$/
+// The standing ask for a full commit message, never a task.
+const COMMIT_ASK = /\b(make|write|put|give)( me)?( the| a)? full commit message\b/
+/** text without wrapped blocks, or undefined when nothing human is left or it only nudges the chat. ask: a raw request, which must also read like a task. */
+export function workText(text: string, ask = false): string | undefined {
+  const t = plainText(text).replace(WRAPPED, ' ').replace(/\s+/g, ' ').trim()
+  const w = t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  if (!w || NUDGE.test(w)) return undefined
+  // ponytail: keyword rules; a quick model call fits better if they let junk through
+  if (ask && (w.split(' ').length < 2 || COMMIT_ASK.test(w))) return undefined
+  return t
+}
 /** Done, but Jev finds a request not covered. Left items are future work; they wait in the to-do's Suggested tray (todo.ts). */
 export const almostDone = (p: ChatProgress) => p.state === 'done' && missed(p).length > 0
 /** What a notification says; the same key twice in a row for one chat is shown once. Almost done and finished differ, so finishing notifies again. */
@@ -531,6 +590,33 @@ export function notifyStep(prevKey: string | undefined, p: ChatProgress): { show
 
 /** Source Control text is only replaced when empty or still what Switchboard wrote there. */
 export const canPrefill = (current: string, lastWritten: string | undefined) => !current.trim() || current === lastWritten
+
+/** A Source Control box Switchboard filled: its text, and each chat's message in it, oldest first. */
+export type Box = { text: string; by: [string, string][] }
+
+/** The box after session's message: undefined over Kenneth's text, fresh when a commit emptied it, else every chat's message
+ * merged, newest summary on top; a chat that finishes again swaps out its own earlier message. */
+export function fillBox(current: string, box: Box | undefined, session: string, message: string): Box | undefined {
+  if (!canPrefill(current, box?.text)) return undefined
+  const by: [string, string][] = [...(current.trim() ? box?.by ?? [] : []).filter(([s]) => s !== session), [session, message]]
+  return { text: by.map(([, m]) => m).reduce((acc, m) => mergeCommit(acc, m)), by }
+}
+
+/** What fillBoxes (notify.ts) does with the git extension's repositories, kept free of vscode for tests. boxes and filled live per window. */
+export function fillRepos(repos: { rootUri: { fsPath: string }; inputBox: { value: string } }[], p: Pick<ChatProgress, 'sessionId' | 'cwd' | 'state' | 'commit' | 'commits'>,
+  boxes: Map<string, Box>, filled: Set<string>): void {
+  if (p.state !== 'done' || (!p.commit && !p.commits)) return
+  for (const [root, message] of commitTargets(repos.map(r => r.rootUri.fsPath), p)) {
+    const key = `${p.sessionId}\n${root}\n${message}`
+    if (filled.has(key)) continue
+    filled.add(key)
+    const repo = repos.find(r => r.rootUri.fsPath === root)!
+    const box = fillBox(repo.inputBox.value, boxes.get(root), p.sessionId, message)
+    if (!box) continue
+    repo.inputBox.value = box.text
+    boxes.set(root, box)
+  }
+}
 
 /** Control characters (osascript rejects them) as spaces. */
 // eslint-disable-next-line no-control-regex

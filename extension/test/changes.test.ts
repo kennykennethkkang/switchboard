@@ -11,7 +11,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { phoneCode } from '../src/hub/lan'
-import { ensureWeb, insideCwd, keepWeb, parseChanges, phoneUrls, readChanges, safeFile, servesLive, webUrl } from '../src/hub/local'
+import { ensureWeb, insideCwd, keepWeb, keepWebRetrying, parseChanges, phoneUrls, readChanges, safeFile, servesLive, webUrl } from '../src/hub/local'
 import { noteSnippet, searchNotes } from '../src/hub/chains'
 import { withSkipShell } from '../src/hub/controls'
 import type { ArchivedChat } from '../src/hub/types'
@@ -417,6 +417,17 @@ describe('browser link', () => {
     up = false
     assert.ok('problem' in await keepWeb(appDir(), { ...deps, listeners: async () => [77] }))
     assert.equal(starts, 1)
+  })
+  it('keepWebRetrying tries again while every window reloads and /hub/state has no window to answer from', async () => {
+    // 3131 is held by our app the whole time; it answers again on the third probe.
+    let probes = 0
+    const deps = { find: async () => (++probes >= 3 ? 'http://127.0.0.1:3131' : null), listeners: async () => [77], tries: 3, waitMs: 1, pidFile: pidFile(), retryMs: 1 }
+    assert.deepEqual(await keepWebRetrying(appDir(), deps), { url: 'http://127.0.0.1:3131' })
+    assert.equal(probes, 3)
+    let none = 0
+    const r = await keepWebRetrying(appDir(), { ...deps, find: async () => { none++; return null }, retries: 2 })
+    assert.ok('problem' in r)
+    assert.equal(none, 3, 'the first try and two retries, then it gives up')
   })
   it('keepWeb on a dev host leaves a stopped app stopped: only the installed build starts it', async () => {
     let starts = 0

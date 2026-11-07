@@ -10,23 +10,21 @@ import * as path from 'path'
 import * as crypto from 'crypto'
 import { execFile, spawn } from 'child_process'
 import { hub, type Handoff } from './hub-service'
-import type { AiId, ChatProfile, ChatRow, Installed } from './types'
+import type { AiId, ChatProfile, ChatRow } from './types'
 import { AIS, chatTerminal, cliPath, codexPaste, codexReady } from './ais'
 import { quickAsk, withBrief } from './brain'
 import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
 import { awsBinary, browserEnv, chromeCall, chromeChoice, loginError, rowText, profileFor, readPrefs, readSessions, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
-import { SHELL, chainBase, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
-import { insideCwd, libraryInventory, projectContext, projectInventory, safeFile } from './local'
+import { SHELL, shellQuote, chainBase, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
+import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
 import { titleFor } from './title'
 import { moveTodoChat } from './todo'
+import { trustFolder, trustedWindowRoots } from './trust'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
-import { FLAGGED, PICK_MS, chatSettings, cleanProfile, defaultProfile, handoffSettings, pickProfile, nameNote, readProfiles, saveProfile, startProfile, toolsNote } from './tools'
-import { createLogger } from '../logger'
-
-const log = createLogger('Tools')
+import { FLAGGED, chatSettings, cleanProfile, defaultProfile, handoffSettings, nameNote, saveProfile, savedProfile, startProfile, toolsNote } from './tools'
 
 // A window opened by `code` from inside a chat inherits Claude's child marker, and a chat started
 // under it saves no transcript (no --resume, no handoff). Chat terminals drop it; null unsets.
@@ -37,6 +35,8 @@ const chatEnv = (cwd: string): Record<string, string | null> => {
   return { ...OWN_CHAT, ...(p && validProfileName(p) ? { AWS_PROFILE: p } : {}), ...browserEnv(chromeChoice(undefined, b, knownChrome()).dir, writeOpenChrome()) }
 }
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
+/** Auto trust, only inside this window's workspace while trusted, or another live trusted window's (trust.ts). */
+const trustHere = (dir: string) => trustFolder(dir, { trusted: vscode.workspace.isTrusted, roots: (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath), others: trustedWindowRoots() })
 // A Codex chat has no pid to stop: the terminal Switchboard started it in, by session id. A terminal waits in
 // codexStarts under the name its row will show (the message's first 60 characters, or a handoff's To: name) until
 // bindCodexTerminals ties it to exactly one new rollout. Lost on reload: such a chat is then never closed by Switchboard.
@@ -102,10 +102,8 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   const goal = text?.trim()
   const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(folder) : []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
-  const [title, profile] = await Promise.all([
-    goal ? titleFor(goal, quickAsk) : project.name,
-    startProfile(inv, tools, goal, g => pickFor(g, inv, folder)),
-  ])
+  const title = goal ? await titleFor(goal, quickAsk) : project.name
+  const profile = startProfile(inv, tools)
   // Codex has no hook to read the brief from, so it rides in front of the first message.
   const first = withPointer(ai === 'claude' ? '' : withBrief(hub.get(), folder, text), rulesState.ready[ai], rulesState.kit)
   if (ai === 'codex') {
@@ -125,6 +123,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   } catch (err) {
     return (err as Error).message
   }
+  trustHere(folder)
   const t = vscode.window.createTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: chatEnv(folder) })
   t.show()
   t.sendText(typed(command))
@@ -158,8 +157,6 @@ export function stopDev(project: string): boolean {
 
 /** The user's plugins and skills plus the project's own skills and design references. */
 const chatInventory = async (folder: string | undefined) => [...hub.get().installed, ...(folder ? await projectInventory(folder).catch(() => []) : []), ...await libraryInventory()]
-const pickFor = async (goal: string, inv: Installed[], folder?: string) =>
-  pickProfile(goal, inv, quickAsk, PICK_MS, why => log.warn(`Tool pick fell back to the default set (${why})`), folder ? await projectContext(folder).catch(() => '') : '')
 
 const myName = () => nameNote(hub.get().controls.switchboard.name) ?? ''
 
@@ -167,9 +164,9 @@ const toolsState = () => hub.get().tools ?? { flagged: FLAGGED, pick: null, chat
 /** Shows a chat's saved profile in the panel at once, before the next refresh reads it back. */
 export const setChatProfile = (sessionId: string, p: ChatProfile) => hub.set({ tools: { ...toolsState(), chats: { ...toolsState().chats, [sessionId]: p } } })
 
-/** The New chat form's pick for a goal, shown as chips before Start; with the folder, its project skills and design references too. */
+/** The New chat form's Pick tools: the all-on defaults as chips to toggle before Start; with the folder, its project skills and design references too. */
 export async function pickTools(goal: string, folder?: string): Promise<void> {
-  const profile = await pickFor(goal, await chatInventory(folder), folder)
+  const profile = defaultProfile(await chatInventory(folder))
   hub.set({ tools: { ...toolsState(), pick: { goal, folder, profile } } })
 }
 
@@ -259,12 +256,12 @@ export async function answerInTerminal(pid: number, keys: string[], claim: () =>
   return undefined
 }
 
-/** Reopens a chat by its id in a new terminal in the chat's folder. */
-export async function resumeChat(sessionId: string, ai: AiId): Promise<string | undefined> {
+/** Reopens a chat by its id in a new terminal in the chat's folder (known, else folder). prompt: a Claude chat's first message. */
+export async function resumeChat(sessionId: string, ai: AiId, prompt?: string, folder?: string): Promise<string | undefined> {
   // The id goes into a shell line: only the hex and dashes a session id has.
   if (!/^[0-9a-f-]{8,64}$/i.test(sessionId)) return 'Not a chat id'
   const s = hub.get()
-  const cwd = [...s.chats, ...s.starred, ...s.archive].find(c => c.sessionId === sessionId)?.cwd
+  const cwd = [...s.chats, ...s.starred, ...s.archive].find(c => c.sessionId === sessionId)?.cwd ?? folder
   if (!cwd || !fs.existsSync(cwd)) return 'That chat\'s folder is gone'
   const name = `${AIS[ai].name}: ${projectName(cwd)}`
   if (ai === 'codex') {
@@ -274,9 +271,10 @@ export async function resumeChat(sessionId: string, ai: AiId): Promise<string | 
     codexTerminals.set(sessionId, t)
     return undefined
   }
+  trustHere(cwd)
   const t = vscode.window.createTerminal({ name, cwd, env: chatEnv(cwd) })
   t.show()
-  t.sendText(typed(AIS[ai].resumeCommand(sessionId, myName())))
+  t.sendText(typed(AIS[ai].resumeCommand(sessionId, myName()) + (prompt ? ` ${shellQuote(prompt, SHELL)}` : '')))
   return undefined
 }
 
@@ -318,7 +316,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
   const text = withPointer(freshPrompt(h.note), rulesState.ready[ai], rulesState.kit)
   const codex = ai === 'codex'
   // The fresh chat keeps the old one's tool set; one started outside Switchboard gets the defaults.
-  const carried = codex ? undefined : readProfiles([h.sessionId])[h.sessionId]
+  const carried = codex ? undefined : savedProfile(h.sessionId)
     ?? (hub.get().installed.length ? defaultProfile(await chatInventory(h.cwd)) : undefined)
   // Always an id for a Claude chat, so a To-do item in progress follows it.
   const freshId = codex ? undefined : crypto.randomUUID()
@@ -343,6 +341,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
     void vscode.window.showWarningMessage(`Switchboard: ${(err as Error).message}.`)
     return false
   }
+  if (!codex) trustHere(h.cwd)
   const t = codex
     ? await codexTerminal(`Codex: ${fresh}`, h.cwd, [withBrief(hub.get(), h.cwd, text)])
     : vscode.window.createTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: chatEnv(h.cwd) })
@@ -378,7 +377,7 @@ export async function runSetup(ext: string): Promise<void> {
   const key = await vscode.window.showInputBox({ title: 'Switchboard setup', prompt: '21st.dev API key for Magic (from 21st.dev/mcp). Leave empty to skip.', password: true, ignoreFocusOut: true })
   if (key === undefined) return
   const kit = JSON.parse(fs.readFileSync(path.join(ext, 'kit', 'setup.json'), 'utf8')) as SetupKit
-  const steps = setupSteps(kit, { ...setupState(os.homedir()), key21st: !!key.trim(), modsDir: path.join(ext, 'kit', 'mods'), keys: hub.get().signIns.keys })
+  const steps = setupSteps(kit, { ...setupState(os.homedir()), key21st: !!key.trim(), modsDir: path.join(ext, 'kit', 'mods'), skillsDir: path.join(ext, 'kit', 'skills'), keys: hub.get().signIns.keys })
   const plan = path.join(os.tmpdir(), 'switchboard-setup.json')
   fs.writeFileSync(plan, JSON.stringify(steps))
   vscode.window.terminals.find(t => t.name === 'Switchboard setup')?.dispose()
@@ -405,6 +404,7 @@ export async function rcServer(folder: string, on: boolean): Promise<string | un
   // The kit's LaunchAgent may already run one outside VS Code; a second would clash with it.
   if (open || await rcRunningNow()) return undefined
   if (!fs.existsSync(RC_ROOT())) return `no ${RC_ROOT()} folder`
+  trustHere(RC_ROOT())
   freshTerminal(RC_TERMINAL, RC_ROOT()).sendText(rcServerCommand())
   return undefined
 }

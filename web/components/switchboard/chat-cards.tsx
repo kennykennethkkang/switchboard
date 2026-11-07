@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AiId, ArchivedChat, ChatProgress, ChatRow, ChatState, TaskRow, HandoffWait, NoteSearch, StuckItem, WindowInfo } from '@/lib/hub-types'
+import type { AiId, ArchivedChat, CacheKeep, ChatProgress, ChatRow, ChatState, TaskRow, HandoffWait, NoteSearch, StuckItem, WindowInfo } from '@/lib/hub-types'
 import { stuckTone } from '@/lib/stuck'
+import { cacheChip } from '@/lib/cache'
 import { byWindow } from '@/lib/windows'
 import { busyLine, projectLeft, sayLeft, timeLeft } from '@/lib/eta'
 import { archiveChains, filterChains, historyCount, liveVersion, projectName, splitVersion } from '@/lib/archive'
@@ -104,12 +105,12 @@ export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (tex
 /** windows: grouped under each VS Code window, here (the panel's own) first. */
 /** starred: session ids with a star. menu: each card's actions, beside it (a card is one button, so the menu cannot sit inside it). */
 /** all: every chat's progress (hub.progress), the history behind the estimates, so the cards and the chat page agree. */
-/** stuck: hub.stuck, for the Stuck note in the meta line. */
-export function ChatCards({ cards, all = [], waits = [], stuck, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, onSelect }: { cards: Card[]; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[] }) {
+/** stuck: hub.stuck, for the Stuck note in the meta line. cache: hub.cache, for the warm/cold chip. */
+export function ChatCards({ cards, all = [], waits = [], stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, onSelect }: { cards: Card[]; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[] }) {
   if (!cards.length) return <p style={{ color: 'var(--hub-ash)', margin: 0, padding: 4 }}>{empty}</p>
   const groups = byWindow(cards, windows, here)
   const now = Date.now()
-  const more = { waits, stuck, selected, starred, menu, onSelect, all, now }
+  const more = { waits, stuck, cache, selected, starred, menu, onSelect, all, now }
   if (!groups.some(g => g.window)) return <CardList cards={cards} label="Chats" {...more} />
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
@@ -136,7 +137,7 @@ export function ChatCards({ cards, all = [], waits = [], stuck, selected, window
 
 /** stripe: the window color down each card's left edge. grouped: the group heading names the project, so the card does not. */
 /** all: every chat's progress, the history behind each estimate. */
-function CardList({ cards, label, stripe, grouped, waits, stuck, selected, starred, menu, onSelect, all, now }: { cards: Card[]; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; stuck?: StuckItem[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
+function CardList({ cards, label, stripe, grouped, waits, stuck, cache, selected, starred, menu, onSelect, all, now }: { cards: Card[]; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; stuck?: StuckItem[]; cache?: CacheKeep[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
   return (
     <ul role="list" aria-label={label} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
       {cards.map(({ chat, progress }) => {
@@ -149,6 +150,7 @@ function CardList({ cards, label, stripe, grouped, waits, stuck, selected, starr
         const open = tasks.length - done
         const left = progress && timeLeft(progress, all, now), leftText = left && sayLeft(left)
         const tone = stuckTone(stuck, chat.sessionId)
+        const warm = finished ? undefined : cacheChip(cache, chat.sessionId, now)
         const meta = [grouped ? '' : projectName(chat), finished ? '' : active, progress ? ago(progress.at) : ''].filter(Boolean).join(' · ')
         return (
           <li key={chat.sessionId} className="hub-card-li" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6, position: 'relative' }}>
@@ -158,6 +160,7 @@ function CardList({ cards, label, stripe, grouped, waits, stuck, selected, starr
                   {starred.includes(chat.sessionId) && <span title="Starred" style={{ color: 'var(--hub-yellow)', flex: 'none' }}>★<span className="sr-only"> starred</span></span>}
                   <span className="hub-card-name" style={{ color: 'var(--hub-ink)', fontWeight: 500, letterSpacing: 0.2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{origin || projectName(chat)}</span>
                   {version > 1 && <Version n={version} />}
+                  {warm && <span className="hub-chip ver" title={warm.title} style={{ flexShrink: 0 }}><span className="sr-only">cache </span>{warm.label}</span>}
                 </span>
                 <span className="hub-chip" style={{ color: s.color, background: s.soft, flexShrink: 0 }}>{finished ? <Check /> : <i aria-hidden />}{s.label}</span>
               </span>

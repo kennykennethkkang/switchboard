@@ -1,11 +1,12 @@
 /**
- * Each chat's own plugins and skills: all on, then one quick model call turns off what its goal does not need, saved under
+ * Each chat's own plugins and skills, all on unless Kenneth turns one off in the panel, saved under
  * ~/.claude/switchboard/chat-profiles/<session id>.json with the settings file made from it
  * (<session id>.settings.json), which the chat starts and resumes with (--settings).
  * enabledPlugins there merges per key, so every plugin is written out; skillOverrides only
  * hides user and project skills, plugin skills go with their plugin. Mods are never touched.
  * Design references (assets) left on are named to the chat in its appended system note, to read before UI work.
- * The bundled design library (source 'library', absolute paths) is the opposite: off unless the pick names it.
+ * The bundled design library (source 'library', absolute paths) is the opposite: off unless turned on by hand.
+ * Every chat settings file also sets bypassPermissions, so a project's own permission mode cannot bring prompts back.
  */
 import * as fs from 'fs'
 import * as os from 'os'
@@ -13,24 +14,16 @@ import * as path from 'path'
 import { SHELL, shellQuote, type Shell } from './projects'
 import type { ChatProfile, Installed } from './types'
 import type { HubService } from './hub-service'
-import { libraryInventory, projectInventory } from './local'
+import { LIBRARY, libraryCopies, libraryInventory, projectInventory } from './local'
 
 export const PROFILES = path.join(os.homedir(), '.claude', 'switchboard', 'chat-profiles')
-// Plugin ids and skill names a pick never turns on; Kenneth can, per chat, and tool_on can. auth0 and Stitch stay off this list.
-// Duplicates or noise: the second security-guidance, code-simplifier (ponytail and /simplify), github MCP (gh CLI),
-// image-to-code (written for Codex), gsap-greensock (gsap-scrolltrigger covers GSAP).
-export const FLAGGED: string[] = [
-  'security-guidance@claude-code-plugins', 'code-simplifier@claude-plugins-official', 'github@claude-plugins-official',
-  'image-to-code-skill', 'gsap-greensock',
-]
+// Off in a new chat; Kenneth can turn one on per chat, and tool_on can. Only real conflicts:
+// the second security-guidance runs the same hooks twice.
+export const FLAGGED: string[] = ['security-guidance@claude-code-plugins']
 // Plugins every chat keeps, by the name before the @.
 export const ALWAYS = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
-export const PICK_MS = 20000
-export const PROMPT_MAX = 8000
-const DESC = 100
-const MAX_LIBRARY = 3
-/** Appended to a profiled chat's system prompt, so it asks instead of working around a missing tool. */
-export const TOOLS_NOTE = 'Switchboard started this chat with every plugin and skill on, minus those its goal does not need. You have full access to every installed plugin and skill. When you need one that is off, never ask: call the switchboard tool_on tool with its name and use it at once from the files it points to.'
+/** Appended to a profiled chat's system prompt, so it never asks for a tool. */
+export const TOOLS_NOTE = 'Every installed plugin and skill is yours to use without asking; if one is off, call the switchboard tool_on tool and use it at once from the file it points to.'
 
 const short = (id: string) => id.split('@')[0]
 const plugins = (inv: Installed[]) => inv.filter(i => i.kind === 'plugin')
@@ -38,7 +31,6 @@ const plugins = (inv: Installed[]) => inv.filter(i => i.kind === 'plugin')
 const skills = (inv: Installed[]) => inv.filter(i => i.kind === 'skill' && i.enabled)
 const isLib = (i: Installed) => i.source === 'library'
 const allAssets = (inv: Installed[]) => inv.filter(i => i.kind === 'asset' && i.path)
-const assets = (inv: Installed[]) => allAssets(inv).filter(i => !isLib(i))
 const library = (inv: Installed[]) => allAssets(inv).filter(isLib)
 // Only a chat with design references or the library gets an assets map.
 const assetMap = (inv: Installed[], on: (a: Installed) => boolean) => {
@@ -46,32 +38,24 @@ const assetMap = (inv: Installed[], on: (a: Installed) => boolean) => {
   return as.length ? { assets: Object.fromEntries(as.map(a => [a.path!, on(a)])) } : {}
 }
 const fix = (id: string, on: boolean) => (ALWAYS.includes(short(id)) ? true : FLAGGED.includes(id) ? false : on)
+// Held by the sweep until Kenneth approves it: off in every chat, whatever the profile says.
+const heldNames = (inv: Installed[]) => new Set(inv.filter(i => i.held).map(i => i.name))
 
-/** What a chat gets with no pick: everything on but flagged plugins and the library. */
+/** A new chat's tools: everything on but FLAGGED, the library and what the sweep holds. */
 export function defaultProfile(inv: Installed[]): ChatProfile {
+  const held = heldNames(inv)
   return {
-    plugins: Object.fromEntries(plugins(inv).map(p => [p.name, fix(p.name, true)])),
-    skills: Object.fromEntries(skills(inv).map(s => [s.name, !FLAGGED.includes(s.name)])),
+    plugins: Object.fromEntries(plugins(inv).map(p => [p.name, !held.has(p.name) && fix(p.name, true)])),
+    skills: Object.fromEntries(skills(inv).map(s => [s.name, !held.has(s.name) && !FLAGGED.includes(s.name)])),
     ...assetMap(inv, a => !isLib(a)),
   }
 }
 
-// Tool-specific kits a failed pick still turns off unless the goal names them, the pick prompt's own rule.
-const NICHE = ['aws', 'bland', 'marketing', 'jev', 'codex', 'expo', 'swift', 'imagegen']
-const niche = (name: string, goal: string) => NICHE.some(k => short(name).includes(k) && !new RegExp(`\\b${k}`, 'i').test(goal))
-
-/** A pick that failed or was slow: the defaults minus the NICHE kits the goal does not name. */
-export function fallbackProfile(goal: string, inv: Installed[]): ChatProfile {
-  const d = defaultProfile(inv)
-  const off = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).map(([k, on]) => [k, on && (ALWAYS.includes(short(k)) || !niche(k, goal))]))
-  return { ...d, plugins: off(d.plugins), skills: off(d.skills) }
-}
-
 /** A profile sent by the panel: only installed names, gaps from the defaults; a flagged plugin turned on by hand stays on, an ALWAYS one cannot be turned off. */
 export function cleanProfile(p: ChatProfile, inv: Installed[]): ChatProfile {
-  const d = defaultProfile(inv)
+  const d = defaultProfile(inv), held = heldNames(inv)
   const pick = (from: Record<string, boolean>, base: Record<string, boolean>) =>
-    Object.fromEntries(Object.entries(base).map(([k, v]) => [k, typeof from[k] === 'boolean' && !ALWAYS.includes(short(k)) ? from[k] : v]))
+    Object.fromEntries(Object.entries(base).map(([k, v]) => [k, held.has(k) ? false : typeof from[k] === 'boolean' && !ALWAYS.includes(short(k)) ? from[k] : v]))
   return { plugins: pick(p.plugins ?? {}, d.plugins), skills: pick(p.skills ?? {}, d.skills), ...(d.assets ? { assets: pick(p.assets ?? {}, d.assets) } : {}) }
 }
 
@@ -81,71 +65,10 @@ export function withLibrary(p: ChatProfile, lib: Installed[]): ChatProfile {
   return add.length ? { ...p, assets: { ...Object.fromEntries(add.map(a => [a.path!, false])), ...p.assets } } : p
 }
 
-/** context: projectContext() of the chat's folder. Past PROMPT_MAX, library then asset descriptions go first, then the rest. */
-export function pickPrompt(goal: string, inv: Installed[], context = ''): string {
-  const build = (desc: number, assetDesc: number, libDesc: number) => {
-    const line = (d: number) => (i: Installed) => `- ${i.name}${d && i.description ? `: ${i.description.slice(0, d)}` : ''}${d && i.skills?.length ? ` (skills: ${i.skills.slice(0, 5).join(', ')})` : ''}`
-    const as = assets(inv), lib = library(inv)
-    return [
-      'Every Claude Code plugin, skill and design reference below starts on. Name the ones to turn off because this coding task clearly will not use them; everything left on costs context in every turn. When unsure, keep it on.',
-      'For UI, styling or visual work, keep the design plugins and skills (impeccable, frontend-design, design and animation skills) and every design reference on.',
-      'Turn off tool-specific plugins and skills (claude-x-jev and jev-*, aws-*, voice or phone agents, marketing, codex, Expo, Swift, image generation) unless the task names that tool or job.',
-      'Turn off design references for work with no UI.',
-      ...(lib.length
-        ? [`The design library starts off. For UI work that names or fits one of those looks, turn on up to ${MAX_LIBRARY} in "library"; else leave it empty.`,
-            'Answer with JSON only, the names to turn off, then library names to turn on: {"plugins":["id",...],"skills":["name",...],"assets":["name",...],"library":["name",...]}']
-        : ['Answer with JSON only, the names to turn off: {"plugins":["id",...],"skills":["name",...],"assets":["name",...]}']),
-      '', `Task: ${goal.slice(0, 600)}`,
-      ...(context ? ['', 'Project:', context.slice(0, 2000)] : []),
-      '', 'Plugins:', ...plugins(inv).filter(p => !FLAGGED.includes(p.name) && !ALWAYS.includes(short(p.name))).map(line(desc)),
-      '', 'Skills:', ...skills(inv).filter(s => !FLAGGED.includes(s.name)).map(line(desc)),
-      ...(as.length ? ['', 'Design references:', ...as.map(line(assetDesc))] : []),
-      ...(lib.length ? ['', 'Design library:', ...lib.map(line(libDesc))] : []),
-    ].join('\n')
-  }
-  const tiers: [number, number, number][] = [[DESC, 60, 60], [DESC, 60, 0], [DESC, 0, 0], [60, 0, 0], [40, 0, 0], [0, 0, 0]]
-  const fits = tiers.map(([d, a, l]) => build(d, a, l)).find(t => t.length <= PROMPT_MAX)
-  return fits ?? build(0, 0, 0).slice(0, PROMPT_MAX)
-}
-
-/** The model's answer as a profile: named ones off, the rest on, library only as named; undefined when it is not the JSON asked for. */
-export function parsePick(answer: string, inv: Installed[]): ChatProfile | undefined {
-  const m = /\{[\s\S]*\}/.exec(answer)
-  let j: { plugins?: unknown; skills?: unknown; assets?: unknown; library?: unknown }
-  try { j = JSON.parse(m?.[0] ?? '') } catch { return undefined }
-  const names = (v: unknown) => (Array.isArray(v) && v.every(x => typeof x === 'string') ? new Set(v as string[]) : undefined)
-  const ps = names(j.plugins), ss = names(j.skills)
-  if (!ps || !ss) return undefined
-  // By name or path; library in the model's order, first few only.
-  const paths = (v: unknown, as: Installed[]) => [...(names(v) ?? [])].flatMap(n => as.filter(a => a.name === n || a.path === n).map(a => a.path!))
-  const off = new Set(paths(j.assets, assets(inv))), on = new Set(paths(j.library, library(inv)).slice(0, MAX_LIBRARY))
-  return {
-    plugins: Object.fromEntries(plugins(inv).map(p => [p.name, fix(p.name, !ps.has(p.name) && !ps.has(short(p.name)))])),
-    skills: Object.fromEntries(skills(inv).map(s => [s.name, !ss.has(s.name) && !FLAGGED.includes(s.name)])),
-    ...assetMap(inv, a => (isLib(a) ? on.has(a.path!) : !off.has(a.path!))),
-  }
-}
-
-/**
- * Same wait as titleFor; slow, failed or unreadable, fallbackProfile, told to onFallback.
- * That is the user's own settings minus only the kits the goal never names, so a failed pick never strips a needed plugin.
- */
-export async function pickProfile(goal: string, inv: Installed[], ask: (prompt: string, ms: number) => Promise<string>, ms = PICK_MS, onFallback: (why: string) => void = () => {}, context = ''): Promise<ChatProfile> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  let why = `no answer in ${ms} ms`
-  const timeout = new Promise<undefined>(r => { timer = setTimeout(() => r(undefined), ms) })
-  const answer = await Promise.race([ask(pickPrompt(goal, inv, context), ms).catch(err => { why = String((err as Error)?.message ?? err).split('\n')[0]; return undefined }), timeout])
-  clearTimeout(timer)
-  const picked = answer ? parsePick(answer, inv) : undefined
-  if (picked) return picked
-  onFallback(answer ? `unreadable answer: ${answer.slice(0, 80)}` : why)
-  return fallbackProfile(goal, inv)
-}
-
-/** A Switchboard chat's starting profile: the panel's, else a pick for the goal, else the defaults (no model call); none with nothing installed. */
-export async function startProfile(inv: Installed[], sent: ChatProfile | undefined, goal: string | undefined, pick: (goal: string) => Promise<ChatProfile>): Promise<ChatProfile | undefined> {
+/** A Switchboard chat's starting profile: the panel's, else the defaults; none with nothing installed. */
+export function startProfile(inv: Installed[], sent: ChatProfile | undefined): ChatProfile | undefined {
   if (!inv.length) return undefined
-  return sent ? cleanProfile(sent, inv) : goal ? pick(goal) : defaultProfile(inv)
+  return sent ? cleanProfile(sent, inv) : defaultProfile(inv)
 }
 
 /** The gear's "Your name": one line, no quotes or shell characters, at most 40 chars; empty is off. */
@@ -163,9 +86,12 @@ export function toolsNote(p: ChatProfile): string {
   return refs.length ? `${TOOLS_NOTE} Before any UI, styling or web design work, read these design references first: ${refs.join(', ')}.` : TOOLS_NOTE
 }
 
+const BYPASS = { permissions: { defaultMode: 'bypassPermissions' } }
+
 export const profileSettings = (p: ChatProfile) => ({
   enabledPlugins: { ...p.plugins },
   skillOverrides: Object.fromEntries(Object.entries(p.skills).filter(([, on]) => !on).map(([k]) => [k, 'off'])),
+  ...BYPASS,
 })
 
 const ID = /^[0-9a-f-]{8,64}$/i
@@ -176,7 +102,7 @@ const fileOf = (id: string, dir: string, ext = 'json') => {
 
 // --settings outranks ~/.claude/settings.json, so this turns auto-connect off for one chat and leaves the user's choice alone.
 const NO_REMOTE = { remoteControlAtStartup: false }
-const NO_REMOTE_ARG = JSON.stringify(NO_REMOTE)
+const NO_REMOTE_ARG = JSON.stringify({ ...NO_REMOTE, ...BYPASS })
 
 /** A chat that must never connect to Remote Control (a To-do run) has an empty <id>.noremote here; every writer and reader checks it. */
 export const isNoRemote = (id: string, dir = PROFILES) => ID.test(id) && fs.existsSync(fileOf(id, dir, 'noremote'))
@@ -221,15 +147,35 @@ export function readProfiles(ids: string[], dir = PROFILES): Record<string, Chat
 }
 
 /** ` --settings '<file>'` for a chat that has a profile, the off switch inline for a no-remote one without, else ''; with picked design references or extra (the name note), --append-system-prompt too. */
-export function resumeSettingsArg(id: string, dir = PROFILES, extra = '', shell: Shell = SHELL): string {
+export function resumeSettingsArg(id: string, dir = PROFILES, extra = '', shell: Shell = SHELL, lib = LIBRARY): string {
   if (!ID.test(id)) return ''
   const file = fileOf(id, dir, 'settings.json')
   const has = fs.existsSync(file)
-  const p = has ? readProfiles([id], dir)[id] : undefined
+  const p = has ? savedProfile(id, dir, lib) : undefined
   const note = p ? toolsNote(p) : TOOLS_NOTE
   const append = [note === TOOLS_NOTE ? '' : note, extra].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
   const settings = has ? file : isNoRemote(id, dir) ? NO_REMOTE_ARG : undefined
   return `${settings ? ` --settings ${shellQuote(settings, shell)}` : ''}${append ? ` --append-system-prompt ${shellQuote(append, shell)}` : ''}`
+}
+
+/** A chat's saved profile for a resume or handoff; one from before chats started all on is rewritten all on first. */
+export function savedProfile(id: string, dir = PROFILES, lib = LIBRARY): ChatProfile | undefined {
+  const p = readProfiles([id], dir)[id]
+  if (!p) return undefined
+  let current = false
+  try { current = !!JSON.parse(fs.readFileSync(fileOf(id, dir, 'settings.json'), 'utf8')).permissions } catch { /* rewrite it */ }
+  if (current) return p
+  const on = allOn(p, lib)
+  saveProfile(id, on, dir)
+  return on
+}
+
+/** A profile saved before chats started all on (its settings lack permissions): all on but FLAGGED, library copies off, other assets as saved. */
+function allOn(p: ChatProfile, lib: string): ChatProfile {
+  const on = (m: Record<string, boolean>) => Object.fromEntries(Object.keys(m).map(k => [k, !FLAGGED.includes(k)]))
+  const brand = (k: string) => /^design-md\/([^/]+)\//.exec(k)?.[1] ?? ''
+  const copies = libraryCopies(Object.keys(p.assets ?? {}).map(brand).filter(Boolean), lib)
+  return { plugins: on(p.plugins), skills: on(p.skills), ...(p.assets ? { assets: Object.fromEntries(Object.entries(p.assets).map(([k, v]) => [k, v && !copies.has(brand(k))])) } : {}) }
 }
 
 /** A plugin (id or short name, either with :skill or :command) or a skill by name, on in the profile, and the file to read to use it now. */
@@ -239,6 +185,7 @@ export function turnOn(p: ChatProfile, inv: Installed[], name: string, cwd?: str
   // The first file that exists; none found, the folder to look in.
   const first = (paths: string[], dir: string) => paths.find(f => fs.existsSync(f)) ?? dir
   const pl = plugins(inv).find(i => i.name === plug || short(i.name) === plug)
+  if (pl?.held || skills(inv).find(i => i.name === n)?.held) throw new Error(`${pl?.name ?? n} needs approval in Switchboard (Settings, Installed) before a chat can use it`)
   if (pl) {
     const dir = pl.path
     const use = !dir ? pl.name : skill ? first([path.join(dir, 'skills', skill, 'SKILL.md'), path.join(dir, 'commands', `${skill}.md`)], dir) : dir

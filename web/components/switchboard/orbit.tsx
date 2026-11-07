@@ -382,6 +382,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   const lc = twc('lead', C[(almostDone(c.progress) ? ALMOST : STATE[c.state]).key])
   pulse(cx, cy, lr, C.blue, 0.3, wWork)
   pulse(cx, cy, lr, C.red, 0.6, wNeed)
+  S.hits.set('lead', { x: cx, y: cy, r: lr })
   bubble(cx, cy, lr, lc, { wash: 0.18, glow: 18 * Math.min(1, wWork + wNeed + wFin), dim })
   const tokens = c.live?.tokens, cap = c.live?.compactAt
   if (tokens && cap) {

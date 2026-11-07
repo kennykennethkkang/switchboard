@@ -72,3 +72,12 @@ test('keywordHit matches a word start, not any letter inside', () => {
   assert.equal(keywordHit(words, 'ins'), false)
   assert.equal(keywordHit(words, ''), false)
 })
+
+test('a swept plugin or skill shows its sweep badge; one with no result shows none', () => {
+  const rec = (state: 'clean' | 'review', approvedAt?: number) => ({ kind: 'plugin' as const, path: '/p', digest: 'd', scannedAt: 1, state, ...(approvedAt ? { approvedAt, approvedDigest: 'd' } : {}) })
+  const sweep = { busy: false, tools: { 'superpowers@superpowers-dev': rec('review'), 'codex@openai-codex': rec('review', 2), phone: { ...rec('clean'), kind: 'skill' as const } } }
+  const r = Object.fromEntries(gearRows({ installed, connections, sweep }, '').map(x => [x.label, x.names]))
+  assert.deepEqual(r.Plugins, ['superpowers (2, review)', 'code-review (1)', 'codex (2, approved)', 'github (off)'])
+  assert.deepEqual(r.Skills, ['phone (clean)', 'skill-inspector'])
+  assert.deepEqual(r.Mods, ['usage-meter'])
+})

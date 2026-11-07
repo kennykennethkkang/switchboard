@@ -15,6 +15,10 @@
     {
       "name": "paid-guard",
       "source": "./paid-guard"
+    },
+    {
+      "name": "cache-keeper",
+      "source": "./cache-keeper"
     }
   ]
 }

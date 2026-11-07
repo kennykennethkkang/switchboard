@@ -7,7 +7,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
-import { gearRows, keywordHit } from '@/lib/gear-rows'
+import { gearRows, keywordHit, sweepBadge } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
 import { label } from './look'
@@ -56,6 +56,48 @@ function Line({ row }: { row: Row }) {
 const sub = { ...label, lineHeight: 1, margin: '16px 0 4px' } as const
 
 /** start: the section to open on. layout: this device's own pick, kept in its browser storage. */
+// Same check as kit/sweep.mjs repoOf, so a typo shows here; the extension checks again.
+const REPO = /^(?:https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}?(?:\.git)?\/?|[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100})$/
+
+/** Add a plugin or skill from GitHub, Sweep all, and each tool the sweep flagged with Fix in a chat, Rescan and Approve. */
+function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) {
+  const [repo, setRepo] = useState('')
+  const s = hub.sweep
+  const busy = !!s?.busy
+  const ok = REPO.test(repo.trim())
+  const flagged = Object.entries(s?.tools ?? {}).filter(([, r]) => sweepBadge(r) === 'Review').sort(([a], [b]) => a.localeCompare(b))
+  const count = (b: string) => Object.values(s?.tools ?? {}).filter(r => sweepBadge(r) === b).length
+  const add = () => { if (ok && !busy) { send({ type: 'hub-tool-add', repo: repo.trim() }); setRepo('') } }
+  return (
+    <>
+      <Line row={{ section: 'Installed', label: 'Add a plugin or skill', hint: 'A GitHub repo as owner/repo or its link. It is swept first; one the sweep flags is added but left off.',
+        control: (
+          <span style={{ display: 'inline-flex', gap: 8 }}>
+            <input className="hub-select" aria-label="GitHub repo" placeholder="owner/repo" value={repo} maxLength={200} style={{ cursor: 'text' }}
+              onChange={e => setRepo(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }} />
+            <button type="button" className="hub-btn" disabled={!ok || busy} onClick={add}>Add</button>
+          </span>
+        ) }} />
+      <Line row={{ section: 'Installed', label: 'Sweep', hint: [busy ? (s?.progress ? `Sweeping ${s.progress.done} of ${s.progress.total}.` : 'Sweeping now.') : s?.note, `${count('Clean')} clean, ${count('Review')} to review, ${count('Approved')} approved. NVIDIA SkillSpector, no LLM.`].filter(Boolean).join(' '),
+        control: <button type="button" className="hub-btn" disabled={busy} onClick={() => send({ type: 'hub-sweep' })}>{busy ? 'Sweeping' : 'Sweep all'}</button> }} />
+      {flagged.length > 0 && <>
+        <h4 style={sub}>Needs review</h4>
+        {flagged.map(([name, r]) => (
+          <Line key={name} row={{ section: 'Installed', label: name.split('@')[0],
+            hint: [`${r.severity ?? r.recommendation ?? 'Flagged'}, ${r.issues ?? 0} issues, ${hub.installed.some(i => i.name === name && i.enabled) ? 'on' : 'off'}.`, r.top?.[0] && `Worst: ${r.top[0].id} in ${r.top[0].file ?? '?'}${r.top[0].line ? `:${r.top[0].line}` : ''}.`].filter(Boolean).join(' '),
+            control: (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="hub-link" disabled={busy} onClick={() => send({ type: 'hub-sweep', name })}>Rescan</button>
+                <button type="button" className="hub-link" onClick={() => send({ type: 'hub-sweep-approve', name })}>Approve</button>
+                <button type="button" className="hub-btn sm" onClick={() => send({ type: 'hub-sweep-fix', name })}>Fix in a chat</button>
+              </span>
+            ) }} />
+        ))}
+      </>}
+    </>
+  )
+}
+
 export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number } | null; start?: Section; layout?: Layout; onLayout?: (l: Layout) => void }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState<Section>(start)
@@ -78,6 +120,8 @@ export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: 
       control: <Pick label="Hide idle chats" options={IDLE} value={sb.idleMinutes === null ? 'never' : String(sb.idleMinutes)} onChange={v => own('idleMinutes', v === 'never' ? null : Number(v))} /> },
     { section: 'Chats', label: 'Continue at usage limit', hint: 'When a usage limit resets, Claude picks the chat up again by itself.',
       control: <Switch label="Continue at usage limit" on={hub.keep.autoContinue} onChange={next => set('autoContinueAtUsageLimit', next)} /> },
+    { section: 'Chats', label: 'Auto-start chats', hint: 'When nothing runs in this window\'s project, a chat starts on the next to-do item. A chat stopped by a usage limit comes back when it resets.',
+      control: <Switch label="Auto-start chats" on={sb.autoStart !== false} onChange={next => own('autoStart', next)} /> },
     { section: 'Chats', label: 'Fresh branch for new chats', hint: 'A chat that continues from a full one starts on its own git branch.',
       control: <Switch label="Fresh branch for new chats" on={hub.keep.freshBranch} onChange={next => send({ type: 'hub-keep', freshBranch: next })} /> },
     { section: 'Chats', label: 'Brief for new chats', hint: 'New chats first read what other chats in the project are doing.',
@@ -149,6 +193,7 @@ export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: 
           control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-setup' })}>Set up</button> }} />
         <Line row={{ section: 'Installed', label: 'Export kit', hint: 'Roles, skills, plugins and mods as one folder you can copy to another Mac.',
           control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-kit-export' })}>Export</button> }} />
+        <Sweep hub={hub} send={send} />
         <h4 style={sub}>Installed</h4>
         {installed()}
       </>

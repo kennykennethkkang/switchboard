@@ -144,7 +144,7 @@ describe('ask-server', () => {
       s.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } })
       await s.next(m => m.id === 1)
       s.send({ id: 2, method: 'tools/list' })
-      assert.deepEqual((await s.next(m => m.id === 2)).result.tools.map((t: { name: string }) => t.name), ['ask', 'todo_add', 'todo_done', 'tool_on'])
+      assert.deepEqual((await s.next(m => m.id === 2)).result.tools.map((t: { name: string }) => t.name), ['ask', 'todo_add', 'todo_done', 'tool_on', 'sweep'])
       s.send({ id: 3, method: 'tools/call', params: { name: 'todo_add', arguments: { text: 'Set up the db', before_text: 'receipts' } } })
       assert.equal((await s.next(m => m.id === 3)).result.content[0].text, 'Added p1: Set up the db')
       const post = seen.find(r => r.url?.startsWith('/hub/todo'))!
@@ -172,6 +172,27 @@ describe('ask-server', () => {
       assert.deepEqual(JSON.parse(post.body), { session: 'sess1', name: 'bland' })
       s.send({ id: 3, method: 'tools/call', params: { name: 'tool_on', arguments: {} } })
       assert.equal((await s.next(m => m.id === 3)).result.isError, true)
+    } finally { s.child.kill(); srv.close() }
+  })
+
+  it('sweep posts only the name to the window and has no approve', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    const { srv, seen } = await fakeWindow(home, home, status(200))
+    const s = start(home, home)
+    try {
+      s.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } })
+      await s.next(m => m.id === 1)
+      s.send({ id: 9, method: 'tools/list' })
+      const tool = (await s.next(m => m.id === 9)).result.tools.find((t: { name: string }) => t.name === 'sweep')
+      assert.deepEqual(Object.keys(tool.inputSchema.properties), ['name'])
+      s.send({ id: 2, method: 'tools/call', params: { name: 'sweep', arguments: { name: 'gemini', approve: true } } })
+      assert.notEqual((await s.next(m => m.id === 2)).result.isError, true)
+      const posts = () => seen.filter(r => r.url?.startsWith('/hub/sweep'))
+      assert.equal(posts()[0].url, '/hub/sweep?token=tok')
+      assert.deepEqual(JSON.parse(posts()[0].body), { name: 'gemini' })
+      s.send({ id: 3, method: 'tools/call', params: { name: 'sweep', arguments: {} } })
+      await s.next(m => m.id === 3)
+      assert.deepEqual(JSON.parse(posts()[1].body), {})
     } finally { s.child.kill(); srv.close() }
   })
 

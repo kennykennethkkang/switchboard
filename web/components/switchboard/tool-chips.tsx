@@ -42,7 +42,7 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
             const fixed = locked(n)
             return (
               <button key={n} type="button" aria-pressed={on} aria-disabled={fixed || undefined} style={{ ...chip(on, warn), ...(fixed ? { cursor: 'default' } : {}) }}
-                title={[warn ? `${n}: flagged: never turned on automatically` : fixed ? `${n.split('@')[0]}: always on in every chat` : n, tips[n]].filter(Boolean).join('\n')}
+                title={[warn ? `${n}: duplicate, off unless you turn it on` : fixed ? `${n.split('@')[0]}: always on in every chat` : n, tips[n]].filter(Boolean).join('\n')}
                 onClick={() => { if (!fixed) onChange({ ...profile, [kind]: { ...map, [n]: !on } }) }}>
                 {warn && <span aria-label="flagged" style={{ color: 'var(--hub-yellow)' }}>!</span>}
                 {kind === 'plugins' ? n.split('@')[0] : n}

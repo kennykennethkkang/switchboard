@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import type { ChatRow, GitOp, RepoFile, RepoView } from '@/lib/hub-types'
+import { MAC_ONLY_GIT, type ChatRow, type GitOp, type RepoFile, type RepoView } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { boxNote } from '@/lib/message-box'
 import { resolvePrompt } from '@/lib/pr-card'
@@ -27,8 +27,8 @@ const target = (r: RepoView) => {
 
 /** Kenneth's git buttons for the chat's repo: each one a plain git or gh command in the extension, never run by a chat. */
 /** shipping: the Ship card above has the primary button, so Commit steps back. */
-export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shipping }: {
-  repo: RepoView | null | undefined; sessionId: string; chat?: ChatRow; commit?: string; isVSCode: boolean; send: (c: HubCommand) => void; shipping?: boolean
+export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shipping, phone }: {
+  repo: RepoView | null | undefined; sessionId: string; chat?: ChatRow; commit?: string; isVSCode: boolean; send: (c: HubCommand) => void; shipping?: boolean; phone?: boolean
 }) {
   const mine = repo?.sessionId === sessionId ? repo : null
   const [unchecked, setUnchecked] = useState<Set<string>>(new Set())
@@ -65,6 +65,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   )
   const r = mine
   const busy = !!r.busy
+  const may = (op: GitOp) => !phone || !MAC_ONLY_GIT.has(op)
   const run = (cmd: Git) => { sent.current = { op: cmd.op, at: Date.now() }; setAsk(null); send({ type: 'hub-git', sessionId, ...cmd }) }
   const open = (url: string) => (isVSCode ? send({ type: 'hub-open-url', url }) : window.open(url, '_blank', 'noopener'))
   const checked = r.files.filter(f => !unchecked.has(f.path)).map(f => f.path)
@@ -102,8 +103,8 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
         </button>
         <span style={{ font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-ash)' }}
           title={r.upstream ? `Against ${r.upstream}` : 'No upstream yet'}>{r.upstream ? `↑${r.ahead} ↓${r.behind}` : 'not published'}</span>
-        <button type="button" className="hub-btn sm" style={{ marginLeft: 'auto' }} disabled={busy || !r.branch} onClick={sync}
-          title={r.sync.kind === 'publish' ? `git push -u origin ${r.branch}` : `git ${r.sync.kind}`}>{r.busy === 'sync' ? 'Working…' : r.sync.label}</button>
+        {may('sync') && <button type="button" className="hub-btn sm" style={{ marginLeft: 'auto' }} disabled={busy || !r.branch} onClick={sync}
+          title={r.sync.kind === 'publish' ? `git push -u origin ${r.branch}` : `git ${r.sync.kind}`}>{r.busy === 'sync' ? 'Working…' : r.sync.label}</button>}
 
       {menu && <div role="group" aria-label="Branches" style={{ flexBasis: '100%', display: 'grid', gap: 6, padding: 10, borderRadius: 8, border: '1px solid var(--hub-hair)', background: 'var(--hub-canvas)' }}>
         <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2, maxHeight: 220, overflowY: 'auto' }}>
@@ -116,7 +117,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
                 style={{ flex: 1, minWidth: 0, textAlign: 'left', font: '400 12px/1.3 var(--hub-mono)', color: here ? 'var(--hub-ink)' : undefined, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {here ? '● ' : ''}{b}
               </button>
-              {!here && !MAIN.test(b) && <button type="button" className="hub-link" aria-label={`Delete ${b}`} disabled={busy}
+              {!here && !MAIN.test(b) && may('delete-branch') && <button type="button" className="hub-link" aria-label={`Delete ${b}`} disabled={busy}
                 onClick={() => setAsk({ text: `Delete the local branch ${b}? git keeps it if it has unmerged commits.`, yes: 'Delete', danger: true, cmd: { op: 'delete-branch', branch: b, confirmed: true } })}>✕</button>}
             </li>
           })}
@@ -163,8 +164,8 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button type="button" className={`hub-btn sm${shipping ? '' : ' primary'}`} style={{ flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} disabled={!canCommit}
                 onClick={() => run({ op: 'commit', files: checked, summary, description })}>{r.busy === 'commit' ? 'Committing…' : `Commit to ${r.branch ?? 'branch'}`}</button>
-              <button type="button" className={shipping ? 'hub-link' : 'hub-btn sm'} style={shipping ? { fontSize: 12 } : undefined} disabled={!canCommit}
-                onClick={() => pushing({ op: 'commit-push', files: checked, summary, description }, `Commit ${plural(checked.length, 'file')} and push`)}>{r.busy === 'commit-push' ? 'Working…' : 'Commit & push'}</button>
+              {may('commit-push') && <button type="button" className={shipping ? 'hub-link' : 'hub-btn sm'} style={shipping ? { fontSize: 12 } : undefined} disabled={!canCommit}
+                onClick={() => pushing({ op: 'commit-push', files: checked, summary, description }, `Commit ${plural(checked.length, 'file')} and push`)}>{r.busy === 'commit-push' ? 'Working…' : 'Commit & push'}</button>}
             </div>
           </>
         : <p style={{ margin: 0, fontSize: 13, color: 'var(--hub-ash)' }}>Nothing to commit.</p>}
@@ -174,7 +175,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
           onClick={() => setAsk({ text: `Undo the last commit, "${head.subject}"? Its changes stay as staged files.`, yes: 'Undo', danger: true, cmd: { op: 'undo', confirmed: true } })}>Undo last commit</button>}
         {r.files.length > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'stash' })} title="git stash push -u">Stash</button>}
         {r.stashes > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'pop' })} title="git stash pop">Pop stash ({r.stashes})</button>}
-        {checked.length > 0 && <button type="button" className="hub-link" disabled={busy} style={{ color: 'var(--hub-red)' }}
+        {checked.length > 0 && may('discard') && <button type="button" className="hub-link" disabled={busy} style={{ color: 'var(--hub-red)' }}
           onClick={() => setAsk({ text: `Discard the changes in ${plural(checked.length, 'checked file')}? New files are deleted. This cannot be undone.`, yes: 'Discard', danger: true, cmd: { op: 'discard', files: checked, confirmed: true } })}>Discard checked ({checked.length})</button>}
       </div>
 

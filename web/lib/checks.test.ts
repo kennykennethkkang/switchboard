@@ -42,8 +42,9 @@ test('limitLine: the used-up limit\'s reset and who continues', () => {
   const now = new Date(2026, 9, 29, 12, 0).getTime()
   const at = (h: number, d = 29) => new Date(2026, 9, d, h, 30).toISOString()
   const limits = [{ kind: 'five_hour', percentUsed: 100, resetsAt: at(14) }, { kind: 'seven_day', percentUsed: 60, resetsAt: at(9, 31) }]
-  assert.equal(limitLine(limits, true, now), 'Resets at 14:30. Auto-continue is on, so Claude Code picks it up then.')
-  assert.equal(limitLine(limits, false, now), 'Resets at 14:30. Auto-continue is off; Switchboard sends it again a minute after.')
-  assert.equal(limitLine([{ kind: 'seven_day', percentUsed: 100, resetsAt: at(9, 31) }], true, now), 'Resets Sat 09:30. Auto-continue is on, so Claude Code picks it up then.')
+  assert.equal(limitLine(limits, true, now), 'Resets 2:30 PM. Auto-continue is on, so Claude Code picks it up then.')
+  assert.equal(limitLine(limits, false, now), 'Resets 2:30 PM. Auto-continue is off; Switchboard sends it again a minute after.')
+  assert.equal(limitLine([{ kind: 'seven_day', percentUsed: 100, resetsAt: at(9, 31) }], true, now), 'Resets Sat 9:30 AM. Auto-continue is on, so Claude Code picks it up then.')
+  assert.equal(limitLine([{ kind: 'five_hour', percentUsed: 100, resetsAt: String(new Date(2026, 9, 29, 14, 30).getTime() / 1000) }], true, now), 'Resets 2:30 PM. Auto-continue is on, so Claude Code picks it up then.')
   assert.equal(limitLine([], false, now), 'Auto-continue is off; Switchboard sends it again a minute after the reset.')
 })

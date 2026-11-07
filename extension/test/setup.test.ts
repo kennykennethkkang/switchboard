@@ -9,14 +9,16 @@ import * as os from 'os'
 import * as path from 'path'
 import { claudeBinary, claudeCall, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
 // @ts-expect-error plain .mjs, no types
-import { commandFor, expand, installSkills, keyFor, mcpConfig, readKey, storeKey } from '../kit/setup-run.mjs'
+import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, readKey, storeKey } from '../kit/setup-run.mjs'
 
 const KIT: SetupKit = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'kit', 'setup.json'), 'utf8'))
-const fresh = { plugins: [], marketplaces: [], mcps: [], plain: [] as string[], skills: [] as string[], key21st: false, modsDir: '/ext/kit/mods' }
+const fresh = { plugins: [], marketplaces: [], mcps: [], plain: [] as string[], skills: [] as string[], key21st: false, modsDir: '/ext/kit/mods', skillsDir: '/ext/kit/skills' }
 const steps = (o = {}) => setupSteps(KIT, { ...fresh, ...o })
 const runs = (o = {}) => steps(o).flatMap(s => (s.run ? [s.run.join(' ')] : []))
 const text = (o = {}) => JSON.stringify(steps(o))
 const MODS = '~/.claude/switchboard/mods'
+// A clean sweep, so these tests never run skillspector.
+const passed = async () => ({ state: 'clean' })
 const ASK = '~/.claude/switchboard/ask/ask-server.mjs'
 
 describe('setup steps', () => {
@@ -86,6 +88,13 @@ describe('setup steps', () => {
     assert.ok(rest.length > 0)
   })
 
+  it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
+    assert.deepEqual(KIT.own, ['aar', 'animation-styles', 'improve-system', 'awwwards'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'animation-styles', 'improve-system', 'awwwards'] } }])
+    assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
+  })
+
   it('carries no absolute path from this machine', () => {
     assert.doesNotMatch(text(), /\/Users\//)
     assert.doesNotMatch(JSON.stringify(KIT), /\/Users\/|kennykennethkkang/)
@@ -147,7 +156,7 @@ describe('setup runner', () => {
     assert.deepEqual(commandFor('claude', ['{"h":"node \\"C:/x y\\""}', 'C:\\A B\\'], 'win32').args, ['"{\\"h\\":\\"node \\\\\\"C:/x y\\\\\\"\\"}"', '"C:\\A B\\\\"'])
   })
 
-  it('copies named skills from a clone, found by their SKILL.md name, and never overwrites one', () => {
+  it('copies named skills from a clone, found by their SKILL.md name, and never overwrites one', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-skills-'))
     const fake = (repo: string, dir: string) => {
       assert.equal(repo, 'a/b')
@@ -161,18 +170,74 @@ describe('setup runner', () => {
     const mine = path.join(home, '.claude', 'skills', 'three')
     fs.mkdirSync(mine, { recursive: true })
     fs.writeFileSync(path.join(mine, 'SKILL.md'), 'my own')
-    const r = installSkills({ repo: 'a/b', names: ['one', 'two', 'three', 'gone'] }, { home, clone: fake, log: () => {} })
-    assert.deepEqual(r, { added: ['one', 'two'], kept: ['three'], missing: ['gone'] })
+    const r = await installSkills({ repo: 'a/b', names: ['one', 'two', 'three', 'gone'] }, { home, clone: fake, scan: passed, log: () => {} })
+    assert.deepEqual(r, { added: ['one', 'two'], flagged: [], kept: ['three'], missing: ['gone'], refused: [] })
     assert.match(fs.readFileSync(path.join(home, '.claude', 'skills', 'two', 'SKILL.md'), 'utf8'), /body renamed/)
     assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'one', 'refs', 'x.md')))
     assert.equal(fs.readFileSync(path.join(mine, 'SKILL.md'), 'utf8'), 'my own')
     fs.rmSync(home, { recursive: true, force: true })
   })
 
-  it('fails soft when a skill repo cannot be cloned, saying why', () => {
+  it('adds a missing own skill, refreshes an older copy of ours, and leaves links and the user\'s own alone', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-')), from = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-kit-'))
+    const MARK = '<!-- switchboard generic copy -->'
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const skills = path.join(home, '.claude', 'skills')
+    for (const n of ['add', 'link', 'mine', 'old', 'same']) { put(path.join(from, n, 'SKILL.md'), `${n} v2\n\n${MARK}\n`); put(path.join(from, n, 'clips', 'a.mp4'), 'v2') }
+    const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-link-'))
+    put(path.join(elsewhere, 'SKILL.md'), 'claude-mods copy')
+    fs.mkdirSync(skills, { recursive: true })
+    fs.symlinkSync(elsewhere, path.join(skills, 'link'))
+    put(path.join(skills, 'mine', 'SKILL.md'), 'my own, no mark')
+    put(path.join(skills, 'old', 'SKILL.md'), `old v1\n\n${MARK}\n`); put(path.join(skills, 'old', 'gone.md'), 'v1 only')
+    fs.cpSync(path.join(from, 'same'), path.join(skills, 'same'), { recursive: true })
+    const r = installOwnSkills({ from, names: ['add', 'link', 'mine', 'old', 'same', 'absent'] }, { home, log: () => {} })
+    assert.deepEqual(r, { added: ['add'], refreshed: ['old'], kept: ['mine', 'same'], linked: ['link'], failed: [] })
+    assert.equal(fs.readFileSync(path.join(skills, 'add', 'clips', 'a.mp4'), 'utf8'), 'v2')
+    assert.match(fs.readFileSync(path.join(skills, 'old', 'SKILL.md'), 'utf8'), /old v2/)
+    assert.ok(!fs.existsSync(path.join(skills, 'old', 'gone.md')))
+    assert.equal(fs.readFileSync(path.join(skills, 'mine', 'SKILL.md'), 'utf8'), 'my own, no mark')
+    assert.ok(fs.lstatSync(path.join(skills, 'link')).isSymbolicLink())
+    assert.equal(fs.readFileSync(path.join(elsewhere, 'SKILL.md'), 'utf8'), 'claude-mods copy')
+    for (const d of [home, from, elsewhere]) fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('refuses an own skill name that is not a plain folder name', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-'))
+    const lines: string[] = []
+    const r = installOwnSkills({ from: home, names: ['', '..', '../x', 'a/b', 'a\\b'] }, { home, log: (l: string) => lines.push(l) })
+    assert.deepEqual(r.failed, ['', '..', '../x', 'a/b', 'a\\b'])
+    assert.match(lines.join('\n'), /not a plain folder name/)
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('keeps the old copy when a refresh fails, says so, and goes on to the next skill', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-')), from = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-kit-'))
+    const MARK = '<!-- switchboard generic copy -->'
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const skills = path.join(home, '.claude', 'skills')
+    put(path.join(from, 'bad', 'SKILL.md'), `bad v2\n\n${MARK}\n`); put(path.join(from, 'bad', 'locked.md'), 'x')
+    fs.chmodSync(path.join(from, 'bad', 'locked.md'), 0o000)
+    put(path.join(from, 'next', 'SKILL.md'), `next v2\n\n${MARK}\n`)
+    put(path.join(skills, 'bad', 'SKILL.md'), `bad v1\n\n${MARK}\n`)
+    const lines: string[] = []
+    try {
+      const r = installOwnSkills({ from, names: ['bad', 'next'] }, { home, log: (l: string) => lines.push(l) })
+      assert.deepEqual(r.failed, ['bad'])
+      assert.deepEqual(r.added, ['next'])
+      assert.match(fs.readFileSync(path.join(skills, 'bad', 'SKILL.md'), 'utf8'), /bad v1/)
+      assert.match(lines.join('\n'), /bad: could not copy/)
+      assert.deepEqual(fs.readdirSync(skills).sort(), ['bad', 'next'])
+    } finally {
+      fs.chmodSync(path.join(from, 'bad', 'locked.md'), 0o644)
+      for (const d of [home, from]) fs.rmSync(d, { recursive: true, force: true })
+    }
+  })
+
+  it('fails soft when a skill repo cannot be cloned, saying why', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-skills-'))
     const lines: string[] = []
-    const r = installSkills({ repo: 'a/b', names: ['one'] }, { home, clone: () => 'repository not found', log: (l: string) => lines.push(l) })
+    const r = await installSkills({ repo: 'a/b', names: ['one'] }, { home, clone: () => 'repository not found', scan: passed, log: (l: string) => lines.push(l) })
     assert.equal(r.error, 'repository not found')
     assert.match(lines.join('\n'), /a\/b: .*repository not found/)
     assert.ok(!fs.existsSync(path.join(home, '.claude', 'skills', 'one')))
@@ -188,6 +253,7 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
+    assert.match(out, /copy aar animation-styles improve-system awwwards from .* to ~\/.claude\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
     assert.doesNotMatch(out, /secret-key-1/)

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { demoApply, demoChat, demoHub, demoTick, demoUpload } from './hub-demo'
+import { demoApply, demoChat, demoHub, demoRunDetails, demoTick, demoUpload } from './hub-demo'
 
 test('a demo New chat puts a working chat on top, named from the goal', () => {
   const h = demoApply(demoHub(), { type: 'hub-new-chat', path: '/Users/k/Documents/GitHub/Armasu', text: 'fix the closet door animation on settings page', remote: false })
@@ -225,4 +225,34 @@ test('the demo transcript fits each chat, not the same script for all', () => {
   assert.ok(!work.messages.some(m => /Codex/.test(m.text)))
   assert.equal(work.before, null)
   assert.match(demoChat(h, 'd-done', 'transcript').transcript!.messages.at(-1)!.text, /Codex|engineer|AI/)
+})
+
+test('demo lead: one run for the whole chat, a dispatch per role run, and its last message', () => {
+  const p = demoHub(0).progress.find(x => x.sessionId === 'd-work')!
+  const [lead, ...rest] = demoRunDetails(p, 'lead', 60_000)
+  assert.equal(rest.length, 0)
+  assert.equal(lead.role, 'lead')
+  assert.equal(lead.id, p.sessionId)
+  assert.equal(lead.dispatches?.length, p.roles.filter(r => r.role !== 'jev').length)
+  assert.equal(lead.dispatches?.[0].role, p.roles[0].role)
+  assert.ok(lead.calls.some(c => c.tool === 'Agent'))
+  assert.ok(lead.reportText)
+  assert.deepEqual(demoRunDetails(undefined, 'lead'), [])
+})
+
+test('a demo tool pick names its folder, so New chat shows it', () => {
+  const h = demoApply(demoHub(), { type: 'hub-pick-tools', text: 'fix the login page', path: '/Users/k/Documents/GitHub/Armasu' })
+  assert.equal(h.tools?.pick?.folder, '/Users/k/Documents/GitHub/Armasu')
+})
+
+test('a demo Finish up step ticked and put back stays a Finish up step', () => {
+  const h = demoHub(), path = Object.keys(h.todos!)[0]
+  const step = { id: 'dt-step', text: 'Reload the window', at: 1, from: 'd-done', why: 'you' as const }
+  const h0 = { ...h, todos: { ...h.todos, [path]: { ...h.todos![path], todo: [...h.todos![path].todo, step] } } }
+  const h1 = demoApply(h0, { type: 'hub-todo-remove', path, id: step.id })
+  const ticked = h1.todos![path].ticked![0]
+  assert.equal(ticked.why, 'you')
+  assert.equal(ticked.from, step.from)
+  const h2 = demoApply(h1, { type: 'hub-todo-restore', path, id: step.id })
+  assert.equal(h2.todos![path].todo.at(-1)?.why, 'you')
 })

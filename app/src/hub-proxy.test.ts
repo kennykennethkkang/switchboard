@@ -5,6 +5,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { allowed, codeLogin, macOnly, hostOk, commandSession, deniedAs, deviceAsks, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
+import { MAC_ONLY_GIT } from '../../web/lib/hub-types'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as http from 'http'
@@ -57,6 +58,11 @@ describe('pickWindow', () => {
 })
 
 describe('macOnly', () => {
+  it('refuses the same git ops the phone hides', () => {
+    for (const op of ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship'])
+      assert.equal(macOnly(JSON.stringify({ type: 'hub-git', op })), MAC_ONLY_GIT.has(op as never), op)
+    assert.equal(MAC_ONLY_GIT.has('commit'), false)
+  })
   it('keeps the Mac mic off for a phone and lets other commands by', () => {
     assert.equal(macOnly('{"type":"hub-voice","on":true}'), true)
     // A spoken reply plays out of the Mac's speakers; the phone asks in text only.

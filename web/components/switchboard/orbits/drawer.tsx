@@ -1,5 +1,6 @@
 'use client'
 // The node drawer: one role in this chat, then each of its runs, newest first, opening in place.
+// The lead's is one run, the chat's own transcript: its calls, who it sent which brief to, and its last message.
 // Beside the picture on a wide view (an aside, the picture stays clickable); a bottom sheet on a narrow one (a modal dialog).
 // Read only: copy, open the transcript, jump to the chat. Nothing here changes a running agent.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -9,7 +10,8 @@ import { clockDur, count, kindOf, loadRuns, roleLeft, runState, statusTone, type
 import { demoRunDetails } from '@/lib/hub-demo'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import type { ChatProgress } from '@/lib/hub-types'
-import { Glyph, LABEL, NAME, TONE } from './parts'
+import { Glyph, LABEL, LEAD_WORD, NAME, TONE, leadState } from './parts'
+import { almostDone } from '../look'
 import type { OrbitChat } from '../orbit'
 import './drawer.css'
 
@@ -33,7 +35,27 @@ function Block({ title, aside, children }: { title: string; aside?: ReactNode; c
   return <section className="ovd-blk"><h4><span>{title}</span>{aside !== undefined && <span>{aside}</span>}</h4>{children}</section>
 }
 
-function Run({ run, n, state, left, onCopy, onFocus, open, toggle }: { run: RunDetail; n: number; state: 'active' | 'done'; left?: string; open: boolean; toggle: () => void } & Pick<DrawerProps, 'onCopy' | 'onFocus'>) {
+type BodyProps = { run: RunDetail; state: 'active' | 'done'; left?: string; lead?: boolean } & Pick<DrawerProps, 'onCopy' | 'onFocus'>
+
+function Run({ run, n, state, left, onCopy, onFocus, open, toggle }: Omit<BodyProps, 'lead'> & { n: number; open: boolean; toggle: () => void }) {
+  const time = state === 'active' ? `${clockDur(Date.now() - run.startedAt)} so far` : clockDur(run.endedAt - run.startedAt)
+  const body = `ovd-run-${run.id}`
+  return (
+    <li data-x={open || undefined} data-s={state}>
+      <button type="button" className="ovd-rh" aria-expanded={open} aria-controls={body} onClick={toggle}>
+        <i aria-hidden style={{ '--c': TONE[state] } as React.CSSProperties} />
+        <span>{n}. {run.title ?? `Run ${n}`}</span>
+        <small>{time}</small>
+        <svg className="ovd-chev" viewBox="0 0 16 16" aria-hidden><path d="m6 3.5 4.5 4.5L6 12.5" /></svg>
+      </button>
+      <div className="ovd-fold" id={body}><div inert={!open || undefined}><div className="ovd-rc">
+        <RunBody run={run} state={state} left={left} onCopy={onCopy} onFocus={onFocus} />
+      </div></div></div>
+    </li>
+  )
+}
+
+function RunBody({ run, state, left, lead, onCopy, onFocus }: BodyProps) {
   const [all, setAll] = useState(false)
   const [said, setSaid] = useState<string>()
   const now = Date.now(), end = state === 'active' ? now : run.endedAt, span = Math.max(1000, end - run.startedAt)
@@ -45,19 +67,18 @@ function Run({ run, n, state, left, onCopy, onFocus, open, toggle }: { run: RunD
   const pos = (at: number) => `${(Math.min(1, Math.max(0, (at - run.startedAt) / span)) * 100).toFixed(2)}%`
   const report = run.report ?? (state === 'done' && run.reportText ? undefined : null)
   const copy = async (what: string, text: string) => { if (onCopy && await onCopy(text)) { setSaid(`${what} copied`); setTimeout(() => setSaid(undefined), 1600) } }
-  const body = `ovd-run-${run.id}`
+  const sent = [...(run.dispatches ?? [])].reverse()
   return (
-    <li data-x={open || undefined} data-s={state}>
-      <button type="button" className="ovd-rh" aria-expanded={open} aria-controls={body} onClick={toggle}>
-        <i aria-hidden style={{ '--c': TONE[state] } as React.CSSProperties} />
-        <span>{n}. {run.title ?? `Run ${n}`}</span>
-        <small>{time}</small>
-        <svg className="ovd-chev" viewBox="0 0 16 16" aria-hidden><path d="m6 3.5 4.5 4.5L6 12.5" /></svg>
-      </button>
-      <div className="ovd-fold" id={body}><div inert={!open || undefined}><div className="ovd-rc">
+      <>
         <p className="ovd-meta">{[`${hhmm(run.startedAt)} start`, time, state === 'active' && left, input && `${count(input)} tokens`, run.costUsd !== undefined && `about $${run.costUsd.toFixed(2)}`].filter(Boolean).join(' · ')}</p>
 
-        <Block title="Brief"><pre className="ovd-brief">{run.brief || 'No brief in the transcript.'}</pre></Block>
+        {lead ? <>
+          <Block title="Last message"><pre className="ovd-brief">{run.reportText || 'No message yet.'}</pre></Block>
+          <Block title="Sent out" aside={sent.length || undefined}>
+            {sent.length ? sent.map((d, i) => <p key={i} className="ovd-note" data-by="lead"><b>{NAME(d.role)} at {hhmm(d.at)}{d.title ? `, ${d.title}` : ''}</b>{d.brief || 'No brief.'}</p>)
+              : <p className="ovd-mute">No roles sent out yet.</p>}
+          </Block>
+        </> : <><Block title="Brief"><pre className="ovd-brief">{run.brief || 'No brief in the transcript.'}</pre></Block>
 
         <Block title="Report" aside={run.report?.status && <span className="ovd-chip" data-t={tone}>{run.report.status}</span>}>
           {report ? <dl className="ovd-rep">
@@ -67,7 +88,7 @@ function Run({ run, n, state, left, onCopy, onFocus, open, toggle }: { run: RunD
           </dl>
             : report === undefined ? <pre className="ovd-brief">{run.reportText}</pre>
             : <p className="ovd-mute">Still running, no report yet.</p>}
-        </Block>
+        </Block></>}
 
         {run.loops.length > 0 && <Block title="Sent back" aside={`${run.loops.length} time${run.loops.length > 1 ? 's' : ''}`}>
           {run.loops.map((l, i) => <p key={i} className="ovd-note" data-by={l.by}><b>{l.by === 'qa' ? 'By QA' : 'By the lead'} at {hhmm(l.at)}</b>{l.text}</p>)}
@@ -100,26 +121,26 @@ function Run({ run, n, state, left, onCopy, onFocus, open, toggle }: { run: RunD
         </Block>
 
         <div className="ovd-acts">
-          {onCopy && <button type="button" className="hub-btn" disabled={!run.brief} onClick={() => void copy('Brief', run.brief)}><Ic d={ICON.copy} />Copy brief</button>}
-          {onCopy && <button type="button" className="hub-btn" disabled={!run.reportText} onClick={() => void copy('Report', run.reportText ?? '')}><Ic d={ICON.copy} />Copy report</button>}
+          {onCopy && !lead && <button type="button" className="hub-btn" disabled={!run.brief} onClick={() => void copy('Brief', run.brief)}><Ic d={ICON.copy} />Copy brief</button>}
+          {onCopy && <button type="button" className="hub-btn" disabled={!run.reportText} onClick={() => void copy(lead ? 'Message' : 'Report', run.reportText ?? '')}><Ic d={ICON.copy} />{lead ? 'Copy last message' : 'Copy report'}</button>}
           {vscodeBridge?.isVSCode && run.file && <button type="button" className="hub-btn" onClick={() => vscodeBridge?.openFile(run.file)}><Ic d={ICON.file} />Open transcript</button>}
           {onFocus && <button type="button" className="hub-btn" onClick={onFocus}><Ic d={ICON.jump} />Jump to chat</button>}
         </div>
         <p className="ovd-said" role="status">{said}</p>
-      </div></div></div>
-    </li>
+      </>
   )
 }
 
 export function RoleDrawer({ chat, role, all, demo, sheet, onClose, onFocus, onCopy }: DrawerProps) {
-  const p = chat.progress, team = teamOf(p).find(r => r.role === role), state = team?.state ?? 'unused'
+  const p = chat.progress, team = teamOf(p).find(r => r.role === role), lead = role === 'lead'
+  const state = lead ? leadState(chat, almostDone(p)) : team?.state ?? 'unused'
   const steps = team?.runs ?? []
   const [runs, setRuns] = useState<RunDetail[]>()
   const [problem, setProblem] = useState<string>()
   const [x, setX] = useState<Record<string, boolean>>({})
   const prog = useRef(p)
   prog.current = p
-  const active = state === 'active'
+  const active = state === 'active' || state === 'working'
 
   // Loaded when it opens or the role's runs change; again every 15 s while one works.
   useEffect(() => {
@@ -142,6 +163,7 @@ export function RoleDrawer({ chat, role, all, demo, sheet, onClose, onFocus, onC
   const left = leftWords(roleLeft(p, all, role, now))
   const model = chat.models?.[role] ?? runs?.[0]?.model
   const n = Math.max(steps.length, runs?.length ?? 0)
+  const main = lead ? runs?.[0] : undefined
 
   const box = useRef<HTMLElement>(null)
   // The sheet is a modal dialog; the aside takes focus once, on open, so the next Tab reads it.
@@ -157,13 +179,25 @@ export function RoleDrawer({ chat, role, all, demo, sheet, onClose, onFocus, onC
       {sheet && <div className="ovd-grab" aria-hidden />}
       <div className="ovd-h">
         <span className="ovd-gl" style={{ '--c': TONE[state] } as React.CSSProperties}><Glyph k={role} /></span>
-        <div><h3 tabIndex={-1} id="ovd-title">{NAME(role)}</h3><small>{[model, `${n} run${n === 1 ? '' : 's'} this chat`].filter(Boolean).join(' · ')}</small></div>
+        <div><h3 tabIndex={-1} id="ovd-title">{NAME(role)}</h3><small>{lead ? [chat.live?.model ?? main?.model, 'this chat'].filter(Boolean).join(' · ') : [model, `${n} run${n === 1 ? '' : 's'} this chat`].filter(Boolean).join(' · ')}</small></div>
         <button type="button" className="ovd-x" aria-label={`Close ${NAME(role)} details`} onClick={onClose}><Ic d={ICON.close} /></button>
       </div>
+      {lead ? <>
+        <div className="ovd-stats">
+          <div><small>Total time</small><b>{main ? clockDur((active ? now : main.endedAt) - main.startedAt) : '0s'}</b></div>
+          <div><small>Tool calls</small><b>{main?.callCount ?? 0}</b></div>
+          <div><small>State</small><b style={{ color: TONE[state] }}>{LEAD_WORD[state]}</b></div>
+          <div><small>Sent out</small><b>{main?.dispatches?.length ?? 0}</b></div>
+        </div>
+        {problem ? <p className="ovd-mute">Could not read the transcript: {problem}</p>
+          : !runs ? <p className="ovd-mute" role="status">Reading the transcript…</p>
+          : !main ? <p className="ovd-mute">No transcript for this chat on this Mac.</p>
+          : <div className="ovd-rc ovd-lead"><RunBody run={main} state={active ? 'active' : 'done'} lead onCopy={onCopy} onFocus={onFocus} /></div>}
+      </> : <>
       <div className="ovd-stats">
         <div><small>Total time</small><b>{total > 0 ? clockDur(total) : '0s'}</b></div>
         <div><small>Runs</small><b>{n}</b></div>
-        <div><small>State</small><b style={{ color: TONE[state] }}>{LABEL[state]}</b></div>
+        <div><small>State</small><b style={{ color: TONE[state] }}>{LABEL[team?.state ?? 'unused']}</b></div>
         <div><small>Time left</small><b>{left ?? (active ? 'estimating' : 'none')}</b></div>
       </div>
       <div>
@@ -179,6 +213,7 @@ export function RoleDrawer({ chat, role, all, demo, sheet, onClose, onFocus, onC
               })}
             </ul>}
       </div>
+      </>}
     </div>
   )
 

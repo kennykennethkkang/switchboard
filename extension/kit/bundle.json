@@ -1,37 +1,45 @@
 {
-  "rulesVersion": "2026-11-01T04:04:06Z",
+  "rulesVersion": "2026-11-07T19:27:05Z",
   "generic": true,
   "history": {
     "Explore.md": [
       "aac11e62f278",
-      "24699a382056"
+      "24699a382056",
+      "61c8141de6af"
     ],
     "designer.md": [
       "df4330c3a43e",
       "7bdfac1ac0fc",
-      "7b5916509f37"
+      "7b5916509f37",
+      "3de2756e6712"
     ],
     "engineer.md": [
       "f067ddefd984",
       "395696df58ef",
-      "6a39eb7a8428"
+      "6a39eb7a8428",
+      "3819b293ec9b"
     ],
     "growth.md": [
       "8f83534c5908",
-      "6e58bbe4e024"
+      "6e58bbe4e024",
+      "f62a5fd41b67"
     ],
     "ops.md": [
       "edeaaf2febe5",
-      "37dc9bb5ef37"
+      "37dc9bb5ef37",
+      "bed25bdac5c0"
     ],
     "qa.md": [
       "116e389dea0a",
       "1819be5e3713",
-      "0145b126719d"
+      "0145b126719d",
+      "b4d5643bc759",
+      "165fe1930f86"
     ],
     "researcher.md": [
       "ab8bfc5bda95",
-      "8311cf492d2c"
+      "8311cf492d2c",
+      "a2c1672db161"
     ]
   }
 }

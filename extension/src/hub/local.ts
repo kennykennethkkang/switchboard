@@ -11,6 +11,7 @@ import type { ChangedFile, Connection, GitState, Installed, PhoneUrls, PlanView,
 import { DEFAULT_RELAY_PORT } from '../constants'
 import { tryLock } from '../fs-utils'
 import { modelOf } from './roles'
+import { digest, needsApproval, readSweep } from '../../kit/sweep.mjs'
 import { newerVersion } from './self-update'
 import { macNames, phoneCode, type MacNames } from './lan'
 
@@ -450,6 +451,19 @@ export async function keepWeb(root: string, deps: WebDeps & { installed?: boolea
   return ensureWeb(root, false, { ...deps, refresh: false })
 }
 
+/**
+ * keepWeb again while it answers a problem. Right after an update every window reloads at once: the app's /hub/state
+ * only proxies to a window, so it fails as not live and keepWeb gives up on a held 3131. Every retryMs, retries times.
+ */
+export async function keepWebRetrying(root: string, deps: Parameters<typeof keepWeb>[1] & { retries?: number; retryMs?: number } = {}): Promise<{ url: string } | { problem: string }> {
+  const { retries = 8, retryMs = 15_000 } = deps
+  for (let i = 0; ; i++) {
+    const r = await keepWeb(root, deps)
+    if (!('problem' in r) || i >= retries) return r
+    await new Promise(res => setTimeout(res, retryMs))
+  }
+}
+
 // ─── Installed and connections ───────────────────────────────────────────────
 
 async function skillName(dir: string): Promise<string> {
@@ -544,6 +558,14 @@ export async function installed(claude = CLAUDE): Promise<Installed[]> {
     out.push({ kind: 'role', name: f.slice(0, -3), enabled: true, ...(model ? { model } : {}) })
   }
   for (const f of await list('jev-presets')) if (f.endsWith('.json')) out.push({ kind: 'preset', name: f.slice(0, -5), enabled: true })
+  // Only tools held at intake are hashed, so this stays cheap.
+  const sweep = readSweep(path.dirname(claude))
+  for (const i of out) {
+    const rec = sweep[i.name]
+    if (!rec?.hold || (i.kind !== 'plugin' && i.kind !== 'skill')) continue
+    const dir = i.kind === 'plugin' ? i.path : path.join(claude, i.enabled ? 'skills' : 'skills-archive', i.name)
+    if (needsApproval(rec, dir && fs.existsSync(dir) ? digest(dir) : undefined)) i.held = true
+  }
   return out
 }
 
@@ -557,7 +579,7 @@ async function mdTitle(file: string): Promise<string | undefined> {
  * A project's own skills (.claude/skills, then .agents/skills, first name wins; symlinks followed) and its
  * design references: design-md/<brand>/ (DESIGN.md, else its first .md), docs/design/*.md, DESIGN.md.
  */
-export async function projectInventory(folder: string): Promise<Installed[]> {
+export async function projectInventory(folder: string, lib = LIBRARY): Promise<Installed[]> {
   const out: Installed[] = []
   const ls = (rel: string) => fs.promises.readdir(path.join(folder, rel)).catch(() => [] as string[])
   const seen = new Set<string>()
@@ -574,8 +596,9 @@ export async function projectInventory(folder: string): Promise<Installed[]> {
     const description = await mdTitle(path.join(folder, rel))
     out.push({ kind: 'asset', name, enabled: true, source: 'project', path: rel, ...(description ? { description } : {}) })
   }
-  for (const brand of (await ls('design-md')).sort()) {
-    if (brand.startsWith('.') || !fs.statSync(path.join(folder, 'design-md', brand), { throwIfNoEntry: false })?.isDirectory()) continue
+  const brands = (await ls('design-md')).sort(), copies = libraryCopies(brands, lib)
+  for (const brand of brands) {
+    if (brand.startsWith('.') || copies.has(brand) || !fs.statSync(path.join(folder, 'design-md', brand), { throwIfNoEntry: false })?.isDirectory()) continue
     const mds = (await ls(`design-md/${brand}`)).filter(n => n.endsWith('.md')).sort()
     const pick = mds.includes('DESIGN.md') ? 'DESIGN.md' : mds[0]
     if (pick) await asset(brand, `design-md/${brand}/${pick}`)
@@ -587,6 +610,14 @@ export async function projectInventory(folder: string): Promise<Installed[]> {
 
 // The bundled design library (kit/design-md), copied here so chats can read it by absolute path.
 export const LIBRARY = path.join(CLAUDE, 'switchboard', 'design-md')
+
+/** Brands of a project's design-md that are a copy of the library, which the library already lists by absolute path. */
+// ponytail: more than 3 brands also in the library counts as a copy; a project that chose a few keeps them.
+export function libraryCopies(brands: string[], lib = LIBRARY): Set<string> {
+  const have = new Set(fs.existsSync(lib) ? fs.readdirSync(lib) : [])
+  const same = brands.filter(b => have.has(b))
+  return new Set(same.length > 3 ? same : [])
+}
 
 // The running copy; libraryInventory waits on it, since a copy empties the folder first.
 let syncing: Promise<unknown> = Promise.resolve()
@@ -619,24 +650,6 @@ export async function libraryInventory(dir = LIBRARY): Promise<Installed[]> {
     out.push({ kind: 'asset', name: brand, enabled: true, source: 'library', path: file, ...(description ? { description } : {}) })
   }
   return out
-}
-
-const MANIFESTS = ['pyproject.toml', 'requirements.txt', 'Cargo.toml', 'go.mod', 'Package.swift', 'Gemfile']
-
-/** What the tool pick knows of a project: its folder name, the head of CLAUDE.md or AGENTS.md, its dependencies. */
-export async function projectContext(folder: string): Promise<string> {
-  const read = (f: string) => fs.promises.readFile(path.join(folder, f), 'utf8').catch(() => '')
-  const out = [`Folder: ${path.basename(folder)}`]
-  for (const f of ['CLAUDE.md', 'AGENTS.md']) {
-    const text = await read(f)
-    if (text.trim()) { out.push(`${f}:`, text.split('\n').slice(0, 40).join('\n')); break }
-  }
-  const pkg = await readJson(path.join(folder, 'package.json'))
-  const deps = [...Object.keys((pkg?.dependencies ?? {}) as object), ...Object.keys((pkg?.devDependencies ?? {}) as object)].slice(0, 30)
-  if (deps.length) out.push(`Dependencies: ${deps.join(', ')}`)
-  const other = MANIFESTS.filter(f => fs.existsSync(path.join(folder, f)))
-  if (other.length) out.push(`Manifests: ${other.join(', ')}`)
-  return out.join('\n')
 }
 
 /** -Users-k-Documents-GitHub-Armasu -> Armasu (the folder name Claude Code made from the path). */

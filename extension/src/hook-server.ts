@@ -12,6 +12,7 @@ import { estimateTokenCost } from './token-estimator'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
 import { handleHubRequest, handleUpload, tokenHeader, type HubReply } from './hub/routes'
+import { EDIT_TOOLS, editGuard, noteEdit } from './hub/brain'
 
 const log = createLogger('HookServer')
 
@@ -48,6 +49,12 @@ interface HookPayload {
   [key: string]: unknown
 }
 
+/** The file an edit tool call writes, when it has a cwd to resolve against. */
+function editedFile(p: HookPayload): string | undefined {
+  const file = p.tool_input?.file_path ?? p.tool_input?.notebook_path
+  return p.cwd && EDIT_TOOLS.has(p.tool_name ?? '') && typeof file === 'string' && file ? file : undefined
+}
+
 export class HookServer implements vscode.Disposable {
   private server: http.Server | null = null
   private port: number
@@ -56,6 +63,11 @@ export class HookServer implements vscode.Disposable {
     startTime: number
     agentNames: Map<string, string> // agent_id → friendly name
   }>()
+
+  /** Edits the guard stopped, by session and file, so a retry goes through. */
+  private tried = new Map<string, number>()
+  /** Edits that went through, from every window's chats. */
+  private edits = new Map<string, number>()
 
   private readonly _onEvent = new vscode.EventEmitter<AgentEvent>()
 
@@ -105,6 +117,7 @@ export class HookServer implements vscode.Disposable {
             }
           })
           req.on('end', () => {
+            let reply = ''
             if (!oversized) {
               try {
                 const parsed: unknown = JSON.parse(body)
@@ -113,17 +126,17 @@ export class HookServer implements vscode.Disposable {
                     || typeof (parsed as HookPayload).hook_event_name !== 'string') {
                   log.warn('Invalid hook payload: missing session_id or hook_event_name')
                 } else {
-                  this.handleHook(parsed as HookPayload, req.headers['x-switchboard-mirror'] === '1')
+                  const mirror = req.headers['x-switchboard-mirror'] === '1'
+                  if (!mirror) reply = this.guard(parsed as HookPayload)
+                  this.handleHook(parsed as HookPayload, mirror)
                 }
               } catch (e) {
                 log.error('Failed to parse payload:', e)
               }
             }
-            // Always return 200 with empty body; we're observing, not blocking.
-            // Empty body = "success, no output" per Claude Code docs.
-            // Returning JSON (even '{}') triggers schema parsing which can cause issues.
+            // Empty body unless the edit guard denies: hook.js prints a body as the hook's output.
             res.writeHead(200)
-            res.end()
+            res.end(reply)
           })
         } else {
           res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -174,6 +187,14 @@ export class HookServer implements vscode.Disposable {
     })
   }
 
+  /** A PreToolUse deny for an edit that would land on another open chat's fresh edit, else ''. */
+  private guard(payload: HookPayload): string {
+    const file = editedFile(payload)
+    if (payload.hook_event_name !== 'PreToolUse' || !file) return ''
+    const why = editGuard(hub.get(), this.edits, this.tried, payload.session_id, payload.cwd!, file)
+    return why ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: why } }) : ''
+  }
+
   getPort(): number {
     return this.port
   }
@@ -194,6 +215,8 @@ export class HookServer implements vscode.Disposable {
 
   private handleHook(payload: HookPayload, mirror = false): void {
     this._onRaw.fire({ payload: payload as unknown as Record<string, unknown>, mirror })
+    const file = editedFile(payload)
+    if (payload.hook_event_name === 'PostToolUse' && file) noteEdit(this.edits, payload.session_id, payload.cwd!, file)
     // A mirror feeds only the hub's progress; the owning window draws and notifies.
     if (mirror) return
     const eventName = payload.hook_event_name

@@ -10,7 +10,7 @@ import * as path from 'path'
 import { execFile } from 'child_process'
 import { ghPath, git, repoRoot } from './git'
 import { cloneTarget, repoTop } from './projects'
-import { MISSED, missed, plainText } from './progress'
+import { MISSED, missed, plainText, workText } from './progress'
 import { writeJsonAtomic } from '../hook-entries'
 import { foldPathCase } from '../fs-utils'
 import { createLogger } from '../logger'
@@ -153,7 +153,7 @@ export function moveChat(d: TodoDoc, from: string, to: string, now = Date.now())
 }
 
 // A chat started from an item takes a while to show in the chat list.
-const START_GRACE_MS = 2 * 60_000
+export const START_GRACE_MS = 2 * 60_000
 /** Items this machine started whose chat is no longer live here go back to not started. */
 export function clearGone(d: TodoDoc, live: Set<string>, now = Date.now()): TodoDoc {
   const gone = d.todo.filter(x => x.chat && x.host === hostId() && !live.has(x.chat) && now - x.at > START_GRACE_MS)
@@ -209,15 +209,61 @@ export function whyLeft(text: string): TodoWhy {
 /** The chat's name now, so a suggestion still says it after the chat leaves the list. */
 const chatName = (id: string) => hub.get().chats.find(c => c.sessionId === id)?.name?.slice(0, 64)
 
-/** This chat's lines as suggestions, skipping a tombstone, a known id and text an open item or suggestion already says. */
+/** This chat's lines as suggestions, skipping junk, a tombstone, a known id and text an open item or suggestion already says; then prune. */
 function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why: (t: string) => TodoWhy, idOf = leftId): TodoDoc {
   const add: TodoItem[] = [], had = d.suggested ?? [], name = chatName(p.sessionId)
-  for (const text of texts) {
+  for (const raw of texts) {
+    const text = workText(raw)
+    if (!text) continue
     const id = idOf(p.sessionId, text)
-    if (Object.hasOwn(d.removed, id) || [...d.todo, ...had, ...add].some(l => l.id === id || mentions(l.text, text))) continue
+    if (Object.hasOwn(d.removed, id) || [...d.todo, ...had, ...add].some(l => l.id === id || sameWork(l.text, text))) continue
     add.push({ id, text, at: now, from: p.sessionId, ...(name ? { name } : {}), why: why(text) })
   }
-  return add.length ? withSuggested(d, [...had, ...add]) : d
+  return prune(add.length ? withSuggested(d, [...had, ...add]) : d, now)
+}
+
+// A For you step this old is stale: the chat that left it is long over.
+const YOU_MS = 3 * 24 * 60 * 60_000
+// Hand steps that repeat across chats; one per verb and object is enough.
+const HAND = /^(?:optional |first |then )?(reload|restart|reconnect|reinstall|rebuild|commit|push)\b/
+const FILLER = new Set(['the', 'a', 'an', 'your', 'this', 'now', 'optional', 'first'])
+/** A For you step's verb and object, from its first clause: "Reload VS Code so ..." and "Reload VS Code. That ..." match; "Commit in X" keeps X. */
+const kind = (t: string) => {
+  if (!HAND.test(words(t))) return words(t)
+  const head = t.replace(/^\s*(?:optional|first|then)\b[\s:,]*/i, '').split(/[.,:;!?](?:\s|$)|\s(?:so|once|then)\s/i)[0]
+  return words(head).split(' ').filter(w => !FILLER.has(w)).join(' ')
+}
+/** Whole-word match on normalized text, so an open "CI" never matches "Decide pricing". */
+const sameWork = (a: string, b: string) => { const x = words(a), y = words(b); return !!x && !!y && (` ${x} `.includes(` ${y} `) || ` ${y} `.includes(` ${x} `) || overlap(x, y, 2)) }
+// Oldest first, then smallest id: every machine keeps the same one of two duplicates.
+const byAge = <T extends { id: string; at: number }>(xs: T[]) => [...xs].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+
+/**
+ * The list without junk. Suggestions: wrapped blocks or nudges (workText), a pointer at an open item's id, a repeat of an
+ * open item or an older suggestion, a For you step past YOU_MS or with a newer one of the same kind. Open items: only an
+ * exact repeat that a chat added and nobody accepted (no -ok id); accepted and typed items stay. Order free: the same
+ * set prunes the same on every machine. Drops are tombstoned, so sync keeps them gone. d itself when nothing goes.
+ */
+export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
+  const open = new Set(d.todo.map(t => t.id))
+  const pointsAt = (x: TodoItem) => [...x.text.matchAll(/\b[0-9a-f]{8}(?:-ok)?\b/g)].some(m => m[0] !== x.id && open.has(m[0]))
+  let out = d
+  const seen = new Set<string>()
+  for (const t of byAge(d.todo)) {
+    const w = words(t.text)
+    if (seen.has(w) && t.from && !t.chat && !t.id.endsWith('-ok')) out = removeItem(out, t.id, now)
+    else seen.add(w)
+  }
+  const sorted = byAge(d.suggested ?? [])
+  const newest = new Map<string, TodoItem>()
+  for (const s of sorted) if (s.why === 'you') newest.set(kind(s.text), s)
+  const kept: TodoItem[] = []
+  for (const s of sorted) {
+    const you = s.why === 'you' && (now - s.at > YOU_MS || newest.get(kind(s.text)) !== s)
+    if (you || !workText(s.text, s.why === 'missed') || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
+    else kept.push(s)
+  }
+  return out
 }
 // For you first, so a Left line that holds one never stands in for it.
 const addLeft = (d: TodoDoc, p: ChatProgress, texts: string[], now: number) => suggest(suggest(d, p, youTexts(p), now, () => 'you', youId), p, texts, now, whyLeft)
@@ -227,7 +273,7 @@ const missedId = (chat: string, text: string) => leftId(chat, `missed\n${text}`)
 /** Kenneth's requests Jev found the Done list does not cover, as suggestions; one Jev now scores covered goes. */
 export function addMissed(d: TodoDoc, p: ChatProgress, now = Date.now()): TodoDoc {
   const scored = p.covered?.length === p.asked?.length ? p.asked ?? [] : []
-  const covered = new Set(scored.filter((_, i) => (p.covered?.[i] ?? 0) > MISSED).map(clean))
+  const covered = new Set(scored.filter((_, i) => (p.covered?.[i] ?? 0) > MISSED).map(t => clean(workText(t, true) ?? t)))
   const gone = (d.suggested ?? []).filter(x => x.from === p.sessionId && x.why === 'missed' && covered.has(x.text) && x.id === missedId(p.sessionId, x.text))
   const out = gone.reduce((o, x) => dismissSuggestion(o, x.id, now), d)
   return suggest(out, p, [...new Set(missed(p).map(clean).filter(Boolean))], now, () => 'missed', missedId)
@@ -289,6 +335,63 @@ export function runOrder(todo: TodoItem[], ids: string[]): TodoItem[] {
   }
   for (const t of todo) if (ids.includes(t.id)) visit(t)
   return out
+}
+
+/**
+ * Auto-start: the items one fresh chat should run in this window's project, or none. folder: the project this window
+ * owns (none: a mirror). busy: a live chat runs in it. limited: a usage limit is used up or a retry waits. tried: items
+ * auto-started before, never again (a chat that keeps failing to start would loop). resumed: when a chat in it was last
+ * resumed after a usage limit. A claim or a resume still in its grace counts as busy: that chat is not live yet.
+ * failedAt: the last auto claim origin did not confirm (offline, rejected); nothing for SYNC_MS after it.
+ */
+export function autoStartPlan(s: { on: boolean; folder?: string; todo: TodoItem[]; busy: boolean; limited: boolean; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): { folder: string; items: TodoItem[] } | undefined {
+  if (!s.on || !s.folder || s.busy || s.limited) return undefined
+  if (s.resumed !== undefined && s.now - s.resumed <= START_GRACE_MS) return undefined
+  if (s.failedAt !== undefined && s.now - s.failedAt < SYNC_MS) return undefined
+  if (s.todo.some(x => x.chat && s.now - x.at <= START_GRACE_MS)) return undefined
+  // A hand step or a blocked item is not a chat's to start, nor anything waiting on one.
+  const ready = (t: TodoItem) => !t.chat && t.why !== 'you' && t.why !== 'blocked' && !s.tried.has(t.id)
+  for (const t of s.todo.filter(ready)) {
+    const items = runOrder(s.todo, [t.id])
+    if (items.every(ready)) return { folder: s.folder, items }
+  }
+  return undefined
+}
+
+/**
+ * The items claimed for chat, or d unchanged when any is gone or taken: running here, claimed within the grace (its
+ * chat may not be live yet), or on another machine. manual (Run): another machine's claim past the grace is taken over,
+ * since only that machine's clearGone frees it and it may be off. Runs inside updateDoc, on the list as it is on disk.
+ */
+export function claimItems(d: TodoDoc, ids: string[], chat: string, live: Set<string>, now = Date.now(), manual = false): TodoDoc {
+  const taken = (t: TodoItem | undefined) => !t || (!!t.chat && ((t.host !== hostId() && !manual) || live.has(t.chat) || now - t.at <= START_GRACE_MS))
+  if (ids.some(id => taken(d.todo.find(t => t.id === id)))) return d
+  return ids.reduce((out, id) => startTodo(out, id, chat, now), d)
+}
+
+/**
+ * claimItems on the stored list; false when another window or tap got there first. Auto-start on a synced list waits
+ * for origin to take the claim (claimRemote), so two devices cannot both start an item; offline it starts nothing.
+ * Run (manual) claims locally and pushes on the next sync: a person pressed it.
+ */
+/** tried: gets the ids once claimed, so auto-start never picks them again; an unconfirmed claim leaves them for later. */
+export async function claimTodo(folder: string, ids: string[], chat: string, live: Set<string>, manual = false, optIn = readOptIn(), tried?: Set<string>): Promise<boolean> {
+  const ok = await claimOnce(folder, ids, chat, live, manual, optIn)
+  if (ok) for (const id of ids) tried?.add(id)
+  return ok
+}
+
+async function claimOnce(folder: string, ids: string[], chat: string, live: Set<string>, manual: boolean, optIn: Record<string, true>): Promise<boolean> {
+  const s = await storeOf(folder)
+  if (!manual && s.root && (await syncMode(folder, (await git(s.root, ['config', '--get', 'remote.origin.url'])).out.trim(), optIn)).state === 'synced') {
+    const d = await claimRemote(s.root, d => claimItems(d, ids, chat, live, Date.now()))
+    if (d) show(folder, d)
+    return !!d
+  }
+  let ok = false
+  // updateDoc may run fn again on a ref race, so ok follows the last run.
+  await changeTodo(folder, d => { const next = claimItems(d, ids, chat, live, Date.now(), manual); ok = next !== d; return next })
+  return ok
 }
 
 /** The prompt a run sends: the items numbered, then how to handle prerequisites and closing. */
@@ -422,17 +525,20 @@ export async function pushTodo(root: string): Promise<string | undefined> {
   return r.ok ? undefined : r.err.trim().split('\n')[0] || 'push failed'
 }
 
-const OPT_IN = path.join(os.homedir(), '.claude', 'switchboard', 'todo-sync.json')
+// At call time, so a test's HOME applies (imports run before it is set).
+export const optInFile = () => path.join(os.homedir(), '.claude', 'switchboard', 'todo-sync.json')
+// A test repo in a temp folder once landed in the real file; such paths are never projects.
+const inTemp = (k: string) => { const t = os.tmpdir(); return [t, fs.realpathSync(t)].some(d => k.startsWith(d + path.sep)) }
 
 /** Folders the user chose to sync even though their repo is not known to be private. */
-export function readOptIn(file = OPT_IN): Record<string, true> {
+export function readOptIn(file = optInFile()): Record<string, true> {
   try {
     const j = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>
-    return Object.fromEntries(Object.entries(j).filter(([k, v]) => v === true && k !== '__proto__')) as Record<string, true>
+    return Object.fromEntries(Object.entries(j).filter(([k, v]) => v === true && k !== '__proto__' && !inTemp(k))) as Record<string, true>
   } catch { return {} }
 }
 
-export function setOptIn(folder: string, on: boolean, file = OPT_IN): void {
+export function setOptIn(folder: string, on: boolean, file = optInFile()): void {
   const o = new Map(Object.entries(readOptIn(file)))
   if (on) o.set(folder, true); else o.delete(folder)
   writeJsonAtomic(file, Object.fromEntries(o))
@@ -499,6 +605,47 @@ export async function syncDoc(s: TodoStore): Promise<string | undefined> {
   }
   const tip = await revParse(root, TODO_REF)
   return tip && tip !== remote ? pushTodo(root) : undefined
+}
+
+/**
+ * A claim origin has taken: fetch, fn on the local list merged with origin's, commit on both, move the local ref, push.
+ * The local move goes first, under update-ref's compare: a Run claim that landed meanwhile fails it, and one after
+ * it sees this claim. A rejected push (another device pushed first) puts the local ref back and tries again, tries
+ * times in all. Undefined when offline, origin's list is unreadable, fn leaves the list as it was (taken), or every
+ * try lost. beforeClaim, beforePush: tests only, to race a Run press or another device. No lock is held over the network.
+ */
+export async function claimRemote(root: string, fn: (d: TodoDoc) => TodoDoc, opts: { tries?: number; beforeClaim?: () => Promise<void>; beforePush?: () => Promise<void> } = {}): Promise<TodoDoc | undefined> {
+  if (!(await hasOrigin(root))) return undefined
+  for (let i = 0; i < (opts.tries ?? 3); i++) {
+    const f = await git(root, ['fetch', '-q', '--no-tags', '--no-write-fetch-head', 'origin', `+${TODO_REF}:${REMOTE_REF}`], 60_000)
+    // Origin with no list yet is an empty one; any other fetch failure is offline.
+    if (!f.ok && !/couldn't find remote ref/i.test(f.err)) return undefined
+    const local = await revParse(root, TODO_REF), remote = f.ok ? await revParse(root, REMOTE_REF) : undefined
+    let base: TodoDoc
+    try { base = remote ? mergeDocs(await docAt(root, local), await docAt(root, remote)) : await docAt(root, local) } catch { return undefined }
+    const next = fn(base)
+    if (next === base) return undefined
+    const parents = [...new Set([remote, local].filter((c): c is string => !!c))]
+    const keep = parents.length === 2 && await isAncestor(root, parents[1], parents[0]) ? [parents[0]] : parents.length === 2 && await isAncestor(root, parents[0], parents[1]) ? [parents[1]] : parents
+    const c = await commitDoc(root, next, keep)
+    if (!c) return undefined
+    await opts.beforeClaim?.()
+    // The list changed here since the read (a Run press): read it again.
+    if (!(await setRef(root, c, local))) continue
+    await opts.beforePush?.()
+    const p = await git(root, ['push', '--no-verify', '-q', 'origin', `${c}:${TODO_REF}`], 60_000)
+    if (p.ok) return next
+    // Not confirmed: the claim comes off here. Something written on top of it keeps it, so take the items back by chat.
+    const back = local ? ['update-ref', TODO_REF, local, c] : ['update-ref', '-d', TODO_REF, c]
+    if (!(await git(root, back)).ok) await updateDoc({ root }, d => unclaim(d, base, next))
+  }
+  return undefined
+}
+
+/** The items next claimed over base, freed again where they still hold that claim. */
+function unclaim(d: TodoDoc, base: TodoDoc, next: TodoDoc): TodoDoc {
+  const ours = next.todo.filter(t => t.chat && base.todo.find(b => b.id === t.id)?.chat !== t.chat)
+  return ours.reduce((out, t) => (out.todo.find(x => x.id === t.id)?.chat === t.chat ? startTodo(out, t.id, undefined) : out), d)
 }
 
 /** The remote list's commit the last fetch saw. */
@@ -620,7 +767,12 @@ export async function loadTodos(folders: string[], force = false): Promise<void>
       syncedAt.set(folder, Date.now())
       await syncNow(folder, s)
     }
-    try { show(folder, await readDoc(s)) } catch (err) {
+    try {
+      const d = await readDoc(s)
+      // Old junk goes on read too, written back so sync carries the tombstones.
+      if (prune(d) === d) show(folder, d)
+      else await changeTodo(folder, prune).catch(() => show(folder, d))
+    } catch (err) {
       syncState.set(folder, { ...syncState.get(folder), state: 'failing', why: (err as Error).message.slice(0, 120) })
       show(folder)
     }
@@ -691,8 +843,9 @@ export async function moveTodoChat(cwd: string, from: string, to: string): Promi
 }
 
 /** After the chat list loads: items whose chat is gone from this machine stop showing in progress. */
-export async function clearGoneChats(now = Date.now()): Promise<void> {
-  const live = new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId))
+/** keep: chats to treat as live, such as one waiting on its usage limit or just resumed from it. */
+export async function clearGoneChats(keep: Iterable<string> = [], now = Date.now()): Promise<void> {
+  const live = new Set([...hub.get().chats.filter(c => c.live).map(c => c.sessionId), ...keep])
   for (const [folder, l] of Object.entries(hub.get().todos ?? {})) {
     const doc: TodoDoc = { version: 1, todo: l.todo, removed: {} }
     if (clearGone(doc, live, now) !== doc) await changeTodo(folder, d => clearGone(d, live, now))

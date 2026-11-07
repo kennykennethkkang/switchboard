@@ -12,12 +12,14 @@ export type RunFile = { path: string; added: number; removed: number }
 export type RunCall = { at: number; tool: string; target?: string }
 export type RunLoop = { at: number; by: 'qa' | 'lead'; text: string }
 export type RunTokens = { input: number; output: number; cacheRead: number; cacheWrite: number }
+export type RunDispatch = { at: number; role: string; title?: string; brief: string }
 export type RunDetail = {
   id: string; role: string; title?: string; model?: string; startedAt: number; endedAt: number; finished: boolean
   brief: string; report?: RunReport; reportText?: string; files: RunFile[]; calls: RunCall[]; callCount: number
-  loops: RunLoop[]; tokens: RunTokens; costUsd?: number; file: string
+  loops: RunLoop[]; tokens: RunTokens; costUsd?: number; file: string; dispatches?: RunDispatch[]
 }
 
+/** role 'lead' gives one run: the chat's own transcript. */
 export async function loadRuns(sessionId: string, role: string, f: typeof fetch = fetch): Promise<RunDetail[] | string> {
   if (vscodeBridge?.isVSCode) return vscodeBridge.runs(sessionId, role)
   try {

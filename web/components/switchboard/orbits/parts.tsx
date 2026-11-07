@@ -3,28 +3,33 @@
 import { busyLine } from '@/lib/eta'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { RoleState } from '@/lib/orbit-views'
+import { almostDone } from '../look'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import type { OrbitChat } from '../orbit'
 
-/** pick: a role node was pressed, open its drawer; picked: the role the drawer shows. */
+/** pick: a role node (or the lead) was pressed, open its drawer; picked: the role the drawer shows. */
 export type ViewProps = { chat: OrbitChat; showTools: boolean; instant?: boolean; pick?: (role: string) => void; picked?: string }
 
-/** A role node's accessible name: "engineer, 3 runs, working". */
-export function nodeName(c: OrbitChat, role: string, state: RoleState): string {
+export const LEAD_WORD: Record<string, string> = { working: 'working', active: 'working', needs: 'needs you', done: 'finished', almost: 'almost done', idle: 'idle' }
+
+/** A role node's accessible name: "engineer, 3 runs, working"; the lead's: "lead, working". */
+export function nodeName(c: OrbitChat, role: string, state: string): string {
+  if (role === 'lead') return `lead, ${LEAD_WORD[state] ?? state}`
   const n = c.progress?.roles.filter(r => r.role === role).length ?? 0
-  return `${role}, ${n} run${n === 1 ? '' : 's'}, ${LABEL[state]}`
+  return `${role}, ${n} run${n === 1 ? '' : 's'}, ${LABEL[state as RoleState] ?? state}`
 }
 
 /** What a node button needs: its name, the drawer it opens, and whether that drawer shows it. */
-export const nodeProps = (v: ViewProps, role: string, state: RoleState) => ({
+export const nodeProps = (v: ViewProps, role: string, state: string) => ({
   'data-node': role, 'aria-label': nodeName(v.chat, role, state), 'aria-expanded': v.picked === role, 'aria-controls': v.picked ? 'ov-drawer' : undefined,
   onClick: () => v.pick?.(role),
 })
 
-/** Buttons over a canvas picture's role bubbles, hidden until the frame loop places them (placeNodes). */
+/** Buttons over a canvas picture's lead and role bubbles, hidden until the frame loop places them (placeNodes). */
 export function NodeButtons({ v, roles }: { v: ViewProps; roles: Array<{ role: string; state: RoleState }> }) {
   if (!v.pick) return null
-  return <>{roles.map(r => <button key={r.role} type="button" className="ov-node" {...nodeProps(v, r.role, r.state)} />)}</>
+  const lead = leadState(v.chat, almostDone(v.chat.progress))
+  return <><button type="button" className="ov-node" {...nodeProps(v, 'lead', lead)} />{roles.map(r => <button key={r.role} type="button" className="ov-node" {...nodeProps(v, r.role, r.state)} />)}</>
 }
 
 export type Hit = { x: number; y: number; r: number }

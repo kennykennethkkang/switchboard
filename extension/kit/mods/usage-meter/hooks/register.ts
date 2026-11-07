@@ -261,7 +261,7 @@ export function handoffNote(o: {
     const lines = [
       `# Handoff: ${o.project}, ${stamp} UTC`,
       '',
-      'Read this note fully before acting. Recreate every open task below with the task tools before any other work, then take the next action. A task counts as done only with the check that proved it.',
+      'Read this note fully before acting. Recreate every open task below with the task tools before any other work, then, if the aar skill is installed, have a subagent run it on the old chat (Old transcript below), then take the next action. A task counts as done only with the check that proved it.',
     ]
     if (o.ask) lines.push('', '## Last request, verbatim', '', ...quote(o.ask))
     lines.push('', '## Goal', '', s.goal ?? (firstAsk || 'see the last request'))
@@ -530,6 +530,7 @@ export function notePlan(file: unknown) {
 }
 
 const ASK = 'hub_ask'
+const RECALL = 'hub_recall'
 const EDITS = new Set(['Edit', 'Write', 'NotebookEdit'])
 
 async function discover($: EngineInterface) {
@@ -599,7 +600,7 @@ export async function poll($: EngineInterface) {
 }
 
 /** The window holding this chat's folder, asked for its brief or an answer; this project only. */
-async function askHome($: EngineInterface, route: 'brief' | 'ask', q?: string) {
+async function askHome($: EngineInterface, route: 'brief' | 'ask' | 'recall', q?: string) {
   const cwd = norm(await $.session.cwd())
   const home = homeOf(await discover($), cwd)
   if (!home) return undefined
@@ -768,6 +769,11 @@ export const register: Register = on => {
       description: "Ask Switchboard's brain about this project's other live chats: who is on what, which files they are editing, what to pick up next. One short paid Haiku call per question; it knows nothing outside this project.",
       inputSchema: { type: 'object', properties: { question: { type: 'string' } }, required: ['question'] },
     })
+    await $.tool.register({
+      name: RECALL,
+      description: 'Search Switchboard memory, the knowledge graph of memory notes and the vault, before researching a topic. Answers the best matching notes and how they relate (supersedes, depends-on, part-of, contradicts, related). Free and local.',
+      inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+    })
     $.clock.every(POLL_MS, () => poll($))
     return started
   })
@@ -785,6 +791,14 @@ export const register: Register = on => {
     if (typeof q !== 'string' || !q.trim()) return { deny: 'Give a question.' }
     const answer = await askHome($, 'ask', q.slice(0, 500)).catch(() => undefined)
     return { result: answer ?? 'No Switchboard window holds this folder, so the brain cannot answer.' }
+  })
+
+  // No pause check: recall reads local files and spends nothing.
+  on('tool.call', { tool: `mcp__usage-meter__${RECALL}` }, async ($, e) => {
+    const q = (e as { query?: unknown }).query
+    if (typeof q !== 'string' || !q.trim()) return { deny: 'Give a query.' }
+    const answer = await askHome($, 'recall', q.slice(0, 500)).catch(() => undefined)
+    return { result: answer ?? 'No Switchboard window holds this folder, so memory cannot be searched.' }
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -842,12 +856,13 @@ export const register: Register = on => {
       if (held) return { deny: held }
     }
     const file = (e as { file_path?: unknown; notebook_path?: unknown }).file_path ?? (e as { notebook_path?: unknown }).notebook_path
-    if (EDITS.has(tool) && typeof file === 'string') feed.file = norm(file)
     notePlan(file)
     if (tool.startsWith('mcp__')) await count($, ownerOf(tool)).catch(() => undefined)
     await restoreFeed($).catch(() => undefined)
     const ran = await next(e)
     if (ran.deny === undefined) {
+      // Only an edit that ran: a denied one would read as this chat editing a file it never wrote.
+      if (EDITS.has(tool) && typeof file === 'string') feed.file = norm(file)
       noteTasks(tool, e as Record<string, unknown>, ran.result)
       noteShell(tool, e as Record<string, unknown>, ran.result, ran.text ?? '')
     }

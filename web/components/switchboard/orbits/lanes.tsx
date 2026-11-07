@@ -94,7 +94,7 @@ export function Lanes(v: ViewProps) {
   const grid = <span className="ovl-grid" aria-hidden>{axis.slice(1).map(t => <i key={t.label} style={{ left: pct(f(t.at)) }} />)}</span>
   const ticks = (list: ToolCall[]) => showTools && list.map(t =>
     <i key={`${t.at}:${t.tool}`} className="ovl-tick" style={{ left: pct(f(t.at)) }} title={`${t.tool}${t.target ? ` ${t.target}` : ''} · ${new Date(t.at).toTimeString().slice(0, 8)}`} />)
-  // A role's label is its node: a button that opens the drawer. The lead's stays a label.
+  // A role's label is its node: a button that opens the drawer. The lead's too.
   const label = (k: string, name: string, word: string, s: string, model?: string, node?: ReturnType<typeof nodeProps>) => {
     const inner = <><Glyph k={k} size={14} /><span><b>{name}</b><small><span className="ovl-word">{word}</span>{model ? ` · ${model}` : ''}</small></span></>
     return node ? <button type="button" className="ovl-label" data-s={s} {...node}>{inner}</button> : <div className="ovl-label" data-s={s}>{inner}</div>
@@ -127,7 +127,7 @@ export function Lanes(v: ViewProps) {
           </div>
 
           <div className="ovl-row" data-s={lead}>
-            {label('lead', 'Lead', leadWord, lead, chat.live?.model)}
+            {label('lead', 'Lead', leadWord, lead, chat.live?.model, v.pick ? nodeProps(v, 'lead', lead) : undefined)}
             <div className="ovl-track">
               {grid}
               <span className="ovl-bar ovl-lead" style={place(0, tl.asked ? f(tl.asked) : 1)} />

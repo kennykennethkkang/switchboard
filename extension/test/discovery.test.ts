@@ -181,3 +181,33 @@ test('hook command uses forward slashes on Windows, so the hook shell keeps the 
   assert.equal(hookCommand('C:\\Program Files\\nodejs\\node.exe', 'C:\\Users\\k\\.claude\\agent-flow\\hook.js', 'win32'), '"C:/Program Files/nodejs/node.exe" "C:/Users/k/.claude/agent-flow/hook.js"')
   assert.equal(hookCommand('/usr/local/bin/node', '/h/hook.js', 'darwin'), '"/usr/local/bin/node" "/h/hook.js"')
 })
+
+test("the forwarder prints the owning window's reply as the hook output, never a mirror's", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-reply-'))
+  const dir = path.join(home, '.claude', 'switchboard')
+  fs.mkdirSync(dir, { recursive: true })
+  const script = path.join(home, 'hook.js')
+  fs.writeFileSync(script, getHookScriptContent())
+  const deny = JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'busy' } })
+  const window = (body: string) => new Promise<http.Server>(resolve => {
+    const s = http.createServer((req, res) => { req.resume(); req.on('end', () => res.end(body)) })
+    s.listen(0, '127.0.0.1', () => resolve(s))
+  })
+  const owner = await window(deny)
+  const other = await window('{"mirror":true}')
+  const port = (s: http.Server) => (s.address() as { port: number }).port
+  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
+  fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ pid: process.ppid, port: port(other), workspace: '/nowhere/b' }))
+  try {
+    const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    let out = ''
+    child.stdout.on('data', c => { out += c })
+    child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(home, 'x.ts') } }))
+    await new Promise(resolve => child.on('exit', resolve))
+    assert.equal(out, deny)
+  } finally {
+    owner.close()
+    other.close()
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})

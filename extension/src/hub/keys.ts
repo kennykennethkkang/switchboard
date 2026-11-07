@@ -14,7 +14,7 @@ export const KEY_NAMES: ApiKeyName[] = ['GEMINI_API_KEY', 'OPENROUTER_API_KEY']
 const SB = path.join(os.homedir(), '.claude', 'switchboard')
 export const KEYS_META = path.join(SB, 'keys.json')
 const SERVICE = 'switchboard'
-// Both providers' keys are letters, digits, - and _; anything else is a paste gone wrong.
+// Both providers' keys are letters, digits, '.', - and _; anything else is a paste gone wrong.
 // security keeps only the first 128 chars from stdin.
 const SHAPE = /^[A-Za-z0-9._-]{16,128}$/
 
@@ -58,7 +58,7 @@ export const isKeyName = (n: unknown): n is ApiKeyName => KEY_NAMES.includes(n a
 
 export function keyProblem(name: string, value: string): string | undefined {
   if (!isKeyName(name)) return 'no such key'
-  if (!SHAPE.test(value)) return 'that does not look like an API key (letters, digits, - and _ only)'
+  if (!SHAPE.test(value)) return "that does not look like an API key (16 to 128 characters: letters, digits, '.', '-' or '_')"
   return undefined
 }
 

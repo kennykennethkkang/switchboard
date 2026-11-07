@@ -101,7 +101,7 @@ export function Relay(v: ViewProps) {
           </>
           return [
           <li key={s.k} className="ov-st" data-s={s.s} data-k={s.k}>
-            {s.role && v.pick ? <button type="button" className="ov-st-btn" {...nodeProps(v, s.role.role, s.role.state)}>{inner}</button> : inner}
+            {v.pick && (s.role || s.k === 'lead') ? <button type="button" className="ov-st-btn" {...nodeProps(v, s.role?.role ?? 'lead', s.role?.state ?? s.s)}>{inner}</button> : inner}
           </li>,
           i < stations.length - 1 && <li key={`w${i}`} className="ov-wire" data-lit={wireLit(i)} aria-hidden>
             {packets.filter(k => k.wire === i).map(k => <span key={k.id} className="ov-run" data-back={k.back || undefined} style={{ '--c': k.tone } as React.CSSProperties}

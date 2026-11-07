@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { parseGitStatus, parseLsof, parseNetstat, parsePlan, decodeProjectDir, installed, libraryInventory, pluginMcp, projectInventory, projectContext, syncLibrary } from '../src/hub/local'
+import { parseGitStatus, parseLsof, parseNetstat, parsePlan, decodeProjectDir, installed, libraryInventory, pluginMcp, projectInventory, syncLibrary } from '../src/hub/local'
 
 describe('local readers', () => {
   it('reads plan tasks and their boxes', () => {
@@ -168,13 +168,14 @@ describe('project skills, assets and context', () => {
     fs.rmSync(root, { recursive: true, force: true })
   })
 
-  it('project context: folder, the first 40 lines of CLAUDE.md, dependency names', async () => {
-    const root = tree()
-    const c = await projectContext(root)
-    assert.match(c, new RegExp(`Folder: ${path.basename(root)}`))
-    assert.match(c, /rule 39/)
-    assert.doesNotMatch(c, /rule 40/)
-    assert.match(c, /next, react, tailwindcss/)
+  it('leaves out a design-md that is a copy of the bundled library, keeps a few chosen brands', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copy-')), lib = path.join(root, 'lib')
+    const put = (rel: string) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), '# x\n') }
+    for (const b of ['airbnb', 'apple', 'stripe', 'zapier']) { put(`lib/${b}/DESIGN.md`); put(`proj/design-md/${b}/DESIGN.md`) }
+    put('proj/design-md/mine/DESIGN.md')
+    put('few/design-md/apple/DESIGN.md')
+    assert.deepEqual((await projectInventory(path.join(root, 'proj'), lib)).map(i => i.path), ['design-md/mine/DESIGN.md'])
+    assert.deepEqual((await projectInventory(path.join(root, 'few'), lib)).map(i => i.path), ['design-md/apple/DESIGN.md'])
     fs.rmSync(root, { recursive: true, force: true })
   })
 })

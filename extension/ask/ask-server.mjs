@@ -1,4 +1,4 @@
-// Switchboard's ask tool, plus todo_add, todo_done and tool_on: an MCP stdio server, no dependencies. The question goes to the terminal
+// Switchboard's ask tool, plus todo_add, todo_done, tool_on and sweep: an MCP stdio server, no dependencies. The question goes to the terminal
 // (an elicitation dialog) and to the Switchboard window at once; the first answer wins, the other is closed.
 import { createInterface } from 'node:readline'
 import { randomBytes } from 'node:crypto'
@@ -48,6 +48,11 @@ const TODO_TOOLS = [
     name: 'tool_on',
     description: 'Turn on an installed plugin or skill that is off in this chat. You have full access to all of them: call this instead of asking. Give the plugin id, its short name, plugin:skill, or the skill name; it answers with the file to read to use it now.',
     inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+  },
+  {
+    name: 'sweep',
+    description: 'The SkillSpector sweep of installed plugins and skills. With name: rescan that one and answer its verdict. With nothing: start a sweep of everything installed; results show in Switchboard. It never approves: only the user turns a flagged tool on, with Approve in Switchboard.',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' } } },
   },
 ]
 
@@ -155,6 +160,17 @@ async function toolOn(msg) {
   return r.ok ? reply(msg.id, text) : reply(msg.id, `Not changed: ${text || `status ${r.status}`}`, true)
 }
 
+/** sweep, through the window's /hub/sweep. A rescan of a big plugin takes about a minute. */
+async function sweep(msg) {
+  const a = msg.params?.arguments ?? {}
+  const name = typeof a.name === 'string' && a.name.trim() ? a.name.trim() : undefined
+  const win = findWindow()
+  if (!win) return reply(msg.id, 'Switchboard is not running here, so nothing was swept.', true)
+  const r = await fetch(`http://127.0.0.1:${win.port}/hub/sweep?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ name }), signal: AbortSignal.timeout(660_000) })
+  const text = await r.text()
+  return r.ok ? reply(msg.id, text) : reply(msg.id, `Not swept: ${text || `status ${r.status}`}`, true)
+}
+
 /** todo_add or todo_done, through the window's /hub/todo. */
 async function todo(msg) {
   const a = msg.params?.arguments ?? {}
@@ -187,6 +203,7 @@ rl.on('line', l => {
   if (m.method === 'tools/call') {
     if (m.params?.name === 'todo_add' || m.params?.name === 'todo_done') return void todo(m).catch(err => reply(m.id, `${m.params.name} failed: ${err.message}`, true))
     if (m.params?.name === 'tool_on') return void toolOn(m).catch(err => reply(m.id, `tool_on failed: ${err.message}`, true))
+    if (m.params?.name === 'sweep') return void sweep(m).catch(err => reply(m.id, `sweep failed: ${err.message}`, true))
     if (m.params?.name !== 'ask') return out({ id: m.id, error: { code: -32602, message: `Unknown tool ${m.params?.name}` } })
     return void call(m).catch(err => reply(m.id, `ask failed: ${err.message}`, true))
   }

@@ -9,9 +9,8 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { hub } from './hub-service'
-import { foldPathCase } from '../fs-utils'
 import { focusChat } from './actions'
-import { canPrefill, desktopNotice, doneText, notifyStep, todayText } from './progress'
+import { desktopNotice, doneText, fillRepos, notifyStep, todayText, type Box } from './progress'
 import type { ChatProgress, ChatState, StuckItem } from './types'
 
 const titleOf = (p: ChatProgress) => hub.get().chats.find(c => c.sessionId === p.sessionId)?.name ?? p.cwd.split(/[\\/]/).pop() ?? 'A chat'
@@ -21,19 +20,21 @@ function mac(title: string, text: string): void {
   if (n) execFile(n.cmd, n.args, { env: { ...process.env, ...n.env }, windowsHide: true, timeout: 15_000 }, () => {})
 }
 
-// Repo root to the message Switchboard last put in its box; anything else there is Kenneth's.
-const written = new Map<string, string>()
+// Repo root to what Switchboard last put in its box and which chat wrote what; anything else there is Kenneth's.
+const boxes = new Map<string, Box>()
+// Session, repo and message this window already filled, so a repeat hook on a Done chat fills nothing twice.
+const filled = new Set<string>()
 // Session to what it was last notified about, so a repeat Done or question shows once.
 const notified = new Map<string, string>()
 
-/** The commit message into the Source Control box of the repo that holds the chat's folder. */
-function prefill(cwd: string, message: string): void {
+/** A Done chat's commit messages into the Source Control boxes of this window's open repos: the plain one to the repo holding
+ * its folder, each "Commit message (<folder>)" one to that repo. Every window runs it for every chat, mirrored ones too,
+ * so a repo open in another window still gets its message. Merged into Switchboard's uncommitted text, never over Kenneth's. */
+export function fillBoxes(p: ChatProgress | undefined): void {
+  if (p?.state !== 'done') return
   try {
-    const git = vscode.extensions.getExtension<{ getAPI(v: 1): { repositories: { rootUri: vscode.Uri; inputBox: { value: string } }[] } }>('vscode.git')?.exports?.getAPI(1)
-    const repo = git?.repositories.filter(r => { const c = foldPathCase(cwd), root = foldPathCase(r.rootUri.fsPath); return c === root || c.startsWith(root + path.sep) }).sort((a, b) => b.rootUri.fsPath.length - a.rootUri.fsPath.length)[0]
-    if (!repo || !canPrefill(repo.inputBox.value, written.get(repo.rootUri.fsPath))) return
-    repo.inputBox.value = message
-    written.set(repo.rootUri.fsPath, message)
+    const repos = vscode.extensions.getExtension<{ getAPI(v: 1): { repositories: { rootUri: vscode.Uri; inputBox: { value: string } }[] } }>('vscode.git')?.exports?.getAPI(1)?.repositories ?? []
+    fillRepos(repos, p, boxes, filled)
   } catch { /* no git extension: Copy on the card still works */ }
 }
 
@@ -45,7 +46,7 @@ export function notify(change: { from?: ChatState; to: ChatProgress }): void {
   if (!n.show) return
   const title = titleOf(p)
   if (p.state === 'done') {
-    if (p.commit) prefill(p.cwd, p.commit)
+    fillBoxes(p)
     const what = doneText(p)
     mac(title, what)
     void vscode.window.showInformationMessage(`Switchboard: ${title}: ${what.replace(/[.!?]$/, '')}.`, 'Show').then(c => c && focusChat(p.sessionId))

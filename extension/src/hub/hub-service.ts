@@ -15,7 +15,7 @@ import { FLAGGED } from './tools'
 import { createLogger } from '../logger'
 import { foldPathCase } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
-import type { AiId, Ask, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, Limit, Server, SessionLive, StuckItem } from './types'
+import type { AiId, Ask, CacheKeep, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, Limit, Server, SessionLive, StuckItem } from './types'
 
 const log = createLogger('Hub')
 
@@ -34,9 +34,11 @@ const COMPACT_SOON = 0.97
 const MAX_JEV = 50
 // A jev.py call this recent in a chat is the run the usage mod reports.
 const JEV_MATCH_MS = 10 * 60 * 1000
+// Past cache-keeper's 3h idle cap plus a cache lifetime: a chat that quiet is long cold.
+const CACHE_KEPT_MS = 4 * 60 * 60 * 1000
 // A limited chat is told to carry on a minute after its reset, or every half hour when none is known.
 const RETRY_MS = 30 * 60 * 1000
-const CONTINUE = 'Switchboard: the usage limit reset. Continue where you left off; if you need the user, ask with AskUserQuestion.'
+export const CONTINUE = 'Switchboard: the usage limit reset. Continue where you left off; if you need the user, ask with AskUserQuestion.'
 
 export const emptyHub = (): HubState => ({
   live: [], history: [], sessions: [], plan: null,
@@ -45,7 +47,7 @@ export const emptyHub = (): HubState => ({
   projects: [],
   controls: {
     claude: { tui: 'default', statusLine: false, push: false, needInput: false },
-    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, name: '' },
+    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, name: '' },
     statusLineReady: false,
   },
   chats: [], rcServers: [], ais: [], starred: [], progress: [], archive: [],
@@ -63,10 +65,18 @@ const HANDOFFS = `${os.homedir().replace(/\\/g, '/')}/.claude/handoffs/`
 const pathKey = (p: string) => foldPathCase(p.replace(/\\/g, '/').replace(/\/+$/, ''))
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 
+// resetsAt may arrive as epoch s or ms; kept as a string, the web parses all three.
+const resetOf = (v: unknown) => str(v) ?? (num(v) === undefined ? undefined : String(v))
+// Same rule as web/lib/limits.ts resetAt: digits under 1e12 are seconds.
+const resetMs = (v = '') => {
+  if (!/^\d+(\.\d+)?$/.test(v.trim())) return Date.parse(v)
+  const n = Number(v)
+  return n < 1e12 ? n * 1000 : n
+}
 const limitsOf = (v: unknown): Limit[] =>
   Array.isArray(v)
     ? v.flatMap(l => (l && typeof l === 'object' && str((l as Limit).kind) && num((l as Limit).percentUsed) !== undefined
-      ? [{ kind: (l as Limit).kind, percentUsed: (l as Limit).percentUsed, resetsAt: str((l as Limit).resetsAt) }] : []))
+      ? [{ kind: (l as Limit).kind, percentUsed: (l as Limit).percentUsed, resetsAt: resetOf((l as Limit).resetsAt) }] : []))
     : []
 
 export class HubService {
@@ -75,8 +85,8 @@ export class HubService {
   private state: HubState = emptyHub()
   private readonly inboxes = new Map<string, InboxItem[]>()
   private readonly polled = new Map<string, number>()
-  // When each limited chat gets its continue prompt; kept in retriesFile so a window reload still sends it.
-  private readonly retries = new Map<string, number>()
+  // When each limited chat gets its continue prompt, and its folder for a resume; kept in retriesFile so a window reload still sends it.
+  private readonly retries = new Map<string, { due: number; cwd?: string }>()
   private readonly changed = new TypedEventEmitter<HubState>()
   readonly onChange = this.changed.event
   private readonly handoffs = new TypedEventEmitter<Handoff>()
@@ -111,6 +121,8 @@ export class HubService {
   readonly onPrompted = this.promptedChat.event
   /** handleHubMessage, set by startHub; kept as a field so routes.ts needs no vscode. A string is why it was refused. */
   runner?: (c: { type: string }) => boolean | string | Promise<boolean | string>
+  /** The sweep tool: rescan name, or start Sweep all without one; answers a line. Never approves. hub-panel.ts sets it. */
+  sweep?: (name: string | undefined) => Promise<string>
   /** Whether this window holds the chat's terminal; hub-panel.ts sets it. */
   holds?: (sessionId: string) => Promise<boolean>
   /** A device asking in (or its end, done), from the standalone app; set by startHub. */
@@ -132,8 +144,10 @@ export class HubService {
     this.retriesFile = file
     try {
       // One overdue by more than a day is for a chat that ended while no window listened.
-      for (const [id, due] of Object.entries(JSON.parse(fs.readFileSync(file, 'utf8')))) {
-        if (typeof due === 'number' && Date.now() - due < PROGRESS_STALE_MS) this.retries.set(id, due)
+      // One from an older window (a bare due time, no folder) cannot be resumed, and would hold auto-start: dropped.
+      for (const [id, v] of Object.entries(JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>)) {
+        const r = (v ?? {}) as { due?: unknown; cwd?: unknown }
+        if (typeof r.due === 'number' && typeof r.cwd === 'string' && Date.now() - r.due < PROGRESS_STALE_MS) this.retries.set(id, { due: r.due, cwd: r.cwd })
       }
     } catch { /* none yet, or broken: start empty */ }
   }
@@ -179,9 +193,10 @@ export class HubService {
     if (payload.hook_event_name === 'PreToolUse' && payload.tool_name === 'Bash' && String(input?.command ?? '').includes('jev.py')) this.jevAsked.set(id, now)
     const next = step(was, this.withEnded(payload, was), now)
     const rest = this.state.progress.filter(p => p.sessionId !== id)
-    // Only the owning window retries, or each window would send it.
-    if (payload.hook_event_name === 'StopFailure' && next?.limited && LIMITS.has(next.limited.error)) { if (!mirror) { this.retries.set(id, this.resetAt(now)); this.saveRetries() } }
-    else if (!next?.limited && this.retries.delete(id)) this.saveRetries()
+    // Only the owning window retries, or each window would send it. A limited chat that ends keeps it (goneDue resumes it),
+    // unless cleared or logged out: that process goes on under a new id.
+    if (payload.hook_event_name === 'StopFailure' && next?.limited && LIMITS.has(next.limited.error)) { if (!mirror) { this.retries.set(id, { due: this.resetAt(now), cwd: payload.cwd }); this.saveRetries() } }
+    else if (!next?.limited && (payload.hook_event_name !== 'SessionEnd' || payload.reason === 'clear' || payload.reason === 'logout') && this.retries.delete(id)) this.saveRetries()
     this.state = { ...this.state, progress: next ? [next, ...rest] : rest }
     this.emit(now)
     if (payload.hook_event_name === 'SessionEnd' && was && !this.handedOff.delete(id) && !mirror) this.endedChat.fire(was)
@@ -190,7 +205,7 @@ export class HubService {
 
   /** A minute past the latest reset of a used-up limit, else RETRY_MS from now. */
   private resetAt(now: number): number {
-    const at = this.state.live.flatMap(s => s.limits).filter(l => l.percentUsed >= 100).map(l => Date.parse(l.resetsAt ?? '')).filter(Number.isFinite)
+    const at = this.state.live.flatMap(s => s.limits).filter(l => l.percentUsed >= 100).map(l => resetMs(l.resetsAt)).filter(Number.isFinite)
     return at.length ? Math.max(...at, now) + 60_000 : now + RETRY_MS
   }
 
@@ -226,6 +241,13 @@ export class HubService {
         const ready = was ? [] : this.pendingClose.filter(p => p.sessionId !== sessionId && p.cwd === pathKey(next.cwd) && now > p.at)
         this.closing = [...this.closing, ...ready.map(p => ({ sessionId: p.sessionId, at: now }))]
         if (ready.length) this.pendingClose = this.pendingClose.filter(p => !ready.includes(p))
+        break
+      }
+      case 'cache': {
+        const sessionId = str(b.sessionId), state = b.state, warmUntil = num(b.warmUntil)
+        if (!sessionId || (state !== 'warm' && state !== 'cold' && state !== 'off') || warmUntil === undefined) return false
+        const c: CacheKeep = { sessionId, state, warmUntil, tokens: num(b.tokens) ?? 0, pings: num(b.pings) ?? 0, at: now }
+        this.state = { ...this.state, cache: [c, ...(this.state.cache ?? []).filter(x => x.sessionId !== sessionId && now - x.at < CACHE_KEPT_MS)] }
         break
       }
       // Older mods still post these; taken and dropped, since a refusal makes a mod look for the window again.
@@ -414,13 +436,31 @@ export class HubService {
     this.polled.set(sessionId, now)
     const list = this.inboxes.get(sessionId) ?? []
     this.inboxes.delete(sessionId)
-    const due = this.retries.get(sessionId)
+    const due = this.retries.get(sessionId)?.due
     if (due === undefined || now < due) return list
     this.retries.delete(sessionId)
     this.saveRetries()
     // Claude Code's own autoContinueAtUsageLimit sends one already; a second would run the turn twice.
     if (this.state.keep.autoContinue) return list
     return [...list, { kind: 'prompt', text: CONTINUE, id: crypto.randomBytes(6).toString('hex') }]
+  }
+
+  /** Due retries of chats with no live process and a quiet mod: dropped here, so the caller resumes each once. */
+  goneDue(live: (sessionId: string) => boolean, now = Date.now()): { sessionId: string; cwd: string }[] {
+    const out = [...this.retries].filter(([id, r]) => r.cwd && now >= r.due && !live(id) && now - (this.polled.get(id) ?? -Infinity) >= POLL_GONE_MS)
+    for (const [id] of out) this.retries.delete(id)
+    if (out.length) this.saveRetries()
+    return out.map(([sessionId, r]) => ({ sessionId, cwd: r.cwd! }))
+  }
+
+  /** A limited chat is waiting on its reset. */
+  retrying(): boolean {
+    return this.retries.size > 0
+  }
+
+  /** Chats waiting on their reset: their to-do items stay theirs, since the resume keeps the id. */
+  retryIds(): string[] {
+    return [...this.retries.keys()]
   }
 
   /** Whether the message box reaches this chat: a Codex chat through its tied terminal, a Claude chat through its polling mod. */

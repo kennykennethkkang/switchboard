@@ -47,6 +47,27 @@ describe('hub feed', () => {
     assert.equal(hub.get().live[0].tokens, 90000)
   })
 
+  it('keeps both limits and a resetsAt sent as epoch seconds', () => {
+    const hub = new HubService()
+    handleHub(hub, 'POST', '/hub', live(hub.token, 's1', { limits: [{ kind: 'five_hour', percentUsed: 42, resetsAt: 1794066000 }, { kind: 'seven_day', percentUsed: 18, resetsAt: '2026-11-10T09:00:00Z' }] }))
+    assert.deepEqual(hub.get().live[0].limits, [{ kind: 'five_hour', percentUsed: 42, resetsAt: '1794066000' }, { kind: 'seven_day', percentUsed: 18, resetsAt: '2026-11-10T09:00:00Z' }])
+  })
+
+  it('keeps each chat\'s cache-keeper state, latest post wins, and refuses a malformed one', () => {
+    const hub = new HubService()
+    const post = (extra: Record<string, unknown>, at = 1000) => hub.ingest({ token: hub.token, kind: 'cache', sessionId: 's1', cwd: '/w', state: 'warm', warmUntil: 5000, tokens: 312000, pings: 0, ...extra }, at)
+    assert.equal(post({}), true)
+    assert.equal(post({ pings: 1, warmUntil: 9000 }, 2000), true)
+    assert.deepEqual(hub.get().cache, [{ sessionId: 's1', state: 'warm', warmUntil: 9000, tokens: 312000, pings: 1, at: 2000 }])
+    assert.equal(post({ state: 'hot' }), false)
+    assert.equal(post({ sessionId: undefined }), false)
+    assert.equal(post({ state: 'cold' }, 3000), true)
+    assert.equal(hub.get().cache?.[0].state, 'cold')
+    // A chat quiet for four hours drops off.
+    hub.ingest({ token: hub.token, kind: 'cache', sessionId: 's2', state: 'warm', warmUntil: 1, tokens: 1, pings: 0 }, 3000 + 4 * 3600_000)
+    assert.deepEqual(hub.get().cache?.map(c => c.sessionId), ['s2'])
+  })
+
   it('takes the old feed kinds and keeps nothing of them, so an older mod is not sent looking again', () => {
     const hub = new HubService()
     const before = JSON.stringify(hub.get())
@@ -215,7 +236,8 @@ describe('brain routes', () => {
 describe('hub state and command routes', () => {
   it('answers the memory graph only with the token', async () => {
     const h = new HubService()
-    const graph = async () => ({ nodes: [{ id: 'project:/w', kind: 'project' as const, label: 'w' }], edges: [] })
+    const health = { dangling: [], orphans: [], duplicates: [], contradictions: [], superseded: [], invalid: [], stale: [] }
+    const graph = async () => ({ nodes: [{ id: 'project:/w', kind: 'project' as const, label: 'w' }], edges: [], health })
     const ask = (token: string) => route(h, 'GET', `/hub/graph?token=${token}`, '', undefined, undefined, graph) as HubReply | Promise<HubReply>
     assert.equal((await ask('wrong')).status, 403)
     const ok = await ask(h.token)
@@ -671,6 +693,17 @@ describe('usage limit retry', () => {
     assert.deepEqual(texts(h, 12 * 60_000), [])
   })
 
+  it('reads a reset sent as epoch seconds or ms too', () => {
+    const t = 1794066000_000
+    for (const resetsAt of [t / 1000 + 600, String(t + 600_000)]) {
+      const h = new HubService()
+      h.ingest({ token: h.token, kind: 'live', sessionId: 's1', cwd: '/r', limits: [{ kind: 'five_hour', percentUsed: 100, resetsAt }] }, t)
+      h.hook(hit, t + 1000)
+      assert.deepEqual(texts(h, t + 10 * 60_000), [])
+      assert.equal(texts(h, t + 11 * 60_000).length, 1, String(resetsAt))
+    }
+  })
+
   it('retries after 30 minutes with no known reset, and not for a mirror', () => {
     const h = new HubService()
     h.hook(hit, 0)
@@ -681,16 +714,15 @@ describe('usage limit retry', () => {
     assert.deepEqual(texts(m, 60 * 60_000), [])
   })
 
-  it('is dropped when the chat moves on or ends, kept through a prompt that may fail', () => {
-    for (const next of [
-      { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: {} },
-      { hook_event_name: 'SessionEnd' },
-    ]) {
-      const h = new HubService()
-      h.hook(hit, 0)
-      h.hook({ session_id: 's1', cwd: '/r', ...next }, 1)
-      assert.deepEqual(texts(h, 60 * 60_000), [], next.hook_event_name)
-    }
+  it('is dropped when the chat moves on, kept through an end (to resume) and a prompt that may fail', () => {
+    const moved = new HubService()
+    moved.hook(hit, 0)
+    moved.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: {} }, 1)
+    assert.deepEqual(texts(moved, 60 * 60_000), [])
+    const ended = new HubService()
+    ended.hook(hit, 0)
+    ended.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'SessionEnd' }, 1)
+    assert.deepEqual(ended.goneDue(() => false, 60 * 60_000), [{ sessionId: 's1', cwd: '/r' }])
     const h = new HubService()
     h.hook(hit, 0)
     h.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'UserPromptSubmit' }, 1)
@@ -699,7 +731,21 @@ describe('usage limit retry', () => {
 
   const kept = (file: string) => { const h = new HubService(); h.keepRetries(file); return h }
 
-  it('outlives a window reload through its file, and leaves it once sent or the chat ends', () => {
+  it('resumes a gone chat once when due; a live or polling chat keeps the inbox path', () => {
+    const h = new HubService()
+    h.hook(hit, 0)
+    assert.deepEqual(h.goneDue(() => false, 29 * 60_000), [], 'not due yet')
+    assert.deepEqual(h.goneDue(() => true, 30 * 60_000), [], 'process still live')
+    h.take('s1', 30 * 60_000 - 5000)
+    assert.deepEqual(h.goneDue(() => false, 30 * 60_000), [], 'mod polled a moment ago')
+    assert.ok(h.retrying())
+    assert.deepEqual(h.goneDue(() => false, 31 * 60_000), [{ sessionId: 's1', cwd: '/r' }])
+    assert.deepEqual(h.goneDue(() => false, 32 * 60_000), [], 'never twice')
+    assert.ok(!h.retrying())
+    assert.deepEqual(texts(h, 33 * 60_000), [], 'the resume carries the prompt, not the inbox')
+  })
+
+  it('outlives a window reload through its file, and leaves it once sent or resumed', () => {
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-')), 'retries.json')
     const t = Date.now()
     kept(file).hook(hit, t)
@@ -709,7 +755,23 @@ describe('usage limit retry', () => {
     assert.deepEqual(texts(kept(file), t + 60 * 60_000), [])
     kept(file).hook(hit, t)
     kept(file).hook({ session_id: 's1', cwd: '/r', hook_event_name: 'SessionEnd' }, t + 1)
-    assert.deepEqual(texts(kept(file), t + 60 * 60_000), [])
+    assert.deepEqual(kept(file).goneDue(() => false, t + 60 * 60_000), [{ sessionId: 's1', cwd: '/r' }])
+    assert.deepEqual(kept(file).goneDue(() => false, t + 60 * 60_000), [])
+  })
+
+  it('a reload drops a retry from an older window: with no folder it cannot be resumed and would hold auto-start', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-')), 'retries.json')
+    fs.writeFileSync(file, JSON.stringify({ s1: Date.now() }))
+    assert.ok(!kept(file).retrying())
+  })
+
+  it('a chat cleared or logged out drops its retry: the process goes on under a new id', () => {
+    for (const reason of ['clear', 'logout']) {
+      const h = new HubService()
+      h.hook(hit, 0)
+      h.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'SessionEnd', reason }, 1)
+      assert.ok(!h.retrying(), reason)
+    }
   })
 
   it('a reload forgets a retry a day overdue: that chat is gone', () => {

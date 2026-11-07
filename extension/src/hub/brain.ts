@@ -149,6 +149,43 @@ export function brief(state: HubState, cwd: string, self: string, now = Date.now
   return text
 }
 
+const GUARD_MS = 10 * 60 * 1000
+const RETRY_MS = 2 * 60 * 1000
+export const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+
+const prune = (m: Map<string, number>, ms: number, now: number) => { for (const [k, at] of m) if (now - at >= ms) m.delete(k) }
+
+/** An edit that went through (its PostToolUse), keyed by session and full path, for editGuard. */
+export function noteEdit(edits: Map<string, number>, session: string, cwd: string, file: string, now = Date.now()): void {
+  prune(edits, GUARD_MS, now)
+  edits.set(`${session}\n${norm(path.resolve(cwd, file))}`, now)
+}
+
+/**
+ * Why `self` should not edit `file` yet: another open chat in the project edited it after self did, in the last ten minutes.
+ * `tried` holds the denials; a retry on the same file within two minutes goes through, so it never deadlocks.
+ */
+export function editGuard(state: HubState, edits: Map<string, number>, tried: Map<string, number>, self: string, cwd: string, file: string, now = Date.now()): string | undefined {
+  prune(tried, RETRY_MS, now)
+  const target = norm(path.resolve(cwd, file))
+  const key = `${self}\n${target}`
+  if (tried.has(key)) return undefined
+  const home = projectOf(state, cwd)
+  const mine = edits.get(key) ?? 0
+  for (const [k, at] of edits) {
+    const cut = k.indexOf('\n'), session = k.slice(0, cut)
+    if (session === self || k.slice(cut + 1) !== target || at <= mine || now - at >= GUARD_MS) continue
+    // No progress row: it ended (SessionEnd drops it) or never hooked; done: finished.
+    const p = state.progress.find(x => x.sessionId === session)
+    if (!p || p.state === 'done' || projectOf(state, p.cwd).cwd !== home.cwd) continue
+    tried.set(key, now)
+    const rel = inside(target, home.cwd) ? target.slice(home.cwd.length + 1) : path.basename(target)
+    const name = state.chats.find(c => c.sessionId === session)?.name ?? state.live.find(s => s.sessionId === session)?.label ?? session.slice(0, 8)
+    return `Another open chat (${name}) edited ${rel} ${Math.max(1, Math.round((now - at) / 60_000))} min ago. Re-read the file before changing it, keep your edit from clobbering theirs, or use a worktree. Retry this edit to go ahead.`
+  }
+  return undefined
+}
+
 /** The board and suggestions for one project only: all Ask ever sees. */
 export function askContext(state: HubState, cwd: string, gone: Server[], now = Date.now()): string {
   const home = projectOf(state, cwd)
@@ -160,7 +197,7 @@ export function askContext(state: HubState, cwd: string, gone: Server[], now = D
 }
 
 /** A throwaway call: no transcript saved, and no hooks, so it never shows up as a chat in Switchboard. */
-// No plugins, MCP servers, tools or default system prompt: a tool pick was 17 s with them, near PICK_MS, and fell back to everything on.
+// No plugins, MCP servers, tools or default system prompt: a quick ask took 17 s with them.
 export const quickAskArgs = (prompt: string) => ['-p', '--no-session-persistence', '--settings', JSON.stringify({ disableAllHooks: true }), '--setting-sources', '', '--strict-mcp-config', '--disable-slash-commands', '--tools', '', '--system-prompt', 'Answer exactly as the prompt asks.', '--model', 'haiku', prompt]
 
 /** One quick answer from Claude Code's Haiku on the subscription; rejects on error. */

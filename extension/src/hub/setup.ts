@@ -15,6 +15,8 @@ export type SetupKit = {
   mcps: { name: string; url: string; keyHeader?: string }[]
   /** Fetched from GitHub into ~/.claude/skills; names are SKILL.md names, not folder names. */
   skills?: SkillRepo[]
+  /** Switchboard's own skills, bundled in kit/skills (esbuild.js) and copied to ~/.claude/skills by the runner. */
+  own?: string[]
 }
 export type SkillRepo = { repo: string; names: string[] }
 /** What the machine has: plugin ids, marketplace names, user-scope MCP server names, ~/.claude/skills folders; plain: those holding a literal header, left out of mcps. */
@@ -25,14 +27,16 @@ export const KEY_ENV = 'API_KEY_21ST'
 const MODS = '~/.claude/switchboard/mods'
 const ASK = '~/.claude/switchboard/ask/ask-server.mjs'
 
-/** One step for kit/setup-run.mjs: say a line, or copy then run, only when ifExists is there; key: store the key and add that server; skills: clone the repo and copy those in. ~/ is the home folder. */
-export type SetupStep = { label?: string; say?: string; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo }
+/** One step for kit/setup-run.mjs: say a line, or copy then run, only when ifExists is there; key: store the key and add that server; skills: clone the repo and copy those in;
+ * own: copy those bundled skills from the folder, where missing or an older copy of ours. ~/ is the home folder. */
+export type SetupStep = { label?: string; say?: string; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo; own?: { from: string; names: string[] } }
 
 const KEY_LABEL: Record<ApiKey['name'], string> = { GEMINI_API_KEY: 'Gemini', OPENROUTER_API_KEY: 'Jev (OpenRouter)' }
 const keyLine = (k: ApiKey) => `${KEY_LABEL[k.name]} key: ${!k.saved ? 'missing. Paste it in Switchboard: Settings, Accounts, API keys.' : `saved (ends ${k.last4})${k.checked ? (k.checked.ok ? ', works' : `, failed its test (${k.checked.reason ?? 'no reason'})`) : ''}.`}`
 
-/** key21st: whether the env holds the key. modsDir: the bundled marketplace, copied out since the extension folder moves on update. keys: Sign-ins' API keys, one line each. */
-export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; modsDir: string; platform?: NodeJS.Platform; keys?: ApiKey[] }): SetupStep[] {
+/** key21st: whether the env holds the key. modsDir: the bundled marketplace, copied out since the extension folder moves on update. skillsDir: kit/skills.
+ * keys: Sign-ins' API keys, one line each. */
+export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; modsDir: string; skillsDir: string; platform?: NodeJS.Platform; keys?: ApiKey[] }): SetupStep[] {
   const out: SetupStep[] = []
   const claude = (label: string, ...args: string[]) => out.push({ label, run: ['claude', ...args] })
   for (const [name, repo] of Object.entries(kit.marketplaces)) if (!o.marketplaces.includes(name)) claude(name, 'plugin', 'marketplace', 'add', repo)
@@ -52,8 +56,10 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
     const names = k.names.filter(n => !o.skills.includes(n))
     if (names.length) out.push({ label: k.repo, skills: { repo: k.repo, names } })
   }
+  // Always handed over: whether a present copy is ours and older takes a look inside it, which the runner does.
+  if (kit.own?.length) out.push({ label: 'Switchboard skills', own: { from: o.skillsDir, names: kit.own } })
   if (!o.mcps.includes('switchboard')) out.push({ label: 'Ask tool', ifExists: ASK, run: ['claude', 'mcp', 'add', '--scope', 'user', 'switchboard', '--', 'node', ASK] })
-  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: 'Set up done. Sign in to Slack with /mcp in a chat, then run /reload-plugins in chats that were already open.' })
+  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: 'Set up done. Sign in to Slack and Cloudflare with /mcp in a chat, then run /reload-plugins in chats that were already open.' })
   return out
 }
 

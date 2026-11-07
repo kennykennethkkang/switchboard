@@ -1,0 +1,265 @@
+{
+ "execution_successful": true,
+ "risk_assessment": {
+  "score": 100,
+  "severity": "CRITICAL",
+  "recommendation": "DO_NOT_INSTALL",
+  "max_issue_severity": "CRITICAL"
+ },
+ "analysis_completeness": {
+  "status": "complete_with_caveats"
+ },
+ "issues": [
+  {
+   "id": "TT3",
+   "category": "Data Flow",
+   "severity": "CRITICAL",
+   "confidence": 0.9,
+   "location": {
+    "file": "gemini.py",
+    "start_line": 64,
+    "end_line": 64,
+    "start_column": 13,
+    "end_column": 53
+   },
+   "finding": "urllib.request.urlopen(req, timeout=900)"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "gemini.py",
+    "start_line": 33,
+    "end_line": null,
+    "start_column": 55
+   },
+   "finding": "Keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 76,
+    "end_line": null,
+    "start_column": 71
+   },
+   "finding": "Keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 74,
+    "end_line": null,
+    "start_column": 38
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 80,
+    "end_line": null,
+    "start_column": 120
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 80,
+    "end_line": null,
+    "start_column": 147
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 108,
+    "end_line": null,
+    "start_column": 13
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 109,
+    "end_line": null,
+    "start_column": 94
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 122,
+    "end_line": null,
+    "start_column": 27
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 123,
+    "end_line": null,
+    "start_column": 84
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 123,
+    "end_line": null,
+    "start_column": 109
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 127,
+    "end_line": null,
+    "start_column": 13
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "PE3",
+   "category": "Privilege Escalation",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 129,
+    "end_line": null,
+    "start_column": 72
+   },
+   "finding": "keychain"
+  },
+  {
+   "id": "E2",
+   "category": "Data Exfiltration",
+   "severity": "HIGH",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 75,
+    "end_line": 75,
+    "start_column": 32
+   },
+   "finding": "os.environ.items()"
+  },
+  {
+   "id": "LP3",
+   "category": "MCP Least Privilege",
+   "severity": "MEDIUM",
+   "confidence": 0.7,
+   "location": {
+    "file": "SKILL.md",
+    "start_line": 1,
+    "end_line": null
+   },
+   "finding": "Skill declares no tool scope ('permissions' or 'allowed-tools') but code capabilities were detected: env, file_read, file_write, network, shell."
+  },
+  {
+   "id": "AST4",
+   "category": "Dangerous Code Execution",
+   "severity": "MEDIUM",
+   "confidence": 0.7,
+   "location": {
+    "file": "gemini.py",
+    "start_line": 35,
+    "end_line": 35,
+    "start_column": 12,
+    "end_column": 148
+   },
+   "finding": "subprocess.run([\"security\", \"find-generic-password\", \"-s\", \"switchboard\", \"-a\", name, \"-w\"], capture_output=True, text=True, timeout=10)"
+  },
+  {
+   "id": "TT2",
+   "category": "Data Flow",
+   "severity": "MEDIUM",
+   "confidence": 0.65,
+   "location": {
+    "file": "gemini.py",
+    "start_line": 148,
+    "end_line": 148,
+    "start_column": 13,
+    "end_column": 29
+   },
+   "finding": "open(path, \"wb\")"
+  },
+  {
+   "id": "TT2",
+   "category": "Data Flow",
+   "severity": "MEDIUM",
+   "confidence": 0.65,
+   "location": {
+    "file": "gemini.py",
+    "start_line": 171,
+    "end_line": 171,
+    "start_column": 9,
+    "end_column": 23
+   },
+   "finding": "open(out, \"w\")"
+  },
+  {
+   "id": "AST4",
+   "category": "Dangerous Code Execution",
+   "severity": "MEDIUM",
+   "confidence": 0.7,
+   "location": {
+    "file": "test_gemini.py",
+    "start_line": 88,
+    "end_line": 88,
+    "start_column": 12,
+    "end_column": 114
+   },
+   "finding": "subprocess.run([sys.executable, SCRIPT, *args], capture_output=True, text=True, env=env, cwd=self.tmp)"
+  }
+ ]
+}

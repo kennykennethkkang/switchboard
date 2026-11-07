@@ -91,6 +91,24 @@ describe('parseRun', () => {
   })
 })
 
+describe('parseRun dispatches', () => {
+  it("lists the lead's Agent calls: who got which brief, oldest first", () => {
+    const raw = [
+      JSON.stringify({ type: 'user', timestamp: '2026-10-31T10:00:00Z', message: { content: 'Build it' } }),
+      JSON.stringify({ type: 'assistant', timestamp: '2026-10-31T10:00:05Z', message: { content: [{ type: 'tool_use', id: 't1', name: 'Agent', input: { subagent_type: 'researcher', description: 'Find the files', prompt: 'Goal: find. Key sk-ant-abcdefghijklmnopqrstuv' } }] } }),
+      JSON.stringify({ type: 'assistant', timestamp: '2026-10-31T10:01:00Z', message: { content: [{ type: 'tool_use', id: 't2', name: 'Task', input: { prompt: 'Goal: fix' } }, { type: 'text', text: 'Sent the engineer.' }] } }),
+    ].join('\n')
+    const r = parseRun(raw, { agentType: 'lead' }, 's', '')
+    assert.deepEqual(r.dispatches?.map(d => [d.role, d.title, d.at]), [['researcher', 'Find the files', at(5)], ['general-purpose', undefined, at(60)]])
+    assert.match(r.dispatches![0].brief, /^Goal: find\. Key \[removed\]/)
+    assert.equal(r.reportText, 'Sent the engineer.')
+  })
+
+  it('leaves dispatches out of a run that made none', () => {
+    assert.equal(parseRun(FIXTURE, META, 'a1', '').dispatches, undefined)
+  })
+})
+
 describe('parseReport', () => {
   it('takes headings in any common form and leaves sentences that start with a section word', () => {
     const r = parseReport('Status: blocked\nFound: x.ts:4 is wrong\nOpen the file first.\nChecked\n- tsc clean\n* lint clean\nOpen: ask Kenneth')
@@ -146,6 +164,44 @@ describe('readRuns', () => {
     assert.equal((await readRuns('s-123', 'engineer', home)).find(r => r.id === 'a1')!.title, 'Renamed')
     fs.writeFileSync(f, FIXTURE)
     fs.writeFileSync(path.join(dir, 'agent-a1.meta.json'), JSON.stringify(META))
+  })
+
+  it("reads the lead from the chat's own transcript, not its subagents", async () => {
+    fs.writeFileSync(path.join(home, '.claude', 'projects', '-w', 's-123.jsonl'), FIXTURE)
+    const [lead, ...rest] = await readRuns('s-123', 'lead', home)
+    assert.equal(rest.length, 0)
+    assert.equal(lead.id, 's-123')
+    assert.equal(lead.role, 'lead')
+    assert.equal(lead.file, path.join(home, '.claude', 'projects', '-w', 's-123.jsonl'))
+    assert.equal(lead.callCount, 5)
+    assert.deepEqual(await readRuns('nope', 'lead', home), [])
+  })
+
+  it('reads only what was appended to a growing transcript, waits for a whole line, and starts over when it shrinks', async () => {
+    const f = path.join(home, '.claude', 'projects', '-w', 's-inc.jsonl')
+    const ev = (s: number, id: string) => JSON.stringify({ type: 'assistant', timestamp: `2026-10-31T10:00:${String(s).padStart(2, '0')}Z`, message: { content: [{ type: 'tool_use', id, name: 'Read', input: { file_path: `/w/${id}.ts` } }] } }) + '\n'
+    const head = JSON.stringify({ type: 'user', timestamp: '2026-10-31T10:00:00Z', message: { content: 'Goal: aaaa' } }) + '\n'
+    fs.writeFileSync(f, head + ev(1, 'a'))
+    assert.equal((await readRuns('s-inc', 'lead', home))[0].callCount, 1)
+    // Same file, an earlier byte changed in place and two lines appended, the second cut mid-line:
+    // only the new bytes are parsed, so the old brief stays and the half line waits.
+    const fd = fs.openSync(f, 'r+')
+    fs.writeSync(fd, 'b', head.indexOf('aaaa'))
+    fs.closeSync(fd)
+    const half = ev(3, 'c')
+    fs.appendFileSync(f, ev(2, 'b') + half.slice(0, 20))
+    let lead = (await readRuns('s-inc', 'lead', home))[0]
+    assert.equal(lead.brief, 'Goal: aaaa')
+    assert.deepEqual(lead.calls.map(c => c.target), ['w/a.ts', 'w/b.ts'])
+    fs.appendFileSync(f, half.slice(20))
+    lead = (await readRuns('s-inc', 'lead', home))[0]
+    assert.deepEqual(lead.calls.map(c => c.target), ['w/a.ts', 'w/b.ts', 'w/c.ts'])
+    assert.equal(lead.endedAt, Date.parse('2026-10-31T10:00:03Z'))
+    // Shorter than what was read: a new file, read from the start.
+    fs.writeFileSync(f, JSON.stringify({ type: 'user', timestamp: '2026-10-31T11:00:00Z', message: { content: 'Goal: new' } }) + '\n')
+    lead = (await readRuns('s-inc', 'lead', home))[0]
+    assert.equal(lead.brief, 'Goal: new')
+    assert.equal(lead.callCount, 0)
   })
 
   it('finds nothing for an unknown chat and refuses a path in the id', async () => {

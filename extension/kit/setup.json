@@ -14,9 +14,11 @@
     "context7@claude-plugins-official",
     "playwright@claude-plugins-official"
   ],
-  "mods": ["usage-meter", "repo-rules", "paid-guard"],
+  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper"],
+  "own": ["aar", "animation-styles", "improve-system", "awwwards"],
   "mcps": [
     { "name": "slack", "url": "https://mcp.slack.com/mcp" },
+    { "name": "cloudflare", "url": "https://mcp.cloudflare.com/mcp" },
     { "name": "21st", "url": "https://21st.dev/api/mcp", "keyHeader": "x-api-key" }
   ],
   "skills": [

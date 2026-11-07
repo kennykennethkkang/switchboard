@@ -5,10 +5,10 @@
  * Lazy-loaded by switchboard.tsx (the Next build splits it out; the app bundle inlines it). Read-only: the panel gets the graph
  * from the extension, the app from its own /hub/graph proxy.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph3D, { type ForceGraph3DInstance } from '3d-force-graph'
 import { AdditiveBlending, CanvasTexture, Group as Obj, LinearFilter, Sprite, SpriteMaterial, type PerspectiveCamera, type WebGLRenderer } from 'three'
-import { GROUPS, colorOf, demoGraph, findNodes, groupOf, listNodes, loadGraph, neighbors, relations, type GraphNode, type Group, type MemoryGraph } from '@/lib/memory-graph'
+import { GROUPS, colorOf, demoGraph, findNodes, groupOf, healthLine, listNodes, loadGraph, neighbors, relations, type GraphEdge, type GraphNode, type Group, type MemoryGraph } from '@/lib/memory-graph'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 
 type Pt = GraphNode & { x?: number; y?: number; z?: number }
@@ -37,6 +37,17 @@ function nameTag(text: string): Sprite {
   s.userData.aspect = c.width / c.height
   return s
 }
+// Edge tints by predicate: link and related purple, contradicts red, supersedes amber, depends-on and part-of blue.
+const TINT: Partial<Record<GraphEdge['kind'], string>> = { link: '169,139,255', related: '169,139,255', contradicts: '255,97,97', supersedes: '255,197,51', 'depends-on': '87,193,255', 'part-of': '87,193,255' }
+// on: touches the pick, or nothing is picked.
+const edgeColor = (kind: GraphEdge['kind'], on: boolean, picked: boolean) => {
+  const t = TINT[kind]
+  if (t) return `rgba(${t},${!picked ? 0.55 : on ? 0.7 : 0.12})`
+  if (kind === 'from') return `rgba(255,255,255,${on && picked ? 0.18 : 0.05})`
+  return on ? (picked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.14)') : 'rgba(255,255,255,0.04)'
+}
+// A superseded note stays on the map, faded.
+const FADED = 0.35
 const reduced = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () => void }) {
@@ -94,7 +105,8 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
       .nodeId('id').linkSource('source').linkTarget('target')
       .nodeThreeObject((n: object) => {
         const node = n as Pt
-        const s = new Sprite(new SpriteMaterial({ map: tex, color: colorOf(node), blending: AdditiveBlending, depthWrite: false, transparent: true }))
+        const s = new Sprite(new SpriteMaterial({ map: tex, color: colorOf(node), blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: node.superseded ? FADED : 1 }))
+        s.userData.faded = !!node.superseded
         s.scale.setScalar(SIZE[node.kind] * grow)
         s.userData.size = SIZE[node.kind] * grow
         sprites.current.set(node.id, s)
@@ -105,8 +117,8 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
         return o
       })
       .onNodeHover((n: object | null) => { setHover(n ? (n as Pt).id : undefined); el.style.cursor = n ? 'pointer' : '' })
-      .linkColor((l: object) => ((l as { kind: string }).kind === 'link' ? 'rgba(169,139,255,0.55)' : 'rgba(255,255,255,0.14)'))
-      .linkWidth((l: object) => ((l as { kind: string }).kind === 'link' ? 0.6 : 0))
+      .linkColor((l: object) => edgeColor((l as GraphEdge).kind, true, false))
+      .linkWidth((l: object) => (TINT[(l as GraphEdge).kind] ? 0.6 : 0))
       .linkOpacity(1)
       .enableNodeDrag(false)
       .onNodeClick((n: object) => setPicked((n as Pt).id))
@@ -175,15 +187,13 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
     if (!g || !graph) return
     const lit = picked ? new Set([picked, ...neighbors(graph, picked).map(n => n.id)]) : undefined
     for (const [id, s] of sprites.current) {
-      s.material.opacity = !lit || lit.has(id) ? 1 : 0.15
+      s.material.opacity = (!lit || lit.has(id) ? 1 : 0.15) * (s.userData.faded ? FADED : 1)
       s.scale.setScalar(s.userData.size * (id === picked ? 1.6 : 1))
     }
     const end = (v: unknown) => (typeof v === 'object' && v ? (v as Pt).id : v as string)
     g.linkColor((l: object) => {
-      const { kind, source, target } = l as { kind: string; source: unknown; target: unknown }
-      const on = !picked || end(source) === picked || end(target) === picked
-      if (kind === 'link') return on ? 'rgba(169,139,255,0.7)' : 'rgba(169,139,255,0.12)'
-      return on ? (picked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.14)') : 'rgba(255,255,255,0.04)'
+      const { kind, source, target } = l as { kind: GraphEdge['kind']; source: unknown; target: unknown }
+      return edgeColor(kind, !picked || end(source) === picked || end(target) === picked, !!picked)
     })
   }, [picked, graph])
 
@@ -220,7 +230,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
   const rel = useMemo(() => {
     if (!graph || !picked) return undefined
     const r = relations(graph, picked), shown = (l: GraphNode[]) => l.filter(n => !off.has(groupOf(n)))
-    return { to: shown(r.to), from: shown(r.from), up: shown(r.up), down: shown(r.down) }
+    return { to: shown(r.to), from: shown(r.from), up: shown(r.up), down: shown(r.down), typed: r.typed.map(t => ({ ...t, list: shown(t.list) })) }
   }, [graph, picked, off])
   const hits = useMemo(() => (graph && view === 'graph' ? findNodes(graph.nodes, q, off) : []), [graph, q, off, view])
   const rows = useMemo(() => (graph ? listNodes(graph.nodes, q, off) : []), [graph, q, off])
@@ -256,6 +266,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
       <ul className="mem-near">{list.map(n => <li key={n.id}><button type="button" onClick={() => fly(n.id)}>{dot(n)}<span>{n.label}</span><small>{labelOf(n)}</small></button></li>)}</ul>
     </section>
   ) : null
+  const health = graph?.health && healthLine(graph.health)
   const sets = SETS.map(set => ({ set, groups: GROUPS.filter(gr => gr.set === set && counts.get(gr.id)) })).filter(x => x.groups.length)
 
   return (
@@ -305,6 +316,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
         <div ref={box} className="mem-canvas" hidden={view === 'list'} role="img" aria-label={graph ? `Graph of ${graph.nodes.length} items and ${graph.edges.length} links. Use search or the list to open one.` : 'Loading the memory graph'} />
         {view === 'list' && graph && graph.nodes.length > 0 && (
           <div className="mem-list">
+            {health && <p className="mem-health">Health: {health}</p>}
             {GROUPS.map(gr => ({ gr, items: rows.filter(n => groupOf(n) === gr.id) })).filter(x => x.items.length).map(({ gr, items }) => (
               <section key={gr.id}>
                 <h3><i style={{ background: gr.color }} aria-hidden />{gr.label}<span>{items.length}</span></h3>
@@ -345,6 +357,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
           ) : null}
           {linkList('Links to', rel?.to)}
           {linkList('Linked from', rel?.from)}
+          {rel?.typed.map(t => <Fragment key={t.title}>{linkList(t.title, t.list)}</Fragment>)}
           {linkList('Belongs to', rel?.up)}
           {linkList('Contains', rel?.down)}
         </aside>

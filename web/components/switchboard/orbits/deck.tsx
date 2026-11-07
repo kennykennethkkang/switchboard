@@ -33,7 +33,7 @@ export function Deck(v: ViewProps) {
   const cur = p?.tasks.find(t => t.status === 'in_progress')?.subject
   const tokens = chat.live?.tokens, cap = chat.live?.compactAt
 
-  // A role card's header opens the drawer (its body stays open while it works); the lead's folds by hand.
+  // A card's header opens the drawer (its body stays open while it works); without a drawer the lead's folds by hand.
   const card = (k: string, s: string, name: string, model: string | undefined, sum: string, chip: string, auto: boolean, body: React.ReactNode, tools: number, count = 0, node?: ReturnType<typeof nodeProps>) => {
     const open = node ? auto : manual[k] ?? auto
     return (
@@ -71,7 +71,7 @@ export function Deck(v: ViewProps) {
           : cur && cur !== leadSum ? <p className="ov-task">{cur}</p> : null}
         {tokens && cap ? <div className="ov-ctx"><span>context</span><span className="ov-meter"><i style={{ transform: `scaleX(${Math.min(1, tokens / cap)})` }} /></span><span>{Math.round(Math.min(1, tokens / cap) * 100)}%</span></div> : null}
         {showTools && <Feed list={lead} />}
-      </>, lead.length)}
+      </>, lead.length, 0, v.pick ? nodeProps(v, 'lead', ls) : undefined)}
       {used.map(roleCard)}
       {bench.length > 0 && <p className="ov-bench"><span>Not used</span>{bench.map(r => <span key={r.role} className="ov-chipb"><Glyph k={r.role} size={13} />{NAME(r.role)}</span>)}</p>}
     </div>

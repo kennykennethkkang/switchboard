@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { finishUp, inside, openElsewhere, ordered, runCount, runIds, runLanded, runTargets, withHome } from './todo'
+import { finishUp, inside, openCount, openElsewhere, ordered, runCount, runIds, runLanded, runTargets, withHome } from './todo'
 import type { ChatRow, TodoItem } from './hub-types'
 
 const t = (id: string, before?: string): TodoItem => ({ id, text: id, at: 1, ...(before ? { before } : {}) })
@@ -13,10 +13,10 @@ describe('todo panel helpers', () => {
     assert.deepEqual(withHome(undefined, '/r/b'), { '/r/b': { todo: [] } })
     assert.deepEqual(withHome(undefined), {})
   })
-  it('groups Kenneth\'s hand steps by chat, from the tray and from older accepted items', () => {
-    const you = (id: string, name?: string): TodoItem => ({ id, text: id, at: 1, why: 'you', ...(name ? { name } : {}) })
-    const groups = finishUp({ todo: [t('a'), you('old', 'Fix login')], suggested: [you('s1', 'Fix login'), you('s2'), { ...t('s3'), why: 'later' }] })
-    assert.deepEqual(groups.map(([n, xs]) => [n, xs.map(x => x.id)]), [['Fix login', ['s1', 'old']], ['a chat', ['s2']]])
+  it('lists Kenneth\'s hand steps from the tray, then older accepted ones', () => {
+    const you = (id: string): TodoItem => ({ id, text: id, at: 1, why: 'you' })
+    const steps = finishUp({ todo: [t('a'), you('old')], suggested: [you('s1'), you('s2'), { ...t('s3'), why: 'later' }] })
+    assert.deepEqual(steps.map(x => x.id), ['s1', 's2', 'old'])
     assert.deepEqual(finishUp({ todo: [t('a')] }), [])
   })
   it('puts each prerequisite indented directly above its item; one whose item is gone stands alone', () => {
@@ -30,9 +30,12 @@ describe('todo panel helpers', () => {
     assert.equal(runCount(list, ['a', 'p']), 3)
     assert.equal(runCount(list, ['gone']), 0)
   })
-  it('counts open items in other projects', () => {
-    assert.equal(openElsewhere({ '/a': { todo: [t('1'), t('2')] }, '/b': { todo: [t('3')] }, '/c': { todo: [] } }, '/b'), 2)
+  it('counts open items in other projects, leaving out hand steps that show under Finish up', () => {
+    const you: TodoItem = { ...t('y'), why: 'you' }
+    assert.equal(openElsewhere({ '/a': { todo: [t('1'), t('2'), you] }, '/b': { todo: [t('3')] }, '/c': { todo: [] } }, '/b'), 2)
     assert.equal(openElsewhere(undefined, '/b'), 0)
+    assert.equal(openCount({ todo: [t('1'), you] }), 1)
+    assert.equal(openCount(undefined), 0)
   })
   it('offers running chats in the project that take messages', () => {
     const c = (sessionId: string, cwd: string, live = true, takes = true): ChatRow => ({ pid: 1, sessionId, cwd, link: '', live, why: [], takes })

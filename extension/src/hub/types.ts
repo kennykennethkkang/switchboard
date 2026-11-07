@@ -24,6 +24,9 @@ export type SessionLive = {
   at: number
 }
 
+/** A chat's prompt cache as the cache-keeper mod last posted it; warmUntil is when it goes cold unless pinged. */
+export type CacheKeep = { sessionId: string; state: 'warm' | 'cold' | 'off'; warmUntil: number; tokens: number; pings: number; at: number }
+
 export type DayUsage = { day: string; reread: number; written: number; io: number; calls: number; sessions: number }
 export type SessionRow = { sessionId: string; label: string; project: string; reread: number; calls: number; startedAt: number; lastAt: number }
 export type PlanView = { name: string; tasks: { title: string; done: number; total: number }[]; decisions?: string[] }
@@ -56,12 +59,18 @@ export type JevProject = { project: string; jobs: { done: boolean; gate: boolean
 export type HandoffWait = { sessionId: string; tasks: number; next: string; since: number }
 /** skills: a plugin's own skill names. model: a role's frontmatter model (inherit, an alias or a full id). description: plugin.json's or SKILL.md's, cut short. */
 /** asset: a design reference in the project; path is relative to the project folder. */
-export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' | 'asset'; name: string; enabled: boolean; tokens?: number; source?: string; skills?: string[]; model?: string; description?: string; path?: string }
+/** held: the sweep holds it until approved (kit/sweep.mjs needsApproval); no chat may turn it on. */
+export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' | 'asset'; name: string; enabled: boolean; held?: boolean; tokens?: number; source?: string; skills?: string[]; model?: string; description?: string; path?: string }
 /** One chat's plugins (by id) and user skills (by name), on or off; tools.ts turns it into the chat's --settings file. */
 /** assets: design references by project-relative path, named to the chat in its system note. */
 export type ChatProfile = { plugins: Record<string, boolean>; skills: Record<string, boolean>; assets?: Record<string, boolean> }
-/** flagged: plugins and skills never turned on by a pick. pick: the last hub-pick-tools answer, for its goal. chats: saved profiles by session id. */
+/** flagged: duplicates kept off unless turned on by hand. pick: the last hub-pick-tools answer (the all-on set), for its goal. chats: saved profiles by session id. */
 export type ToolsState = { flagged: string[]; pick: { goal: string; folder?: string; profile: ChatProfile } | null; chats: Record<string, ChatProfile> }
+/** A sweep result. review: DO_NOT_INSTALL or a HIGH or CRITICAL issue, or an add that could not be scanned. top: the worst issues, at most 5.
+ * hold: held at intake; it stays off until approvedDigest matches its files. Only intake sets it and nothing clears it. offFailed: claude plugin disable failed, so it may still be on. */
+export type SweepIssue = { id: string; severity: string; file?: string; line?: number; finding: string }
+export type SweepVerdict = { state: 'clean' | 'review' | 'unscanned'; reason?: string; score?: number; severity?: string; recommendation?: string; issues?: number; top?: SweepIssue[] }
+export type SweepRecord = SweepVerdict & { kind: 'plugin' | 'skill'; path: string; digest: string; scannedAt: number; approvedAt?: number; approvedDigest?: string; hold?: boolean; offFailed?: boolean }
 export type Connection = { kind: 'mcp' | 'app' | 'project' | 'window' | 'repo'; name: string; status: 'on' | 'off' | 'error'; detail?: string }
 
 export type HubState = {
@@ -101,8 +110,12 @@ export type HubState = {
   webUrl: string | null
   /** The app's phone links with their secret, one per network, for the QRs. Only the VS Code panel gets them; /hub/state blanks them. */
   phoneUrls?: PhoneUrls | null
+  /** cache-keeper's state per chat; absent with no such mod. */
+  cache?: CacheKeep[]
   /** Per chat tool sets; an older extension sends none. */
   tools?: ToolsState
+  /** The SkillSpector sweep (kit/sweep.mjs): one result per plugin or skill name; busy while a sweep or an add runs; note: the last add's or sweep's outcome; progress: Sweep all's count so far. An older extension sends none. */
+  sweep?: { busy: boolean; tools: Record<string, SweepRecord>; note?: string; progress?: { done: number; total: number } }
   /** Projects with a dev script; an older extension sends none. */
   dev?: DevProject[]
   /** Whether tailscale is installed and up, for the Phone links. */
@@ -139,6 +152,8 @@ export type Changes = { sessionId: string; cwd: string; files: ChangedFile[]; at
 /** One file git status lists, relative to the repo root. from: a rename's old path. */
 export type RepoFile = { path: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'; from?: string }
 export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun' | 'ship'
+/** Git ops only the Mac may run: the phone hides them and the app's proxy refuses them. */
+export const MAC_ONLY_GIT: ReadonlySet<GitOp> = new Set<GitOp>(['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch'])
 /** sync: the one sync button (Publish branch, Pull N, Push N or Fetch). github: the repo's page, from the branch's remote (origin by default). pr: the branch's open PR when gh can tell. busy: the op running now; result: the last one's outcome. */
 export type RepoView = {
   sessionId: string; name: string; branch?: string; upstream?: string; ahead: number; behind: number; files: RepoFile[]; branches: string[]
@@ -168,7 +183,7 @@ export type KeepSetting = 'autoCompactEnabled' | 'autoCompactWindow' | 'autoCont
 export type SettingKey = KeepSetting | 'remoteControlAtStartup' | 'agentPushNotifEnabled' | 'inputNeededNotifEnabled' | 'model' | 'effortLevel' | 'tui' | 'statusLine'
 export type ClaudeControls = { model?: 'fable' | 'opus' | 'sonnet' | 'haiku'; effortLevel?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; tui: 'default' | 'fullscreen'; statusLine: boolean; push: boolean; needInput: boolean }
 /** Switchboard's own switches, kept in VS Code's globalState. idleMinutes null: never hide. */
-export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; name: string }
+export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; name: string }
 export type SwitchboardKey = keyof SwitchboardControls
 /** rulesNote: what the last rules and roles sync did, one line. */
 export type Controls = { claude: ClaudeControls; switchboard: SwitchboardControls; statusLineReady: boolean; rulesNote?: string }
@@ -198,7 +213,7 @@ export type TaskRow = { id: string; subject: string; status: 'pending' | 'in_pro
 export type BgJob = { id: string; label?: string; task?: string; command?: string; agent?: string; startedAt: number }
 /** One tool call for the picture: role is "lead" for the main chat, else the subagent type. target: the file, pattern or command it touched, cut short. */
 export type ToolCall = { tool: string; target?: string; role: string; at: number }
-export type ChatProgress = { sessionId: string; cwd: string; state: ChatState; roles: RoleStep[]; tasks: TaskRow[]; question?: string; commit?: string; startedAt: number; at: number; /** The newest tool calls, oldest first, at most 200. */ tools?: ToolCall[]; /** Subagents still running, by agent id (or role); they outlive the chat's Stop. */ running?: string[]; /** Agent ids that stopped lately and when, kept past the role trim so a late hook from one is ignored. */ ended?: Record<string, number>; /** The lead's turn ended while some still ran. */ waiting?: boolean; /** Background shells and monitors the lead started, until their task-notification. */ jobs?: BgJob[]; /** Background shells subagents started, until that subagent's transcript says they ended. */ subJobs?: BgJob[]; /** The lead's last turn ended with a commit block or every task done; Done once nothing runs. */ finishing?: true; /** When it last reached Done. */ finishedAt?: number; /** The prompt the terminal shows, while it waits. */ ask?: Ask; /** Every prompt waiting, oldest (ask) first. */ asks?: Ask[]; /** The lead's last turn died on an API error (StopFailure), until it makes real progress. */ limited?: { at: number; error: string }; /** The standup in the lead's last message; its Left items go to the to-do. */ report?: Report; /** Kenneth's own prompts in this chat, newest last, at most 8. */ asked?: string[]; /** Jev's score per asked item (0 to 1, null: no answer) for whether Done covers it. */ covered?: Array<number | null>; /** The newest test run any role made, from its Bash hook. */ tests?: TestRun }
+export type ChatProgress = { sessionId: string; cwd: string; state: ChatState; roles: RoleStep[]; tasks: TaskRow[]; question?: string; commit?: string; /** Commit message (<repo folder>) blocks from the same message, for other repos' boxes. */ commits?: Record<string, string>; startedAt: number; at: number; /** The newest tool calls, oldest first, at most 200. */ tools?: ToolCall[]; /** Subagents still running, by agent id (or role); they outlive the chat's Stop. */ running?: string[]; /** Agent ids that stopped lately and when, kept past the role trim so a late hook from one is ignored. */ ended?: Record<string, number>; /** The lead's turn ended while some still ran. */ waiting?: boolean; /** Background shells and monitors the lead started, until their task-notification. */ jobs?: BgJob[]; /** Background shells subagents started, until that subagent's transcript says they ended. */ subJobs?: BgJob[]; /** The lead's last turn ended with a commit block or every task done; Done once nothing runs. */ finishing?: true; /** When it last reached Done. */ finishedAt?: number; /** The prompt the terminal shows, while it waits. */ ask?: Ask; /** Every prompt waiting, oldest (ask) first. */ asks?: Ask[]; /** The lead's last turn died on an API error (StopFailure), until it makes real progress. */ limited?: { at: number; error: string }; /** The standup in the lead's last message; its Left items go to the to-do. */ report?: Report; /** Kenneth's own prompts in this chat, newest last, at most 8. */ asked?: string[]; /** Jev's score per asked item (0 to 1, null: no answer) for whether Done covers it. */ covered?: Array<number | null>; /** The newest test run any role made, from its Bash hook. */ tests?: TestRun }
 /** A test command's outcome. failed, total, first: parsed from its output when it says; tail: its last 8 lines. */
 export type TestRun = { command: string; ok: boolean; at: number; failed?: number; total?: number; first?: string; tail?: string[] }
 /** A standup's Done and Left items, cut short. */

@@ -4,5 +4,6 @@
   "description": "Asks before a tool call that spends money: Bland, OpenRouter, NewBlack, paid shop searches, Gemini, AWS changes",
   "author": {
     "name": "Kenneth Kang"
-  }
+  },
+  "license": "MIT"
 }

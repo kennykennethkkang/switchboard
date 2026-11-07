@@ -66,6 +66,12 @@ export type HubCommand =
   | { type: 'hub-role-model'; role: string; model: 'inherit' | 'fable' | 'opus' | 'sonnet' | 'haiku' }
   | { type: 'hub-rc-server'; folder: string; on: boolean }
   | { type: 'hub-handoff'; sessionId: string }
+  /** The SkillSpector sweep: name rescans one tool, none sweeps everything installed. */
+  | { type: 'hub-sweep'; name?: string }
+  | { type: 'hub-sweep-approve'; name: string }
+  | { type: 'hub-sweep-fix'; name: string }
+  /** Add a plugin or skill from GitHub: owner/repo or an https://github.com link, swept on the way in. */
+  | { type: 'hub-tool-add'; repo: string }
   | { type: 'hub-dev-start'; folder: string }
   | { type: 'hub-dev-stop'; folder: string }
   | { type: 'hub-awake'; on: boolean }

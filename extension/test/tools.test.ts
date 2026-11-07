@@ -4,7 +4,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { Installed } from '../src/hub/types'
-import { FLAGGED, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, fallbackProfile, startProfile, parsePick, pickProfile, pickPrompt, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE, PROMPT_MAX } from '../src/hub/tools'
+import { FLAGGED, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, startProfile, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE } from '../src/hub/tools'
 
 const inv: Installed[] = [
   { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, description: 'TDD and plans' },
@@ -26,56 +26,26 @@ test('defaultProfile: every plugin on, mods and archived skills left out', () =>
   })
 })
 
-test('defaultProfile: auth0 and Stitch start on, the audited duplicates start off', () => {
-  const all = defaultProfile(['auth0@claude-plugins-official', 'stitch-design@google-labs-code-stitch-skills'].map(name => ({ kind: 'plugin' as const, name, enabled: false })))
-  assert.ok(Object.values(all.plugins).every(Boolean))
-  for (const name of ['security-guidance@claude-code-plugins', 'code-simplifier@claude-plugins-official', 'github@claude-plugins-official', 'image-to-code-skill', 'gsap-greensock']) assert.ok(FLAGGED.includes(name), name)
-  const d = defaultProfile(FLAGGED.map(name => ({ kind: name.includes('@') ? 'plugin' as const : 'skill' as const, name, enabled: true })))
-  for (const name of FLAGGED) assert.equal((name.includes('@') ? d.plugins : d.skills)[name], false, name)
+test('defaultProfile: everything on but the second security-guidance, whose hooks would run twice', () => {
+  const names = ['auth0@claude-plugins-official', 'stitch-design@google-labs-code-stitch-skills', 'code-simplifier@claude-plugins-official', 'github@claude-plugins-official', 'security-guidance@claude-code-plugins']
+  const d = defaultProfile([...names.map(name => ({ kind: 'plugin' as const, name, enabled: false })), ...['image-to-code-skill', 'gsap-greensock'].map(name => ({ kind: 'skill' as const, name, enabled: true }))])
+  assert.deepEqual(FLAGGED, ['security-guidance@claude-code-plugins'])
+  assert.equal(d.plugins['security-guidance@claude-code-plugins'], false)
+  assert.ok(Object.entries(d.plugins).every(([k, on]) => on || FLAGGED.includes(k)))
+  assert.ok(Object.values(d.skills).every(Boolean))
 })
 
-test('flagged skills: a pick never turns one on or lists it, a hand toggle and tool_on still can', () => {
-  const withFlagged: Installed[] = [...inv, { kind: 'skill', name: 'gsap-greensock', enabled: true }, { kind: 'plugin', name: 'code-simplifier@claude-plugins-official', enabled: true }]
-  const p = parsePick('{"plugins":[],"skills":[]}', withFlagged)!
-  assert.equal(p.skills['gsap-greensock'], false)
-  assert.equal(p.plugins['code-simplifier@claude-plugins-official'], false)
-  assert.doesNotMatch(pickPrompt('animate the hero', withFlagged), /gsap-greensock|code-simplifier/)
-  assert.equal(fallbackProfile('use gsap here', withFlagged).skills['gsap-greensock'], false)
-  assert.equal(cleanProfile({ plugins: {}, skills: { 'gsap-greensock': true } }, withFlagged).skills['gsap-greensock'], true)
-  assert.equal(turnOn(p, withFlagged, 'gsap-greensock')?.profile.skills['gsap-greensock'], true)
+test('flagged: a hand toggle and tool_on still turn it on', () => {
+  const withFlagged: Installed[] = [...inv, { kind: 'plugin', name: 'security-guidance@claude-code-plugins', enabled: true }]
+  const d = defaultProfile(withFlagged)
+  assert.equal(cleanProfile({ plugins: { 'security-guidance@claude-code-plugins': true }, skills: {} }, withFlagged).plugins['security-guidance@claude-code-plugins'], true)
+  assert.equal(turnOn(d, withFlagged, 'security-guidance@claude-code-plugins')?.profile.plugins['security-guidance@claude-code-plugins'], true)
 })
 
-test('fallbackProfile: platform kits (codex, Expo, Swift, image generation) off unless the goal names them', () => {
-  const more: Installed[] = [{ kind: 'plugin', name: 'codex@openai-codex', enabled: true }, ...['animate-expo', 'write-swift', 'imagegen-frontend-web'].map(name => ({ kind: 'skill' as const, name, enabled: true }))]
-  const p = fallbackProfile('fix the window routing', more)
-  assert.equal(p.plugins['codex@openai-codex'], false)
-  assert.deepEqual(p.skills, { 'animate-expo': false, 'write-swift': false, 'imagegen-frontend-web': false })
-  assert.equal(fallbackProfile('ask Codex to review', more).plugins['codex@openai-codex'], true)
-  assert.equal(fallbackProfile('port the sheet to Swift', more).skills['write-swift'], true)
-  assert.equal(fallbackProfile('Expo screen transitions', more).skills['animate-expo'], true)
-})
-
-test('startProfile: no goal is the defaults with no model call; nothing installed is none', async () => {
-  const pick = async () => { throw new Error('no model call without a goal') }
-  assert.deepEqual(await startProfile(inv, undefined, undefined, pick), defaultProfile(inv))
-  assert.deepEqual(await startProfile(inv, undefined, '', pick), defaultProfile(inv))
-  assert.equal(await startProfile([], undefined, 'build it', pick), undefined)
-  const picked = { plugins: { 'bland@bland': false }, skills: {} }
-  assert.equal(await startProfile(inv, undefined, 'build it', async g => (assert.equal(g, 'build it'), picked)), picked)
-  const sent = await startProfile(inv, { plugins: { 'bland@bland': false }, skills: {} }, 'build it', pick)
-  assert.deepEqual(sent, cleanProfile({ plugins: { 'bland@bland': false }, skills: {} }, inv))
-})
-
-test('parsePick: named ones off, the rest on, always kept on', () => {
-  const p = parsePick('Sure: {"plugins":["aws-core","superpowers"],"skills":["phone"]}', inv)!
-  assert.deepEqual(p.plugins, { 'superpowers@superpowers-dev': true, 'bland@bland': true, 'marketing-skills@marketingskills': true, 'auth0@claude-plugins-official': true, 'aws-core@claude-plugins-official': false })
-  assert.deepEqual(p.skills, { phone: false, 'taste-design': true })
-})
-
-test('parsePick: junk or no JSON is undefined', () => {
-  assert.equal(parsePick('no idea', inv), undefined)
-  assert.equal(parsePick('{"plugins":"all"}', inv), undefined)
-  assert.equal(parsePick('{broken', inv), undefined)
+test('startProfile: the panel profile cleaned, else all on with no model call; nothing installed is none', () => {
+  assert.deepEqual(startProfile(inv, undefined), defaultProfile(inv))
+  assert.equal(startProfile([], undefined), undefined)
+  assert.deepEqual(startProfile(inv, { plugins: { 'bland@bland': false }, skills: {} }), cleanProfile({ plugins: { 'bland@bland': false }, skills: {} }, inv))
 })
 
 test('cleanProfile: unknown names dropped, missing ones from defaults, a flagged one the user turned on kept', () => {
@@ -90,35 +60,9 @@ test('cleanProfile: an always-on plugin like superpowers stays on when turned of
   assert.equal(cleanProfile({ plugins: { 'superpowers@superpowers-dev': false }, skills: {} }, inv).plugins['superpowers@superpowers-dev'], true)
 })
 
-test('pickPrompt: names the goal and every choice, not mods or roles', () => {
-  const s = pickPrompt('make a phone agent', inv)
-  assert.match(s, /make a phone agent/)
-  assert.match(s, /bland@bland: Voice agents/)
-  assert.match(s, /phone: Call the owner/)
-  assert.doesNotMatch(s, /usage-meter|engineer/)
-  assert.match(s, /auth0@claude-plugins-official/)
-})
-
-test('pickProfile: the answer when it parses, the fallback when it fails or is slow', async () => {
-  assert.equal((await pickProfile('x', inv, async () => '{"plugins":["bland"],"skills":[]}')).plugins['bland@bland'], false)
-  assert.deepEqual(await pickProfile('x', inv, async () => { throw new Error('x') }), fallbackProfile('x', inv))
-  assert.deepEqual(await pickProfile('x', inv, () => new Promise(r => setTimeout(() => r('{"plugins":[],"skills":[]}'), 50)), 10), fallbackProfile('x', inv))
-})
-
-test('fallbackProfile: tool-specific kits off unless the goal names them, the rest as the defaults', () => {
-  const p = fallbackProfile('fix the window routing', inv)
-  assert.equal(p.plugins['bland@bland'], false)
-  assert.equal(p.plugins['marketing-skills@marketingskills'], false)
-  assert.equal(p.plugins['superpowers@superpowers-dev'], true)
-  assert.equal(p.plugins['auth0@claude-plugins-official'], true)
-  assert.deepEqual(p.skills, defaultProfile(inv).skills)
-  assert.equal(fallbackProfile('tune the Bland pathway', inv).plugins['bland@bland'], true)
-  assert.equal(fallbackProfile('write AWS cdk', inv).plugins['aws-core@claude-plugins-official'], true)
-})
-
 test('profileSettings: every plugin written out, only off skills overridden', () => {
   assert.deepEqual(profileSettings({ plugins: { 'a@b': true, 'c@d': false }, skills: { phone: false, x: true } }), {
-    enabledPlugins: { 'a@b': true, 'c@d': false }, skillOverrides: { phone: 'off' },
+    enabledPlugins: { 'a@b': true, 'c@d': false }, skillOverrides: { phone: 'off' }, permissions: { defaultMode: 'bypassPermissions' },
   })
 })
 
@@ -144,7 +88,7 @@ test('chatSettings: a to-do chat starts with Remote Control off, a normal new ch
   assert.deepEqual(JSON.parse(fs.readFileSync(normal, 'utf8')), profileSettings(p))
   assert.ok(!('remoteControlAtStartup' in profileSettings(p)))
   // No tool profile: the off switch goes inline, and a normal chat passes no --settings at all.
-  assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, true, dir)!), { remoteControlAtStartup: false })
+  assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, true, dir)!), { remoteControlAtStartup: false, permissions: { defaultMode: 'bypassPermissions' } })
   assert.equal(chatSettings(undefined, undefined, false, dir), undefined)
   assert.equal(chatSettings('2f8fad5b-d9cb-469f-a165-70867728950e', undefined, false, dir), undefined)
 })
@@ -168,7 +112,7 @@ test('no remote on resume: with a profile its file, without one the switch inlin
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
   const bare = '2f8fad5b-d9cb-469f-a165-70867728950e'
   chatSettings(bare, undefined, true, dir)
-  assert.equal(resumeSettingsArg(bare, dir, '', 'posix'), ` --settings '{"remoteControlAtStartup":false}'`)
+  assert.equal(resumeSettingsArg(bare, dir, '', 'posix'), ` --settings '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"}}'`)
   const withTools = '3f8fad5b-d9cb-469f-a165-70867728950e'
   const file = chatSettings(withTools, { plugins: {}, skills: {} }, true, dir)!
   assert.equal(resumeSettingsArg(withTools, dir, '', 'posix'), ` --settings '${file}'`)
@@ -185,7 +129,7 @@ test('no remote follows a handoff to the fresh chat, with or without tools; a no
   assert.equal(a.off, true)
   assert.equal(isNoRemote(fresh, dir), true)
   assert.equal(JSON.parse(fs.readFileSync(a.settings!, 'utf8')).remoteControlAtStartup, false)
-  assert.deepEqual(handoffSettings(old, fresh2, undefined, dir), { settings: '{"remoteControlAtStartup":false}', off: true })
+  assert.deepEqual(handoffSettings(old, fresh2, undefined, dir), { settings: '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"}}', off: true })
   const normal = '8f8fad5b-d9cb-469f-a165-70867728950e', next = '9f8fad5b-d9cb-469f-a165-70867728950e'
   const b = handoffSettings(normal, next, p, dir)
   assert.equal(b.off, false)
@@ -200,6 +144,7 @@ test('routes: tool commands checked, a profile must be two maps of booleans', as
   assert.equal(commandProblem({ type: 'hub-new-chat', path: '/p', remote: false, tools }), undefined)
   assert.equal(commandProblem({ type: 'hub-new-chat', path: '/p', remote: false }), undefined)
   assert.equal(commandProblem({ type: 'hub-pick-tools', text: 'x' }), undefined)
+  assert.equal(commandProblem({ type: 'hub-pick-tools', text: '', path: '/p' }), undefined)
   assert.equal(commandProblem({ type: 'hub-chat-tools', sessionId: 'x', tools }), undefined)
   assert.ok(commandProblem({ type: 'hub-chat-tools', sessionId: 'x', tools: { plugins: { a: 'yes' }, skills: {} } }))
   assert.ok(commandProblem({ type: 'hub-new-chat', path: '/p', remote: false, tools: { plugins: [] } }))
@@ -213,42 +158,6 @@ const projInv: Installed[] = [
   { kind: 'asset', name: 'apple', enabled: true, source: 'project', path: 'design-md/apple/DESIGN.md', description: 'Photography-first gallery look' },
   { kind: 'asset', name: 'raycast-DESIGN', enabled: true, source: 'project', path: 'docs/design/raycast-DESIGN.md', description: 'Raycast dark' },
 ]
-
-test('pickPrompt: descriptions, project context, project skills and assets, the rules', () => {
-  const s = pickPrompt('restyle the login page', projInv, 'Folder: Armasu\nCLAUDE.md:\nNext.js app')
-  assert.match(s, /Folder: Armasu/)
-  assert.match(s, /Next\.js app/)
-  assert.match(s, /apple-design: Apple motion for the web/)
-  assert.match(s, /- apple: Photography-first/)
-  assert.match(s, /"assets"/)
-  assert.match(s, /turn off/)
-  assert.match(s, /impeccable/)
-  assert.match(s, /claude-x-jev/)
-})
-
-test('pickPrompt: stays under the cap with a huge inventory and context', () => {
-  const big: Installed[] = Array.from({ length: 400 }, (_, i) => ({ kind: i % 2 ? 'skill' : 'asset', name: `item-${i}`, enabled: true, path: `design-md/item-${i}/DESIGN.md`, description: 'x'.repeat(300) }))
-  const s = pickPrompt('g'.repeat(5000), [...inv, ...big], 'c'.repeat(20000))
-  assert.ok(s.length <= PROMPT_MAX, `${s.length}`)
-  assert.match(s, /Answer with JSON only/)
-})
-
-test('pickPrompt: over the cap, asset descriptions go before plugin and skill ones', () => {
-  const many: Installed[] = Array.from({ length: 80 }, (_, i) => ({ kind: 'asset', name: `brand-${i}`, enabled: true, path: `design-md/brand-${i}/DESIGN.md`, description: 'y'.repeat(150) }))
-  const s = pickPrompt('restyle', [...projInv, ...many], 'c'.repeat(2000))
-  assert.ok(s.length <= PROMPT_MAX)
-  assert.match(s, /bland@bland: Voice agents/)
-  assert.match(s, /apple-design: Apple motion for the web/)
-  assert.match(s, /- brand-79$/m)
-})
-
-test('parsePick: assets turned off by name or path, missing assets means all on', () => {
-  const p = parsePick('{"plugins":[],"skills":["apple-design"],"assets":["apple"]}', projInv)!
-  assert.deepEqual(p.assets, { 'design-md/apple/DESIGN.md': false, 'docs/design/raycast-DESIGN.md': true })
-  assert.equal(p.skills['apple-design'], false)
-  assert.deepEqual(parsePick('{"plugins":[],"skills":[]}', projInv)!.assets, { 'design-md/apple/DESIGN.md': true, 'docs/design/raycast-DESIGN.md': true })
-  assert.deepEqual(parsePick('{"plugins":[],"skills":[],"assets":["docs/design/raycast-DESIGN.md"]}', projInv)!.assets, { 'design-md/apple/DESIGN.md': true, 'docs/design/raycast-DESIGN.md': false })
-})
 
 test('defaultProfile: project skills and assets on; no assets key without assets', () => {
   const d = defaultProfile(projInv)
@@ -270,7 +179,7 @@ test('toolsNote: tells the chat to read the design references on before UI work'
 })
 
 test('profileSettings: a project skill turned off goes through skillOverrides', () => {
-  assert.deepEqual(profileSettings({ plugins: {}, skills: { 'apple-design': false }, assets: { 'a.md': true } }), { enabledPlugins: {}, skillOverrides: { 'apple-design': 'off' } })
+  assert.deepEqual(profileSettings({ plugins: {}, skills: { 'apple-design': false }, assets: { 'a.md': true } }), { enabledPlugins: {}, skillOverrides: { 'apple-design': 'off' }, permissions: { defaultMode: 'bypassPermissions' } })
 })
 
 test('resumeSettingsArg: a profile with assets resumes with the note', () => {
@@ -278,16 +187,8 @@ test('resumeSettingsArg: a profile with assets resumes with the note', () => {
   const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
   saveProfile(id, { plugins: {}, skills: {}, assets: { "design-md/o'neil/DESIGN.md": true } }, dir)
   const arg = resumeSettingsArg(id, dir, '', 'posix')
-  assert.match(arg, /--settings '.+' --append-system-prompt 'Switchboard started/)
+  assert.match(arg, /--settings '.+' --append-system-prompt 'Every installed plugin/)
   assert.match(arg, /o'\\''neil/)
-})
-
-test('pickProfile: a fallback is reported', async () => {
-  const why: string[] = []
-  await pickProfile('x', inv, async () => 'no json', 1000, w => why.push(w))
-  await pickProfile('x', inv, async () => { throw new Error('boom') }, 1000, w => why.push(w))
-  assert.equal(why.length, 2)
-  assert.match(why[1], /boom/)
 })
 
 const libInv: Installed[] = [
@@ -302,32 +203,6 @@ test('defaultProfile: library off, project assets on', () => {
     'design-md/apple/DESIGN.md': true, 'docs/design/raycast-DESIGN.md': true,
     '/h/lib/cursor/DESIGN.md': false, '/h/lib/apple/DESIGN.md': false, '/h/lib/a/DESIGN.md': false, '/h/lib/b/DESIGN.md': false, '/h/lib/c/DESIGN.md': false,
   })
-})
-
-test('parsePick: library names turn on, up to three, apart from project assets of the same name', () => {
-  const p = parsePick('{"plugins":[],"skills":[],"assets":["apple"],"library":["cursor","a","b","c"]}', libInv)!
-  assert.deepEqual(p.assets, {
-    'design-md/apple/DESIGN.md': false, 'docs/design/raycast-DESIGN.md': true,
-    '/h/lib/cursor/DESIGN.md': true, '/h/lib/apple/DESIGN.md': false, '/h/lib/a/DESIGN.md': true, '/h/lib/b/DESIGN.md': true, '/h/lib/c/DESIGN.md': false,
-  })
-  const none = parsePick('{"plugins":[],"skills":[]}', libInv)!
-  assert.equal(Object.entries(none.assets!).filter(([k, on]) => on && k.startsWith('/h/lib')).length, 0)
-})
-
-test('pickPrompt: a design library section to turn on, only with a library', () => {
-  const s = pickPrompt('restyle the login page', libInv)
-  assert.match(s, /Design library:\n- cursor: Warm cream editor/)
-  assert.match(s, /"library"/)
-  assert.match(s, /up to 3/)
-  assert.doesNotMatch(pickPrompt('x', projInv), /library/i)
-})
-
-test('pickPrompt: over the cap, library descriptions go first', () => {
-  const many: Installed[] = Array.from({ length: 80 }, (_, i) => ({ kind: 'asset', name: `lib-${i}`, enabled: true, source: 'library', path: `/h/lib/lib-${i}/DESIGN.md`, description: 'z'.repeat(150) }))
-  const s = pickPrompt('restyle', [...projInv, ...many], 'c'.repeat(2000))
-  assert.ok(s.length <= PROMPT_MAX)
-  assert.match(s, /- apple: Photography-first/)
-  assert.match(s, /- lib-79$/m)
 })
 
 test('cleanProfile: keeps library keys turned on by hand', () => {
@@ -407,6 +282,36 @@ test('turnOn: a plugin by id, short name or plugin:skill, or a skill, and the fi
   assert.equal(turnOn(off, withDir, '/phone')?.profile.skills.phone, true)
   assert.equal(turnOn(off, withDir, 'local-one', proj)?.use, path.join(proj, '.agents', 'skills', 'local-one', 'SKILL.md'))
   assert.equal(turnOn(off, withDir, 'nope'), undefined)
+})
+
+test('resume: a settings file from before every chat started all on is rewritten all on, assets as saved', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
+  const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const old = { plugins: { 'a@b': false, 'security-guidance@claude-code-plugins': false }, skills: { phone: false }, assets: { 'x.md': false, '/l/y.md': true } }
+  fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(old))
+  fs.writeFileSync(path.join(dir, `${id}.settings.json`), JSON.stringify({ enabledPlugins: old.plugins, skillOverrides: { phone: 'off' } }))
+  resumeSettingsArg(id, dir, '', 'posix', path.join(dir, 'lib'))
+  const p = { plugins: { 'a@b': true, 'security-guidance@claude-code-plugins': false }, skills: { phone: true }, assets: old.assets }
+  assert.deepEqual(readProfiles([id], dir)[id], p)
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${id}.settings.json`), 'utf8')), profileSettings(p))
+  // A hand toggle saved since then stays.
+  saveProfile(id, { ...p, skills: { phone: false } }, dir)
+  resumeSettingsArg(id, dir, '', 'posix')
+  assert.equal(readProfiles([id], dir)[id].skills.phone, false)
+})
+
+test('resume: library copies saved on in an old profile go off and out of the note', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-')), lib = path.join(dir, 'lib')
+  const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const brands = ['airbnb', 'apple', 'stripe', 'zapier']
+  for (const b of brands) { fs.mkdirSync(path.join(lib, b), { recursive: true }); fs.writeFileSync(path.join(lib, b, 'DESIGN.md'), '') }
+  const assets = { ...Object.fromEntries(brands.map(b => [`design-md/${b}/DESIGN.md`, true])), 'design-md/mine/DESIGN.md': true, 'docs/design/raycast-DESIGN.md': true }
+  fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ plugins: {}, skills: {}, assets }))
+  fs.writeFileSync(path.join(dir, `${id}.settings.json`), JSON.stringify({ enabledPlugins: {}, skillOverrides: {} }))
+  const arg = resumeSettingsArg(id, dir, '', 'posix', lib)
+  assert.match(arg, /design-md\/mine\/DESIGN\.md, docs\/design\/raycast-DESIGN\.md\./)
+  assert.doesNotMatch(arg, /airbnb|zapier/)
+  assert.equal(readProfiles([id], dir)[id].assets!['design-md/airbnb/DESIGN.md'], false)
 })
 
 test('withLibrary: a profile saved before the library gets every look, off; ones it has stay as set', () => {
