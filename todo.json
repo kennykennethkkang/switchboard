@@ -30,14 +30,6 @@
    "name": "Fix Switchboard plugin access prompt"
   },
   {
-   "id": "1478322a-ok",
-   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
-   "at": 1793818613630,
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "missed"
-  },
-  {
    "id": "0e849084",
    "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
    "at": 1793822517720,
@@ -189,7 +181,8 @@
   "e75e0921": 1794113771979,
   "29c4f61f": 1794114466352,
   "7ffd4fde": 1794114467048,
-  "8133346b": 1794114467698
+  "8133346b": 1794114467698,
+  "1478322a-ok": 1794125486813
  },
  "suggested": [
   {
@@ -426,11 +419,20 @@
  ],
  "ticked": [
   {
+   "id": "1478322a-ok",
+   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "missed",
+   "at": 1794125486813,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
    "id": "8133346b",
    "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639",
    "at": 1794114467698,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
   },
   {
    "id": "7ffd4fde",
@@ -497,15 +499,6 @@
    "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
    "name": "Security Audit Application",
    "why": "later"
-  },
-  {
-   "id": "3644d6ca",
-   "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
-   "at": 1793870136284,
-   "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
   }
  ]
 }
