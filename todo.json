@@ -191,7 +191,10 @@
   "c217d01c": 1794082082744,
   "6a3650aa-ok": 1794082120416,
   "bc3ce8c9-ok": 1794082320992,
-  "5bb830e8": 1794085712525
+  "5bb830e8": 1794085712525,
+  "9a73acad": 1794107112579,
+  "e8aad6e8": 1794107112579,
+  "5642110c": 1794107112579
  },
  "ticked": [
   {
@@ -397,28 +400,20 @@
    "why": "you"
   },
   {
-   "id": "9a73acad",
-   "text": "Rebuild and reload the extension, then try archiving a chat and bringing it back.",
-   "at": 1794090092278,
+   "id": "621c5d95",
+   "text": "Rebuild and reload Switchboard. Codex chats that are already open keep asking until you restart them.",
+   "at": 1794107112579,
    "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
    "name": "Switchboard chat archive controls",
    "why": "you"
   },
   {
-   "id": "e8aad6e8",
-   "text": "A qa review, the full test suite, and a look at the change in the running app.",
-   "at": 1794090092278,
+   "id": "c37e9bc4",
+   "text": "Try Archive on a card, then Bring back from the Archive list.",
+   "at": 1794107112579,
    "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
    "name": "Switchboard chat archive controls",
-   "why": "later"
-  },
-  {
-   "id": "5642110c",
-   "text": "Sweeping the changed files for em dashes. The Python edits added none.",
-   "at": 1794090092278,
-   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
-   "name": "Switchboard chat archive controls",
-   "why": "later"
+   "why": "you"
   }
  ]
 }
