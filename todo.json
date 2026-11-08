@@ -200,7 +200,10 @@
   "9ab89b5f": 1794125487009,
   "ac60400a": 1794125487203,
   "784b0510": 1794125538357,
-  "9ce4d0a2": 1794131692535
+  "9ce4d0a2": 1794131692535,
+  "99c3b7ad": 1794132037117,
+  "c8901aad": 1794132037117,
+  "d613a361": 1794132037117
  },
  "ticked": [
   {
@@ -485,30 +488,6 @@
    "why": "later"
   },
   {
-   "id": "99c3b7ad",
-   "text": "Reload any VS Code window that still shows the old panel. No agent-flow window was open to check.",
-   "at": 1794113768312,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
-   "id": "c8901aad",
-   "text": "claude-mods/kit now holds nine build files, 0.19.0 to 0.21.5, about 28 MB. Delete the old ones first if you only want the latest in git.",
-   "at": 1794113768312,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
-   "id": "d613a361",
-   "text": "Nothing. f426e746's Perplexity login and commit cleaner will go in a later release.",
-   "at": 1794113768312,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
    "id": "32b883a8",
    "text": "Please also make it so if user is typing stuff and something happens it has a save what was typed feature.",
    "at": 1794125585735,
@@ -555,7 +534,14 @@
    "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
    "name": "Tailscale Commit Button Fixes v2",
    "why": "you"
+  },
+  {
+   "id": "0d5b8bf5",
+   "text": "Wait for f426e746 and b0d9a260 to finish, then rebuild 0.21.5 once and commit from the Source Control box.",
+   "at": 1794132037117,
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
   }
- ],
- "cleared": 1
+ ]
 }
