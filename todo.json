@@ -23,12 +23,6 @@
    "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
   },
   {
-   "id": "8133346b",
-   "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
-   "at": 1793534677696,
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
-  },
-  {
    "id": "d6bdfb41",
    "text": "Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Slack/Notion/Drive/Figma/Linear). Each needs Kenneth's API key; wire into kit setup mcps list.",
    "at": 1793667505292,
@@ -194,7 +188,8 @@
   "8fbb8fb6": 1794113771198,
   "e75e0921": 1794113771979,
   "29c4f61f": 1794114466352,
-  "7ffd4fde": 1794114467048
+  "7ffd4fde": 1794114467048,
+  "8133346b": 1794114467698
  },
  "suggested": [
   {
@@ -431,6 +426,13 @@
  ],
  "ticked": [
   {
+   "id": "8133346b",
+   "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639",
+   "at": 1794114467698,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
    "id": "7ffd4fde",
    "text": "Create instructions on creating mod instructions taylored for your own use.",
    "at": 1794114467048,
@@ -503,14 +505,6 @@
    "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "1aca550a",
-   "text": "Reload the VS Code windows (or rebuild Switchboard's extension) so the new auto-start and trust code loads, then check that \"Auto-start chats\" shows under Chats",
-   "at": 1793851808280,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
    "why": "you"
   }
  ]
