@@ -98,6 +98,13 @@
    "at": 1794108908267,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "784b0510",
+   "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
+   "at": 1794112444944,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   }
  ],
  "removed": {
