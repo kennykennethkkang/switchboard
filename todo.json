@@ -86,6 +86,13 @@
    "at": 1794132911887,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "3b5da7e1",
+   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/agents/engineer.md and qa.md, add: \"macOS has no timeout. Run suites as perl -e 'alarm 600; exec @ARGV' -- <cmd> (120 for one file); an alarm kill is a fail.\" Two unbounded runs hung ~30 min. Memory: macos-test-timeout.",
+   "at": 1794132913227,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   }
  ],
  "removed": {
