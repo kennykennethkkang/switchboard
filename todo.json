@@ -65,6 +65,13 @@
    "at": 1794125531556,
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes"
+  },
+  {
+   "id": "005e5cfd",
+   "text": "MiroFish pilot on Switchboard: once ZEP_API_KEY is in ~/Documents/GitHub/MiroFish/.env (see SETUP-KENNETH.md), run sb-pilot.py with 20 agents, 10 rounds, seeded with the ux/ screenshot descriptions; read it as a rollout story, not a vote.",
+   "at": 1794125532774,
+   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "name": "Tailscale Commit Button Fixes"
   }
  ],
  "removed": {
