@@ -512,6 +512,22 @@
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "later"
+  },
+  {
+   "id": "31223cae",
+   "text": "`extension/package.json` still says 0.21.4 while the CHANGELOG has a 0.21.5 section. I didn't bump it because other chats are still in the repo, so bump it when",
+   "at": 1794112771445,
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
+  },
+  {
+   "id": "c0a623ab",
+   "text": "claude-mods has eight untracked `.vsix` files (about 24 MB) and a personal `.vscode/settings.json`. Leave them out unless you want them in git.",
+   "at": 1794112771445,
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
   }
  ]
 }
