@@ -202,7 +202,8 @@
   "9a73acad": 1794107112579,
   "e8aad6e8": 1794107112579,
   "5642110c": 1794107112579,
-  "f73d81df-r": 1794110571911
+  "f73d81df-r": 1794110571911,
+  "19223c07": 1794112236181
  },
  "ticked": [
   {
@@ -416,18 +417,18 @@
    "why": "you"
   },
   {
-   "id": "19223c07",
-   "text": "open a new chat in agent-flow so the hooks load; this chat can't use them.",
-   "at": 1794109168656,
-   "from": "0a9fa6a8-a134-4239-9fd6-258745d9ebe5",
-   "name": "Setup agent-flow project",
-   "why": "you"
-  },
-  {
    "id": "97a4adbe",
    "text": "Restart any Codex chats that are already open, so they pick up the no-prompt setting.",
    "at": 1794112209535,
    "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
+   "why": "you"
+  },
+  {
+   "id": "9b1fbd4d",
+   "text": "commit claude-mods. Nothing in agent-flow changed.",
+   "at": 1794112236181,
+   "from": "0a9fa6a8-a134-4239-9fd6-258745d9ebe5",
+   "name": "Setup agent-flow project",
    "why": "you"
   }
  ]
