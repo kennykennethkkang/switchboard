@@ -224,7 +224,13 @@
   "9ce4d0a2": 1794131692535,
   "99c3b7ad": 1794132037117,
   "c8901aad": 1794132037117,
-  "d613a361": 1794132037117
+  "d613a361": 1794132037117,
+  "c57c6e35": 1794134076971,
+  "fbeb9617": 1794134076971,
+  "bdcfa504": 1794134076971,
+  "0ef6bec1": 1794134076971,
+  "54c0e21b": 1794134076971,
+  "5e13e5d3": 1794134076971
  },
  "ticked": [
   {
@@ -308,6 +314,7 @@
    "name": "Couple of issues to bring"
   }
  ],
+ "cleared": 1,
  "suggested": [
   {
    "id": "7bd3478d",
@@ -461,48 +468,8 @@
    "why": "missed"
   },
   {
-   "id": "c57c6e35",
-   "text": "Fix the \"ificSwitchboard adjustments\" note title, and check your New chat draft.",
-   "at": 1794112646353,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "fbeb9617",
-   "text": "When committing agent-flow, add the untracked Board files (`web/components/switchboard/board.*`, `web/lib/board-tree*`, `web/lib/skins/`, `web/public/skins/`, `",
-   "at": 1794112646353,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "bdcfa504",
-   "text": "Reload VS Code for the new build. Run `codex mcp login slack` and `codex mcp login cloudflare`. Start one Codex chat to confirm its hook events reach Switchboar",
-   "at": 1794112646353,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "0ef6bec1",
-   "text": "Close VS Code, Claude and Codex. Then run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename",
-   "at": 1794112646353,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
    "id": "ee375e39",
    "text": "The \"any editor or language\" half of the self-improve item.",
-   "at": 1794112646353,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later"
-  },
-  {
-   "id": "54c0e21b",
-   "text": "The four claude-mods plugin test suites, which need bun.",
    "at": 1794112646353,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
@@ -563,6 +530,70 @@
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
+  },
+  {
+   "id": "117d73b3",
+   "text": "Fix the \"ificSwitchboard adjustments\" note title, and check your New chat draft for missing letters.",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "583d0e2a",
+   "text": "Paste your Perplexity key in Settings, Accounts, API keys, then run Set up. Run `codex mcp login slack` and `codex mcp login cloudflare`, then reload VS Code.",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "2173ddca",
+   "text": "Close VS Code, Claude and Codex. Run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename switc",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "c2c20f3b",
+   "text": "Commit the untracked new files too: `web/lib/court-map*`, `web/components/switchboard/board.*`, `web/lib/skins/`, `extension/src/hub/clean-text.ts`, `extension/",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "d9db23eb",
+   "text": "Decide on the 8 untracked `.vsix` files in claude-mods.",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "556a609b",
+   "text": "The caveman A/B before widening its scope (to-do da240ba3).",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
+  },
+  {
+   "id": "2f08890c",
+   "text": "Tidying the Board's crowded phone view at Fit.",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
+  },
+  {
+   "id": "fc2939be",
+   "text": "The bun-only plugin test suites.",
+   "at": 1794134076971,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
   }
  ]
 }
