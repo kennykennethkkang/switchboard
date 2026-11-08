@@ -86,13 +86,6 @@
    "why": "missed"
   },
   {
-   "id": "8fbb8fb6",
-   "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
-   "at": 1794108908267,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
    "id": "784b0510",
    "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
    "at": 1794112444944,
@@ -209,7 +202,8 @@
   "f807ea2e": 1794112646353,
   "31223cae": 1794113768312,
   "c0a623ab": 1794113768312,
-  "86d2ea6b": 1794113769691
+  "86d2ea6b": 1794113769691,
+  "8fbb8fb6": 1794113771198
  },
  "suggested": [
   {
@@ -454,12 +448,20 @@
  ],
  "ticked": [
   {
+   "id": "8fbb8fb6",
+   "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "at": 1794113771198,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
    "id": "86d2ea6b",
    "text": "Approve kit rule edit (from AAR 2026-11-07): in claude-mods/kit/rules.md under \"Hand any job that spans several files\", add \"End every brief with a tool-call budget (about 25 to 35) and 'send the Report before the budget runs out'.\" Three subagents hit their turn cap this chat without one.",
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
    "at": 1794113769691,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring"
   },
   {
    "id": "31223cae",
@@ -528,13 +530,6 @@
    "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard"
-  },
-  {
-   "id": "ed188d8a",
-   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
-   "at": 1793527102970,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
   }
  ]
 }
