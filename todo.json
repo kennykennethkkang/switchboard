@@ -100,6 +100,13 @@
    "at": 1794132914791,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "5b5cf8d5",
+   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
+   "at": 1794136321609,
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2"
   }
  ],
  "removed": {
@@ -315,7 +322,6 @@
    "name": "Couple of issues to bring"
   }
  ],
- "cleared": 1,
  "suggested": [
   {
    "id": "7bd3478d",
