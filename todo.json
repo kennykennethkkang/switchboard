@@ -91,6 +91,13 @@
    "at": 1794085674006,
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring"
+  },
+  {
+   "id": "8fbb8fb6",
+   "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
+   "at": 1794108908267,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   }
  ],
  "removed": {
