@@ -114,6 +114,13 @@
    "at": 1794137321564,
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3"
+  },
+  {
+   "id": "440724a4",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskStop only one that does not answer.' Why: TaskStop on four mid-edit agents left flow-map.tsx with tsc errors and no reports.",
+   "at": 1794137323685,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
   }
  ],
  "removed": {
