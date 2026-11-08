@@ -203,7 +203,8 @@
   "31223cae": 1794113768312,
   "c0a623ab": 1794113768312,
   "86d2ea6b": 1794113769691,
-  "8fbb8fb6": 1794113771198
+  "8fbb8fb6": 1794113771198,
+  "e75e0921": 1794113771979
  },
  "suggested": [
   {
@@ -358,14 +359,6 @@
    "why": "missed"
   },
   {
-   "id": "e75e0921",
-   "text": "Can you check if mirofish is added in",
-   "at": 1794112638679,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
-  },
-  {
    "id": "ac60400a",
    "text": "Also tell what was added in what wasn't and why",
    "at": 1794112638679,
@@ -448,12 +441,21 @@
  ],
  "ticked": [
   {
-   "id": "8fbb8fb6",
-   "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
+   "id": "e75e0921",
+   "text": "Can you check if mirofish is added in",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
-   "at": 1794113771198,
+   "why": "missed",
+   "at": 1794113771979,
    "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
+   "id": "8fbb8fb6",
+   "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
+   "at": 1794113771198,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   },
   {
    "id": "86d2ea6b",
@@ -522,14 +524,6 @@
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity",
    "why": "you"
-  },
-  {
-   "id": "6b74570d",
-   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
-   "at": 1793786201684,
-   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard"
   }
  ]
 }
