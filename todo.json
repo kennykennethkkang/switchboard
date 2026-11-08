@@ -7,13 +7,6 @@
    "at": 1793353577294
   },
   {
-   "id": "29c4f61f",
-   "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
-   "at": 1793525870153,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2"
-  },
-  {
    "id": "1d1d499f-ok",
    "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
    "at": 1793526817270,
@@ -204,7 +197,8 @@
   "c0a623ab": 1794113768312,
   "86d2ea6b": 1794113769691,
   "8fbb8fb6": 1794113771198,
-  "e75e0921": 1794113771979
+  "e75e0921": 1794113771979,
+  "29c4f61f": 1794114466352
  },
  "suggested": [
   {
@@ -441,13 +435,21 @@
  ],
  "ticked": [
   {
+   "id": "29c4f61f",
+   "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2",
+   "at": 1794114466352,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
    "id": "e75e0921",
    "text": "Can you check if mirofish is added in",
+   "at": 1794113771979,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed",
-   "at": 1794113771979,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+   "why": "missed"
   },
   {
    "id": "8fbb8fb6",
@@ -515,14 +517,6 @@
    "at": 1793818505174,
    "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
    "name": "Security Audit Application",
-   "why": "you"
-  },
-  {
-   "id": "ec818f9a",
-   "text": "Reload the agent-flow window.",
-   "at": 1793818472516,
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
    "why": "you"
   }
  ]
