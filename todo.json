@@ -176,7 +176,8 @@
   "7ffd4fde": 1794114467048,
   "8133346b": 1794114467698,
   "1478322a-ok": 1794125486813,
-  "9ab89b5f": 1794125487009
+  "9ab89b5f": 1794125487009,
+  "ac60400a": 1794125487203
  },
  "suggested": [
   {
@@ -331,14 +332,6 @@
    "why": "missed"
   },
   {
-   "id": "ac60400a",
-   "text": "Also tell what was added in what wasn't and why",
-   "at": 1794112638679,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
-  },
-  {
    "id": "c57c6e35",
    "text": "Fix the \"ificSwitchboard adjustments\" note title, and check your New chat draft.",
    "at": 1794112646353,
@@ -413,12 +406,21 @@
  ],
  "ticked": [
   {
+   "id": "ac60400a",
+   "text": "Also tell what was added in what wasn't and why",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "missed",
+   "at": 1794125487203,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
    "id": "9ab89b5f",
    "text": "Phone voice for Jarvis: add a browser getUserMedia mic path for the phone over the Tailscale Serve URL (port 3131) and test on iPhone (watch tailscale issue 19147)",
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
    "at": 1794125487009,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity"
   },
   {
    "id": "1478322a-ok",
@@ -483,15 +485,6 @@
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
-  },
-  {
-   "id": "bc3ce8c9-ok",
-   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
-   "at": 1794082320992,
-   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "later"
   }
  ]
 }
