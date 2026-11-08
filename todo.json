@@ -199,7 +199,8 @@
   "1478322a-ok": 1794125486813,
   "9ab89b5f": 1794125487009,
   "ac60400a": 1794125487203,
-  "784b0510": 1794125538357
+  "784b0510": 1794125538357,
+  "9ce4d0a2": 1794131692535
  },
  "ticked": [
   {
@@ -538,6 +539,23 @@
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
    "why": "missed"
+  },
+  {
+   "id": "ed3a63d0",
+   "text": "Reload one VS Code window to pick up the new extension code.",
+   "at": 1794131692535,
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "why": "you"
+  },
+  {
+   "id": "1379ee82",
+   "text": "`web/components/switchboard/switchboard.tsx` and `web/lib/hub-demo.ts` stay out of this commit until the Board chat finishes. Unstage them before you commit.",
+   "at": 1794131692535,
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "why": "you"
   }
- ]
+ ],
+ "cleared": 1
 }
