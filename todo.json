@@ -210,7 +210,10 @@
   "e8aad6e8": 1794107112579,
   "5642110c": 1794107112579,
   "f73d81df-r": 1794110571911,
-  "19223c07": 1794112236181
+  "19223c07": 1794112236181,
+  "77cafb74": 1794112646353,
+  "7fcd40ce": 1794112646353,
+  "f807ea2e": 1794112646353
  },
  "ticked": [
   {
@@ -461,6 +464,54 @@
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "missed"
+  },
+  {
+   "id": "c57c6e35",
+   "text": "Fix the \"ificSwitchboard adjustments\" note title, and check your New chat draft.",
+   "at": 1794112646353,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "fbeb9617",
+   "text": "When committing agent-flow, add the untracked Board files (`web/components/switchboard/board.*`, `web/lib/board-tree*`, `web/lib/skins/`, `web/public/skins/`, `",
+   "at": 1794112646353,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "bdcfa504",
+   "text": "Reload VS Code for the new build. Run `codex mcp login slack` and `codex mcp login cloudflare`. Start one Codex chat to confirm its hook events reach Switchboar",
+   "at": 1794112646353,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "0ef6bec1",
+   "text": "Close VS Code, Claude and Codex. Then run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename",
+   "at": 1794112646353,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you"
+  },
+  {
+   "id": "ee375e39",
+   "text": "The \"any editor or language\" half of the self-improve item.",
+   "at": 1794112646353,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
+  },
+  {
+   "id": "54c0e21b",
+   "text": "The four claude-mods plugin test suites, which need bun.",
+   "at": 1794112646353,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
   }
  ]
 }
