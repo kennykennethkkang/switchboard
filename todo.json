@@ -213,9 +213,20 @@
   "19223c07": 1794112236181,
   "77cafb74": 1794112646353,
   "7fcd40ce": 1794112646353,
-  "f807ea2e": 1794112646353
+  "f807ea2e": 1794112646353,
+  "31223cae": 1794113768312,
+  "c0a623ab": 1794113768312
  },
  "ticked": [
+  {
+   "id": "31223cae",
+   "text": "`extension/package.json` still says 0.21.4 while the CHANGELOG has a 0.21.5 section. I didn't bump it because other chats are still in the repo, so bump it when",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you",
+   "at": 1794113768312,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0"
+  },
   {
    "id": "bc3ce8c9-ok",
    "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
@@ -286,13 +297,6 @@
    "id": "d16fa4d2-ok",
    "text": "your Gemini key, then a live test of image, video and notebooks",
    "at": 1793527102566,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  },
-  {
-   "id": "f1634e88",
-   "text": "Gemini live test: once Kenneth saves the key in Settings > Accounts > API keys, run gemini.py image, video and ask once each and confirm they work",
-   "at": 1793527102198,
    "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "from": "8846e195-934e-46f1-845f-35d4b664c54b"
   }
@@ -514,17 +518,25 @@
    "why": "later"
   },
   {
-   "id": "31223cae",
-   "text": "`extension/package.json` still says 0.21.4 while the CHANGELOG has a 0.21.5 section. I didn't bump it because other chats are still in the repo, so bump it when",
-   "at": 1794112771445,
+   "id": "99c3b7ad",
+   "text": "Reload any VS Code window that still shows the old panel. No agent-flow window was open to check.",
+   "at": 1794113768312,
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
   },
   {
-   "id": "c0a623ab",
-   "text": "claude-mods has eight untracked `.vsix` files (about 24 MB) and a personal `.vscode/settings.json`. Leave them out unless you want them in git.",
-   "at": 1794112771445,
+   "id": "c8901aad",
+   "text": "claude-mods/kit now holds nine build files, 0.19.0 to 0.21.5, about 28 MB. Delete the old ones first if you only want the latest in git.",
+   "at": 1794113768312,
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
+  },
+  {
+   "id": "d613a361",
+   "text": "Nothing. f426e746's Perplexity login and commit cleaner will go in a later release.",
+   "at": 1794113768312,
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
