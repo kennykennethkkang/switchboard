@@ -107,6 +107,13 @@
    "at": 1794136321609,
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2"
+  },
+  {
+   "id": "ad52b456",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '- [ ] <description> (stopped mid-work)'. Add a test in usage-meter/tests/usage-meter.test.ts. Why: the v2 handoff said Open tasks none while four stopped workstreams were unfinished.",
+   "at": 1794137321564,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
   }
  ],
  "removed": {
