@@ -93,6 +93,13 @@
    "at": 1794132913227,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "925b2b40",
+   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses on glanceability'.\" Board lost 1000-0 twice on the glance goal. Memory: crowd-goal-matches-view.",
+   "at": 1794132914791,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   }
  ],
  "removed": {
