@@ -86,13 +86,6 @@
    "why": "missed"
   },
   {
-   "id": "86d2ea6b",
-   "text": "Approve kit rule edit (from AAR 2026-11-07): in claude-mods/kit/rules.md under \"Hand any job that spans several files\", add \"End every brief with a tool-call budget (about 25 to 35) and 'send the Report before the budget runs out'.\" Three subagents hit their turn cap this chat without one.",
-   "at": 1794085674006,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring"
-  },
-  {
    "id": "8fbb8fb6",
    "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
    "at": 1794108908267,
@@ -215,92 +208,9 @@
   "7fcd40ce": 1794112646353,
   "f807ea2e": 1794112646353,
   "31223cae": 1794113768312,
-  "c0a623ab": 1794113768312
+  "c0a623ab": 1794113768312,
+  "86d2ea6b": 1794113769691
  },
- "ticked": [
-  {
-   "id": "31223cae",
-   "text": "`extension/package.json` still says 0.21.4 while the CHANGELOG has a 0.21.5 section. I didn't bump it because other chats are still in the repo, so bump it when",
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you",
-   "at": 1794113768312,
-   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0"
-  },
-  {
-   "id": "bc3ce8c9-ok",
-   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
-   "at": 1794082320992,
-   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "later"
-  },
-  {
-   "id": "6a3650aa-ok",
-   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
-   "at": 1794082120416,
-   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
-   "why": "later"
-  },
-  {
-   "id": "3644d6ca",
-   "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
-   "at": 1793870136284,
-   "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "1aca550a",
-   "text": "Reload the VS Code windows (or rebuild Switchboard's extension) so the new auto-start and trust code loads, then check that \"Auto-start chats\" shows under Chats",
-   "at": 1793851808280,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "2c03159b",
-   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
-   "at": 1793818505174,
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
-   "why": "you"
-  },
-  {
-   "id": "ec818f9a",
-   "text": "Reload the agent-flow window.",
-   "at": 1793818472516,
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity",
-   "why": "you"
-  },
-  {
-   "id": "6b74570d",
-   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
-   "at": 1793786201684,
-   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard"
-  },
-  {
-   "id": "ed188d8a",
-   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
-   "at": 1793527102970,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
-  },
-  {
-   "id": "d16fa4d2-ok",
-   "text": "your Gemini key, then a live test of image, video and notebooks",
-   "at": 1793527102566,
-   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "from": "8846e195-934e-46f1-845f-35d4b664c54b"
-  }
- ],
  "suggested": [
   {
    "id": "7bd3478d",
@@ -540,6 +450,91 @@
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
+  }
+ ],
+ "ticked": [
+  {
+   "id": "86d2ea6b",
+   "text": "Approve kit rule edit (from AAR 2026-11-07): in claude-mods/kit/rules.md under \"Hand any job that spans several files\", add \"End every brief with a tool-call budget (about 25 to 35) and 'send the Report before the budget runs out'.\" Three subagents hit their turn cap this chat without one.",
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "at": 1794113769691,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
+   "id": "31223cae",
+   "text": "`extension/package.json` still says 0.21.4 while the CHANGELOG has a 0.21.5 section. I didn't bump it because other chats are still in the repo, so bump it when",
+   "at": 1794113768312,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
+  },
+  {
+   "id": "bc3ce8c9-ok",
+   "text": "Small extras: older accepted steps have a tick but no Dismiss, and the project counts still include Finish up items.",
+   "at": 1794082320992,
+   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "later"
+  },
+  {
+   "id": "6a3650aa-ok",
+   "text": "Reload VS Code once the new extension build is installed, so every window uses the new hook script.",
+   "at": 1794082120416,
+   "by": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "later"
+  },
+  {
+   "id": "3644d6ca",
+   "text": "A note whose `description:` spans several lines can have relation text inside it read as a real relation. None of your notes do this today.",
+   "at": 1793870136284,
+   "by": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "1aca550a",
+   "text": "Reload the VS Code windows (or rebuild Switchboard's extension) so the new auto-start and trust code loads, then check that \"Auto-start chats\" shows under Chats",
+   "at": 1793851808280,
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard",
+   "why": "you"
+  },
+  {
+   "id": "2c03159b",
+   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
+   "at": 1793818505174,
+   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
+   "name": "Security Audit Application",
+   "why": "you"
+  },
+  {
+   "id": "ec818f9a",
+   "text": "Reload the agent-flow window.",
+   "at": 1793818472516,
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity",
+   "why": "you"
+  },
+  {
+   "id": "6b74570d",
+   "text": "Approve AAR fix: in claude-mods/kit/skills/gemini/SKILL.md under \"## video\", add: \"- If the call fails (503 or 429), do not cycle models: pull frames with `ffmpeg -i FILE -vf \\\"fps=1,scale=360:-2,tile=4x3\\\" sheet%02d.jpg` and Read the sheets.\" then sync to ~/.claude/skills/gemini",
+   "at": 1793786201684,
+   "by": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
+   "name": "Add these functions into switchboard"
+  },
+  {
+   "id": "ed188d8a",
+   "text": "Phone voice for Jarvis: Kenneth turns on HTTPS Certificates at login.tailscale.com/admin/dns and enables Serve, then `tailscale serve --bg 3131`; add a browser getUserMedia mic path for the phone and test on iPhone (watch tailscale issue 19147)",
+   "at": 1793527102970,
+   "by": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e"
   }
  ]
 }
