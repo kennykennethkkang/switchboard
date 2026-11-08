@@ -640,6 +640,62 @@
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3",
    "why": "missed"
+  },
+  {
+   "id": "0cee494c",
+   "text": "Open `~/Documents/GitHub/MiroFish/.env` and paste your OpenRouter key after `LLM_API_KEY=`, then save. Tell me \"saved\" and I'll run the MiroFish test.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "5492b56f",
+   "text": "Set a credit limit on your OpenRouter key at openrouter.ai, or Jev and OpenRouter calls will ask once per chat.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "a66fcabf",
+   "text": "Review in the Codex chat: realm C as built, plus the round 2 wait-rope and frozen-pause mocks.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "9e8016f7",
+   "text": "Commit both repos once \"Couple of issues to bring v2\" has rebuilt.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "dfb17052",
+   "text": "The MiroFish usability test, once the key is in.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "later"
+  },
+  {
+   "id": "a3bfbe88",
+   "text": "Build the wait rope and frozen pause after you approve the mocks.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "6b629f0f",
+   "text": "Two small known gaps in bash-approve: `sud''o` with quotes spliced in, and `printenv` of a single named key.",
+   "at": 1794176137743,
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
   }
  ]
 }
