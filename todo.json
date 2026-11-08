@@ -79,6 +79,13 @@
    "at": 1794131071091,
    "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
    "name": "Tailscale Commit Button Fixes v2"
+  },
+  {
+   "id": "5b95f145",
+   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/rules.md, under \"Every role\", add: \"Never send System Events keystroke or key code to another app while Kenneth may be typing: focus moves and the keys land in his window. Read Apple Notes with osascript get plaintext; list ticks under For you.\" Memory: apple-notes-no-keystrokes.",
+   "at": 1794132911887,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   }
  ],
  "removed": {
