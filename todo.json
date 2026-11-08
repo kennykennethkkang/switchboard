@@ -75,14 +75,14 @@
   },
   {
    "id": "a38d0a25",
-   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses them. Fix: before building pausePrompt(liveShells()) at ~685 and the shell nudge at ~702, also run shellsDone() over the transcript's recent queue-operation contents (or drop shells whose <task-id> has a <status>completed|failed|killed|stopped</status> notice anywhere in the transcript). Add a test that an absorbed_mid_turn notification removes the shell. Seen 2026-11-08: 9 stale shells listed, 9 failed TaskStops.",
+   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
    "at": 1794131071091,
    "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
    "name": "Tailscale Commit Button Fixes v2"
   },
   {
    "id": "5b95f145",
-   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/rules.md, under \"Every role\", add: \"Never send System Events keystroke or key code to another app while Kenneth may be typing: focus moves and the keys land in his window. Read Apple Notes with osascript get plaintext; list ticks under For you.\" Memory: apple-notes-no-keystrokes.",
+   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/rules.md, under \"Every role\", add: \"Never send System Events keystroke or key code to another app while Kenneth may be typing: focus moves and the keys land in his window. Read Apple Notes with osascript get plaintext; list ticks under For you.\" Mem",
    "at": 1794132911887,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
@@ -96,7 +96,7 @@
   },
   {
    "id": "925b2b40",
-   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses on glanceability'.\" Board lost 1000-0 twice on the glance goal. Memory: crowd-goal-matches-view.",
+   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses",
    "at": 1794132914791,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
@@ -110,14 +110,14 @@
   },
   {
    "id": "ad52b456",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '- [ ] <description> (stopped mid-work)'. Add a test in usage-meter/tests/usage-meter.test.ts. Why: the v2 handoff said Open tasks none while four stopped workstreams were unfinished.",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '- ",
    "at": 1794137321564,
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3"
   },
   {
    "id": "440724a4",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskStop only one that does not answer.' Why: TaskStop on four mid-edit agents left flow-map.tsx with tsc errors and no reports.",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
    "at": 1794137323685,
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3"
@@ -252,7 +252,8 @@
   "0ef6bec1": 1794134076971,
   "54c0e21b": 1794134076971,
   "5e13e5d3": 1794134076971,
-  "cbe2d195": 1794134131446
+  "cbe2d195": 1794134131446,
+  "77dc8fdb-r": 1794164809704
  },
  "ticked": [
   {
@@ -392,14 +393,6 @@
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "later"
-  },
-  {
-   "id": "77dc8fdb-r",
-   "text": "Commit and push both repos. Leave out the leftovers from earlier chats: `agent-flow/ck-collision-test.txt`, and the 0.19.x vsix files and `.vscode/` in claude-m",
-   "at": 1793905602864,
-   "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
-   "name": "Add these functions into switchboard",
-   "why": "you"
   },
   {
    "id": "3ecc36b7",
