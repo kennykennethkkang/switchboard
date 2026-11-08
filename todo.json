@@ -230,7 +230,8 @@
   "bdcfa504": 1794134076971,
   "0ef6bec1": 1794134076971,
   "54c0e21b": 1794134076971,
-  "5e13e5d3": 1794134076971
+  "5e13e5d3": 1794134076971,
+  "cbe2d195": 1794134131446
  },
  "ticked": [
   {
@@ -593,6 +594,22 @@
    "at": 1794134076971,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
+  },
+  {
+   "id": "fc791914",
+   "text": "the new `extension/kit/design-md` entries and `scripts/rename-folder.*`",
+   "at": 1794134131446,
+   "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
+   "name": "Codex Switchboard Integration Setup v3",
+   "why": "you"
+  },
+  {
+   "id": "dd0f7384",
+   "text": "The Codex transcript tab (to-do 29c4f61f).",
+   "at": 1794134131446,
+   "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
+   "name": "Codex Switchboard Integration Setup v3",
    "why": "later"
   }
  ]
