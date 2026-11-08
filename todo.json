@@ -2,11 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "7ffd4fde",
-   "text": "Create instructions on creating mod instructions taylored for your own use.",
-   "at": 1793353577294
-  },
-  {
    "id": "1d1d499f-ok",
    "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
    "at": 1793526817270,
@@ -198,7 +193,8 @@
   "86d2ea6b": 1794113769691,
   "8fbb8fb6": 1794113771198,
   "e75e0921": 1794113771979,
-  "29c4f61f": 1794114466352
+  "29c4f61f": 1794114466352,
+  "7ffd4fde": 1794114467048
  },
  "suggested": [
   {
@@ -435,12 +431,18 @@
  ],
  "ticked": [
   {
+   "id": "7ffd4fde",
+   "text": "Create instructions on creating mod instructions taylored for your own use.",
+   "at": 1794114467048,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
    "id": "29c4f61f",
    "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
    "at": 1794114466352,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2"
   },
   {
    "id": "e75e0921",
@@ -509,14 +511,6 @@
    "at": 1793851808280,
    "from": "95cb3071-268c-472f-a7df-02a3802ebc8a",
    "name": "Add these functions into switchboard",
-   "why": "you"
-  },
-  {
-   "id": "2c03159b",
-   "text": "Turn on HTTPS in Tailscale (admin console, DNS page). Until you do, the phone link shows that message and phone access stays off.",
-   "at": 1793818505174,
-   "from": "60bab513-ee8c-4290-9b8a-85ab572fcd08",
-   "name": "Security Audit Application",
    "why": "you"
   }
  ]
