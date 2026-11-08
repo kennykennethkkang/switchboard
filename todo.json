@@ -72,6 +72,13 @@
    "at": 1794125533920,
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes"
+  },
+  {
+   "id": "a38d0a25",
+   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses them. Fix: before building pausePrompt(liveShells()) at ~685 and the shell nudge at ~702, also run shellsDone() over the transcript's recent queue-operation contents (or drop shells whose <task-id> has a <status>completed|failed|killed|stopped</status> notice anywhere in the transcript). Add a test that an absorbed_mid_turn notification removes the shell. Seen 2026-11-08: 9 stale shells listed, 9 failed TaskStops.",
+   "at": 1794131071091,
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2"
   }
  ],
  "removed": {
