@@ -201,7 +201,8 @@
   "5bb830e8": 1794085712525,
   "9a73acad": 1794107112579,
   "e8aad6e8": 1794107112579,
-  "5642110c": 1794107112579
+  "5642110c": 1794107112579,
+  "f73d81df-r": 1794110571911
  },
  "ticked": [
   {
@@ -341,14 +342,6 @@
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "later"
-  },
-  {
-   "id": "f73d81df-r",
-   "text": "commit the two `claude-mods` edits, rebuild the kit and reload VS Code.",
-   "at": 1793851366427,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
-   "why": "you"
   },
   {
    "id": "77dc8fdb-r",
