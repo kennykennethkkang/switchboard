@@ -421,6 +421,14 @@
    "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
    "name": "Switchboard chat archive controls",
    "why": "you"
+  },
+  {
+   "id": "19223c07",
+   "text": "open a new chat in agent-flow so the hooks load; this chat can't use them.",
+   "at": 1794109168656,
+   "from": "0a9fa6a8-a134-4239-9fd6-258745d9ebe5",
+   "name": "Setup agent-flow project",
+   "why": "you"
   }
  ]
 }
