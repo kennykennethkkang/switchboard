@@ -497,6 +497,14 @@
    "from": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
    "name": "Switchboard kit delegation A B",
    "why": "missed"
+  },
+  {
+   "id": "cbf80c17",
+   "text": "After all other chats are finished inside of switchboard please fix formatting issues for all pages. Some of the pages habe spill over to other parts of the page and buttons, names, and information is",
+   "at": 1794261603812,
+   "from": "7edf7c04-4696-43ab-af10-7fa891d6ee82",
+   "name": "Fix Switchboard page layout overflow",
+   "why": "missed"
   }
  ]
 }
