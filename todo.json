@@ -277,6 +277,92 @@
   "fe4738f7": 1794214839912,
   "6a7283d4": 1794214840099
  },
+ "ticked": [
+  {
+   "id": "6a7283d4",
+   "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
+   "at": 1794214840099,
+   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
+  },
+  {
+   "id": "fe4738f7",
+   "text": "Web Push for the phone app: manifest + service worker + subscribe button in the Tailscale web app, VAPID keys and a send helper the extension can call",
+   "at": 1794214839912,
+   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "before": "6a7283d4",
+   "name": "AWS phone heads-up path"
+  },
+  {
+   "id": "5b5cf8d5",
+   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
+   "at": 1794207923920,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2"
+  },
+  {
+   "id": "2dc6cbb4",
+   "text": "Reload any VS Code window that still shows the old panel.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
+  },
+  {
+   "id": "ed3a63d0",
+   "text": "Reload one VS Code window to pick up the new extension code.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "why": "you"
+  },
+  {
+   "id": "4fd3f17f",
+   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "7035c0ab",
+   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
+   "at": 1794207084031,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "1cc1b2f2",
+   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
+   "at": 1794207083314,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "71d7ef16",
+   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
+   "at": 1794207082598,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "a3bfbe88",
+   "text": "Build the wait rope and frozen pause after you approve the mocks.",
+   "at": 1794197121845,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  }
+ ],
  "suggested": [
   {
    "id": "7bd3478d",
@@ -684,91 +770,37 @@
    "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
    "name": "Codex Switchboard Integration Setup v4",
    "why": "you"
-  }
- ],
- "ticked": [
-  {
-   "id": "6a7283d4",
-   "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639",
-   "at": 1794214840099,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259"
   },
   {
-   "id": "fe4738f7",
-   "text": "Web Push for the phone app: manifest + service worker + subscribe button in the Tailscale web app, VAPID keys and a send helper the extension can call",
-   "at": 1794214839912,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "id": "9f15eb5f",
+   "text": "Rebuild and restart the phone app (`node app/build.js`), then reload the VS Code windows.",
+   "at": 1794214878401,
    "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "before": "6a7283d4",
-   "name": "AWS phone heads-up path"
-  },
-  {
-   "id": "5b5cf8d5",
-   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
-   "at": 1794207923920,
-   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2"
-  },
-  {
-   "id": "2dc6cbb4",
-   "text": "Reload any VS Code window that still shows the old panel.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
+   "name": "AWS phone heads-up path",
    "why": "you"
   },
   {
-   "id": "ed3a63d0",
-   "text": "Reload one VS Code window to pick up the new extension code.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2",
+   "id": "c72a4d5e",
+   "text": "On the iPhone, open the Tailscale https link in Safari, then Share > Add to Home Screen. iOS only allows push from a home-screen app, on iOS 16.4 or later.",
+   "at": 1794214878401,
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "name": "AWS phone heads-up path",
    "why": "you"
   },
   {
-   "id": "4fd3f17f",
-   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
+   "id": "9588df5d",
+   "text": "Open Switchboard from the home screen and sign in again. It doesn't share Safari's sign-in.",
+   "at": 1794214878401,
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "name": "AWS phone heads-up path",
    "why": "you"
   },
   {
-   "id": "7035c0ab",
-   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
-   "at": 1794207084031,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "1cc1b2f2",
-   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
-   "at": 1794207083314,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "71d7ef16",
-   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
-   "at": 1794207082598,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "a3bfbe88",
-   "text": "Build the wait rope and frozen pause after you approve the mocks.",
-   "at": 1794197121845,
-   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
+   "id": "7fae770d",
+   "text": "Turn on Settings > Chats > Phone alerts and allow notifications.",
+   "at": 1794214878401,
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "name": "AWS phone heads-up path",
    "why": "you"
   }
  ]
