@@ -121,13 +121,6 @@
    "at": 1794137323685,
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "7035c0ab",
-   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
-   "at": 1794205239386,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
   }
  ],
  "removed": {
@@ -278,7 +271,8 @@
   "621c5d95": 1794205306312,
   "9e8016f7": 1794205306312,
   "71d7ef16": 1794207082598,
-  "1cc1b2f2": 1794207083314
+  "1cc1b2f2": 1794207083314,
+  "7035c0ab": 1794207084031
  },
  "suggested": [
   {
@@ -723,12 +717,20 @@
  ],
  "ticked": [
   {
-   "id": "1cc1b2f2",
-   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
+   "id": "7035c0ab",
+   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
-   "at": 1794207083314,
+   "at": 1794207084031,
    "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0"
+  },
+  {
+   "id": "1cc1b2f2",
+   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
+   "at": 1794207083314,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
   },
   {
    "id": "71d7ef16",
@@ -793,14 +795,6 @@
    "text": "Create instructions on creating mod instructions taylored for your own use.",
    "at": 1794114467048,
    "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
-  },
-  {
-   "id": "29c4f61f",
-   "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
-   "at": 1794114466352,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2"
   }
  ]
 }
