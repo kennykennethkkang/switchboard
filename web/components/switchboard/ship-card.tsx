@@ -84,9 +84,9 @@ function Files({ title, files }: { title: string; files: { path: string; added: 
 }
 
 /** A finished chat's repo at a glance, and Kenneth's one press to ship it. Chats never press it. */
-export function ShipCard({ repo, progress, sessionId, send, onCopy, phone }: {
+export function ShipCard({ repo, progress, sessionId, send, onCopy, phone, harden }: {
   repo: RepoView | null | undefined; progress: ChatProgress; sessionId: string
-  send: (c: HubCommand) => void; onCopy: (text: string) => Promise<boolean>; phone?: boolean
+  send: (c: HubCommand) => void; onCopy: (text: string) => Promise<boolean>; phone?: boolean; harden?: boolean
 }) {
   // The files on screen when Kenneth pressed; the server refuses if its own list differs by then.
   const [asking, setAsking] = useState<string[] | null>(null)
@@ -148,6 +148,9 @@ export function ShipCard({ repo, progress, sessionId, send, onCopy, phone }: {
           </div>
         : <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
             {text && <CopyCommit small text={text} onCopy={onCopy} />}
+            {harden && !phone && <button type="button" className="hub-btn sm" disabled={busy}
+              title="Runs BLA on a throwaway copy of the build, never your real one" onClick={() => { setSentAt(Date.now()); send({ type: 'hub-harden', sessionId }) }}>
+              {r.busy === 'harden' ? 'Hardening…' : 'Try hardening'}</button>}
             {(act.kind === 'pull' || act.kind === 'merge') && <span style={{ fontSize: 12, color: 'var(--hub-yellow)' }}>{act.note}</span>}
             {phone
               ? <span style={{ fontSize: 12, color: 'var(--hub-ash)', marginLeft: 'auto' }}>Push from the Mac</span>

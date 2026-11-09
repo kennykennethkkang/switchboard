@@ -4,18 +4,24 @@
  * Feed posts from the usage mods come through ingest(); what the extension gathers itself comes through set(). Every
  * change fires onChange, which extension.ts throttles into `hub-state`.
  */
+import { approvalBlock, closingApprove, isTempDir } from './approve'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
+import * as path from 'path'
 import { TypedEventEmitter } from '../typed-event-emitter'
 import { addAsk, dropAsk, finishedJobs, LIMITS, settle, step, TOOLS_MAX } from './progress'
 import { chainVersion } from './projects'
-import { snoozed } from './stuck'
+import { endedOnLimit, limitReset, pauseDue, resumeOrder } from './limit-pause'
+import { phonePause } from './phone'
+import { fixDue, snoozed, waitsOnUser } from './stuck'
 import { FLAGGED } from './tools'
 import { createLogger } from '../logger'
 import { foldPathCase } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
-import type { AiId, Ask, CacheKeep, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, Limit, Server, SessionLive, StuckItem } from './types'
+import { MirofishPoller } from './mirofish'
+import type { AiId, Ask, CacheKeep, ChatLink, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, KeptLimits, Limit, LimitPause, Server, SessionLive, StuckItem } from './types'
+import { isTabCommand } from './window-tabs'
 
 const log = createLogger('Hub')
 
@@ -34,11 +40,42 @@ const COMPACT_SOON = 0.97
 const MAX_JEV = 50
 // A jev.py call this recent in a chat is the run the usage mod reports.
 const JEV_MATCH_MS = 10 * 60 * 1000
+// brain.ts GUARD_MS: an auto link lasts while the target's edit would still be guarded, and 15 minutes at most.
+const EDIT_FRESH_MS = 10 * 60 * 1000
+const AUTO_LINK_MS = 15 * 60 * 1000
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x))
+const idList = (v: unknown) => (Array.isArray(v) && v.length && v.length <= 20 && v.every(x => typeof x === 'string' && x) ? [...new Set(v as string[])] : undefined)
 // Past cache-keeper's 3h idle cap plus a cache lifetime: a chat that quiet is long cold.
 const CACHE_KEPT_MS = 4 * 60 * 60 * 1000
 // A limited chat is told to carry on a minute after its reset, or every half hour when none is known.
 const RETRY_MS = 30 * 60 * 1000
+// The last 64 KB of a transcript, enough for its final entries; empty when unreadable.
+const tailOf = (file: unknown): string => {
+  if (typeof file !== 'string') return ''
+  let fd: number | undefined
+  try {
+    fd = fs.openSync(file, 'r')
+    const size = fs.fstatSync(fd).size, n = Math.min(size, 65_536), b = Buffer.alloc(n)
+    fs.readSync(fd, b, 0, n, size - n)
+    return b.toString('utf8')
+  } catch { return '' } finally { if (fd !== undefined) fs.closeSync(fd) }
+}
+// SessionEnd reasons that mean the user ended it, not the limit.
+const QUITS = new Set(['clear', 'logout', 'prompt_input_exit'])
 export const CONTINUE = 'Switchboard: the usage limit reset. Continue where you left off; if you need the user, ask with AskUserQuestion.'
+type CutAgent = { id: string; type?: string }
+export const PAUSE_CONTINUE = 'Usage limit reset. Continue where you stopped; resume any subagents cut off with SendMessage.'
+const agentsNote = (agents: CutAgent[]) =>
+  `Subagents cut off by the limit: ${agents.map(a => a.type ? `${a.id} (${a.type})` : a.id).join(', ')}. Before starting new work, resume each with SendMessage to its agent id; it keeps its full history.`
+/** The prompt after a pause near the limit, naming any subagents it cut off. */
+export const pauseText = (agents?: CutAgent[]) => agents?.length ? `${PAUSE_CONTINUE} ${agentsNote(agents)}` : PAUSE_CONTINUE
+/** The continue prompt, naming any subagents the limit cut off. */
+export const continueText = (agents?: CutAgent[]) => agents?.length ? `${CONTINUE} ${agentsNote(agents)}` : CONTINUE
+// Subagents still running when the lead hit the limit; StopFailure keeps their roles active.
+const cutAgents = (p?: ChatProgress): { agents?: CutAgent[] } => {
+  const agents = (p?.running ?? []).map(id => { const type = p!.roles.find(r => r.id === id)?.role; return type ? { id, type } : { id } })
+  return agents.length ? { agents } : {}
+}
 
 export const emptyHub = (): HubState => ({
   live: [], history: [], sessions: [], plan: null,
@@ -47,7 +84,7 @@ export const emptyHub = (): HubState => ({
   projects: [],
   controls: {
     claude: { tui: 'default', statusLine: false, push: false, needInput: false },
-    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, name: '' },
+    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '', pauseAt: 99 },
     statusLineReady: false,
   },
   chats: [], rcServers: [], ais: [], starred: [], progress: [], archive: [],
@@ -86,7 +123,10 @@ export class HubService {
   private readonly inboxes = new Map<string, InboxItem[]>()
   private readonly polled = new Map<string, number>()
   // When each limited chat gets its continue prompt, and its folder for a resume; kept in retriesFile so a window reload still sends it.
-  private readonly retries = new Map<string, { due: number; cwd?: string }>()
+  private readonly retries = new Map<string, { due: number; cwd?: string; agents?: CutAgent[]; paused?: boolean; at?: number }>()
+  private limitsFile?: string
+  // A pause ended by hand: no new one until this reset passes.
+  private pauseOff = -Infinity
   private readonly changed = new TypedEventEmitter<HubState>()
   readonly onChange = this.changed.event
   private readonly handoffs = new TypedEventEmitter<Handoff>()
@@ -102,15 +142,22 @@ export class HubService {
   private readonly forced = new Set<string>()
   // When each chat last ran jev.py, from its own Bash hook.
   private readonly jevAsked = new Map<string, number>()
+  private mirofish?: MirofishPoller
   private codexWaits: HandoffWait[] = []
   private readonly closeFailed = new TypedEventEmitter<string>()
   readonly onCloseFailed = this.closeFailed.event
   private readonly closingChat = new TypedEventEmitter<string>()
   /** A handed-off chat was told to exit; hub-panel.ts closes its terminal once it has. */
   readonly onClosing = this.closingChat.event
+  private readonly approvedChat = new TypedEventEmitter<string>()
+  /** The chat's own closing AskUserQuestion came back Approve; the owning window approves it. */
+  readonly onApproved = this.approvedChat.event
   private readonly devAsked = new TypedEventEmitter<{ kind: 'start' | 'stop'; folder: string }>()
   /** Another window passed on a Dev start or stop; hub-panel.ts checks the folder and acts. */
   readonly onDev = this.devAsked.event
+  private readonly tabAsked = new TypedEventEmitter<string>()
+  /** A tab command another window posted; routes.ts let only isTabCommand ones through. */
+  readonly onTab = this.tabAsked.event
   private readonly promptedChat = new TypedEventEmitter<string>()
   private readonly endedChat = new TypedEventEmitter<ChatProgress>()
   /** A chat this window owns ended (SessionEnd), with its last progress; never one that handed off to a fresh chat. */
@@ -129,12 +176,17 @@ export class HubService {
   onDevice?: (d: DeviceAsk & { port: number } | { id: string; done: true }) => void
   /** When the standalone app last read /hub/state; hub-panel.ts keeps chats fresh while it is recent. */
   stateReadAt = 0
+  /** A phone's clip to text, for POST /hub/voice; hub-panel.ts sets it. */
+  voiceClip?: (bytes: Uint8Array) => Promise<string>
   /** The mic's last level, 0..1, for GET /hub/voice. */
   voiceLevel = 0
   // Everything the last sample found, before snoozes; the dismissed ids and when; the ids already notified.
   private stuckAll: StuckItem[] = []
   private readonly snoozes = new Map<string, number>()
   private readonly told = new Set<string>()
+  private readonly fixed = new Set<string>()
+  /** Chats told they are paused, until they stop waiting. */
+  private readonly paused = new Set<string>()
   // Chats whose hooks come here first, not as a mirror: this window notifies for them.
   private readonly owned = new Set<string>()
 
@@ -146,10 +198,103 @@ export class HubService {
       // One overdue by more than a day is for a chat that ended while no window listened.
       // One from an older window (a bare due time, no folder) cannot be resumed, and would hold auto-start: dropped.
       for (const [id, v] of Object.entries(JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>)) {
-        const r = (v ?? {}) as { due?: unknown; cwd?: unknown }
-        if (typeof r.due === 'number' && typeof r.cwd === 'string' && Date.now() - r.due < PROGRESS_STALE_MS) this.retries.set(id, { due: r.due, cwd: r.cwd })
+        const r = (v ?? {}) as { due?: unknown; cwd?: unknown; agents?: unknown; paused?: unknown; at?: unknown }
+        const agents = Array.isArray(r.agents) ? (r.agents as CutAgent[]).filter(a => typeof a?.id === 'string') : []
+        if (typeof r.due === 'number' && typeof r.cwd === 'string' && Date.now() - r.due < PROGRESS_STALE_MS) this.retries.set(id, { due: r.due, cwd: r.cwd, ...(agents.length ? { agents } : {}), ...(r.paused === true ? { paused: true, at: num(r.at) ?? r.due } : {}) })
       }
     } catch { /* none yet, or broken: start empty */ }
+    // limits.json sits beside it, shared by every window.
+    this.limitsFile = path.join(path.dirname(file), 'limits.json')
+    try {
+      const k = JSON.parse(fs.readFileSync(this.limitsFile, 'utf8')) as { at?: unknown; windows?: unknown; out?: KeptLimits['out']; pause?: LimitPause }
+      if (typeof k.at === 'number') this.state = { ...this.state, limitsKept: { at: k.at, windows: limitsOf(k.windows), ...(k.out ? { out: k.out } : {}) } }
+      if (k.pause && Array.isArray(k.pause.chats)) this.state = { ...this.state, pause: k.pause }
+    } catch { /* none yet */ }
+  }
+
+  private saveLimits(): void {
+    const k = this.state.limitsKept
+    if (!this.limitsFile) return
+    // paused: the usage-meter mod reads this and holds every tool call. pauseAt (null off) and pauseOff (resumed by hand up to then) let it hold on its own. phone: the phone-mode mod denies AskUserQuestion for a call.
+    const pauseAt = this.state.controls.switchboard.pauseAt === undefined ? 99 : this.state.controls.switchboard.pauseAt
+    const off = Number.isFinite(this.pauseOff) ? { pauseOff: this.pauseOff } : {}
+    try { writeJsonAtomic(this.limitsFile, { ...k, pauseAt, phone: this.state.controls.switchboard.phone === true, ...off, ...(this.state.pause ? { pause: this.state.pause, paused: true } : {}) }) } catch (err) { log.warn('Limits not kept:', err) }
+  }
+
+  /** A chat's own usage hold from the mod: it joins the pause the panel shows, or leaves it. */
+  private noteHold(sessionId: string, hold: unknown, now: number): void {
+    const p = this.state.pause
+    const rest = (p?.chats ?? []).filter(c => c.sessionId !== sessionId)
+    const o = hold && typeof hold === 'object' ? (hold as Record<string, unknown>) : undefined
+    if (o) {
+      // Resumed by hand up to then: a late hold from the mod must not pause again.
+      if ((num(o.resetsAt) ?? Infinity) <= this.pauseOff) return
+      const name = this.state.chats.find(c => c.sessionId === sessionId)?.name
+      // Same minute of grace as startPause, so both paths claim one phone key.
+      const reset = num(o.resetsAt), resumeAt = p?.resumeAt ?? (reset === undefined ? undefined : reset + 60_000)
+      this.state = { ...this.state, pause: { kind: p?.kind ?? str(o.kind) ?? 'usage', percent: p?.percent ?? Math.floor(num(o.percent) ?? 99), ...(resumeAt !== undefined ? { resumeAt } : {}), chats: [...rest, { sessionId, ...(name ? { name } : {}) }] } }
+      if (!p) this.ringPause(false)
+    } else if (p?.chats.some(c => c.sessionId === sessionId)) this.state = { ...this.state, pause: rest.length && (p.resumeAt ?? Infinity) > now ? { ...p, chats: rest } : undefined }
+    else return
+    this.saveLimits()
+  }
+
+  /** After a feed: keeps the highest % per window, and pauses this window's running chats at the threshold. */
+  private noteLimits(now: number): void {
+    const best = new Map<string, Limit>()
+    for (const l of this.state.live.flatMap(s => s.limits)) {
+      const b = best.get(l.kind)
+      if (!b || resetMs(l.resetsAt) > resetMs(b.resetsAt) + 5 * 60_000 || (l.percentUsed > b.percentUsed && !(resetMs(b.resetsAt) > resetMs(l.resetsAt) + 5 * 60_000))) best.set(l.kind, l)
+    }
+    if (!best.size) return
+    const was = this.state.limitsKept
+    const windows = [...best.values()]
+    // A feed below 100% after the reset ends the out state.
+    const out = was?.out && (was.out.resetsAt ?? Infinity) > now && !windows.every(w => w.percentUsed < 100 && resetMs(w.resetsAt) > (was.out!.resetsAt ?? 0)) ? { out: was.out } : {}
+    const kept: KeptLimits = { at: now, windows, ...out }
+    const changed = JSON.stringify({ ...kept, at: 0 }) !== JSON.stringify({ ...was, at: 0 })
+    this.state = { ...this.state, limitsKept: kept }
+    const due = !this.state.pause && pauseDue(windows, this.state.controls.switchboard.pauseAt === undefined ? 99 : this.state.controls.switchboard.pauseAt, resetMs, now)
+    if (due && (due.resetsAt ?? Infinity) > this.pauseOff) this.startPause(due, now)
+    else if (changed || now - (was?.at ?? 0) > 60_000) this.saveLimits()
+  }
+
+  private startPause(due: { kind: string; percent: number; resetsAt?: number }, now: number): void {
+    const resumeAt = (due.resetsAt ?? now + RETRY_MS) + 60_000
+    // Every live chat this window owns; subagents run inside them and get named on resume.
+    const chats = this.state.chats.filter(c => c.live && c.ai !== 'codex' && this.owned.has(c.sessionId))
+    for (const c of chats) this.retries.set(c.sessionId, { due: resumeAt, cwd: c.cwd, ...cutAgents(this.state.progress.find(p => p.sessionId === c.sessionId)), paused: true, at: now })
+    this.saveRetries()
+    this.state = { ...this.state, pause: { kind: due.kind, percent: Math.floor(due.percent), resumeAt, chats: chats.map(c => ({ sessionId: c.sessionId, ...(c.name ? { name: c.name } : {}) })) } }
+    log.info(`Usage at ${Math.floor(due.percent)}%: paused ${chats.length} chat(s) until ${new Date(resumeAt).toISOString()}`)
+    this.saveLimits()
+    this.ringPause(false)
+  }
+
+  /** The phone notice for the pause, once per machine: every window runs the same pause. */
+  private ringPause(resumed: boolean): void {
+    if (this.state.pause && this.state.controls.switchboard.phone) phonePause(this.state.pause, resumed, this.limitsFile && path.dirname(this.limitsFile))
+  }
+
+  /** Paused chats in resume order. */
+  pausedQueue(): { sessionId: string; cwd: string; agents?: CutAgent[] }[] {
+    return resumeOrder([...this.retries].filter(([, r]) => r.paused && r.cwd).map(([sessionId, r]) => ({ sessionId, cwd: r.cwd!, at: r.at ?? r.due, ...(r.agents ? { agents: r.agents } : {}) })))
+  }
+
+  /** Resume now (true) or cancel: either way the pause lifts and stays off until this reset. */
+  endPause(resume: boolean, now = Date.now()): void {
+    if (resume) this.ringPause(true)
+    this.pauseOff = this.state.pause?.resumeAt ?? now
+    for (const [id, r] of this.retries) if (r.paused) { if (resume) r.due = now; else this.retries.delete(id) }
+    this.saveRetries()
+    this.state = { ...this.state, pause: undefined }
+    this.saveLimits()
+    this.emit(now)
+  }
+
+  /** Lifts the pause once its reset passed; the retries send the prompts. */
+  pauseTick(now = Date.now()): void {
+    if (this.state.pause && now >= (this.state.pause.resumeAt ?? Infinity)) { this.ringPause(true); this.pauseOff = this.state.pause.resumeAt!; this.state = { ...this.state, pause: undefined }; this.saveLimits(); this.emit(now) }
   }
 
   private saveRetries(): void {
@@ -160,6 +305,21 @@ export class HubService {
   get(): HubState {
     return this.state
   }
+
+  startMirofish(): void {
+    if (this.mirofish) return
+    this.mirofish = new MirofishPoller()
+    this.mirofish.start(mirofish => this.set({ mirofish }))
+  }
+
+  stopMirofish(): void {
+    this.mirofish?.dispose()
+    this.mirofish = undefined
+  }
+
+  /** Sessions a headless learn run reported; the Flow tabs skip them too. */
+  private headless = new Set<string>()
+  isHeadless(id: string): boolean { return this.headless.has(id) }
 
   isToken(candidate: unknown): boolean {
     if (typeof candidate !== 'string') return false
@@ -174,7 +334,13 @@ export class HubService {
       const stopped = this.state.servers.filter(s => !up.has(s.port)).map(server => ({ server, at: now }))
       this.gone = [...this.gone.filter(g => !up.has(g.server.port) && now - g.at < GONE_MS), ...stopped]
     }
+    // Temp-folder chats (scratchpads, bench runs) never reach lists, counts, the Board, the map or History.
+    for (const k of ['chats', 'live', 'progress', 'starred', 'archive'] as const) {
+      const list = part[k] as { cwd: string }[] | undefined
+      if (list) part = { ...part, [k]: list.filter(c => !isTempDir(c.cwd)) }
+    }
     this.state = { ...this.state, ...part }
+    if (part.controls) this.saveLimits()
     this.emit(now)
   }
 
@@ -185,7 +351,8 @@ export class HubService {
   hook(payload: Record<string, unknown>, now = Date.now(), mirror = false): { from?: ChatState; to: ChatProgress } | undefined {
     const id = typeof payload.session_id === 'string' ? payload.session_id : undefined
     // A `claude -p` from outside a project (cwd /) or a payload with no folder is no chat.
-    if (!id || typeof payload.cwd !== 'string' || !payload.cwd || payload.cwd === '/') return undefined
+    if (!id || typeof payload.cwd !== 'string' || !payload.cwd || payload.cwd === '/' || isTempDir(payload.cwd)) return undefined
+    if (payload.headless) { this.headless.add(id); return undefined }
     const was = this.state.progress.find(p => p.sessionId === id)
     if (payload.hook_event_name === 'SessionEnd') this.owned.delete(id)
     else if (!mirror) this.owned.add(id)
@@ -195,16 +362,45 @@ export class HubService {
     const rest = this.state.progress.filter(p => p.sessionId !== id)
     // Only the owning window retries, or each window would send it. A limited chat that ends keeps it (goneDue resumes it),
     // unless cleared or logged out: that process goes on under a new id.
-    if (payload.hook_event_name === 'StopFailure' && next?.limited && LIMITS.has(next.limited.error)) { if (!mirror) { this.retries.set(id, { due: this.resetAt(now), cwd: payload.cwd }); this.saveRetries() } }
+    if (payload.hook_event_name === 'StopFailure' && next?.limited && LIMITS.has(next.limited.error)) this.limitHit(`${str(payload.last_assistant_message) ?? ''} ${str(payload.error_details) ?? ''}`, now)
+    if (payload.hook_event_name === 'StopFailure' && next?.limited && LIMITS.has(next.limited.error)) { if (!mirror) { this.retries.set(id, { due: this.resetAt(now), cwd: payload.cwd, ...cutAgents(next) }); this.saveRetries() } }
     else if (!next?.limited && (payload.hook_event_name !== 'SessionEnd' || payload.reason === 'clear' || payload.reason === 'logout') && this.retries.delete(id)) this.saveRetries()
+    // Claude Code can exit at the limit with no StopFailure: an end whose transcript stops on the limit error queues it too.
+    // A closed tab or /exit is the user's.
+    if (payload.hook_event_name === 'SessionEnd' && !mirror && !this.retries.has(id) && !this.handedOff.has(id) && !QUITS.has(String(payload.reason)) && (this.state.pause || this.outNow(now)) && endedOnLimit(tailOf(payload.transcript_path))) {
+      const pause = this.state.pause
+      this.retries.set(id, { due: pause?.resumeAt ?? this.resetAt(now), cwd: payload.cwd, ...cutAgents(was), ...(pause ? { paused: true, at: now } : {}) })
+      this.saveRetries()
+    }
     this.state = { ...this.state, progress: next ? [next, ...rest] : rest }
     this.emit(now)
     if (payload.hook_event_name === 'SessionEnd' && was && !this.handedOff.delete(id) && !mirror) this.endedChat.fire(was)
+    if (!mirror && closingApprove(payload)) {
+      const why = approvalBlock(was, now)
+      if (why) log.warn(`Approve for chat ${id.slice(0, 8)} not taken: ${why}`)
+      else this.approvedChat.fire(id)
+    }
     return !mirror && next && next.state !== (was?.state ?? 'working') ? { from: was?.state, to: next } : undefined
+  }
+
+  /** Still out of usage: before the told reset, or within RETRY_MS of a limit message with none. */
+  private outNow(now: number): boolean {
+    const k = this.state.limitsKept
+    return !!k?.out && (k.out.resetsAt ?? k.at + RETRY_MS) > now
+  }
+
+  /** A limit message: the meter reads out until its reset ("resets 11:50pm (America/Los_Angeles)"). */
+  private limitHit(text: string, now: number): void {
+    const resetsAt = limitReset(text, now)
+    const was = this.state.limitsKept
+    this.state = { ...this.state, limitsKept: { at: now, windows: was?.windows ?? [], out: { ...(resetsAt ? { resetsAt } : {}), text: text.trim().slice(0, 200) } } }
+    this.saveLimits()
   }
 
   /** A minute past the latest reset of a used-up limit, else RETRY_MS from now. */
   private resetAt(now: number): number {
+    const told = this.state.limitsKept?.out?.resetsAt
+    if (told && told > now) return told + 60_000
     const at = this.state.live.flatMap(s => s.limits).filter(l => l.percentUsed >= 100).map(l => resetMs(l.resetsAt)).filter(Number.isFinite)
     return at.length ? Math.max(...at, now) + 60_000 : now + RETRY_MS
   }
@@ -236,11 +432,13 @@ export class HubService {
           tokens: num(b.tokens), compactAt: num(b.compactAt), limits: limitsOf(b.limits), costUsd: num(b.costUsd),
           prompt: str(b.prompt)?.slice(0, 200) ?? was?.prompt, file, fileAt: file && file === was?.file ? was.fileAt : file ? now : undefined, at: now,
         }
+        if (isTempDir(next.cwd)) return true
         this.state = { ...this.state, live: [next, ...this.state.live.filter(s => s.sessionId !== sessionId)] }
         // Only a session's first post is the fresh chat; one already open in the folder is not.
         const ready = was ? [] : this.pendingClose.filter(p => p.sessionId !== sessionId && p.cwd === pathKey(next.cwd) && now > p.at)
         this.closing = [...this.closing, ...ready.map(p => ({ sessionId: p.sessionId, at: now }))]
         if (ready.length) this.pendingClose = this.pendingClose.filter(p => !ready.includes(p))
+        this.noteLimits(now)
         break
       }
       case 'cache': {
@@ -255,6 +453,24 @@ export class HubService {
       case 'guard':
       case 'agent':
         return true
+      case 'hold': {
+        const sessionId = str(b.sessionId)
+        if (!sessionId) return false
+        this.noteHold(sessionId, b.hold, now)
+        break
+      }
+      case 'link': {
+        const from = str(b.from), to = idList(b.to)
+        if (!from || !to) return false
+        this.link({ from, to, reason: str(b.reason)?.slice(0, 400) ?? '', auto: b.auto === true, since: num(b.since) ?? now }, now)
+        return true
+      }
+      case 'link-end': {
+        const from = str(b.from), to = idList(b.to)
+        if (!from || !to) return false
+        this.unlink(from, to, now, true)
+        return true
+      }
       case 'jev':
         // A credits-only post or a malformed run is taken and dropped, like the old kinds.
         this.jevRun(b, now)
@@ -294,6 +510,11 @@ export class HubService {
         this.snooze(id, now)
         return true
       }
+      case 'window-tab': {
+        if (!isTabCommand(b.command)) return false
+        this.tabAsked.fire(b.command)
+        return true
+      }
       case 'close-failed': {
         const sessionId = str(b.sessionId)
         if (!sessionId) return false
@@ -320,13 +541,32 @@ export class HubService {
     this.setStuck(this.stuckAll, now)
   }
 
-  /** Shown items not notified yet, of chats this window owns; each comes back once only. */
+  /** Shown items not notified yet, of chats this window owns; each comes back once only. A chat waiting on Kenneth gets dueFix's paused notice instead. */
   unseenStuck(): StuckItem[] {
-    const out = (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId) && !this.told.has(i.id))
+    const out = (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId) && !this.told.has(i.id) && !this.waitsOnUser(i.sessionId))
     for (const i of out) this.told.add(i.id)
     // Ids of items gone for good are forgotten once the set grows.
     if (this.told.size > 500) for (const id of this.told) if (!this.stuckAll.some(i => i.id === id)) this.told.delete(id)
     return out
+  }
+
+  /** Shown items of owned chats due an auto-fix, each once. A chat waiting on Kenneth gets no fix: it comes back once
+   * per wait in paused, with what it waits for, and its items are due again after he answers. */
+  dueFix(now = Date.now()): { fix: StuckItem[]; paused: { sessionId: string; why: string }[] } {
+    if (this.fixed.size > 500) for (const id of this.fixed) if (!this.stuckAll.some(i => i.id === id)) this.fixed.delete(id)
+    const fix: StuckItem[] = [], paused: { sessionId: string; why: string }[] = []
+    for (const id of this.paused) if (!this.waitsOnUser(id)) this.paused.delete(id)
+    for (const item of (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId))) {
+      const why = this.waitsOnUser(item.sessionId)
+      if (!why) fix.push(item)
+      else if (!this.paused.has(item.sessionId)) { this.paused.add(item.sessionId); paused.push({ sessionId: item.sessionId, why }) }
+    }
+    return { fix: fixDue(fix, this.fixed, now), paused }
+  }
+
+  /** What a chat waits on Kenneth for, if anything (stuck.ts waitsOnUser). */
+  waitsOnUser(sessionId: string): string | undefined {
+    return waitsOnUser(this.state.progress.find(p => p.sessionId === sessionId))
   }
 
   /** How many subagents of a chat still run. */
@@ -380,6 +620,8 @@ export class HubService {
   /** Passes on held handoffs and closes whose chat has no subagent running, or that waited WAIT_CAP_MS. */
   private flush(now: number): void {
     const due = (id: string, since: number, what: string) => {
+      // A chat waiting out a usage limit or a pause is never closed; it resumes in place.
+      if (what === 'Closing' && this.retries.has(id)) return false
       if (!this.busy(id)) return true
       if (what === 'Handing off' && (this.forced.has(id) || this.compactSoon(id))) return true
       if (now - since < WAIT_CAP_MS) return false
@@ -436,21 +678,22 @@ export class HubService {
     this.polled.set(sessionId, now)
     const list = this.inboxes.get(sessionId) ?? []
     this.inboxes.delete(sessionId)
-    const due = this.retries.get(sessionId)?.due
-    if (due === undefined || now < due) return list
+    const r = this.retries.get(sessionId)
+    if (!r || now < r.due) return list
     this.retries.delete(sessionId)
     this.saveRetries()
-    // Claude Code's own autoContinueAtUsageLimit sends one already; a second would run the turn twice.
-    if (this.state.keep.autoContinue) return list
-    return [...list, { kind: 'prompt', text: CONTINUE, id: crypto.randomBytes(6).toString('hex') }]
+    // Claude Code's own autoContinueAtUsageLimit sends one already; a second would run the turn twice. It knows nothing of subagents, so those still get a note.
+    if (r.paused) return [...list, { kind: 'prompt', text: pauseText(r.agents), id: crypto.randomBytes(6).toString('hex') }]
+    const text = this.state.keep.autoContinue ? (r.agents?.length ? `Switchboard: ${agentsNote(r.agents)}` : undefined) : continueText(r.agents)
+    return text ? [...list, { kind: 'prompt', text, id: crypto.randomBytes(6).toString('hex') }] : list
   }
 
   /** Due retries of chats with no live process and a quiet mod: dropped here, so the caller resumes each once. */
-  goneDue(live: (sessionId: string) => boolean, now = Date.now()): { sessionId: string; cwd: string }[] {
+  goneDue(live: (sessionId: string) => boolean, now = Date.now()): { sessionId: string; cwd: string; agents?: CutAgent[]; paused?: boolean }[] {
     const out = [...this.retries].filter(([id, r]) => r.cwd && now >= r.due && !live(id) && now - (this.polled.get(id) ?? -Infinity) >= POLL_GONE_MS)
     for (const [id] of out) this.retries.delete(id)
     if (out.length) this.saveRetries()
-    return out.map(([sessionId, r]) => ({ sessionId, cwd: r.cwd! }))
+    return out.map(([sessionId, r]) => ({ sessionId, cwd: r.cwd!, ...(r.agents ? { agents: r.agents } : {}), ...(r.paused ? { paused: true } : {}) }))
   }
 
   /** A limited chat is waiting on its reset. */
@@ -470,6 +713,34 @@ export class HubService {
     return now - (this.polled.get(chat.sessionId) ?? -Infinity) < POLL_GONE_MS
   }
 
+  /** A chat waiting on others; one per waiting chat and target set. */
+  link(l: ChatLink, now = Date.now()): void {
+    this.state = { ...this.state, links: [...(this.state.links ?? []).filter(x => x.from !== l.from || !sameSet(x.to, l.to)), l] }
+    this.emit(now)
+  }
+
+  /** exact: the chat's own link-end, for that target set. Otherwise Kenneth's unlink: drops just those targets, and a link with none left. */
+  unlink(from: string, to: string[], now = Date.now(), exact = false): void {
+    const links = (this.state.links ?? []).flatMap(x => { const left = x.from !== from ? x.to : exact ? (sameSet(x.to, to) ? [] : x.to) : x.to.filter(t => !to.includes(t)); return left.length ? [left.length === x.to.length ? x : { ...x, to: left }] : [] })
+    this.state = { ...this.state, links }
+    this.emit(now)
+  }
+
+  /** A chat row says whether it runs; one not listed yet counts while it posts. */
+  private alive(id: string): boolean {
+    const c = this.state.chats.find(x => x.sessionId === id)
+    return c ? c.live : this.state.live.some(s => s.sessionId === id)
+  }
+
+  /** Auto links never get a link-end: they go with the target's fresh edit of that file. */
+  private linkHolds(l: ChatLink, now: number): boolean {
+    if (!this.alive(l.from) || !l.to.some(id => this.alive(id))) return false
+    if (!l.auto) return true
+    if (now - l.since >= AUTO_LINK_MS) return false
+    const file = l.reason.replace(/\\/g, '/')
+    return l.to.some(id => { const s = this.state.live.find(x => x.sessionId === id); return s?.file?.replace(/\\/g, '/') === file && !!s.fileAt && now - s.fileAt < EDIT_FRESH_MS })
+  }
+
   /** Dev servers that stopped in the last ten minutes. */
   stopped(now = Date.now()): Server[] {
     return this.gone.filter(g => now - g.at < GONE_MS).map(g => g.server)
@@ -480,6 +751,8 @@ export class HubService {
     if (fresh.length !== this.state.live.length) this.state = { ...this.state, live: fresh }
     const progress = this.state.progress.filter(p => now - p.at < PROGRESS_STALE_MS).map(p => settle(p, now))
     if (progress.some((p, i) => p !== this.state.progress[i]) || progress.length !== this.state.progress.length) this.state = { ...this.state, progress }
+    const links = this.state.links?.filter(l => this.linkHolds(l, now))
+    if (links && links.length !== this.state.links?.length) this.state = { ...this.state, links }
     this.flush(now)
     this.changed.fire(this.state)
   }

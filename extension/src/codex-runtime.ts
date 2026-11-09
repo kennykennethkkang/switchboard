@@ -1,9 +1,9 @@
 /**
  * Codex runtime.
  *
- * Codex has no hook mechanism (unlike Claude Code) — its only event source is
- * the rollout JSONL file. This runtime wires CodexSessionWatcher to the
- * visualizer panel and reports a connection status reflecting the watch root.
+ * The visualizer reads Codex from its rollout JSONL files. Codex hooks
+ * (~/.codex/hooks.json, see hooks-config.ts) feed only the hub's chat status.
+ * This runtime wires CodexSessionWatcher to the visualizer panel and reports a connection status reflecting the watch root.
  */
 
 import * as vscode from 'vscode'

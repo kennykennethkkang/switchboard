@@ -49,8 +49,11 @@ export async function readMacNames(): Promise<MacNames> {
 }
 let names: MacNames = {}
 let namesAt = -Infinity
+let reading: Promise<MacNames> = Promise.resolve(names)
 /** This Mac's MagicDNS name as last read. A read older than 3 minutes starts a new one in the background, so no caller waits on tailscale. */
 export function macNames(now = Date.now()): MacNames {
-  if (now - namesAt >= 3 * 60_000) { namesAt = now; void readMacNames().then(n => { names = n }) }
+  if (now - namesAt >= 3 * 60_000) { namesAt = now; reading = readMacNames().then(n => (names = n)) }
   return names
 }
+/** The read macNames last started; the app awaits the first one before it listens. */
+export const macNamesRead = () => reading

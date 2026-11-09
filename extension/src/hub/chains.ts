@@ -11,9 +11,9 @@ import * as os from 'os'
 import * as path from 'path'
 import { writeJsonAtomic } from '../hook-entries'
 import { withLock } from '../fs-utils'
-import { chainBase, inWorkspace, projectName } from './projects'
+import { chainBase, chainVersion, inWorkspace, projectName } from './projects'
 import { isAi } from './ais'
-import type { ArchivedChat, ChatRow } from './types'
+import type { AiId, ArchivedChat, ChatRow } from './types'
 
 const FILE = path.join(os.homedir(), '.claude', 'switchboard', 'chains.json')
 const ARCHIVE = path.join(os.homedir(), '.claude', 'switchboard', 'archive.json')
@@ -97,7 +97,7 @@ function loadArchive(file: string): { rows: ArchivedChat[]; bad: boolean } {
   } catch { return { rows: [], bad: true } }
 }
 
-// project is renamed on read, so rows saved under a subfolder's name (extension) join their repo (agent-flow).
+// project is renamed on read, so rows saved under a subfolder's name (extension) join their repo (switchboard).
 export const readArchive = (file = ARCHIVE): ArchivedChat[] => loadArchive(file).rows.map(r => ({ ...r, project: projectName(r.cwd) }))
 
 /** Writes the archive; an unreadable file is kept beside it first, so a write never wipes History. */
@@ -113,6 +113,22 @@ function writeArchive(file: string, edit: (rows: ArchivedChat[]) => ArchivedChat
 export function recordArchive(row: ArchivedChat, file = ARCHIVE): void {
   writeArchive(file, rows => [...rows.filter(r => r.sessionId !== row.sessionId), row])
 }
+
+/** A chat as an archive row, archived by Kenneth or ended on its own. */
+export function archiveRow(c: { sessionId: string; ai?: AiId; name?: string; cwd: string }, startedAt?: number, ended?: boolean, now = Date.now()): ArchivedChat {
+  const name = c.name?.trim() || projectName(c.cwd)
+  return {
+    sessionId: c.sessionId, ai: c.ai ?? 'claude', name, origin: chainBase(name) ?? name, version: chainVersion(name), cwd: c.cwd, project: projectName(c.cwd),
+    ...(startedAt ? { startedAt } : {}), archivedAt: now, ...(ended ? { ended: true as const } : {}),
+  }
+}
+
+// A chat's last writes while it exits land after SessionEnd; only later ones mean it runs again.
+const BACK_MS = 60_000
+
+/** Ended rows whose chat runs again (resumed in a terminal); they go back to the live list. */
+export const backAgain = (archive: ArchivedChat[], chats: ChatRow[]) =>
+  archive.filter(a => a.ended && chats.some(c => c.sessionId === a.sessionId && c.live && (c.updatedAt ?? 0) > a.archivedAt + BACK_MS)).map(a => a.sessionId)
 
 /** A resumed chat leaves History; false when it was not there. */
 export function removeArchive(sessionId: string, file = ARCHIVE): boolean {

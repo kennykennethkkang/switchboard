@@ -1,6 +1,6 @@
-# Contributing to Agent Flow
+# Contributing to Switchboard
 
-Thank you for your interest in contributing to Agent Flow! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to Switchboard, a fork of [Agent Flow](https://github.com/patoles/agent-flow) by Simon Patole. This document provides guidelines for contributing to the project.
 
 ## Contributor License Agreement (CLA)
 
@@ -29,7 +29,7 @@ Before your first contribution can be merged, you must sign the [Contributor Lic
 
 ### Pull Request Guidelines
 
-- Keep pull requests focused — one feature or fix per PR
+- Keep pull requests focused: one feature or fix per PR
 - Provide a clear description of what the PR does and why
 - Reference any related issues
 - Ensure existing functionality is not broken
@@ -40,4 +40,4 @@ Be respectful and constructive in all interactions. We are committed to providin
 
 ## License
 
-By contributing to Agent Flow, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE), subject to the terms of the [CLA](CLA.md).
+By contributing to Switchboard, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE), subject to the terms of the [CLA](CLA.md).

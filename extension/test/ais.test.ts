@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { AIS, chatTerminal, pickCli, closeChatTerminal, codexPaste, codexReady, codexRow, isCodexCommand, lastCodexPrompt, rolloutLines } from '../src/hub/ais'
+import { AIS, chatTerminal, hermesMcp, pickCli, shareKitWithHermes, signedIn, closeChatTerminal, codexPaste, codexReady, codexRow, isCodexCommand, lastCodexPrompt, rolloutLines } from '../src/hub/ais'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -69,7 +69,7 @@ describe('ais', () => {
   it('starts and resumes each AI with its own CLI', () => {
     assert.equal(AIS.codex.startCommand({ text: "it's" }, 'posix'), `codex 'it'\\''s'`)
     assert.equal(AIS.codex.startCommand({ text: 'it\u2019s' }, 'powershell'), "codex 'it\u2019\u2019s'")
-    assert.equal(AIS.codex.resumeCommand('abc'), 'codex resume abc')
+    assert.equal(AIS.codex.resumeCommand('abc'), 'codex resume --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust abc')
     assert.equal(AIS.claude.resumeCommand('abc'), 'claude --resume abc')
     assert.equal(AIS.claude.startCommand({ name: 'x' }, 'posix'), `claude --name 'x'`)
   })
@@ -159,5 +159,82 @@ describe('pickCli', () => {
     assert.equal(pickCli('C:\\npm\\codex\r\nC:\\npm\\codex.cmd\r\n', 'win32'), 'C:\\npm\\codex.cmd')
     assert.equal(pickCli('C:\\Program Files\\GitHub CLI\\gh.exe\r\n', 'win32'), 'C:\\Program Files\\GitHub CLI\\gh.exe')
     assert.equal(pickCli('', 'win32'), undefined)
+  })
+})
+
+describe('signedIn', () => {
+  it('reads codex login status', () => {
+    assert.equal(signedIn('codex', 'Logged in using ChatGPT\n'), true)
+    assert.equal(signedIn('codex', 'Not logged in\n'), false)
+    assert.equal(signedIn('codex', ''), undefined)
+  })
+  it('reads claude auth status json', () => {
+    assert.equal(signedIn('claude', '{"loggedIn": true, "authMethod": "claude.ai"}'), true)
+    assert.equal(signedIn('claude', '{"loggedIn": false}'), false)
+    assert.equal(signedIn('claude', 'garbage'), undefined)
+  })
+  it('has a sign in command per AI', () => {
+    // One command PowerShell 5.1 runs too; device auth is named in the button's tooltip.
+    assert.equal(AIS.codex.loginCommand, 'codex login')
+    assert.equal(AIS.claude.loginCommand, 'claude auth login')
+  })
+})
+
+describe('hermes', () => {
+  it('starts with the message seeded and resumes by id', () => {
+    assert.equal(AIS.hermes.startCommand({}, 'posix'), 'hermes')
+    assert.equal(AIS.hermes.startCommand({ text: "fix it's bug" }, 'posix'), `hermes -q 'fix it'\\''s bug'`)
+    assert.equal(AIS.hermes.resumeCommand('abc-123'), 'hermes --resume abc-123')
+    assert.equal(AIS.hermes.optional, true)
+  })
+
+  it('shares the Claude skills and the ask server with Hermes, once', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-'))
+    assert.equal(shareKitWithHermes(home), false)
+    fs.mkdirSync(path.join(home, '.claude/skills/foo'), { recursive: true })
+    fs.writeFileSync(path.join(home, '.claude/skills/foo/SKILL.md'), '---\nname: foo\n---\n')
+    fs.mkdirSync(path.join(home, '.claude/skills/bar'), { recursive: true })
+    fs.mkdirSync(path.join(home, '.hermes'))
+    fs.writeFileSync(path.join(home, '.hermes/config.yaml'), 'model:\n  default: x\nmcp_servers:\n  other:\n    command: npx\n')
+    assert.equal(shareKitWithHermes(home), true)
+    assert.ok(fs.existsSync(path.join(home, '.hermes/skills/claude-kit/foo/SKILL.md')))
+    assert.ok(!fs.existsSync(path.join(home, '.hermes/skills/claude-kit/bar')))
+    const yaml = fs.readFileSync(path.join(home, '.hermes/config.yaml'), 'utf8')
+    assert.equal(yaml, `model:\n  default: x\nmcp_servers:\n  switchboard-ask:\n    command: node\n    args: [${JSON.stringify(path.join(home, '.claude/switchboard/ask/ask-server.mjs'))}]\n  other:\n    command: npx\n`)
+    shareKitWithHermes(home)
+    assert.equal(fs.readFileSync(path.join(home, '.hermes/config.yaml'), 'utf8'), yaml)
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('adds the ask server to a config with no mcp_servers or none at all', () => {
+    assert.match(hermesMcp('', '/a.mjs') ?? '', /^mcp_servers:\n {2}switchboard-ask:\n {4}command: node\n {4}args: \["\/a.mjs"\]\n$/)
+    assert.equal(hermesMcp('mcp_servers: {}\n', '/a.mjs'), 'mcp_servers:\n  switchboard-ask:\n    command: node\n    args: ["/a.mjs"]\n')
+    assert.equal(hermesMcp('x: 1', '/a.mjs'), 'x: 1\nmcp_servers:\n  switchboard-ask:\n    command: node\n    args: ["/a.mjs"]\n')
+  })
+
+  it('keeps a 4-space indented mcp_servers at its own indent', () => {
+    assert.equal(hermesMcp('mcp_servers:\n    other:\n        command: npx\n', '/a.mjs'), 'mcp_servers:\n    switchboard-ask:\n        command: node\n        args: ["/a.mjs"]\n    other:\n        command: npx\n')
+    const done = 'mcp_servers:\n    switchboard-ask:\n        command: node\n'
+    assert.equal(hermesMcp(done, '/a.mjs'), done)
+  })
+
+  it('refuses a flow map or list it cannot edit safely', () => {
+    assert.equal(hermesMcp('mcp_servers: {foo: {command: x}}\n', '/a.mjs'), undefined)
+    assert.equal(hermesMcp('mcp_servers: [a]\n', '/a.mjs'), undefined)
+    assert.equal(hermesMcp('mcp_servers: &m\n  foo: 1\n', '/a.mjs'), undefined)
+  })
+
+  it('backs config.yaml up once before writing, and leaves a refused one alone', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-hermes-bak-'))
+    fs.mkdirSync(path.join(home, '.hermes'))
+    const cfg = path.join(home, '.hermes/config.yaml')
+    fs.writeFileSync(cfg, 'model: x\n')
+    shareKitWithHermes(home)
+    assert.equal(fs.readFileSync(`${cfg}.switchboard-bak`, 'utf8'), 'model: x\n')
+    fs.writeFileSync(cfg, 'mcp_servers: {foo: 1}\n')
+    shareKitWithHermes(home)
+    assert.equal(fs.readFileSync(cfg, 'utf8'), 'mcp_servers: {foo: 1}\n')
+    assert.equal(fs.readFileSync(`${cfg}.switchboard-bak`, 'utf8'), 'model: x\n')
+    fs.rmSync(home, { recursive: true, force: true })
   })
 })

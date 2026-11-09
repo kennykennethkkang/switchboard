@@ -11,24 +11,26 @@ import * as crypto from 'crypto'
 import { execFile, spawn } from 'child_process'
 import { hub, type Handoff } from './hub-service'
 import type { AiId, ChatProfile, ChatRow } from './types'
-import { AIS, chatTerminal, cliPath, codexPaste, codexReady } from './ais'
+import { AIS, chatTerminal, cliPath, codexPaste, codexReady, shareKitWithHermes } from './ais'
 import { quickAsk, withBrief } from './brain'
 import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
 import { awsBinary, browserEnv, chromeCall, chromeChoice, loginError, rowText, profileFor, readPrefs, readSessions, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
-import { SHELL, shellQuote, chainBase, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
+import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
 import { titleFor } from './title'
 import { moveTodoChat } from './todo'
 import { trustFolder, trustedWindowRoots } from './trust'
+import { openChatTerminal, tags } from './terminals'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
 import { FLAGGED, chatSettings, cleanProfile, defaultProfile, handoffSettings, nameNote, saveProfile, savedProfile, startProfile, toolsNote } from './tools'
 
 // A window opened by `code` from inside a chat inherits Claude's child marker, and a chat started
 // under it saves no transcript (no --resume, no handoff). Chat terminals drop it; null unsets.
-const OWN_CHAT = { CLAUDE_CODE_CHILD_SESSION: null }
+// SWITCHBOARD_CHAT: the git guard reads it (git-guard.ts); Codex has no marker of its own.
+const OWN_CHAT = { CLAUDE_CODE_CHILD_SESSION: null, SWITCHBOARD_CHAT: '1' }
 /** A chat terminal's env: no child marker, and the AWS profile picked for its folder (Sign-ins). */
 const chatEnv = (cwd: string): Record<string, string | null> => {
   const p = profileFor(hub.get().signIns.projects, cwd), b = profileFor(hub.get().signIns.browsers ?? {}, cwd)
@@ -36,7 +38,7 @@ const chatEnv = (cwd: string): Record<string, string | null> => {
 }
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
 /** Auto trust, only inside this window's workspace while trusted, or another live trusted window's (trust.ts). */
-const trustHere = (dir: string) => trustFolder(dir, { trusted: vscode.workspace.isTrusted, roots: (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath), others: trustedWindowRoots() })
+const trustHere = (dir: string) => trustFolder(dir, { ask: ask.claude, trusted: vscode.workspace.isTrusted, roots: (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath), others: trustedWindowRoots() })
 // A Codex chat has no pid to stop: the terminal Switchboard started it in, by session id. A terminal waits in
 // codexStarts under the name its row will show (the message's first 60 characters, or a handoff's To: name) until
 // bindCodexTerminals ties it to exactly one new rollout. Lost on reload: such a chat is then never closed by Switchboard.
@@ -66,7 +68,11 @@ const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | und
 export function bindCodexTerminals(chats: ChatRow[], now = Date.now()): void {
   codexStarts = codexStarts.filter(s => now - s.at < START_TTL_MS && s.terminal.exitStatus === undefined)
   const tied = matchCodexStarts(codexStarts, chats, new Set(codexTerminals.keys()))
-  for (const [key, sessionId] of tied) codexTerminals.set(sessionId, codexStarts.find(s => s.key === key)!.terminal)
+  for (const [key, sessionId] of tied) {
+    const t = codexStarts.find(s => s.key === key)!.terminal
+    codexTerminals.set(sessionId, t)
+    tags.host(t, sessionId)
+  }
   codexStarts = codexStarts.filter(s => !tied.has(s.key))
 }
 
@@ -74,10 +80,10 @@ export function bindCodexTerminals(chats: ChatRow[], now = Date.now()): void {
  * A Codex chat runs as its terminal's own process, with no shell around it: when Codex quits the terminal ends,
  * so a message typed into it can never land at a shell prompt. Answers why it could not start.
  */
-async function codexTerminal(name: string, cwd: string, args: string[]): Promise<vscode.Terminal | string> {
+async function codexTerminal(name: string, cwd: string, args: string[], sessionId?: string): Promise<vscode.Terminal | string> {
   const bin = await cliPath('codex')
   if (!bin) return 'codex is not on PATH'
-  const t = vscode.window.createTerminal({ name, cwd, env: chatEnv(cwd), shellPath: bin, shellArgs: args })
+  const t = openChatTerminal({ name, cwd, env: chatEnv(cwd), shellPath: bin, shellArgs: codexArgs(args) }, AIS.codex.name, sessionId)
   codexBorn.set(t, Date.now())
   return t
 }
@@ -86,6 +92,7 @@ async function codexTerminal(name: string, cwd: string, args: string[]): Promise
 function freshTerminal(name: string, cwd: string): vscode.Terminal {
   vscode.window.terminals.find(t => t.name === name)?.dispose()
   const t = vscode.window.createTerminal({ name, cwd })
+  tags.own(t)
   t.show(true)
   return t
 }
@@ -109,14 +116,20 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   if (ai === 'codex') {
     const t = await codexTerminal(`${AIS.codex.name}: ${title}`, folder, first.trim() ? [first] : [])
     if (typeof t === 'string') return t
-    t.show()
+    t.show(true)
     // The row is named by the message, never the brief in front of it (ais.ts).
     waitForCodex(t, folder, rowName(text ?? '') || undefined)
     return undefined
   }
+  if (ai === 'hermes') {
+    const t = openChatTerminal({ name: `${AIS.hermes.name}: ${title}`, cwd: folder }, AIS.hermes.name)
+    t.show(true)
+    t.sendText(typed(AIS.hermes.startCommand({ text: first }, SHELL)))
+    return undefined
+  }
   let command: string
+  const sessionId = id ?? (profile ? crypto.randomUUID() : undefined)
   try {
-    const sessionId = id ?? (profile ? crypto.randomUUID() : undefined)
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
     command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, profileFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
@@ -124,8 +137,8 @@ export async function newChat(folder: string, text: string | undefined, remote: 
     return (err as Error).message
   }
   trustHere(folder)
-  const t = vscode.window.createTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: chatEnv(folder) })
-  t.show()
+  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: chatEnv(folder) }, AIS[ai].name, sessionId)
+  t.show(true)
   t.sendText(typed(command))
   return undefined
 }
@@ -144,6 +157,7 @@ export function startDev(folder: string, project: string, command: string): bool
   const win = process.platform === 'win32'
   const t = vscode.window.createTerminal({ name: devName(project), cwd: folder, env: chatEnv(folder),
     shellPath: win ? process.env.ComSpec ?? 'cmd.exe' : process.env.SHELL || '/bin/zsh', shellArgs: win ? ['/d', '/c', command] : ['-lc', command] })
+  tags.own(t)
   t.show(true)
   return true
 }
@@ -238,7 +252,8 @@ export function openNote(sessionId: string): string | undefined {
 export function focusChat(sessionId: string): boolean {
   // Name matching misses chats not started from Switchboard; match by pid (the chat is a child of the terminal's shell) if that matters.
   const name = hub.get().chats.find(c => c.sessionId === sessionId)?.name
-  const t = name ? vscode.window.terminals.find(x => x.name.endsWith(`: ${name}`)) : undefined
+  const t = tags.of(sessionId) ?? (name ? vscode.window.terminals.find(x => x.name.endsWith(`: ${name}`)) : undefined)
+  // Only a click (Focus chat, a toast's Show) lands here, so this one takes focus; agent-started terminals use show(true).
   t?.show()
   return !!t
 }
@@ -265,15 +280,21 @@ export async function resumeChat(sessionId: string, ai: AiId, prompt?: string, f
   if (!cwd || !fs.existsSync(cwd)) return 'That chat\'s folder is gone'
   const name = `${AIS[ai].name}: ${projectName(cwd)}`
   if (ai === 'codex') {
-    const t = await codexTerminal(name, cwd, ['resume', sessionId])
+    const t = await codexTerminal(name, cwd, ['resume', sessionId], sessionId)
     if (typeof t === 'string') return t
-    t.show()
+    t.show(true)
     codexTerminals.set(sessionId, t)
     return undefined
   }
+  if (ai === 'hermes') {
+    const t = openChatTerminal({ name, cwd }, AIS.hermes.name, sessionId)
+    t.show(true)
+    t.sendText(typed(AIS.hermes.resumeCommand(sessionId)))
+    return undefined
+  }
   trustHere(cwd)
-  const t = vscode.window.createTerminal({ name, cwd, env: chatEnv(cwd) })
-  t.show()
+  const t = openChatTerminal({ name, cwd, env: chatEnv(cwd) }, AIS[ai].name, sessionId)
+  t.show(true)
   t.sendText(typed(AIS[ai].resumeCommand(sessionId, myName()) + (prompt ? ` ${shellQuote(prompt, SHELL)}` : '')))
   return undefined
 }
@@ -344,12 +365,12 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
   if (!codex) trustHere(h.cwd)
   const t = codex
     ? await codexTerminal(`Codex: ${fresh}`, h.cwd, [withBrief(hub.get(), h.cwd, text)])
-    : vscode.window.createTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: chatEnv(h.cwd) })
+    : openChatTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: chatEnv(h.cwd) }, 'Claude', freshId)
   if (typeof t === 'string') {
     void vscode.window.showWarningMessage(`Switchboard: ${t}.`)
     return false
   }
-  t.show()
+  t.show(true)
   if (codex) waitForCodex(t, h.cwd, fresh)
   else t.sendText(typed(command))
   // Only now that the fresh chat runs: the old chat moves to History and is closed once the fresh one posts.
@@ -380,8 +401,10 @@ export async function runSetup(ext: string): Promise<void> {
   const steps = setupSteps(kit, { ...setupState(os.homedir()), key21st: !!key.trim(), modsDir: path.join(ext, 'kit', 'mods'), skillsDir: path.join(ext, 'kit', 'skills'), keys: hub.get().signIns.keys })
   const plan = path.join(os.tmpdir(), 'switchboard-setup.json')
   fs.writeFileSync(plan, JSON.stringify(steps))
+  shareKitWithHermes() // no-op without ~/.hermes
   vscode.window.terminals.find(t => t.name === 'Switchboard setup')?.dispose()
   const t = vscode.window.createTerminal({ name: 'Switchboard setup', cwd: os.homedir(), env: key.trim() ? { [KEY_ENV]: key.trim() } : undefined })
+  tags.own(t)
   t.show(true)
   // Same line in sh, cmd and PowerShell.
   t.sendText(`node "${path.join(ext, 'kit', 'setup-run.mjs')}" "${plan}"`)

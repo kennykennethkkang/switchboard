@@ -9,11 +9,13 @@
  * GET  /hub/holds   204 when this window holds the chat's terminal, so the app routes its commands here
  * GET  /hub/graph   the Memory view's graph (graph.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/recall  ?q=&cwd=: what memory knows about q, from that graph (graph.ts recall), free (token in the x-switchboard-token header or the query)
+ * GET  /hub/flowmap ?cwd=: that project's Flow map (flowmap.ts), built on demand and cached (token in the x-switchboard-token header or the query)
  * GET  /hub/runs    ?session=&role=: that role's runs in that chat for the node drawer (runs.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/outputs     ?session=: what that chat produced (chat-view.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/transcript  ?session=&before=: 50 messages ending before byte before (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/shot        ?session=&path=: an image listed in that chat's outputs, under 10 MB (token in the x-switchboard-token header or the query)
  * GET  /hub/voice   {voice, level, heard}: the mic while it runs, polled by the app (token in the x-switchboard-token header or the query)
+ * POST /hub/voice   a phone's audio clip, under 5 MB (handleVoice): answers {text}, or the problem as plain text (token in the x-switchboard-token header or the query)
  * GET  /hub/state   the whole HubState, for the standalone web app's proxy (token in the x-switchboard-token header or the query); no thisWindow, it is no window
  * POST /hub/command a hub-* command, run as the panel's (token in the x-switchboard-token header or the query)
  * POST /hub/device  the standalone app passes on a device asking to sign in, or that it was answered (token in the x-switchboard-token header or the query)
@@ -33,13 +35,18 @@ import { isAi } from './ais'
 import { isKeyName } from './keys'
 import { ROLE_MODELS } from './roles'
 import { questionAsk } from './progress'
-import { closeQuestion, openQuestion, questionOf, waitQuestion } from './questions'
+import { answerQuestion, closeQuestion, openQuestion, questionOf, waitQuestion } from './questions'
+import { phoneAsk } from './phone'
 import { todoTool, type TodoCall } from './todo'
 import { toolOn } from './tools'
 import { projectId, readGraph, recall, recentGraph, type MemoryGraph } from './graph'
+import { buildFlowMap, flowChatDirs, flowLabels, flowRoots } from './flowmap'
 import { readRuns, type RunDetail } from './runs'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs, type ChatOutputs, type ChatTranscript } from './chat-view'
 import { chatLabel, saveUpload, UploadRefused } from './uploads'
+import { isClipType } from './voice'
+import { SPEND_KEYS, SPEND_MODES } from './spend'
+import { isTabCommand, TAB_OPS } from './window-tabs'
 
 /** bytes: a binary body, sent in place of body. */
 export type HubReply = { status: number; body: string; contentType?: string; bytes?: Buffer }
@@ -67,13 +74,13 @@ const picks: Check = v => Array.isArray(v) && v.length > 0 && v.length <= 4 && v
 const flags = (v: unknown) => obj(v) && Object.values(v).every(bool)
 const profile: Check = v => obj(v) && flags(v.plugins) && flags(v.skills) && (v.assets === undefined || flags(v.assets))
 const SETTING_KEYS: SettingKey[] = ['autoCompactEnabled', 'autoCompactWindow', 'autoContinueAtUsageLimit', 'remoteControlAtStartup', 'agentPushNotifEnabled', 'inputNeededNotifEnabled', 'model', 'effortLevel', 'tui', 'statusLine']
-const GIT_OPS: GitOp[] = ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship']
+const GIT_OPS: GitOp[] = ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship', 'push']
 // The request body has a size cap too, so the count stays modest; web/lib/ship-card.ts says the same before sending.
 const MAX_PATHS = 1000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
-// Typed by Kenneth; todo.ts cuts it to 300 after cleaning, this only stops a huge body.
+// Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'name']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'phone']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -86,13 +93,20 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-setting': { key: oneOf(...SETTING_KEYS), value: any(bool, num, str, oneOf(null)) },
   'hub-switchboard': { key: oneOf(...SWITCHBOARD_KEYS), value: any(bool, num, str, oneOf(null)) },
   'hub-compact': { sessionId: str },
+  'hub-pause': { action: oneOf('resume', 'cancel') },
+  'hub-hand-to': { sessionId: str },
+  'hub-ai-login': { ai: isAi },
   'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile) },
   'hub-pick-tools': { text: str, path: opt(str) },
   'hub-chat-tools': { sessionId: str, tools: profile },
   'hub-star': { sessionId: str, ai: isAi, on: bool },
   'hub-resume': { sessionId: str, ai: isAi },
+  'hub-archive': { sessionId: str },
+  'hub-unarchive': { sessionId: str },
+  'hub-approve': { sessionId: str },
   'hub-open-note': { sessionId: str },
   'hub-focus-chat': { sessionId: str },
+  'hub-terminal': { id: num, act: oneOf('show', 'close') },
   'hub-keep': { onFull: opt(oneOf('compact', 'fresh')), freshBranch: opt(bool) },
   'hub-aws-login': { profile: str, chrome: opt(str) },
   'hub-aws-default': { profile: str },
@@ -113,6 +127,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-key-save': { name: isKeyName, value: v => typeof v === 'string' && v.length <= 512 },
   'hub-key-test': { name: isKeyName },
   'hub-key-remove': { name: isKeyName },
+  'hub-env-setup': { folder: str },
   'hub-kit-export': {},
   'hub-setup': {},
   'hub-rules-sync': {},
@@ -120,7 +135,10 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-rc-server': { folder: str, on: bool },
   'hub-handoff': { sessionId: str },
   'hub-sweep': { name: opt(str) },
+  'hub-spend': { key: oneOf(...SPEND_KEYS), mode: oneOf(...SPEND_MODES), monthlyUsd: opt(num) },
   'hub-sweep-approve': { name: str },
+  'hub-learn': { id: str, ok: bool },
+  'hub-summary': { sessionId: str, refresh: opt(bool) },
   'hub-sweep-fix': { name: str },
   'hub-tool-add': { repo: v => typeof v === 'string' && v.length <= 200 },
   'hub-changes': { sessionId: str },
@@ -130,17 +148,23 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-voice': { on: bool },
   'hub-dev-start': { folder: str },
   'hub-dev-stop': { folder: str },
+  'hub-window-tab': { op: oneOf(...TAB_OPS), workspace: opt(str) },
   'hub-awake': { on: bool },
   'hub-device': { id: str, allow: bool },
   'hub-stuck-stop': { sessionId: str, id: str },
   'hub-stuck-dismiss': { sessionId: str, id: str },
+  'hub-stuck-fix': { sessionId: str, id: str },
+  'hub-wait-for': { from: str, to: str },
+  'hub-unlink': { from: str, to: str },
   'hub-git': { sessionId: str, op: oneOf(...GIT_OPS), files: opt(paths), summary: opt(str), description: opt(str), branch: opt(str), stash: opt(bool), confirmed: opt(bool) },
+  'hub-harden': { sessionId: str },
   'hub-todo-add': { path: str, text: todoText },
   'hub-todo-edit': { path: str, id: str, text: todoText },
   'hub-todo-remove': { path: str, id: str },
   'hub-todo-restore': { path: str, id: str },
   'hub-todo-accept': { path: str, id: str },
   'hub-todo-dismiss': { path: str, id: str },
+  'hub-todo-move': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 500 && v.every(x => typeof x === 'string') },
   'hub-todo-run': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(x => typeof x === 'string'), to: opt(str) },
   'hub-todo-sync': { path: str, on: bool },
   'hub-todo-replace': { path: str, remote: v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v) },
@@ -180,6 +204,8 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     } catch {
       return { status: 400, body: '' }
     }
+    // Another window asks this one to run a command: only the tab ones, never anything else.
+    if (obj(parsed) && parsed.kind === 'window-tab' && !isTabCommand(parsed.command)) return { status: 400, body: '' }
     return { status: hub.ingest(parsed) ? 204 : 403, body: '' }
   }
 
@@ -225,6 +251,13 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     if (!q) return { status: 400, body: '' }
     const cwd = u.searchParams.get('cwd')
     return recentGraph(hub.get(), graph).then(g => text(recall(g, q, 2, cwd ? projectId(hub.get(), cwd) : undefined)), err => ({ status: 500, body: (err as Error).message }))
+  }
+
+  if (method === 'GET' && u.pathname === '/hub/flowmap') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    const cwd = u.searchParams.get('cwd')
+    if (!cwd) return { status: 400, body: 'cwd is needed' }
+    return buildFlowMap(cwd, flowLabels(hub.get()), flowRoots(hub.get()), undefined, flowChatDirs(hub.get())).then(m => ({ status: 200, body: JSON.stringify(m), contentType: 'application/json' }), err => ({ status: 400, body: (err as Error).message }))
   }
 
   if (method === 'GET' && u.pathname === '/hub/runs') {
@@ -298,6 +331,8 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
       const hubAsk = { ...ask, tool: 'ask', via: 'hub' as const, sub: true as const }
       openQuestion(hubAsk.id, b.sessionId as string, hubAsk)
       hub.asked(b.sessionId as string, hubAsk)
+      // Phone mode: whichever answers first, the call or the terminal, wins.
+      if (hub.get().controls.switchboard.phone) void phoneAsk(hubAsk, hub.get().chats.find(c => c.sessionId === b.sessionId)?.name ?? 'a chat').then(c => { if (c) answerQuestion(hubAsk.id, c) })
       return { status: 204, body: '' }
     }
     if (method === 'GET' && u.pathname === '/hub/question') {
@@ -373,6 +408,27 @@ export async function handleUpload(hub: HubService, url: string | undefined, bod
     return { status: 200, body: JSON.stringify({ path }), contentType: 'application/json' }
   } catch (err) {
     return { status: err instanceof UploadRefused ? err.status : 500, body: (err as Error).message }
+  }
+}
+
+const CLIP_MAX = 5 * 1024 * 1024
+/** POST /hub/voice, apart from handleHub since the body is binary. */
+export async function handleVoice(hub: HubService, url: string | undefined, type: string | undefined, body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>, token?: string): Promise<HubReply> {
+  const sent = tokenOf(new URL(url ?? '/', 'http://127.0.0.1'), token)
+  if (!hub.isToken(sent)) return { status: 403, body: '' }
+  if (!isClipType(type)) return { status: 415, body: 'Send an audio clip (webm, mp4, ogg, wav, m4a, aac or mpeg).' }
+  const parts: Uint8Array[] = []
+  let size = 0
+  for await (const c of body) {
+    size += c.length
+    if (size > CLIP_MAX) return { status: 413, body: 'The clip is over 5 MB.' }
+    parts.push(c)
+  }
+  if (!hub.voiceClip) return { status: 503, body: 'Voice is not running in this window.' }
+  try {
+    return json({ text: await hub.voiceClip(Buffer.concat(parts)) })
+  } catch (err) {
+    return { status: 500, body: (err as Error).message, contentType: 'text/plain; charset=utf-8' }
   }
 }
 

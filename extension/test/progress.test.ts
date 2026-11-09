@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { step, settle, finishedJobs, RUNNING_CAP_MS, commitMessage, commitMessages, commitTargets, fillBox, fillRepos, mergeCommit, shouldNotify, notifyKey, notifyStep, canPrefill, plainText, askKeys, otherText, OTHER_MAX, dropAsk, askedQuestion, standup, doneText, almostDone, missed, todayText, newerVersion, desktopNotice } from '../src/hub/progress'
+import { step, settle, finishedJobs, RUNNING_CAP_MS, commitMessage, commitMessages, commitTargets, fillBox, fillRepos, leftovers, mergeCommit, pendingAt, shouldNotify, notifyKey, notifyStep, canPrefill, plainText, askKeys, otherText, OTHER_MAX, dropAsk, askedQuestion, standup, doneText, almostDone, missed, todayText, newerVersion, desktopNotice, workText } from '../src/hub/progress'
 import { coverageItems, parseScores } from '../src/hub/coverage'
 import { commandProblem } from '../src/hub/routes'
 import { HubService } from '../src/hub/hub-service'
@@ -193,30 +193,30 @@ test('commitMessage takes the last plain block; commitMessages keys named ones b
 })
 
 test('a Stop keeps the per-repo blocks; one named for the chat\'s own folder is its plain block, the plain one first', () => {
-  const p = run([ev('SessionStart', { cwd: '/g/agent-flow/extension' }), ev('Stop', { cwd: '/g/agent-flow/extension', last_assistant_message: MULTI })])
+  const p = run([ev('SessionStart', { cwd: '/g/switchboard/extension' }), ev('Stop', { cwd: '/g/switchboard/extension', last_assistant_message: MULTI })])
   assert.equal(p?.commit, 'feat: own\n\n- a')
   assert.deepEqual(p?.commits, { 'claude-mods': 'Kit: newer' })
-  const lone = run([ev('SessionStart', { cwd: '/g/agent-flow/extension' }), ev('Stop', { cwd: '/g/agent-flow/extension', last_assistant_message: 'Commit message (agent-flow):\n```\nown: named\n```' })])
+  const lone = run([ev('SessionStart', { cwd: '/g/switchboard/extension' }), ev('Stop', { cwd: '/g/switchboard/extension', last_assistant_message: 'Commit message (switchboard):\n```\nown: named\n```' })])
   assert.equal(lone?.commit, 'own: named')
   assert.equal(lone?.commits, undefined)
-  const loneDone = run([ev('SessionStart', { cwd: '/g/agent-flow/web' }), ev('UserPromptSubmit', { cwd: '/g/agent-flow/web', prompt: 'go' }), ev('Stop', { cwd: '/g/agent-flow/web', last_assistant_message: 'All set.\n\nCommit message (agent-flow):\n```\nown: named\n```' })])
+  const loneDone = run([ev('SessionStart', { cwd: '/g/switchboard/web' }), ev('UserPromptSubmit', { cwd: '/g/switchboard/web', prompt: 'go' }), ev('Stop', { cwd: '/g/switchboard/web', last_assistant_message: 'All set.\n\nCommit message (switchboard):\n```\nown: named\n```' })])
   assert.equal(loneDone?.state, 'done')
-  const both = run([ev('SessionStart', { cwd: '/g/agent-flow' }), ev('Stop', { cwd: '/g/agent-flow', last_assistant_message: 'Commit message (agent-flow):\n```\nnamed\n```\n\nCommit message:\n```\nplain\n```' })])
+  const both = run([ev('SessionStart', { cwd: '/g/switchboard' }), ev('Stop', { cwd: '/g/switchboard', last_assistant_message: 'Commit message (switchboard):\n```\nnamed\n```\n\nCommit message:\n```\nplain\n```' })])
   assert.equal(both?.commit, 'plain')
   assert.equal(both?.commits, undefined)
 })
 
 test('commitTargets: the plain one to the repo holding cwd, each named one to the open repo of that folder name', () => {
-  const roots = ['/g/agent-flow', '/g/agent-flow/sub', '/g/claude-mods', '/g/x/claude-mods']
-  const p = { cwd: '/g/agent-flow/sub/x', commit: 'own', commits: { 'claude-mods': 'kit', gone: 'nowhere' } }
+  const roots = ['/g/switchboard', '/g/switchboard/sub', '/g/claude-mods', '/g/x/claude-mods']
+  const p = { cwd: '/g/switchboard/sub/x', commit: 'own', commits: { 'claude-mods': 'kit', gone: 'nowhere' } }
   // Two open claude-mods, neither holding the chat: both get it.
-  assert.deepEqual(commitTargets(roots, p), [['/g/claude-mods', 'kit'], ['/g/x/claude-mods', 'kit'], ['/g/agent-flow/sub', 'own']])
+  assert.deepEqual(commitTargets(roots, p), [['/g/claude-mods', 'kit'], ['/g/x/claude-mods', 'kit'], ['/g/switchboard/sub', 'own']])
   assert.deepEqual(commitTargets(['/g/claude-mods'], p), [['/g/claude-mods', 'kit']])
   assert.deepEqual(commitTargets(roots, { cwd: '/elsewhere' }), [])
   // A block named for the repo holding the chat is its own: only that repo, never a namesake, and the plain one wins.
-  const two = ['/g/agent-flow', '/w/agent-flow']
-  assert.deepEqual(commitTargets(two, { cwd: '/g/agent-flow/x', commits: { 'agent-flow': 'named' } }), [['/g/agent-flow', 'named']])
-  assert.deepEqual(commitTargets(two, { cwd: '/g/agent-flow/x', commit: 'plain', commits: { 'agent-flow': 'named' } }), [['/g/agent-flow', 'plain']])
+  const two = ['/g/switchboard', '/w/switchboard']
+  assert.deepEqual(commitTargets(two, { cwd: '/g/switchboard/x', commits: { 'switchboard': 'named' } }), [['/g/switchboard', 'named']])
+  assert.deepEqual(commitTargets(two, { cwd: '/g/switchboard/x', commit: 'plain', commits: { 'switchboard': 'named' } }), [['/g/switchboard', 'plain']])
 })
 
 test('mergeCommit: the new summary, the new lines, the old summary as a bullet, then old lines not already there', () => {
@@ -241,26 +241,26 @@ test('fillBox: fresh into an empty box, never over Kenneth\'s text, and a chat f
 
 test('fillRepos: each Done chat into this window\'s boxes, once each, merged across chats, a chat replacing itself', () => {
   const box = (root: string, value = '') => ({ rootUri: { fsPath: root }, inputBox: { value } })
-  const own = box('/g/agent-flow'), mods = box('/g/claude-mods'), mine = box('/g/mine', 'Kenneth typed this')
+  const own = box('/g/switchboard'), mods = box('/g/claude-mods'), mine = box('/g/mine', 'Kenneth typed this')
   const repos = [own, mods, mine]
   const boxes = new Map(), filled = new Set<string>()
   const done = (sessionId: string, cwd: string, commit: string, commits?: Record<string, string>) => ({ sessionId, cwd, state: 'done' as const, commit, commits })
-  fillRepos(repos, done('A', '/g/agent-flow', 'A one\n\n- a1', { 'claude-mods': 'Kit A\n\n- k1' }), boxes, filled)
+  fillRepos(repos, done('A', '/g/switchboard', 'A one\n\n- a1', { 'claude-mods': 'Kit A\n\n- k1' }), boxes, filled)
   assert.equal(own.inputBox.value, 'A one\n\n- a1')
   assert.equal(mods.inputBox.value, 'Kit A\n\n- k1')
-  fillRepos(repos, done('B', '/g/agent-flow', 'B one\n\n- b1'), boxes, filled)
+  fillRepos(repos, done('B', '/g/switchboard', 'B one\n\n- b1'), boxes, filled)
   assert.equal(own.inputBox.value, 'B one\n\n- b1\n- A one\n- a1')
   // The same hook again changes nothing; A finishing again swaps only its own part.
   // assert.equal narrowed value to a literal; widen it back.
   ;(own.inputBox as { value: string }).value += ''
-  fillRepos(repos, done('B', '/g/agent-flow', 'B one\n\n- b1'), boxes, filled)
+  fillRepos(repos, done('B', '/g/switchboard', 'B one\n\n- b1'), boxes, filled)
   assert.equal(own.inputBox.value, 'B one\n\n- b1\n- A one\n- a1')
-  fillRepos(repos, done('A', '/g/agent-flow', 'A two\n\n- a2'), boxes, filled)
+  fillRepos(repos, done('A', '/g/switchboard', 'A two\n\n- a2'), boxes, filled)
   assert.equal(own.inputBox.value, 'A two\n\n- a2\n- B one\n- b1')
   fillRepos(repos, done('C', '/g/mine', 'C'), boxes, filled)
   assert.equal(mine.inputBox.value, 'Kenneth typed this')
   // Not done yet: nothing.
-  fillRepos(repos, { ...done('D', '/g/agent-flow', 'D'), state: 'working' as const }, boxes, filled)
+  fillRepos(repos, { ...done('D', '/g/switchboard', 'D'), state: 'working' as const }, boxes, filled)
   assert.equal(own.inputBox.value, 'A two\n\n- a2\n- B one\n- b1')
 })
 
@@ -639,6 +639,13 @@ test('ask: a question ask ends with its own call', () => {
   assert.equal(step(left, ev('PostToolUse', { tool_name: 'AskUserQuestion', tool_use_id: 'toolu_q', tool_input: ASK_INPUT }), 10)?.ask, undefined)
 })
 
+test('ask: option descriptions ride along as details; none at all leaves the field out', () => {
+  const p = run([ev('SessionStart'), ev('PreToolUse', { tool_name: 'AskUserQuestion', tool_use_id: 'td', tool_input: ASK_INPUT })])!
+  assert.deepEqual(p.ask?.questions?.[0].details, ['warm', 'cool'])
+  const bare = run([ev('SessionStart'), ev('PreToolUse', { tool_name: 'AskUserQuestion', tool_use_id: 'te', tool_input: { questions: [{ question: 'Which?', options: [{ label: 'a' }, { label: 'b' }] }] } })])!
+  assert.equal('details' in bare.ask!.questions![0], false)
+})
+
 test('ask: one unreadable question drops the buttons for the whole ask', () => {
   const q = ASK_INPUT.questions[0]
   const p = run([ev('SessionStart'), ev('PreToolUse', { tool_name: 'AskUserQuestion', tool_use_id: 't9', tool_input: { questions: [q, { question: 'Size?', options: [] }] } })])!
@@ -647,7 +654,7 @@ test('ask: one unreadable question drops the buttons for the whole ask', () => {
 
 test('ask: tools with their own dialog get no permission buttons', () => {
   const p = run([ev('SessionStart'), ev('PreToolUse', { tool_name: 'AskUserQuestion', tool_use_id: 'toolu_1', tool_input: ASK_INPUT }), ev('PermissionRequest', { tool_name: 'AskUserQuestion', tool_input: ASK_INPUT })])!
-  assert.deepEqual(p.ask, { id: 'toolu_1', kind: 'question', tool: 'AskUserQuestion', options: [], questions: [{ header: 'Color', question: 'Which color?', options: ['Red', 'Blue'] }] })
+  assert.deepEqual(p.ask, { id: 'toolu_1', kind: 'question', tool: 'AskUserQuestion', options: [], questions: [{ header: 'Color', question: 'Which color?', options: ['Red', 'Blue'], details: ['warm', 'cool'] }] })
   assert.equal(step(undefined, ev('PermissionRequest', { tool_name: 'ExitPlanMode', tool_input: {} }), 1)?.ask, undefined)
 })
 
@@ -893,7 +900,7 @@ const LIMIT = { error: 'rate_limit', error_details: '429 Too Many Requests', las
 test('StopFailure on a usage limit ends the turn on needs-you, marked limited', () => {
   const p = run([ev('SessionStart'), ev('SubagentStart', { agent_type: 'qa', agent_id: 'q1' }), ev('PermissionRequest', PERM), ev('StopFailure', LIMIT)])!
   assert.equal(p.state, 'needs-you')
-  assert.match(p.question!, /Usage limit hit\. It continues by itself after the limit resets\./)
+  assert.match(p.question!, /Paused: usage limit\. It continues by itself after the limit resets\./)
   assert.deepEqual(p.limited, { at: 1003, error: 'rate_limit' })
   assert.equal(p.ask, undefined)
   assert.equal(p.roles[0].state, 'active', 'a background subagent still runs')
@@ -1105,4 +1112,48 @@ test('coverage: a nudge or a pasted block Jev scores uncovered never makes a cha
   assert.deepEqual(missed(scored), [])
   assert.equal(almostDone(scored), false)
   assert.deepEqual(missed(step(p, ev('SwitchboardCovered', { scores: [0.05, 0.05, 0.05] }), 5)!), ['add a Today push'])
+})
+
+test('workText: anything else nudges with trailing words are not tasks', () => {
+  for (const t of ['Is there anything else to do?', 'anything else left', 'Is there anything else to do here?', 'is there anything else that needs doing']) assert.equal(workText(t, true), undefined, t)
+  assert.equal(workText('anything else to do with the receipts page, add CSV export', true), 'anything else to do with the receipts page, add CSV export')
+})
+
+test('pendingAt: every finished chat merged per repo, past Kenneth\'s typing, dropped once HEAD moves', () => {
+  const typed = { rootUri: { fsPath: '/p/pend' }, inputBox: { value: 'Kenneth typed this' } }
+  const done = (sessionId: string, commit: string) => ({ sessionId, cwd: '/p/pend', state: 'done' as const, commit })
+  const boxes = new Map(), filled = new Set<string>()
+  fillRepos([typed], done('A', 'A one\n\n- a1'), boxes, filled)
+  fillRepos([typed], done('B', 'B one\n\n- b1'), boxes, filled)
+  assert.equal(typed.inputBox.value, 'Kenneth typed this')
+  const p = pendingAt('/p/pend', 'h1')!
+  assert.equal(p.text, 'B one\n\n- b1\n- A one\n- a1')
+  assert.equal(p.last, 'B one')
+  assert.ok(p.at > 0)
+  // A chat finishing again swaps its own part.
+  fillRepos([typed], done('A', 'A two\n\n- a2'), boxes, filled)
+  assert.equal(pendingAt('/p/pend', 'h1')?.text, 'A two\n\n- a2\n- B one\n- b1')
+  assert.equal(pendingAt('/p/pend', 'h2'), undefined)
+  assert.equal(pendingAt('/p/pend', 'h2'), undefined)
+})
+
+test('leftovers: changed files no message names, as one bullet grouped by folder', () => {
+  assert.equal(leftovers('Fix\n\n- git.ts: push op\n- web/app.tsx', ['extension/src/hub/git.ts', 'web/app.tsx', 'extension/src/hub/progress.ts', 'extension/src/hub/types.ts', 'README.md']),
+    'Fix\n\n- git.ts: push op\n- web/app.tsx\n- Also changed: extension/src/hub: progress.ts, types.ts; README.md')
+  assert.equal(leftovers('Fix\n\n- a', ['a']), 'Fix\n\n- a')
+  assert.equal(leftovers('Fix', ['x/y.ts']), 'Fix\n\n- Also changed: x: y.ts')
+  // A bare name without a dot only counts by its full path.
+  assert.equal(leftovers('Fix the Makefile', ['src/a']), 'Fix the Makefile\n\n- Also changed: src: a')
+})
+
+test('pendingAt: a commit made elsewhere drops only the parts from before it, never a chat that finished after', () => {
+  const box = { rootUri: { fsPath: '/p/moved' }, inputBox: { value: '' } }
+  const done = (sessionId: string, commit: string) => ({ sessionId, cwd: '/p/moved', state: 'done' as const, commit })
+  const boxes = new Map(), filled = new Set<string>()
+  fillRepos([box], done('A', 'A one\n\n- a1'), boxes, filled)
+  assert.equal(pendingAt('/p/moved', 'H1')?.text, 'A one\n\n- a1')
+  fillRepos([box], done('B', 'B one\n\n- b1'), boxes, filled)
+  const p = pendingAt('/p/moved', 'H2')!
+  assert.equal(p.text, 'B one\n\n- b1')
+  assert.equal(p.last, 'B one')
 })

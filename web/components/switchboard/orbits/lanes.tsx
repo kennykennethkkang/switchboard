@@ -88,7 +88,7 @@ export function Lanes(v: ViewProps) {
   const axis = axisTicks(tl.t0, tl.t1, px, Math.max(110, (box.vw - box.lw) / 5))
   const over = px > box.vw - box.lw + 1
   const lead = chat.state === 'working' ? 'active' : chat.state === 'needs-you' ? 'needs' : chat.state === 'done' ? (almost ? 'almost' : 'done') : 'idle'
-  const leadWord = { active: 'working', needs: 'needs you', done: 'finished', almost: 'almost done', idle: 'stopped' }[lead]
+  const leadWord = { active: 'working', needs: 'needs you', done: 'ready to approve', almost: 'ready to approve', idle: chat.wait ?? 'stopped' }[lead]
   const end = chat.state === 'working' || chat.state === 'needs-you' ? 'now' : `${chat.state === 'done' ? 'done' : 'stopped'} ${clock(tl.t1)}`
 
   const grid = <span className="ovl-grid" aria-hidden>{axis.slice(1).map(t => <i key={t.label} style={{ left: pct(f(t.at)) }} />)}</span>
@@ -155,7 +155,7 @@ export function Lanes(v: ViewProps) {
       </div>
       {unused.length > 0 && <p className="ovl-unused">Not used: {unused.map(m => NAME(m.role)).join(', ')}</p>}
       <Reveal on={chat.state === 'needs-you'} className="ov-call"><span data-tone="needs"><b>Needs you</b>{p?.question ?? 'This chat is waiting on you.'}</span></Reveal>
-      <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{almost ? 'Almost done' : 'Finished'}</b>{p?.commit ? <Commit text={p.commit} /> : 'No commit message.'}</span></Reveal>
+      <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{'Ready to approve'}</b>{p?.commit ? <Commit text={p.commit} /> : 'No commit message.'}</span></Reveal>
       <p className="ov-legend" aria-hidden>
         <span style={{ '--c': 'var(--hub-blue)' } as CSSProperties}><i />working</span>
         <span style={{ '--c': almost ? 'var(--hub-teal)' : 'var(--hub-green)' } as CSSProperties}><i />done</span>

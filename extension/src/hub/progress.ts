@@ -4,9 +4,10 @@
  * Pure, so the tests drive it with recorded payloads; hub-service.ts keeps the results.
  */
 import { createHash } from 'crypto'
+import * as fs from 'fs'
 import * as path from 'path'
 import { foldPathCase } from '../fs-utils'
-import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall } from './types'
+import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, Helper, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall } from './types'
 
 type Payload = Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -73,8 +74,57 @@ function testRun(event: string, payload: Payload, now: number): TestRun | undefi
   return { command: cut(command, 160)!, ok: event === 'PostToolUse' && !o.failed, at: now, ...o, ...(tail.length ? { tail } : {}) }
 }
 
+// Jev verbs that make a model call; setup, status and the like do not.
+// Only at a command position (start, or after ; & |), maybe behind python and a path; a grep or echo naming it is not a call.
+const JEV = /(?:^|[;&|])\s*(?:python3?\s+)?(?:"[^"]*jev\.py"|'[^']*jev\.py'|[^\s;&|'"]*jev\.py)\s+(ask|route|match|gate|tune|bench|classify|check|score|verify)\b/
+// The preset of that one command; quoted prompt text is dropped first, a quoted preset value kept.
+const presetOf = (rest: string) => /--preset[ =]([\w.-]+)/.exec(rest.replace(/(--preset[ =])?(['"])(.*?)\2/g, (_m, p: string | undefined, _q, v: string) => p ? p + v : '').split(/[;&|]/)[0])?.[1]
+const GEMINI = /gemini\.py['"]?(?:\s+"\$@"'?\s+_)?\s+(\w+)/
+// claude at a command position, maybe by path; quoted prompt text is dropped first. Headless only: -p or --print.
+const CLAUDE = /(?:^|[;&|])\s*(?:[^\s;&|'"]*\/)?claude\s+([^;&|]*)/
+function claudeShell(cmd: string): Pick<Helper, 'ai' | 'role' | 'label'> | undefined {
+  const args = CLAUDE.exec(cmd.replace(/(['"]).*?\1/g, '""'))?.[1]
+  if (!args || !/(?:^|\s)(?:-p|--print)(?:\s|$)/.test(args)) return undefined
+  const role = /--agent[ =]([\w.:-]+)/.exec(args)?.[1]?.split(':').pop()
+  return role ? { ai: 'claude', role, label: role } : { ai: 'claude', label: 'claude -p' }
+}
+/** Work a call hands to another AI, labeled by its verb or tool, never its prompt. */
+export function helperCall(tool: string, input: Payload): Pick<Helper, 'ai' | 'role' | 'label'> | undefined {
+  const [, server, rest] = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(tool) ?? []
+  if (server?.includes('perplexity')) return { ai: 'perplexity', label: rest }
+  if (server?.includes('gemini')) return { ai: 'gemini', label: rest }
+  const px = /^perplexity_(.+)$/.exec(tool)
+  if (px) return { ai: 'perplexity', label: px[1] }
+  if (tool === 'Bash') {
+    const cmd = str(input.command) ?? ''
+    const j = JEV.exec(cmd)
+    if (j) { const pre = presetOf(cmd.slice(j.index + j[0].length)); return { ai: 'jev', label: pre ? `${j[1]} ${pre}` : j[1] } }
+    const g = GEMINI.exec(cmd)
+    if (g) return { ai: 'gemini', label: g[1] }
+    const c = claudeShell(cmd)
+    if (c) return c
+  }
+  const role = tool === 'Agent' || tool === 'Task' ? str(input.subagent_type)?.split(':').pop() : undefined
+  if (role?.endsWith('-codex')) return { ai: 'codex', role, label: cut(input.description, 60) ?? role }
+  return undefined
+}
+const HELPERS_MAX = 8
+const sameHelper = (a: Pick<Helper, 'ai' | 'role'>, b: Pick<Helper, 'ai' | 'role'>) => a.ai === b.ai && a.role === b.role
+function helperStart(p: ChatProgress, c: Pick<Helper, 'ai' | 'role' | 'label'>, now: number): Helper[] {
+  const was = p.helpers?.find(h => sameHelper(h, c))
+  const h: Helper = { ai: c.ai, ...(c.role ? { role: c.role } : {}), label: c.label, state: 'working', since: now, last: now, count: (was?.count ?? 0) + 1 }
+  return [...(p.helpers ?? []).filter(x => x !== was), h].slice(-HELPERS_MAX)
+}
+const helperEnd = (p: ChatProgress, c: Pick<Helper, 'ai' | 'role'>, now: number) =>
+  p.helpers?.map(h => sameHelper(h, c) && h.state === 'working' ? { ...h, state: 'done' as const, last: now } : h)
+// A helper whose end never came stops counting as working once its chat settles.
+const idled = (hs?: Helper[]) => hs?.map(h => h.state === 'working' ? { ...h, state: 'idle' as const } : h)
+
 /** Nothing runs any more: Done if the lead's last turn finished the work, else idle. */
-const settled = (p: ChatProgress, now: number): ChatProgress => p.finishing ? { ...p, state: 'done', finishedAt: now } : { ...p, state: 'idle' }
+const settled = (p: ChatProgress, now: number): ChatProgress => {
+  const q = p.helpers ? { ...p, helpers: idled(p.helpers) } : p
+  return q.finishing ? { ...q, state: 'done', finishedAt: now } : { ...q, state: 'idle' }
+}
 
 // A "Commit message:" heading, or "Commit message (<repo folder>):" for another repo, then its fenced block.
 // Only a plain folder name counts as a repo; "(Other Repo)" or "(a/b)" leaves the block a plain one.
@@ -281,7 +331,9 @@ export function questionAsk(id: string, input: Payload): Ask | undefined {
     const options = (Array.isArray(o.options) ? o.options : []).slice(0, 8).map(x => cut((x as Payload)?.label, 80) ?? '')
     if (!question || !options.length || options.includes('')) return []
     const header = cut(o.header, 40)
-    return [{ ...(header ? { header } : {}), question, options, ...(o.multiSelect === true ? { multiSelect: true } : {}) }]
+    // Same order as options; only sent when some option has one.
+    const details = (o.options as Payload[]).slice(0, 8).map(x => cut(x?.description, 140) ?? '')
+    return [{ ...(header ? { header } : {}), question, options, ...(details.some(Boolean) ? { details } : {}), ...(o.multiSelect === true ? { multiSelect: true } : {}) }]
   })
   return questions.length && questions.length === raw.length ? { id: cut(id, 80) ?? id, kind: 'question', tool: 'AskUserQuestion', options: [], questions } : undefined
 }
@@ -339,7 +391,7 @@ const MAX_ASKS = 6
 const ASKED_ITEM = 200, ASKED_MAX = 8
 /** StopFailure errors that clear up by waiting; hub-service.ts retries these after the reset. */
 export const LIMITS = new Set(['rate_limit'])
-const LIMIT_TEXT = 'Usage limit hit. It continues by itself after the limit resets.'
+const LIMIT_TEXT = 'Paused: usage limit. It continues by itself after the limit resets.'
 const NO_ASK = { question: undefined, ask: undefined, asks: undefined }
 const askText = (a: Ask) => a.kind === 'question' ? a.questions![0].question : `Claude needs your permission to use ${a.tool}`
 /** The terminal shows waiting prompts one at a time, oldest first; ask is that one. */
@@ -420,7 +472,8 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       // hub-service.ts reads its transcript; a job not ended there outlives the agent.
       const over = new Set(Array.isArray(payload.bg_finished) ? payload.bg_finished.map(String) : [])
       const subJobs = r0.subJobs?.filter(j => !over.has(j.id))
-      const r = { ...r0, subJobs: subJobs?.length ? subJobs : undefined }
+      const codex = role?.split(':').pop()
+      const r = { ...r0, subJobs: subJobs?.length ? subJobs : undefined, ...(codex?.endsWith('-codex') && r0.helpers ? { helpers: helperEnd(r0, { ai: 'codex', role: codex }, now) } : {}) }
       if (!q.waiting || running?.length || q.jobs?.length) return r
       // A finished subagent always starts another lead turn, so a turn that ended with a block or every task done
       // stays wrapping up until that Stop decides; settle() covers a Stop that never comes. A plain turn goes idle now.
@@ -434,6 +487,8 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const target = toolTarget(tool, input)
       const call: ToolCall = { tool, ...(target ? { target } : {}), role: sub ? role ?? 'subagent' : 'lead', at: now }
       p.tools = [...(p.tools ?? []), call].slice(-TOOLS_MAX)
+      const helper = helperCall(tool, input)
+      if (helper) p.helpers = helperStart(p, helper, now)
       // A subagent's own TodoWrite is its private list; only the shared task tools reach the chat's list.
       if (sub) { const q = seen(p, str(payload.agent_id)!, role, now); return tool === 'TodoWrite' ? q : { ...q, tasks: tasksFrom(q, tool, input, now) } }
       delete p.limited
@@ -461,6 +516,9 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       // A subagent's job never holds the chat: only the stuck check (stuck.ts) watches it.
       if (job && sub) p.subJobs = [...(p.subJobs ?? []).filter(j => j.id !== job.id), job]
       else if (job) p.jobs = [...(p.jobs ?? []).filter(j => j.id !== job.id), job]
+      // A codex subagent ends on its SubagentStop; its Agent call returns at once when it runs in the background.
+      const helper = helperCall(str(payload.tool_name) ?? '', (payload.tool_input ?? {}) as Payload)
+      if (helper && helper.ai !== 'codex') p.helpers = helperEnd(p, helper, now)
       const tests = testRun(event, payload, now)
       if (tests) p.tests = tests
       // A subagent stopped with TaskStop sends no SubagentStop, a stopped shell no notification.
@@ -547,7 +605,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
 export function settle(p: ChatProgress, now: number): ChatProgress {
   if (!p.waiting || now - p.at < RUNNING_CAP_MS) return p
   const { waiting: _, running: __, jobs: ___, finishing: ____, ...rest } = p
-  return { ...rest, state: 'idle', roles: rest.roles.map(r => r.state === 'active' ? { ...r, state: 'done' as const } : r) }
+  return { ...rest, state: 'idle', roles: rest.roles.map(r => r.state === 'active' ? { ...r, state: 'done' as const } : r), ...(rest.helpers ? { helpers: idled(rest.helpers) } : {}) }
 }
 
 // notify.ts rules, here so the tests reach them without vscode.
@@ -560,7 +618,7 @@ export const missed = (p: ChatProgress) => p.covered?.length !== p.asked?.length
 // Pasted blocks, other chats' messages and harness text arrive wrapped; only these tags, closed or not.
 const WRAPPED = /<(pasted_content|cross-session-message|system-reminder|task-notification|command-[\w-]+)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi
 // Harness prompts and nudges to the chat itself, on lowercased words, anchored so a real task that mentions them stays.
-const NUDGE = /^your claude ai usage limit has reset\b|^(is there )?anything else$|^(please )?(do|finish) (what is|what s|whatever is) left$|^is (everything|it all|that all|it) (done|finished)\b|^(it )?(seems|looks) like (the )?\w+ (is|got) stuck( please fix( it)?)?$/
+const NUDGE = /^your claude ai usage limit has reset\b|^(is there )?anything else( (to do|left|that needs doing|that needs to be done|to work on))?( here| now)?$|^(please )?(do|finish) (what is|what s|whatever is) left$|^is (everything|it all|that all|it) (done|finished)\b|^(it )?(seems|looks) like (the )?\w+ (is|got) stuck( please fix( it)?)?$/
 // The standing ask for a full commit message, never a task.
 const COMMIT_ASK = /\b(make|write|put|give)( me)?( the| a)? full commit message\b/
 /** text without wrapped blocks, or undefined when nothing human is left or it only nudges the chat. ask: a raw request, which must also read like a task. */
@@ -602,6 +660,53 @@ export function fillBox(current: string, box: Box | undefined, session: string, 
   return { text: by.map(([, m]) => m).reduce((acc, m) => mergeCommit(acc, m)), by }
 }
 
+/** A repo's merged message from every chat that finished since its last commit, whatever the box holds.
+ * Each part keeps the HEAD it arrived under, so any window drops what a commit made anywhere already took. last: the newest summary; at: when it last grew. */
+export type Pending = { text: string; at: number; last: string }
+type Part = { session: string; message: string; head?: string; at: number }
+const pending = new Map<string, Part[]>()
+
+/** HEAD's sha from the .git files, so fillRepos stays sync; undefined (stamped at the next read) when it can't tell. */
+export function headOf(root: string): string | undefined {
+  try {
+    let dir = path.join(root, '.git')
+    if (fs.statSync(dir).isFile()) dir = path.resolve(root, fs.readFileSync(dir, 'utf8').replace(/^gitdir:\s*/, '').trim())
+    const head = fs.readFileSync(path.join(dir, 'HEAD'), 'utf8').trim()
+    if (!head.startsWith('ref: ')) return head
+    const ref = head.slice(5)
+    // A worktree's branches live in the main repo.
+    const common = fs.existsSync(path.join(dir, 'commondir')) ? path.resolve(dir, fs.readFileSync(path.join(dir, 'commondir'), 'utf8').trim()) : dir
+    for (const d of [dir, common]) { try { return fs.readFileSync(path.join(d, ref), 'utf8').trim() } catch { /* packed */ } }
+    return fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n').find(l => l.endsWith(` ${ref}`))?.split(' ')[0]
+  } catch { return undefined }
+}
+
+function addPending(root: string, session: string, message: string): void {
+  const key = foldPathCase(root)
+  pending.set(key, [...(pending.get(key) ?? []).filter(p => p.session !== session), { session, message, head: headOf(root), at: Date.now() }])
+}
+
+/** The parts that arrived under this HEAD, merged; older ones are dropped. */
+export function pendingAt(root: string, head: string | undefined): Pending | undefined {
+  const key = foldPathCase(root)
+  const parts = (pending.get(key) ?? []).filter(p => (p.head ??= head) === head)
+  if (!parts.length) { pending.delete(key); return undefined }
+  pending.set(key, parts)
+  const newest = parts[parts.length - 1]
+  return { text: parts.map(p => p.message).reduce((acc, m) => mergeCommit(acc, m)), at: newest.at, last: newest.message.split('\n')[0].trim() }
+}
+export const dropPending = (root: string) => pending.delete(foldPathCase(root))
+
+/** The message plus one bullet for changed files it never names (full path, or a dotted file name), grouped by folder. */
+export function leftovers(message: string, files: string[]): string {
+  const named = (f: string) => { const b = path.posix.basename(f); return message.includes(f) || (b.includes('.') && message.includes(b)) }
+  const dirs = new Map<string, string[]>()
+  for (const f of files.filter(f => !named(f))) { const d = path.posix.dirname(f); dirs.set(d, [...dirs.get(d) ?? [], path.posix.basename(f)]) }
+  if (!dirs.size) return message
+  const line = `- Also changed: ${[...dirs].map(([d, fs]) => (d === '.' ? fs.join(', ') : `${d}: ${fs.join(', ')}`)).join('; ')}`
+  return message.includes('\n') ? `${message}\n${line}` : `${message}\n\n${line}`
+}
+
 /** What fillBoxes (notify.ts) does with the git extension's repositories, kept free of vscode for tests. boxes and filled live per window. */
 export function fillRepos(repos: { rootUri: { fsPath: string }; inputBox: { value: string } }[], p: Pick<ChatProgress, 'sessionId' | 'cwd' | 'state' | 'commit' | 'commits'>,
   boxes: Map<string, Box>, filled: Set<string>): void {
@@ -610,6 +715,7 @@ export function fillRepos(repos: { rootUri: { fsPath: string }; inputBox: { valu
     const key = `${p.sessionId}\n${root}\n${message}`
     if (filled.has(key)) continue
     filled.add(key)
+    addPending(root, p.sessionId, message)
     const repo = repos.find(r => r.rootUri.fsPath === root)!
     const box = fillBox(repo.inputBox.value, boxes.get(root), p.sessionId, message)
     if (!box) continue

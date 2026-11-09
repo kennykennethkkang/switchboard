@@ -101,9 +101,41 @@ Setting ids keep the upstream `agentVisualizer.` prefix:
 
 For a non-default Codex install, set `CODEX_HOME`.
 
-## About Agent Flow
+## Credits
 
-Agent Flow is real-time visualization of Claude Code and Codex agent orchestration, created by [Simon Patole](https://github.com/patoles) for [Antics](https://antics.gg). Its hook server and Codex rollout reader are still the base of Switchboard's live data. The upstream project is at https://github.com/patoles/agent-flow.
+Switchboard is a fork of [Agent Flow](https://github.com/patoles/agent-flow), the real-time visualization of Claude Code and Codex agent orchestration created by [Simon Patole](https://github.com/patoles) for [Antics](https://antics.gg). Its hook server and Codex rollout reader are still the base of Switchboard's live data. Used under the Apache License 2.0. Agent Flow is a trademark of Simon Patole; Switchboard is not affiliated with or endorsed by it.
+
+Shipped with Switchboard:
+
+- ECC subagents (kit/mods/ecc-agents) from [ECC](https://github.com/affaan-m/ECC) by Affaan Mustafa, MIT.
+- DESIGN.md files (kit/design-md) from [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) by VoltAgent, MIT.
+- Silkscreen font by Jason Kottke ([kottke.org](https://kottke.org/plus/type/silkscreen)), SIL Open Font License 1.1.
+- Hanken Grotesk font by [The Hanken Grotesk Project Authors](https://github.com/marcologous/hanken-grotesk), SIL Open Font License 1.1.
+- Kit skills, each with its LICENSE: aar, adapted from aar-loop by Cooper Simson, MIT; the awwwards rubric, adapted from [claude-skill-awwwards](https://github.com/tponscr-debug/claude-skill-awwwards) by Thomas Pons, MIT; accessibility, click-path-audit and e2e-testing from ECC by Affaan Mustafa, MIT; accessible-motion, gsap-greensock, hover-interactions, page-transitions and scroll-animations by Dylan Tarre, MIT; image-to-code-skill by Leonxlnx, MIT; extract-design-md, extract-static-html and taste-design from [stitch-skills](https://github.com/google-labs-code/stitch-skills) by Google, Apache 2.0.
+- web-design-guidelines by Vercel; claude-x-jev and jev-setup-project by Charles J Dove (Jev).
+- The Board page's pixel character per agent is an idea from [Pixel Agents](https://github.com/pablodelucca/pixel-agents) by pablodelucca, MIT; no code is copied.
+- Stripping invisible characters on commit is an idea from [watermarks-remover](https://github.com/guillaumemeyer/watermarks-remover) by Guillaume Meyer, MIT; no code is copied.
+
+Installed by Set up from their own repos (not bundled):
+
+- [superpowers](https://github.com/obra/superpowers) by Jesse Vincent (obra)
+- [ponytail](https://github.com/DietrichGebert/ponytail) by Dietrich Gebert
+- [impeccable](https://github.com/pbakaus/impeccable) by Paul Bakaus, Apache 2.0
+- [skills](https://github.com/emilkowalski/skills) by Emil Kowalski
+- [taste-skill-classics](https://github.com/Leonxlnx/taste-skill-classics) and [imagegen-skills](https://github.com/Leonxlnx/imagegen-skills) by Leonxlnx
+- [pixelfx](https://github.com/patch-gg/pixelfx) by Patch
+- [humanizer](https://github.com/blader/humanizer) by Siqi Chen
+- [last30days](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
+- [find-skills](https://github.com/vercel-labs/skills) by Vercel
+- [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache-2.0
+- [Scrapling](https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause
+- [Agent Reach](https://github.com/Panniantong/Agent-Reach) by Panniantong
+- [archify](https://github.com/tt-a1i/archify) by tt-a1i, Apache 2.0
+- [diagram-design](https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery
+- grill-me by [Matt Pocock](https://github.com/mattpocock/skills)
+- Anthropic's [official plugins](https://github.com/anthropics/claude-plugins-official) (code-review, context7, frontend-design, playwright)
+
+Licenses are MIT unless noted. [NOTICE](NOTICE) and [extension/NOTICE](extension/NOTICE) have the full lines.
 
 ## License
 

@@ -422,3 +422,47 @@ describe('chatShot', () => {
     assert.equal(await chatShot(all, fake), undefined)
   })
 })
+
+describe('chatTranscript for a Codex rollout', () => {
+  const id = '01a1b917-9d24-7430-b590-c3623b80d155'
+  const ri = (payload: object) => JSON.stringify({ type: 'response_item', payload })
+  const msg = (role: string, text: string) => ri({ type: 'message', role, content: [{ type: role === 'assistant' ? 'output_text' : 'input_text', text }] })
+  const write = (home: string, lines: string[]) => {
+    const dir = path.join(home, '.codex', 'sessions', '2026', '11', '07')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, `rollout-2026-11-07T18-58-14-${id}.jsonl`), `${lines.join('\n')}\n`)
+  }
+
+  it('reads prompts, replies and tool calls, skipping injections, redacted', async () => {
+    const home = tmp()
+    write(home, [
+      JSON.stringify({ type: 'session_meta', payload: { id, cwd: '/repo' } }),
+      msg('developer', '<permissions instructions>x'),
+      msg('user', '<environment_context>\n<cwd>/repo</cwd>\n</environment_context>'),
+      msg('user', 'fix the bug'),
+      msg('assistant', `On it ${KEY}`),
+      ri({ type: 'function_call', name: 'exec_command', arguments: JSON.stringify({ cmd: 'ls -la' }), call_id: 'c1' }),
+      ri({ type: 'function_call_output', call_id: 'c1', output: 'a.ts\nb.ts' }),
+      ri({ type: 'custom_tool_call', name: 'apply_patch', input: '*** Begin Patch\n*** Update File: /repo/a.ts\n', call_id: 'c2' }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'dup' } }),
+    ])
+    const t = (await chatTranscript(id, undefined, { home }))!
+    assert.equal(t.transcript, undefined)
+    assert.deepEqual(t.messages.slice(0, 2), [{ role: 'you', text: 'fix the bug' }, { role: 'claude', text: 'On it [removed]' }])
+    assert.deepEqual(t.messages.slice(2).map(m => m.role), ['tool', 'tool', 'tool'])
+    assert.match(t.messages[2].text, /^exec_command .*ls -la/)
+    assert.match(t.messages[3].text, /^result: a\.ts/)
+    assert.equal(t.messages[4].text, 'apply_patch /repo/a.ts')
+  })
+
+  it('pages 50 at a time and refuses an id that is not a uuid', async () => {
+    const home = tmp()
+    write(home, Array.from({ length: 70 }, (_, i) => msg('user', `m${i}`)))
+    const t = (await chatTranscript(id, undefined, { home }))!
+    assert.equal(t.messages.length, 50)
+    assert.equal(t.messages[0].text, 'm20')
+    const back = (await chatTranscript(id, t.before!, { home }))!
+    assert.deepEqual([back.messages.length, back.messages[0].text, back.before], [20, 'm0', null])
+    assert.equal(await chatTranscript('../x', undefined, { home }), null)
+  })
+})

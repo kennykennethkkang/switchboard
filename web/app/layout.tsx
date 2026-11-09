@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { BusyBar } from '@/components/switchboard/busy-bar'
 
 export const metadata: Metadata = {
   title: 'Switchboard',
@@ -41,6 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="font-sans antialiased bg-[var(--hub-canvas)]">
+        <BusyBar />
         {children}
       </body>
     </html>

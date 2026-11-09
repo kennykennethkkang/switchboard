@@ -94,6 +94,17 @@ export function gitPuller(run: (args: string[]) => Promise<string>): () => Promi
   })().finally(() => { inFlight = undefined })
 }
 
+/** A status bar "Reload ready" item: a new build waits for the user's click, never reloads under them. One per window (per vscode module, for the tests). */
+const items = new WeakMap<object, vscode.StatusBarItem>()
+export function reloadReady(vs: typeof vscode, why: string): void {
+  const item = items.get(vs) ?? vs.window.createStatusBarItem(vs.StatusBarAlignment.Left, 100)
+  items.set(vs, item)
+  item.text = '$(refresh) Reload ready'
+  item.tooltip = `${why}. Click to reload this window.`
+  item.command = 'workbench.action.reloadWindow'
+  item.show()
+}
+
 export function startSelfUpdate(context: vscode.ExtensionContext, kitDir: string, pull = gitPuller(gitIn(path.dirname(kitDir))), lock = LOCK): Promise<void> {
   // Loaded here so the tests can import the helpers above without VS Code.
   const vs: typeof vscode = require('vscode')
@@ -104,16 +115,15 @@ export function startSelfUpdate(context: vscode.ExtensionContext, kitDir: string
   // In globalState, like TRIED: a row that stays ahead of the running version reloads once, not on every start.
   const PROMPTED = 'selfUpdate.prompted'
   let prompted = context.globalState.get<string>(PROMPTED)
-  let pending = false
   const reload = () => vs.commands.executeCommand('workbench.action.reloadWindow')
 
-  const askReload = (version: string) => {
+  // now: the user just pressed Install. Otherwise another window or an agent put it there: offer, never reload.
+  const askReload = (version: string, now: boolean) => {
     if (prompted === version) return
     prompted = version
     void context.globalState.update(PROMPTED, version)
-    pending = true
-    if (!vs.window.state.focused) { void reload(); return }
-    void vs.window.showInformationMessage(`Switchboard ${version} is installed.`, 'Reload').then(pick => { if (pick) void reload() })
+    if (now) { void reload(); return }
+    reloadReady(vs, `Switchboard ${version} is installed`)
   }
 
   const readDisk = async () => diskVersion(await fs.promises.readFile(listing, 'utf8').catch(() => '[]'), id)
@@ -122,8 +132,7 @@ export function startSelfUpdate(context: vscode.ExtensionContext, kitDir: string
   const ASKED = 'selfUpdate.asked'
 
   const check = async () => {
-    // Asked while focused, and the window went to the background without a blur event reaching us.
-    if (pending && !vs.window.state.focused) { void reload(); return }
+    let installed = false
     try {
       // No row means a dev host or a folder we do not manage: never install or reload there.
       let disk = await readDisk()
@@ -149,13 +158,14 @@ export function startSelfUpdate(context: vscode.ExtensionContext, kitDir: string
                 throw err
               }
               await context.globalState.update(TRIED, kit.version)
+              installed = true
               // Trust the row, not the command: a failed install leaves it as it was.
               disk = await readDisk()
             }
           }
         } finally { release() }
       }
-      if (disk && newerVersion(disk, running)) askReload(disk)
+      if (disk && newerVersion(disk, running)) askReload(disk, installed)
     } catch (err) {
       log.warn('Self update failed:', err)
     }
@@ -164,11 +174,7 @@ export function startSelfUpdate(context: vscode.ExtensionContext, kitDir: string
   const first = check()
   // Jitter, so windows opened together do not all check at once.
   const timer = setInterval(() => void check(), EVERY_MS + Math.floor(Math.random() * 60_000))
-  context.subscriptions.push(
-    { dispose: () => clearInterval(timer) },
-    // Reload when the user leaves the window, not while they are in it.
-    vs.window.onDidChangeWindowState(s => { if (!s.focused && pending) void reload() }),
-  )
+  context.subscriptions.push({ dispose: () => clearInterval(timer) })
   // The first check, so the tests can wait on it; check never rejects.
   return first
 }

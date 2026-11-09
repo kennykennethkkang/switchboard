@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 import * as os from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { HubService } from '../src/hub/hub-service'
+import { CONTINUE, HubService, continueText } from '../src/hub/hub-service'
 import { commandProblem, handleHub as route, handleHubRequest, type HubReply } from '../src/hub/routes'
 import { board, suggest } from '../src/hub/brain'
 
@@ -252,7 +252,7 @@ describe('hub state and command routes', () => {
     assert.equal(ok.status, 200)
     assert.deepEqual(JSON.parse(ok.body).chats, [])
     // The phone secret stays in the VS Code panel, never in the browser's state.
-    h.set({ phoneUrls: { wifi: 'http://192.168.1.5:3131/?k=secret' }, thisWindow: '/g/agent-flow' })
+    h.set({ phoneUrls: { wifi: 'http://192.168.1.5:3131/?k=secret' }, thisWindow: '/g/switchboard' })
     const again = handleHub(h, 'GET', `/hub/state?token=${h.token}`, '') as { body: string }
     assert.equal(JSON.parse(again.body).phoneUrls, null)
     // The browser app is no window, so it gets no "this window" tag.
@@ -351,6 +351,17 @@ describe('hub state and command routes', () => {
     assert.equal(r?.body, 'that terminal is not running Codex')
   })
 
+  it('passes ultrathink and ultracode through to the chat word for word', async () => {
+    const h = new HubService()
+    const text = 'ultrathink about this, then ultracode the fix'
+    let got = ''
+    h.runner = c => { const m = c as { type: string; sessionId: string; text: string }; if (m.type === 'hub-send') { h.queue(m.sessionId, { kind: 'prompt', text: m.text }); got = m.text } return true }
+    const r = await handleHub(h, 'POST', `/hub/command?token=${h.token}`, JSON.stringify({ type: 'hub-send', sessionId: 's1', text }))
+    assert.equal(r?.status, 204)
+    assert.equal(got, text)
+    assert.deepEqual(h.take('s1').map(i => (i as { text?: string }).text), [text])
+  })
+
   it('has no hub-close command: only a handoff queues a close', () => {
     const h = new HubService()
     h.runner = () => true
@@ -429,7 +440,7 @@ describe('close after handoff', () => {
     const h = new HubService()
     h.ingest({ token: h.token, kind: 'handoff', sessionId: 'old', cwd: '/u/Armasu', note }, 2)
     h.closeAfterFresh('old', '/u/Armasu', 2)
-    h.ingest({ token: h.token, kind: 'live', sessionId: 'other', cwd: '/u/agent-flow', limits: [] }, 4)
+    h.ingest({ token: h.token, kind: 'live', sessionId: 'other', cwd: '/u/switchboard', limits: [] }, 4)
     assert.deepEqual(h.take('old'), [])
   })
 
@@ -511,7 +522,7 @@ describe('jev runs', () => {
   it('picks the chat in the posted folder when the session is not here, and draws on none when no chat is there', () => {
     const h = new HubService()
     h.hook({ session_id: 'arm', cwd: '/u/Armasu', hook_event_name: 'SessionStart' }, 1)
-    h.hook({ session_id: 'flow', cwd: '/u/agent-flow', hook_event_name: 'SessionStart' }, 2)
+    h.hook({ session_id: 'flow', cwd: '/u/switchboard', hook_event_name: 'SessionStart' }, 2)
     h.ingest({ token: h.token, kind: 'jev', ...run, sessionId: 'elsewhere', cwd: '/u/Armasu/web' }, 3)
     assert.equal(h.get().jev[0].sessionId, 'arm')
     h.ingest({ token: h.token, kind: 'jev', ...run, sessionId: 'elsewhere', cwd: '/u/other' }, 4)
@@ -786,5 +797,244 @@ describe('usage limit retry', () => {
     h.hook(hit, 0)
     assert.equal(h.get().progress[0].limited?.error, 'rate_limit')
     assert.deepEqual(texts(h, 60 * 60_000), [])
+  })
+
+  const start = (agent_id: string, agent_type: string) => ({ session_id: 's1', cwd: '/r', hook_event_name: 'SubagentStart', agent_id, agent_type })
+  const cutOff = (h: HubService) => {
+    h.hook(start('a1', 'engineer'), 0)
+    h.hook(start('a2', 'qa'), 0)
+    h.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'SubagentStop', agent_id: 'a2', agent_type: 'qa' }, 1)
+    h.hook(hit, 2)
+  }
+
+  it('names the subagents the limit cut off, to resume with SendMessage', () => {
+    const h = new HubService()
+    cutOff(h)
+    const got = texts(h, 60 * 60_000)
+    assert.equal(got.length, 1)
+    assert.match(got[0], /^Switchboard: the usage limit reset\. Continue where you left off/)
+    assert.match(got[0], /a1 \(engineer\)/)
+    assert.doesNotMatch(got[0], /a2/, 'a finished one is not listed')
+    assert.match(got[0], /SendMessage/)
+  })
+
+  it('keeps the subagents through a reload and a resume of a gone chat', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-')), 'retries.json')
+    const t = Date.now()
+    const h = kept(file)
+    h.hook(start('a1', 'engineer'), t)
+    h.hook(hit, t + 1)
+    h.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'SessionEnd' }, t + 2)
+    const [r] = kept(file).goneDue(() => false, t + 60 * 60_000)
+    assert.deepEqual(r.agents, [{ id: 'a1', type: 'engineer' }])
+    assert.match(continueText(r.agents), /a1 \(engineer\)/)
+    assert.equal(continueText(undefined), CONTINUE)
+  })
+
+  it('still sends the subagent note when Claude Code continues by itself', () => {
+    const h = new HubService()
+    h.set({ keep: { ...h.get().keep, autoContinue: true } }, 0)
+    cutOff(h)
+    const got = texts(h, 60 * 60_000)
+    assert.equal(got.length, 1)
+    assert.doesNotMatch(got[0], /Continue where you left off/)
+    assert.match(got[0], /a1 \(engineer\).*SendMessage/)
+  })
+})
+
+describe('usage limit pause', () => {
+  const now = Date.UTC(2026, 10, 7, 12)
+  const reset = now + 2 * 3_600_000
+  const setup = (pauseAt?: number | null) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pause-'))
+    const h = new HubService()
+    h.keepRetries(path.join(dir, 'retries-x.json'))
+    h.set({ controls: { ...h.get().controls, switchboard: { ...h.get().controls.switchboard, ...(pauseAt !== undefined ? { pauseAt } : {}) } } })
+    const chats = [['a', 3], ['b', 1], ['c', 2]] as const
+    h.set({ chats: chats.map(([sessionId], i) => ({ pid: i + 1, sessionId, name: sessionId, cwd: '/u/w', link: '', live: true, why: [] })) })
+    for (const [id, at] of chats) h.hook({ session_id: id, cwd: '/u/w', hook_event_name: 'SessionStart' }, at)
+    // c holds a running subagent.
+    h.hook({ session_id: 'c', cwd: '/u/w', hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_use_id: 't1', tool_input: { subagent_type: 'engineer' } }, 4)
+    h.hook({ session_id: 'c', cwd: '/u/w', hook_event_name: 'SubagentStart', agent_id: 'ag1', agent_type: 'engineer' }, 5)
+    const feed = (pct: number, at = now) => h.ingest({ token: h.token, kind: 'live', sessionId: 'a', cwd: '/u/w', limits: [{ kind: 'five_hour', percentUsed: pct, resetsAt: new Date(reset).toISOString() }] }, at)
+    return { h, dir, feed }
+  }
+
+  it('queues every live chat at the threshold and writes limits.json', () => {
+    const { h, dir, feed } = setup()
+    feed(98)
+    assert.equal(h.get().pause, undefined)
+    feed(99)
+    assert.equal(h.get().pause?.percent, 99)
+    assert.equal(h.get().pause?.resumeAt, reset + 60_000)
+    assert.deepEqual(h.get().pause?.chats.map(c => c.sessionId).sort(), ['a', 'b', 'c'])
+    const file = JSON.parse(fs.readFileSync(path.join(dir, 'limits.json'), 'utf8'))
+    assert.equal(file.paused, true)
+    assert.equal(file.windows[0].percentUsed, 99)
+  })
+
+  it('writes pauseAt and pauseOff to limits.json for the mod', () => {
+    const { h, dir, feed } = setup(null)
+    feed(99)
+    const read = () => JSON.parse(fs.readFileSync(path.join(dir, 'limits.json'), 'utf8'))
+    assert.equal(read().pauseAt, null)
+    assert.equal(read().pauseOff, undefined)
+    const on = setup()
+    on.feed(99)
+    on.h.endPause(true, now + 1)
+    const file = JSON.parse(fs.readFileSync(path.join(on.dir, 'limits.json'), 'utf8'))
+    assert.equal(file.pauseAt, 99)
+    assert.equal(file.pauseOff, reset + 60_000)
+  })
+
+  it("a chat's own hold joins the pause and leaves it", () => {
+    const { h } = setup(null)
+    assert.equal(h.ingest({ token: h.token, kind: 'hold', sessionId: 'b', hold: { kind: 'five_hour', percent: 99, resetsAt: reset } }, now), true)
+    assert.deepEqual(h.get().pause, { kind: 'five_hour', percent: 99, resumeAt: reset + 60_000, chats: [{ sessionId: 'b', name: 'b' }] })
+    h.ingest({ token: h.token, kind: 'hold', sessionId: 'a', hold: { kind: 'five_hour', percent: 99, resetsAt: reset } }, now)
+    h.ingest({ token: h.token, kind: 'hold', sessionId: 'b', hold: null }, now)
+    assert.deepEqual(h.get().pause?.chats.map(c => c.sessionId), ['a'])
+    h.ingest({ token: h.token, kind: 'hold', sessionId: 'a', hold: null }, now)
+    assert.equal(h.get().pause, undefined)
+  })
+
+  it('resumes subagent holders first, then in queue order, with the pause prompt', () => {
+    const { h, feed } = setup()
+    feed(99)
+    assert.equal(h.pausedQueue()[0].sessionId, 'c')
+    assert.equal(h.take('a', reset).length, 0)
+    const sent = h.take('a', reset + 60_000)
+    assert.match(sent[0].kind === 'prompt' ? sent[0].text : '', /^Usage limit reset\. Continue where you stopped/)
+    h.pauseTick(reset + 60_000)
+    assert.equal(h.get().pause, undefined)
+  })
+
+  it('queues a chat that exits on the limit while paused or out of usage, not one the user closed', () => {
+    const { h, dir, feed } = setup()
+    const tx = (name: string, last: object) => {
+      const f = path.join(dir, `${name}.jsonl`)
+      fs.writeFileSync(f, [{ type: 'user', message: {} }, last, { type: 'system', subtype: 'x' }].map(x => JSON.stringify(x)).join('\n') + '\n')
+      return f
+    }
+    const limitTx = tx('limit', { type: 'assistant', isApiErrorMessage: true, error: 'rate_limit', message: { content: [{ type: 'text', text: "You've hit your 5-hour limit" }] } })
+    const okTx = tx('ok', { type: 'assistant', message: { content: [{ type: 'text', text: 'done' }] } })
+    feed(99)
+    h.hook({ session_id: 'd', cwd: '/u/d', hook_event_name: 'SessionStart' }, now + 1)
+    h.hook({ session_id: 'd', cwd: '/u/d', hook_event_name: 'SessionEnd', reason: 'other', transcript_path: limitTx }, now + 2)
+    assert.ok(h.pausedQueue().some(q => q.sessionId === 'd' && q.cwd === '/u/d'))
+    h.hook({ session_id: 'e', cwd: '/u/e', hook_event_name: 'SessionStart' }, now + 3)
+    h.hook({ session_id: 'e', cwd: '/u/e', hook_event_name: 'SessionEnd', reason: 'prompt_input_exit', transcript_path: limitTx }, now + 4)
+    assert.ok(!h.retryIds().includes('e'), '/exit')
+    h.hook({ session_id: 't', cwd: '/u/t', hook_event_name: 'SessionStart' }, now + 5)
+    h.hook({ session_id: 't', cwd: '/u/t', hook_event_name: 'SessionEnd', reason: 'other', transcript_path: okTx }, now + 6)
+    assert.ok(!h.retryIds().includes('t'), 'a closed tab')
+    h.hook({ session_id: 'n', cwd: '/u/n', hook_event_name: 'SessionStart' }, now + 7)
+    h.hook({ session_id: 'n', cwd: '/u/n', hook_event_name: 'SessionEnd', reason: 'other' }, now + 8)
+    assert.ok(!h.retryIds().includes('n'), 'no transcript')
+    const out = new HubService()
+    out.hook({ session_id: 'f', cwd: '/r', hook_event_name: 'StopFailure', error: 'rate_limit', last_assistant_message: 'resets 11:50pm (America/Los_Angeles)' }, now)
+    out.hook({ session_id: 'g', cwd: '/g', hook_event_name: 'SessionStart' }, now + 1)
+    out.hook({ session_id: 'g', cwd: '/g', hook_event_name: 'SessionEnd', reason: 'other', transcript_path: limitTx }, now + 2)
+    assert.deepEqual(out.goneDue(() => false, now + 2), [], 'not before the reset')
+    assert.ok(out.goneDue(() => false, now + 86_400_000).some(r => r.sessionId === 'g'))
+    const calm = new HubService()
+    calm.hook({ session_id: 'g', cwd: '/g', hook_event_name: 'SessionStart' }, now)
+    calm.hook({ session_id: 'g', cwd: '/g', hook_event_name: 'SessionEnd', reason: 'other', transcript_path: limitTx }, now + 1)
+    assert.ok(!calm.retrying(), 'no limit, no queue')
+    const late = new HubService()
+    late.hook({ session_id: 'f', cwd: '/r', hook_event_name: 'StopFailure', error: 'rate_limit', last_assistant_message: 'resets 5am (America/Los_Angeles)' }, Date.UTC(2026, 10, 7, 12))
+    late.hook({ session_id: 'f', cwd: '/r', hook_event_name: 'UserPromptSubmit' }, Date.UTC(2026, 10, 7, 13, 1))
+    late.hook({ session_id: 'u', cwd: '/u', hook_event_name: 'SessionStart' }, Date.UTC(2026, 10, 7, 18))
+    late.hook({ session_id: 'u', cwd: '/u', hook_event_name: 'SessionEnd', reason: 'other', transcript_path: limitTx }, Date.UTC(2026, 10, 7, 18, 1))
+    assert.ok(!late.retryIds().includes('u'), 'past the reset: a close is a close')
+  })
+
+  it('off, or after Cancel, does not pause again until the reset', () => {
+    const off = setup(null)
+    off.feed(100)
+    assert.equal(off.h.get().pause, undefined)
+    const { h, feed } = setup()
+    feed(99)
+    h.endPause(false, now + 1)
+    assert.equal(h.pausedQueue().length, 0)
+    feed(100, now + 2)
+    assert.equal(h.get().pause, undefined)
+  })
+
+  it('never closes a handed-off chat while it waits on its limit', () => {
+    const { h, feed } = setup(null)
+    feed(50)
+    h.hook({ session_id: 'b', cwd: '/u/w', hook_event_name: 'StopFailure', error: 'rate_limit', last_assistant_message: "You've hit your 5-hour limit · resets 11:50pm (America/Los_Angeles)" }, now)
+    assert.equal(h.get().limitsKept?.out?.resetsAt !== undefined, true)
+    h.closeAfterFresh('b', '/u/w', now)
+    h.ingest({ token: h.token, kind: 'live', sessionId: 'fresh', cwd: '/u/w', limits: [] }, now + 1)
+    assert.ok(!h.take('b', now + 2).some(i => i.kind === 'close'))
+    // Without the limit it closes as before.
+    h.closeAfterFresh('a', '/u/w', now)
+    h.ingest({ token: h.token, kind: 'live', sessionId: 'fresh2', cwd: '/u/w', limits: [] }, now + 3)
+    assert.ok(h.take('a', now + 4).some(i => i.kind === 'close'))
+  })
+})
+
+describe('chat links', () => {
+  const MIN = 60_000, now = 1_000_000_000
+  const setup = () => {
+    const h = new HubService()
+    h.set({ chats: ['a', 'b', 'c'].map((sessionId, i) => ({ pid: i + 1, sessionId, name: sessionId, cwd: '/u/w', link: '', live: true, why: [] })) }, now)
+    const post = (body: Record<string, unknown>, at = now) => h.ingest({ token: h.token, ...body }, at)
+    return { h, post }
+  }
+
+  it('takes a link, upserts it by from and target set, and drops it on link-end', () => {
+    const { h, post } = setup()
+    assert.equal(post({ kind: 'link', from: 'a', to: ['b', 'c'], reason: 'needs the schema', auto: false, since: now - 5 }), true)
+    post({ kind: 'link', from: 'a', to: ['c', 'b'], reason: 'still the schema', auto: false, since: now })
+    assert.deepEqual(h.get().links, [{ from: 'a', to: ['c', 'b'], reason: 'still the schema', auto: false, since: now }])
+    post({ kind: 'link', from: 'a', to: ['b'], reason: 'r', auto: false, since: now })
+    assert.equal(post({ kind: 'link-end', from: 'a', to: ['b', 'c'] }), true)
+    assert.deepEqual(h.get().links?.map(l => l.to), [['b']])
+    assert.equal(post({ kind: 'link', from: 'a', to: [] }), false)
+    assert.equal(post({ kind: 'link', to: ['b'] }), false)
+  })
+
+  it('drops a link once the waiting chat or every target is gone', () => {
+    const { h, post } = setup()
+    post({ kind: 'link', from: 'a', to: ['b', 'c'], reason: 'r', auto: false, since: now })
+    post({ kind: 'link', from: 'c', to: ['b'], reason: 'r', auto: false, since: now })
+    const rows = h.get().chats
+    h.set({ chats: rows.map(c => (c.sessionId === 'b' ? { ...c, live: false } : c)) }, now + 1)
+    assert.deepEqual(h.get().links?.map(l => l.from), ['a'])
+    h.set({ chats: rows.map(c => (c.sessionId === 'a' ? { ...c, live: false } : c)) }, now + 2)
+    assert.deepEqual(h.get().links, [])
+  })
+
+  it('keeps an auto link while the target edit is fresh, at most 15 minutes', () => {
+    const { h, post } = setup()
+    post({ kind: 'live', sessionId: 'b', cwd: '/u/w', file: '/u/w/x.ts' }, now)
+    post({ kind: 'link', from: 'a', to: ['b'], reason: '/u/w/x.ts', auto: true, since: now })
+    h.set({}, now + 9 * MIN)
+    assert.equal(h.get().links?.length, 1)
+    h.set({}, now + 10 * MIN)
+    assert.deepEqual(h.get().links, [])
+    post({ kind: 'live', sessionId: 'b', cwd: '/u/w', file: '/u/w/y.ts' }, now + 11 * MIN)
+    post({ kind: 'live', sessionId: 'b', cwd: '/u/w', file: '/u/w/x.ts' }, now + 12 * MIN)
+    post({ kind: 'link', from: 'a', to: ['b'], reason: '/u/w/x.ts', auto: true, since: now + 12 * MIN - 6 * MIN }, now + 12 * MIN)
+    assert.equal(h.get().links?.length, 1)
+    h.set({}, now + 21 * MIN)
+    assert.deepEqual(h.get().links, [])
+  })
+
+  it('a card link and unlink, as Kenneth made them', () => {
+    const { h } = setup()
+    h.link({ from: 'a', to: ['b'], reason: 'Kenneth linked these in Switchboard', auto: false, since: now }, now)
+    assert.equal(h.get().links?.length, 1)
+    h.unlink('a', ['b'], now)
+    assert.deepEqual(h.get().links, [])
+    // One target at a time from a link to several.
+    h.link({ from: 'a', to: ['b', 'c'], reason: 'r', auto: false, since: now }, now)
+    h.unlink('a', ['b'], now)
+    assert.deepEqual(h.get().links?.map(l => l.to), [['c']])
+    h.unlink('a', ['c'], now)
+    assert.deepEqual(h.get().links, [])
   })
 })

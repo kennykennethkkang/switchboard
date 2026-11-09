@@ -1,5 +1,5 @@
 /**
- * History: chats closed by a handoff, grouped by the origin chat they continue.
+ * Archive: chats closed by a handoff, archived from the menu or ended, grouped by the origin chat they continue.
  * The extension's archive is in hub.archive; extension/src/hub/projects.ts names the chats.
  */
 import type { ArchivedChat } from './hub-types'
@@ -19,21 +19,17 @@ export function liveChats<T extends { sessionId: string }>(chats: T[], archive: 
   return chats.filter(c => !gone.has(c.sessionId))
 }
 
-type IdleCard = { chat: { sessionId: string; status?: string; updatedAt?: number }; progress?: { state: string; at: number } }
+type IdleCard = { chat: { sessionId: string }; progress?: { state: string; at: number } }
 
-/** The rail's chats: a stopped chat (idle or done) quiet for longer than `minutes` is hidden; null hides none. Find still lists it. */
-export function hideIdle<T extends IdleCard>(cards: T[], minutes: number | null, picked: string | undefined, now = Date.now()): T[] {
+/** The rail's chats: a done chat quiet for longer than `minutes` is hidden; null hides none. An idle chat always stays, so it can be talked to. Find still lists it. */
+export function hideDone<T extends IdleCard>(cards: T[], minutes: number | null, picked: string | undefined, now = Date.now()): T[] {
   if (minutes === null) return cards
-  return cards.filter(c => {
-    const state = c.progress?.state ?? (c.chat.status === 'idle' ? 'idle' : undefined)
-    const at = c.progress?.at ?? c.chat.updatedAt
-    return c.chat.sessionId === picked || (state !== 'idle' && state !== 'done') || at === undefined || now - at <= minutes * 60e3
-  })
+  return cards.filter(c => c.chat.sessionId === picked || c.progress?.state !== 'done' || now - c.progress.at <= minutes * 60e3)
 }
 
 type Placed = { cwd: string; project?: string }
 // A folder outside git is named by its last part, so two such folders with one name share a chip; key by full path if that happens.
-/** The extension's repo name for a chat (agent-flow for agent-flow/extension), else the folder's last part. */
+/** The extension's repo name for a chat (switchboard for switchboard/extension), else the folder's last part. */
 export const projectName = (c: Placed) => c.project || c.cwd.split(/[\\/]/).filter(Boolean).pop() || c.cwd
 
 /** The projects chats run in, most chats first; a picked one with no chat left stays listed so it can be unpicked. */

@@ -4,7 +4,7 @@ import * as fs from 'node:fs'
 import * as net from 'node:net'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { installKeeper, keeperPlist, KEEPER_LABEL } from '../src/hub/keeper'
+import { installKeeper, keeperPlist, keepApp, KEEPER_LABEL } from '../src/hub/keeper'
 // @ts-expect-error plain ESM, no types
 import { keep } from '../keeper/app-keeper.mjs'
 
@@ -129,5 +129,39 @@ fs.writeFileSync(${JSON.stringify(path.join(dir, 'grand'))}, String(g.pid)); set
       k.stop()
       try { process.kill(Number(fs.readFileSync(path.join(dir, 'app.pid'), 'utf8'))) } catch { /* gone */ }
     }
+  })
+
+  it('starts nothing while Keep Switchboard app running is off', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-keeper-'))
+    const port = await freePort()
+    const app = path.join(dir, 'fake-app.js')
+    fs.writeFileSync(app, "require('http').createServer().listen(Number(process.argv[3]), '127.0.0.1')")
+    fs.writeFileSync(path.join(dir, 'app.args'), JSON.stringify({ cwd: dir, args: [app, '-p', String(port)] }))
+    keepApp(false, dir)
+    const k = keep({ dir, everyMs: 30, misses: 1, log: () => {} })
+    try {
+      await new Promise(r => setTimeout(r, 300))
+      assert.equal(fs.existsSync(path.join(dir, 'app.pid')), false)
+      keepApp(true, dir)
+      assert.ok(await until(() => fs.existsSync(path.join(dir, 'app.pid'))))
+    } finally {
+      k.stop()
+      try { process.kill(Number(fs.readFileSync(path.join(dir, 'app.pid'), 'utf8'))) } catch { /* gone */ }
+    }
+  })
+
+  it('backs off when the app keeps crashing at start', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-keeper-'))
+    const port = await freePort()
+    const app = path.join(dir, 'fake-app.js')
+    fs.writeFileSync(app, 'process.exit(1)')
+    fs.writeFileSync(path.join(dir, 'app.args'), JSON.stringify({ cwd: dir, args: [app, '-p', String(port)] }))
+    const logs: string[] = []
+    const k = keep({ dir, everyMs: 20, misses: 1, backoffMs: 600, log: (m: string) => logs.push(m) })
+    try {
+      await new Promise(r => setTimeout(r, 1000))
+      const starts = logs.filter(l => / starting /.test(l)).length
+      assert.ok(starts >= 1 && starts <= 2, logs.join('\n'))
+    } finally { k.stop() }
   })
 })

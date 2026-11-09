@@ -61,7 +61,7 @@ export function Deck(v: ViewProps) {
   }
 
   const leadSum = chat.state === 'needs-you' ? p?.question ?? 'Waiting on you' : chat.state === 'done' ? (p?.commit ? 'Finished. Commit message ready.' : 'Finished.') : cur ?? leadLine(chat, almost, active)
-  const leadChip = { working: 'Working', needs: 'Needs you', done: 'Finished', almost: 'Almost done', idle: 'Idle' }[ls]
+  const leadChip = { working: 'Working', needs: 'Needs you', done: 'Ready to approve', almost: 'Ready to approve', idle: chat.wait ? 'Waiting' : 'Idle' }[ls]
   return (
     <div ref={root} className="ov-stage ov-deck" aria-label="The chat as role cards">
       <p className="ov-you"><Glyph k="you" size={15} /><span><b>You</b>{p?.asked?.length ? <> · {p.asked.at(-1)}</> : null}</span><span>{chat.state === 'needs-you' ? 'waiting on you' : chat.ago}</span></p>

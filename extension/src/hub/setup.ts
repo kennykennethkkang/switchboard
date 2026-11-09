@@ -11,16 +11,22 @@ export type SetupKit = {
   marketplaces: Record<string, string>
   plugins: string[]
   mods: string[]
-  /** keyHeader: the server needs the 21st key, sent in this header. */
-  mcps: { name: string; url: string; keyHeader?: string }[]
+  /** keyHeader: the server needs the 21st key, sent in this header. command + keyEnv: a stdio server that reads that saved Sign-ins key at launch. */
+  mcps: { name: string; url?: string; keyHeader?: string; command?: string[]; keyEnv?: ApiKey['name'] }[]
   /** Fetched from GitHub into ~/.claude/skills; names are SKILL.md names, not folder names. */
   skills?: SkillRepo[]
   /** Switchboard's own skills, bundled in kit/skills (esbuild.js) and copied to ~/.claude/skills by the runner. */
   own?: string[]
+  /** Python tools: uv installs them, then their skill and stdio MCP go to Claude and Codex. */
+  tools?: Tool[]
 }
-export type SkillRepo = { repo: string; names: string[] }
-/** What the machine has: plugin ids, marketplace names, user-scope MCP server names, ~/.claude/skills folders; plain: those holding a literal header, left out of mcps. */
-export type SetupState = { plugins: string[]; marketplaces: string[]; mcps: string[]; plain: string[]; skills: string[] }
+/** path: the folder holding the skill folders (default skills); file: the one to use as SKILL.md. */
+export type SkillRepo = { repo: string; names: string[]; path?: string; file?: string }
+export type Tool = { uv: string; skill?: { repo: string; path: string; name: string; file?: string }; mcp?: { name: string; command: string } }
+/** What Codex has, from its config.toml. */
+export type CodexState = { plugins: string[]; marketplaces: string[]; mcps: string[] }
+/** What the machine has: plugin ids, marketplace names, user-scope MCP server names, ~/.claude/skills and ~/.agents/skills folders; plain: those holding a literal header, left out of mcps. */
+export type SetupState = { plugins: string[]; marketplaces: string[]; mcps: string[]; plain: string[]; skills: string[]; agentsSkills: string[]; codex: CodexState }
 
 /** The terminal's env carries the key; kit/setup-run.mjs moves it to the OS secret store, never into a command or config. */
 export const KEY_ENV = 'API_KEY_21ST'
@@ -28,16 +34,31 @@ const MODS = '~/.claude/switchboard/mods'
 const ASK = '~/.claude/switchboard/ask/ask-server.mjs'
 
 /** One step for kit/setup-run.mjs: say a line, or copy then run, only when ifExists is there; key: store the key and add that server; skills: clone the repo and copy those in;
- * own: copy those bundled skills from the folder, where missing or an older copy of ours. ~/ is the home folder. */
-export type SetupStep = { label?: string; say?: string; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo; own?: { from: string; names: string[] } }
+ * own: copy those bundled skills from the folder, where missing or an older copy of ours. needs: skipped with a note when one of these commands is missing.
+ * wait: seconds after which a still running command counts as done. ~/ is the home folder. */
+export type SetupStep = { label?: string; say?: string; needs?: string[]; wait?: number; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo; own?: { from: string; names: string[] } }
 
-const KEY_LABEL: Record<ApiKey['name'], string> = { GEMINI_API_KEY: 'Gemini', OPENROUTER_API_KEY: 'Jev (OpenRouter)' }
-const keyLine = (k: ApiKey) => `${KEY_LABEL[k.name]} key: ${!k.saved ? 'missing. Paste it in Switchboard: Settings, Accounts, API keys.' : `saved (ends ${k.last4})${k.checked ? (k.checked.ok ? ', works' : `, failed its test (${k.checked.reason ?? 'no reason'})`) : ''}.`}`
+const KEY_LABEL: Record<ApiKey['name'], string> = { GEMINI_API_KEY: 'Gemini', OPENROUTER_API_KEY: 'OpenRouter (Jev, MiroFish)', PERPLEXITY_API_KEY: 'Perplexity', ZEP_API_KEY: 'Zep (MiroFish)' }
+const KEY_URL: Partial<Record<ApiKey['name'], string>> = { OPENROUTER_API_KEY: 'https://openrouter.ai/keys', ZEP_API_KEY: 'https://app.getzep.com' }
+const paste = (n: ApiKey['name']) => `${KEY_URL[n] ? `Get one at ${KEY_URL[n]} and paste` : 'Paste'} it in Switchboard: Settings, Accounts, API keys.`
+const keyLine = (k: ApiKey) => `${KEY_LABEL[k.name]} key: ${!k.saved ? `missing. ${paste(k.name)}` : `saved (ends ${k.last4})${k.checked ? (k.checked.ok ? ', works' : `, failed its test (${k.checked.reason ?? 'no reason'})`) : ''}.`}`
 
 /** key21st: whether the env holds the key. modsDir: the bundled marketplace, copied out since the extension folder moves on update. skillsDir: kit/skills.
  * keys: Sign-ins' API keys, one line each. */
+/** sh that reads the saved key from the Keychain or the 0600 file (keys.ts) at launch, so no config holds it. */
+const keyLaunch = (env: string, cmd: string[], platform: NodeJS.Platform) =>
+  `${env}=$(${platform === 'darwin' ? `security find-generic-password -s switchboard -a ${env} -w` : `cat "$HOME/.claude/switchboard/keys/${env}"`}) exec ${cmd.join(' ')}`
+
 export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; modsDir: string; skillsDir: string; platform?: NodeJS.Platform; keys?: ApiKey[] }): SetupStep[] {
   const out: SetupStep[] = []
+  const platform = o.platform ?? process.platform
+  // Keyed stdio servers, the same launch line for Claude and Codex; null when skipped.
+  const keyed = new Map<string, string[] | null>()
+  for (const m of kit.mcps) {
+    if (!m.command || !m.keyEnv) continue
+    const ok = o.keys?.some(k => k.name === m.keyEnv && k.saved) && platform !== 'win32'
+    keyed.set(m.name, ok ? ['--', 'sh', '-c', keyLaunch(m.keyEnv, m.command, platform)] : null)
+  }
   const claude = (label: string, ...args: string[]) => out.push({ label, run: ['claude', ...args] })
   for (const [name, repo] of Object.entries(kit.marketplaces)) if (!o.marketplaces.includes(name)) claude(name, 'plugin', 'marketplace', 'add', repo)
   const copy = { from: o.modsDir, to: MODS }
@@ -46,20 +67,55 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
   else out.push({ label: 'Refresh mods', ifExists: MODS, copy, run: ['claude', 'plugin', 'marketplace', 'update', 'kenneth-mods'] })
   for (const id of [...kit.plugins, ...kit.mods.map(m => `${m}@kenneth-mods`)]) if (!o.plugins.includes(id)) claude(id, 'plugin', 'install', id)
   for (const m of kit.mcps) {
+    if (keyed.has(m.name)) {
+      const cmd = keyed.get(m.name)
+      if (cmd && !o.mcps.includes(m.name)) claude(m.name, 'mcp', 'add', '--scope', 'user', m.name, ...cmd)
+      else if (!cmd) out.push({ say: platform === 'win32' ? `${m.name}: not added on Windows, its launch line needs sh.` : `${m.name}: no key saved, skipped. Paste it in Switchboard: Settings, Accounts, API keys, then run Set up again.` })
+      continue
+    }
     // A new key always goes to the store; a plain-text one is moved there without asking, except on linux, which has no store.
-    if (m.keyHeader && (o.key21st || (o.plain.includes(m.name) && (o.platform ?? process.platform) !== 'linux'))) { out.push({ label: m.name, key: { name: m.name, url: m.url, header: m.keyHeader } }); continue }
+    if (m.keyHeader && (o.key21st || (o.plain.includes(m.name) && platform !== 'linux'))) { out.push({ label: m.name, key: { name: m.name, url: m.url!, header: m.keyHeader } }); continue }
     if (o.mcps.includes(m.name)) continue
-    if (!m.keyHeader) out.push({ label: m.name, run: ['claude', 'mcp', 'add', '--scope', 'user', '--transport', 'http', m.name, m.url] })
+    if (!m.keyHeader) out.push({ label: m.name, run: ['claude', 'mcp', 'add', '--scope', 'user', '--transport', 'http', m.name, m.url!] })
     else out.push({ say: `${m.name}: no key given, skipped. Get one at https://21st.dev/mcp and run Set up again.` })
   }
+  const lacking = (n: string) => !o.skills.includes(n) || !o.agentsSkills.includes(n)
   for (const k of kit.skills ?? []) {
-    const names = k.names.filter(n => !o.skills.includes(n))
-    if (names.length) out.push({ label: k.repo, skills: { repo: k.repo, names } })
+    const names = k.names.filter(lacking)
+    if (names.length) out.push({ label: k.repo, skills: { ...k, names } })
   }
   // Always handed over: whether a present copy is ours and older takes a look inside it, which the runner does.
   if (kit.own?.length) out.push({ label: 'Switchboard skills', own: { from: o.skillsDir, names: kit.own } })
   if (!o.mcps.includes('switchboard')) out.push({ label: 'Ask tool', ifExists: ASK, run: ['claude', 'mcp', 'add', '--scope', 'user', 'switchboard', '--', 'node', ASK] })
-  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: 'Set up done. Sign in to Slack and Cloudflare with /mcp in a chat, then run /reload-plugins in chats that were already open.' })
+  // Codex gets the same kit; the mods are Claude hooks, so they stay out.
+  const cx = o.codex
+  const codex = (label: string, ...args: string[]) => out.push({ label: `${label} (Codex)`, needs: ['codex'], run: ['codex', ...args] })
+  for (const [name, repo] of Object.entries(kit.marketplaces)) if (!cx.marketplaces.includes(name)) codex(name, 'plugin', 'marketplace', 'add', repo)
+  for (const id of kit.plugins) if (!cx.plugins.includes(id)) codex(id, 'plugin', 'add', id)
+  for (const m of kit.mcps) {
+    if (cx.mcps.includes(m.name)) continue
+    if (keyed.has(m.name)) {
+      const cmd = keyed.get(m.name)
+      if (cmd) codex(m.name, 'mcp', 'add', m.name, ...cmd)
+      continue
+    }
+    // The entry is written before codex starts a browser login, which would hang Set up.
+    if (!m.keyHeader) out.push({ label: `${m.name} (Codex)`, needs: ['codex'], wait: 20, run: ['codex', 'mcp', 'add', m.name, '--url', m.url!] })
+    else if (o.key21st) out.push({ say: `${m.name} for Codex: not added, its key goes in an x-api-key header that codex mcp add cannot set.` })
+  }
+  if (!cx.mcps.includes('switchboard')) out.push({ label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK] })
+  for (const t of kit.tools ?? []) {
+    out.push({ label: t.uv, needs: ['uv'], quiet: true, run: ['uv', 'tool', 'install', t.uv] })
+    const k = t.skill
+    if (k && lacking(k.name)) out.push({ label: k.repo, needs: ['uv'], skills: { repo: k.repo, names: [k.name], path: k.path, ...(k.file ? { file: k.file } : {}) } })
+    if (!t.mcp) continue
+    // ponytail: uv's default bin folder, no .exe; Windows needs the real path.
+    const bin = `~/.local/bin/${t.mcp.command}`
+    if (!o.mcps.includes(t.mcp.name)) out.push({ label: t.mcp.name, needs: ['uv'], run: ['claude', 'mcp', 'add', '--scope', 'user', t.mcp.name, '--', bin] })
+    if (!cx.mcps.includes(t.mcp.name)) out.push({ label: `${t.mcp.name} (Codex)`, needs: ['uv', 'codex'], run: ['codex', 'mcp', 'add', t.mcp.name, '--', bin] })
+  }
+  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: 'Set up done. Sign in to Slack and Cloudflare with /mcp in a chat, then run /reload-plugins in chats that were already open.' },
+    { say: `In Codex, sign in with ${kit.mcps.filter(m => m.url && !m.keyHeader).map(m => `codex mcp login ${m.name}`).join(' and ')}.` })
   return out
 }
 
@@ -70,6 +126,16 @@ const names = (file: string, pick: (j: Record<string, unknown>) => unknown) => {
 /** A server whose headers hold a literal value, as Set up before 0.18 wrote the 21st key; it counts as missing so a rerun replaces it. */
 const plain = (m: unknown) => Object.values((m as { headers?: object })?.headers ?? {}).some(v => typeof v === 'string' && !v.includes('${'))
 
+const dirs = (d: string) => (fs.existsSync(d) ? fs.readdirSync(d).filter(n => !n.startsWith('.')) : [])
+
+/** Table names from Codex's config.toml: [plugins."id"], [marketplaces.name], [mcp_servers.name] (not its .env subtables). */
+export function codexState(file: string): CodexState {
+  let toml = ''
+  try { toml = fs.readFileSync(file, 'utf8') } catch { /* no Codex */ }
+  const tables = (key: string) => [...toml.matchAll(new RegExp(`^\\[${key}\\.(?:"([^"]+)"|([^\\]."]+))\\]\\s*$`, 'gm'))].map(m => m[1] ?? m[2])
+  return { plugins: tables('plugins'), marketplaces: tables('marketplaces'), mcps: tables('mcp_servers') }
+}
+
 export function setupState(home: string): SetupState {
   const plugins = path.join(home, '.claude', 'plugins')
   const plainOnes = names(path.join(home, '.claude.json'), j => Object.fromEntries(Object.entries((j.mcpServers ?? {}) as object).filter(([, m]) => plain(m))))
@@ -78,7 +144,9 @@ export function setupState(home: string): SetupState {
     marketplaces: names(path.join(plugins, 'known_marketplaces.json'), j => j),
     mcps: names(path.join(home, '.claude.json'), j => j.mcpServers).filter(n => !plainOnes.includes(n)),
     plain: plainOnes,
-    skills: fs.existsSync(path.join(home, '.claude', 'skills')) ? fs.readdirSync(path.join(home, '.claude', 'skills')).filter(n => !n.startsWith('.')) : [],
+    skills: dirs(path.join(home, '.claude', 'skills')),
+    agentsSkills: dirs(path.join(home, '.agents', 'skills')),
+    codex: codexState(path.join(process.env.CODEX_HOME || path.join(home, '.codex'), 'config.toml')),
   }
 }
 

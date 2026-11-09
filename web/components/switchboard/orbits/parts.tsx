@@ -10,7 +10,7 @@ import type { OrbitChat } from '../orbit'
 /** pick: a role node (or the lead) was pressed, open its drawer; picked: the role the drawer shows. */
 export type ViewProps = { chat: OrbitChat; showTools: boolean; instant?: boolean; pick?: (role: string) => void; picked?: string }
 
-export const LEAD_WORD: Record<string, string> = { working: 'working', active: 'working', needs: 'needs you', done: 'finished', almost: 'almost done', idle: 'idle' }
+export const LEAD_WORD: Record<string, string> = { working: 'working', active: 'working', needs: 'needs you', done: 'ready to approve', almost: 'ready to approve', idle: 'idle' }
 
 /** A role node's accessible name: "engineer, 3 runs, working"; the lead's: "lead, working". */
 export function nodeName(c: OrbitChat, role: string, state: string): string {
@@ -114,12 +114,12 @@ export const leadState = (c: OrbitChat, almost: boolean) => c.state === 'working
 export function leadLine(c: OrbitChat, almost: boolean, active: string[]): string {
   if (c.state === 'working') return active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning'
   if (c.state === 'needs-you') return 'waiting on you'
-  if (c.state === 'done') return almost ? 'almost done' : 'finished'
-  return `idle ${c.ago}`
+  if (c.state === 'done') return 'ready to approve'
+  return c.wait ?? `idle ${c.ago}`
 }
 
 /** The legend under a picture. */
 export function Legend({ tools, almost }: { tools: boolean; almost: boolean }) {
-  const keys: Array<[string, string]> = [['working', TONE.active], ...(tools ? [['tool call', 'var(--hub-yellow)'] as [string, string]] : []), ['done', TONE.done], ...(almost ? [['almost done', TONE.almost] as [string, string]] : []), ['needs you', TONE.needs]]
+  const keys: Array<[string, string]> = [['working', TONE.active], ...(tools ? [['tool call', 'var(--hub-yellow)'] as [string, string]] : []), ['done', TONE.done], ...(almost ? [['requests not covered', TONE.almost] as [string, string]] : []), ['needs you', TONE.needs]]
   return <p className="ov-legend" aria-hidden>{keys.map(([l, c]) => <span key={l} style={{ '--c': c } as React.CSSProperties}><i />{l}</span>)}</p>
 }

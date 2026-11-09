@@ -15,6 +15,7 @@ import { hub } from './hub/hub-service'
 import { SliceUploads, chatLabel } from './hub/uploads'
 import { readGraph } from './hub/graph'
 import { readRuns } from './hub/runs'
+import { buildFlowMap, flowChatDirs, flowLabels, flowRoots } from './hub/flowmap'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs } from './hub/chat-view'
 
 const log = createLogger('Extension')
@@ -217,7 +218,8 @@ function promptHookSetupIfNeededForClaude(context: vscode.ExtensionContext): voi
 function collectActiveSessions(): ReturnType<AgentRuntime['watcher']['getActiveSessions']> {
   const all: ReturnType<AgentRuntime['watcher']['getActiveSessions']> = []
   for (const r of runtimes) all.push(...r.watcher.getActiveSessions())
-  return all
+  // Learn runs start in this clone, so the watcher sees them. Temp chats never match a real workspace.
+  return all.filter(s => !hub.isHeadless(s.id))
 }
 
 function replaySessions(sessionIds: string[]): void {
@@ -323,6 +325,12 @@ function wirePanel(panel: VisualizerPanel): void {
       case 'graph-get': {
         const { id } = message
         void readGraph(hub.get()).then(graph => panel.postMessage({ type: 'graph', id, graph }), err => panel.postMessage({ type: 'graph', id, problem: (err as Error).message }))
+        break
+      }
+
+      case 'flowmap-get': {
+        const { id, cwd } = message
+        void buildFlowMap(cwd, flowLabels(hub.get()), flowRoots(hub.get()), undefined, flowChatDirs(hub.get())).then(map => panel.postMessage({ type: 'flowmap', id, map }), err => panel.postMessage({ type: 'flowmap', id, problem: (err as Error).message }))
         break
       }
 

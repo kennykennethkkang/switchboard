@@ -26,10 +26,47 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-Set up fetches these skills from GitHub into ~/.claude/skills. They are not shipped in this package. Each is used under the MIT License (text above), with its own copyright line:
+kit/design-md/INDEX.md and the starnet-station, colony-sim-rooms, tactics-hud and palace-vermilion entries are original to Switchboard: written descriptions with source links, no copied images.
+
+kit/mods/ecc-agents holds the 71 subagents from ECC (https://github.com/affaan-m/ECC) by Affaan Mustafa, copied with dashes normalized under the MIT License (text above), Copyright (c) 2026 Affaan Mustafa. Its LICENSE ships beside them.
+
+Set up fetches these skills from GitHub into ~/.claude/skills. They are not shipped in this package. Each is used under the MIT License (text above) unless noted, with its own copyright line:
   emilkowalski/skills (https://github.com/emilkowalski/skills), Copyright (c) 2026 Emil Kowalski
-  Leonxlnx/taste-skill (https://github.com/Leonxlnx/taste-skill), Copyright (c) 2026 Leonxlnx
   Leonxlnx/taste-skill-classics (https://github.com/Leonxlnx/taste-skill-classics), Copyright (c) 2026 Leonxlnx
   Leonxlnx/imagegen-skills (https://github.com/Leonxlnx/imagegen-skills), Copyright (c) 2026 Leonxlnx
+  pixelfx (https://github.com/patch-gg/pixelfx) by Patch
+  humanizer (https://github.com/blader/humanizer) by Siqi Chen
+  last30days (https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
+  find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc.
+  Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License
+  Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong
+  caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0
+  archify (https://github.com/tt-a1i/archify) by tt-a1i, Apache License 2.0
+  diagram-design (https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery
 
 The Desk layout embeds Hanken Grotesk (web/app/fonts/hanken.css), Copyright 2020 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk), used under the SIL Open Font License 1.1 (https://openfontlicense.org).
+The Board page borrows its idea of an animated pixel character per agent from Pixel Agents (https://github.com/pablodelucca/pixel-agents), MIT License; no code is copied.
+The Git panel's invisible character cleanup on commit is an idea from watermarks-remover (https://github.com/guillaumemeyer/watermarks-remover) by Guillaume Meyer, MIT License; no code is copied.
+The Board page embeds Silkscreen (web/app/fonts/silkscreen.css), Copyright 2001 Jason Kottke (https://kottke.org/plus/type/silkscreen), used under the SIL Open Font License 1.1 (https://openfontlicense.org).
+
+Set up installs these third-party skills from their own repos; none are bundled:
+- pixelfx (https://github.com/patch-gg/pixelfx) by Patch, MIT License.
+- humanizer (https://github.com/blader/humanizer) by Siqi Chen, MIT License.
+- last30days (https://github.com/mvanhorn/last30days-skill) by Matt Van Horn, MIT License.
+- find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc., MIT License.
+- Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License.
+- Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong, MIT License.
+- caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0.
+
+Also installed by Set up from their own repos, not bundled: superpowers (https://github.com/obra/superpowers) by Jesse Vincent, ponytail (https://github.com/DietrichGebert/ponytail) by Dietrich Gebert, impeccable (https://github.com/pbakaus/impeccable) by Paul Bakaus, and grill-me by Matt Pocock (https://github.com/mattpocock/skills).
+
+Set up also installs Anthropic's official plugins (https://github.com/anthropics/claude-plugins-official): code-review, context7, frontend-design and playwright. They are not bundled.
+
+Kit skills that ship in claude-mods/kit/skills and are copied with their LICENSE files:
+- aar is adapted from aar-loop by Cooper Simson, MIT License, Copyright (c) 2026 Cooper Simson.
+- awwwards: references/rubric.md is adapted from claude-skill-awwwards (https://github.com/tponscr-debug/claude-skill-awwwards) by Thomas Pons, MIT License, Copyright (c) 2026 Thomas Pons.
+- accessibility, click-path-audit and e2e-testing are from ECC (https://github.com/affaan-m/ECC) by Affaan Mustafa, MIT License, Copyright (c) 2026 Affaan Mustafa.
+- accessible-motion, gsap-greensock, hover-interactions, page-transitions and scroll-animations are by Dylan Tarre, MIT License, Copyright (c) 2024 Dylan Tarre.
+- image-to-code-skill is by Leonxlnx, MIT License, Copyright (c) 2026 Leonxlnx.
+- extract-design-md, extract-static-html and taste-design are from stitch-skills (https://github.com/google-labs-code/stitch-skills) by Google, Apache License 2.0; the first two are modified.
+- web-design-guidelines names Vercel as its author; claude-x-jev and jev-setup-project name Charles J Dove (Jev, TypeSafe). skill-inspector runs NVIDIA SkillSpector, which is not bundled.

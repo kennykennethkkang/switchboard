@@ -60,7 +60,8 @@ function bundleKit() {
 }
 
 // The mods and their marketplace manifest ship too (kit/mods), for Set up on a machine without claude-mods.
-const MODS = ['usage-meter', 'repo-rules', 'paid-guard', 'cache-keeper']
+// Same list Set up installs.
+const MODS = JSON.parse(fs.readFileSync(path.join(__dirname, 'kit', 'setup.json'), 'utf8')).mods
 const MODS_OUT = path.join(KIT_OUT, 'mods')
 
 function bundleMods() {
@@ -103,7 +104,7 @@ function bundleSkills(kitSrc = KIT_SRC, out = SKILLS_OUT, own = ownSkills()) {
     if (!fs.existsSync(path.join(src, 'SKILL.md'))) { console.warn(`skills: ${src} not found, keeping the bundled copy`); continue }
     fs.rmSync(to, { recursive: true, force: true })
     // No symlinks: the name swap below would write through one into the file it points at.
-    fs.cpSync(src, to, { recursive: true, filter: s => !/[\\/](\.DS_Store|__pycache__)$/.test(s) && !fs.lstatSync(s).isSymbolicLink() })
+    fs.cpSync(src, to, { recursive: true, filter: s => !/[\\/](\.DS_Store|__pycache__|eval)$/.test(s) && !fs.lstatSync(s).isSymbolicLink() })
     for (const f of fs.readdirSync(to, { recursive: true })) {
       const p = path.join(to, f)
       if (!fs.lstatSync(p).isFile()) continue

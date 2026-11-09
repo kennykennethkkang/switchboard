@@ -75,6 +75,13 @@ export function dietOf(b: SessionContextBreakdown, uses: Record<string, number>)
 export async function deliver($: EngineInterface, items: InboxItem[]) {
   for (const item of items) {
     if (item.kind === 'prompt') {
+      if (item.text.startsWith(HUB_RESUME)) {
+        // Resumed here already: one turn, not two. Switchboard first: the hold lifts with it.
+        await loadHold($)
+        const now = await $.clock.now()
+        if (held.resumedAt !== undefined && now - held.resumedAt < RESUME_DEDUP_MS) continue
+        if (held.hold) await liftHold($, now)
+      }
       await $.prompt.submit({ text: item.text, asUser: true })
       // The window holding this chat's terminal brings it up.
       await post($, { kind: 'prompted', sessionId: await $.session.id() })
@@ -106,8 +113,38 @@ export function budgetDenial(role: string, used: Record<string, number>, budgets
 const READS = new Set(['Read', 'Grep', 'Glob'])
 export const pausedDenial = (tool: string, paused: boolean) => (paused && !READS.has(tool) ? 'Switchboard is paused from the Company card: reading only until it is resumed.' : undefined)
 
+// Usage hold: owned here, so a chat pauses near the limit and resumes after the reset with no Switchboard window open.
+type Window = { kind: string; percentUsed: number; resetsAt?: string | number }
+export type Hold = { kind: string; percent: number; resetsAt: number; mid?: boolean }
+type HubPause = { kind?: unknown; percent?: unknown; resumeAt?: unknown }
+const msOf = (r?: string | number) => (typeof r === 'number' ? r : r ? Date.parse(r) : NaN)
+const kindText = (k: string) => k.replace(/_/g, '-')
+
+/** The fullest window at pauseAt or over (99 by default, null off). One past its reset, or one the hub resumed by hand (pauseOff), counts as empty. */
+export function overLimit(windows: Window[], pauseAt: number | null | undefined, now: number, pauseOff = -Infinity): Hold | undefined {
+  if (pauseAt === null) return undefined
+  const w = windows.filter(l => l.percentUsed >= (pauseAt ?? 99) && msOf(l.resetsAt) > Math.max(now, pauseOff)).sort((a, b) => b.percentUsed - a.percentUsed)[0]
+  return w && { kind: w.kind, percent: Math.floor(w.percentUsed), resetsAt: msOf(w.resetsAt) }
+}
+
+/** The hub's pause from limits.json, until its resumeAt: a window that closed never lifts it, so the time does. */
+export const hubHold = (p: HubPause | undefined, now: number): Hold | undefined => {
+  if (!p) return undefined
+  const resetsAt = typeof p.resumeAt === 'number' ? p.resumeAt : Number.MAX_SAFE_INTEGER
+  return resetsAt > now ? { kind: typeof p.kind === 'string' ? p.kind : 'usage', percent: typeof p.percent === 'number' ? p.percent : 99, resetsAt } : undefined
+}
+
+export function untilText(ms: number) {
+  const s = Math.max(0, Math.ceil(ms / 1000))
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
+  return h ? `${h}h ${m}m` : m ? `${m}m` : `${s}s`
+}
+
+export const holdLine = (h: Hold, now: number) => `Paused: ${kindText(h.kind)} limit at ${h.percent}%, resumes in ${untilText(h.resetsAt - now)}`
+export const holdDenial = (h: Hold, now: number) => `Paused by usage-meter: ${kindText(h.kind)} usage at ${h.percent}%. Stop here; this chat resumes by itself when the limit resets, in ${untilText(h.resetsAt - now)}.`
+
 const COMPANY_MS = 10_000
-const company: { at: number; paused: boolean; budgets: Record<string, number> } = { at: -Infinity, paused: false, budgets: {} }
+const company: { at: number; paused: boolean; budgets: Record<string, number>; limit?: HubPause; windows: Window[]; pauseAt?: number | null; pauseOff: number } = { at: -Infinity, paused: false, budgets: {}, windows: [], pauseOff: -Infinity }
 
 /** The hub's company.json, read at most every 10 seconds; missing or broken means not paused, no budgets. */
 async function readCompany($: EngineInterface) {
@@ -120,7 +157,79 @@ async function readCompany($: EngineInterface) {
     company.paused = f.paused === true
     company.budgets = f.budgets && typeof f.budgets === 'object' ? f.budgets : {}
   } catch { company.paused = false; company.budgets = {} }
+  try {
+    const l = JSON.parse(String(await $.fs.read(`${home}/.claude/switchboard/limits.json`)))
+    company.limit = l.paused === true && l.pause && typeof l.pause === 'object' ? l.pause : undefined
+    company.windows = Array.isArray(l.windows) ? l.windows : []
+    company.pauseAt = l.pauseAt === null ? null : typeof l.pauseAt === 'number' ? l.pauseAt : undefined
+    company.pauseOff = typeof l.pauseOff === 'number' ? l.pauseOff : -Infinity
+  } catch { company.limit = undefined; company.windows = []; company.pauseAt = undefined; company.pauseOff = -Infinity }
   return company
+}
+
+// This chat's own limits from session.measure; limits.json adds what other chats saw.
+let measured: Window[] = []
+const held: { id?: string; hold?: Hold; resumedAt?: number } = {}
+let holdBusy = false
+// Switchboard's resume prompt (hub-service.ts PAUSE_CONTINUE).
+const HUB_RESUME = 'Usage limit reset. Continue where you stopped'
+const RESUME_DEDUP_MS = 30 * 60_000
+
+async function loadHold($: EngineInterface) {
+  const id = await $.session.id()
+  if (held.id === id) return
+  const k = (await Promise.resolve().then(() => $.store.get('hold')).catch(() => undefined)) as typeof held | undefined
+  const mine = k?.id === id
+  Object.assign(held, { id, hold: mine ? k?.hold : undefined, resumedAt: mine ? k?.resumedAt : undefined })
+}
+const saveHold = ($: EngineInterface) => Promise.resolve().then(() => $.store.set('hold', { ...held })).catch(() => undefined)
+const postHold = async ($: EngineInterface) => post($, { kind: 'hold', sessionId: held.id, hold: held.hold ?? null }).catch(() => undefined)
+
+async function liftHold($: EngineInterface, now: number) {
+  held.hold = undefined
+  held.resumedAt = now
+  // The cached limits.json may still hold the pause just lifted; reread it next tick.
+  company.at = -Infinity
+  await saveHold($)
+  await $.ui.status(undefined)
+  await postHold($)
+}
+
+const resumeText = (step?: string) => `${OWN}usage limit reset. Carry on from where you stopped${step ? `: ${step}` : ''}. Resume any subagents cut off with SendMessage.`
+
+/** Every poll, idle or not: starts the hold, keeps its status line, and after the reset lifts it with one prompt if it cut work off. */
+export async function holdTick($: EngineInterface) {
+  if (holdBusy) return
+  holdBusy = true
+  try {
+    await loadHold($)
+    const now = await $.clock.now()
+    const c = await readCompany($)
+    const due = overLimit([...measured, ...c.windows], c.pauseAt, now, c.pauseOff) ?? hubHold(c.limit, now)
+    const was = held.hold
+    if (due) {
+      held.hold = was && was.resetsAt >= due.resetsAt ? was : { ...due, ...(was?.mid ? { mid: true } : {}) }
+      if (held.hold !== was) { await saveHold($); await postHold($) }
+      await $.ui.status(holdLine(held.hold, now))
+      return
+    }
+    if (!was) return
+    await liftHold($, now)
+    if (!was.mid) return void (await $.ui.toast('Usage limit reset: unpaused'))
+    await $.ui.toast('Resumed: limit reset')
+    const step = [...feed.tasks.values()].find(t => t.status === 'in_progress')?.subject ?? feed.prompt
+    await $.prompt.submit({ text: resumeText(step) })
+  } finally { holdBusy = false }
+}
+
+/** The denial while held; a denied call means the chat was mid-work, so it gets the resume prompt. */
+export async function heldNow($: EngineInterface) {
+  await loadHold($)
+  const now = await $.clock.now()
+  const h = held.hold
+  if (!h || h.resetsAt <= now) return undefined
+  if (!h.mid) { held.hold = { ...h, mid: true }; await saveHold($) }
+  return holdDenial(h, now)
 }
 
 async function startsToday($: EngineInterface) {
@@ -442,7 +551,7 @@ const pausePrompt = (shells: Shell[]) => [
 
 const ASK_RULE = 'When you need the user to answer or act, ask with the AskUserQuestion tool so it pops up in the terminal and Switchboard. Never end a turn with open tasks you can do yourself.'
 // Same rule as Switchboard's progress.ts askedQuestion: the last paragraph, past a trailing fenced block, ends in '?'.
-// Both test suites hold the same table of cases (agent-flow extension/test/progress.test.ts).
+// Both test suites hold the same table of cases (switchboard extension/test/progress.test.ts).
 export const endsAsking = (text: string) => (text.replace(/\n*```[^\n]*\n(?:(?!```)[\s\S])*```\s*$/, '').trim().split(/\n\s*\n/).pop() ?? '').trim().endsWith('?')
 // Nudges per chat that keeps stopping without touching its tasks; after that it waits for the user.
 const NUDGES = 3
@@ -774,18 +883,20 @@ export const register: Register = on => {
       description: 'Search Switchboard memory, the knowledge graph of memory notes and the vault, before researching a topic. Answers the best matching notes and how they relate (supersedes, depends-on, part-of, contradicts, related). Free and local.',
       inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
     })
-    $.clock.every(POLL_MS, () => poll($))
+    $.clock.every(POLL_MS, () => { void poll($); void holdTick($).catch(() => undefined) })
     return started
   })
 
   on('session.measure', async ($, e, next) => {
+    measured = e.rateLimits
     void postLive($, e).catch(() => undefined)
     return next(e)
   })
 
   // Answers without next, so the generic hook's pause check below never sees it.
   on('tool.call', { tool: `mcp__usage-meter__${ASK}` }, async ($, e) => {
-    const held = pausedDenial(String(e.tool), (await readCompany($).catch(() => company)).paused)
+    const c = await readCompany($).catch(() => company)
+    const held = (await heldNow($).catch(() => undefined)) ?? pausedDenial(String(e.tool), c.paused)
     if (held) return { deny: held }
     const q = (e as { question?: unknown }).question
     if (typeof q !== 'string' || !q.trim()) return { deny: 'Give a question.' }
@@ -849,7 +960,8 @@ export const register: Register = on => {
 
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
-    const held = pausedDenial(tool, (await readCompany($).catch(() => company)).paused)
+    const c = await readCompany($).catch(() => company)
+    const held = (await heldNow($).catch(() => undefined)) ?? pausedDenial(tool, c.paused)
     if (held) return { deny: held }
     if (tool === 'Bash' && (e as { run_in_background?: unknown }).run_in_background === true) {
       const held = await heldBack($)

@@ -16,7 +16,7 @@ import { vscodeBridge } from '@/lib/vscode-bridge'
 import { NodeButtons, placeNodes, type Hit, type ViewProps } from './orbits/parts'
 
 /** models: each role's model, drawn under its bubble. */
-export type OrbitChat = { id: string; name: string; state: ChatState; ago: string; progress?: ChatProgress; live?: SessionLive; models?: Record<string, string> }
+export type OrbitChat = { id: string; name: string; state: ChatState; ago: string; /** "waiting on X" while it holds for another chat; never read as idle. */ wait?: string; progress?: ChatProgress; live?: SessionLive; models?: Record<string, string> }
 /** running: the ids of this role's subagents still at work. */
 type RoleOn = { role: string; state: 'active' | 'done' | 'waiting' | 'unused'; running: string[] }
 
@@ -32,7 +32,7 @@ export function ringRoles(p?: ChatProgress): RoleOn[] {
 export function describe(c: OrbitChat): string {
   const roles = ringRoles(c.progress).filter(r => r.state !== 'unused')
     .map(r => `${r.role}${c.models?.[r.role] ? ` (${c.models[r.role]})` : ''} ${r.state}${r.running.length > 1 ? `, ${r.running.length} running` : ''}`)
-  return `${c.name}: ${(almostDone(c.progress) ? ALMOST : STATE[c.state]).label}. You, the lead${roles.length ? `, and ${roles.join('; ')}` : ', no roles yet'}.`
+  return `${c.name}: ${c.wait && c.state !== 'done' && c.state !== 'needs-you' ? c.wait.replace(/^./, x => x.toUpperCase()) : (almostDone(c.progress) ? ALMOST : STATE[c.state]).label}. You, the lead${roles.length ? `, and ${roles.join('; ')}` : ', no roles yet'}.`
 }
 
 /**
@@ -196,7 +196,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     tick(x, y, 8, light ? '#ffffff' : C.canvas, 1.75)
   }
 
-  const legend: Array<[string, string]> = [['working', C.blue], ...(showTools ? [['tool call', C.yellow] as [string, string]] : []), ['done', C.green], ...(almostDone(c.progress) ? [['almost done', C.teal] as [string, string]] : []), ['needs you', C.red]]
+  const legend: Array<[string, string]> = [['working', C.blue], ...(showTools ? [['tool call', C.yellow] as [string, string]] : []), ['done', C.green], ...(almostDone(c.progress) ? [['requests not covered', C.teal] as [string, string]] : []), ['needs you', C.red]]
   // The legend: one row, or more on a narrow stage (a key that would run past the edge starts a new row below);
   // each extra row lifts the picture above it by its height.
   ctx.font = `400 12px ${C.mono}`
@@ -252,6 +252,12 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     })
   }
   const active = roles.filter(r => r.state === 'active').map(r => r.role)
+  // Done takes the first slot clear of every role's bubble and label, and glides when the ring turns.
+  {
+    const ys = [0.66, 0.98, 0.34].map(k => cy + R * k), cap = h - 40 - (rows.length - 1) * 16
+    const clear = (y: number) => [...pos.values()].every(p => Math.abs(p.x - done.x) > rr + 40 || y < p.y - rr - 14 || y > p.y + rr + 40)
+    done.y = snap(tw('doneY', Math.min(cap, ys.find(clear) ?? ys[0]), TW.move))
+  }
 
   edge(you, lead, C.ash, 0.7 * dim, [], -0.08)
   if (!still) spark(you, lead, (t * 0.3) % 1, C.blue, -0.08, 2, wWork)
@@ -270,6 +276,13 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     if (!still) calls = calls.slice(-4)
     // Each source's pills fan out around its outward direction, newest nearest; a still frame keeps the newest 2 per source.
     const groups = new Map<string, typeof calls>(), placed: P[] = [done, you]
+    // Keep clear of the top corners (wait pills), each count badge and each label under a bubble.
+    placed.push({ x: 60, y: 14 }, { x: w * 0.25, y: 14 }, { x: w - 60, y: 14 }, { x: w * 0.75, y: 14 })
+    const labels: P[] = []
+    for (const p of pos.values()) {
+      labels.push({ x: p.x, y: p.y + rr + 11 + p.band }, { x: p.x, y: p.y })
+      if (p.r.running.length > 1) placed.push({ x: p.x + rr * 0.72 + 12, y: p.y - rr * 0.72 })
+    }
     for (const e of calls) { const k = pos.has(e.call.role) ? e.call.role : 'lead'; groups.set(k, [...(groups.get(k) ?? []), e]) }
     for (const [k, all] of groups) {
       const list = (still ? all.slice(-2) : all).reverse()
@@ -284,7 +297,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
         // and with none free it is left out (the Activity feed below still lists it).
         const x0 = src.x + Math.cos(ang) * dd, y0 = src.y + Math.sin(ang) * dd
         const spot = SPOTS.map(([dx, dy]) => ({ x: Math.min(w - 48, Math.max(48, x0 + dx)), y: Math.min(h - 52, Math.max(18, y0 + dy)) }))
-          .find(s => !placed.some(p => Math.abs(p.x - s.x) < 60 && Math.abs(p.y - s.y) < 34))
+          .find(s => !placed.some(p => Math.abs(p.x - s.x) < 60 && Math.abs(p.y - s.y) < 34) && !labels.some(l => Math.abs(l.x - s.x) < 90 && Math.abs(l.y - s.y) < 40))
         if (!spot) return
         placed.push(spot)
         // A newer call pushes older ones outward; they glide there instead of jumping a slot.
@@ -345,7 +358,8 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
       const ink = mix(C.ink, C.mute, wU)
       if (narrow) {
         // Too small for the name: the model goes in the bubble and the name under it.
-        if (model) { ctx.font = `400 10px ${C.mono}`; text(fit(model, rr * 1.8), p.x, p.y, { size: 10, color: C.mute, mono: true, weight: 400, alpha: dim }) }
+        // Only when it fits whole; a cut model name spills over a small bubble.
+        if (model) { ctx.font = `400 10px ${C.mono}`; if (ctx.measureText(model).width <= rr * 1.6) text(model, p.x, p.y, { size: 10, color: C.mute, mono: true, weight: 400, alpha: dim }) }
       } else {
         // Shrinks to fit the bubble, down to 9px, before it cuts the name.
         // The fitted size is kept per name and bubble size, so a frame does not re-measure it.
@@ -392,7 +406,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   }
   text('Lead', cx, cy - lr * 0.16, { size: Math.max(12, lr * 0.25), weight: 600, alpha: dim })
   // The line under Lead crossfades when it changes.
-  const sub = live ? (active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning') : needs ? 'waiting on you' : finished ? (almostDone(c.progress) ? 'almost done' : 'finished') : `idle ${c.ago}`
+  const sub = live ? (active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning') : needs ? 'waiting on you' : finished ? 'ready to approve' : c.wait ?? `idle ${c.ago}`
   if (S.snap || !S.sub) S.sub = { text: sub, at: -1e9 }
   else if (S.sub.text !== sub) S.sub = { text: sub, prev: S.sub.text, at: now }
   const fade = Math.min(1, (now - S.sub.at) / 180)
@@ -412,7 +426,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   const qOn = tw('q', qText ? 1 : 0, TW.enter, 0)
   if (qOn > 0.01 && qShown) pop(cx, cy - lr - 30, 1, qOn, () => pill(cx, cy - lr - 30 - (1 - qOn) * 6, qShown, C.red, 1, { size: 12, mono: false, fg: C.ink }))
 
-  pill(done.x, done.y, 'Done', twc('dc', finished ? fin : C.ash), lerp(dim, 1, wFin), { size: 12, mono: false, fg: twc('df', finished ? fin : C.mute), check: wFin })
+  pill(done.x, done.y, 'Done', twc('dc', finished ? fin : C.ash), lerp(dim, 1, wFin), { size: 12, mono: false, fg: twc('df', finished ? fin : C.mute), check: almostDone(c.progress) ? 0 : wFin })
   if (wFin > 0.01) text(c.progress?.commit ? 'commit message ready' : 'no commit message', done.x, done.y + 24, { size: 11, color: fin, mono: true, weight: 400, alpha: wFin })
 
   rows.forEach((row, i) => {

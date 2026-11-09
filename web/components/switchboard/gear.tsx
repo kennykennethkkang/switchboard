@@ -5,12 +5,16 @@
  * Claude Code rows go through the extension's whitelist into ~/.claude/settings.json, so new chats pick them up.
  * Search runs across every section; installed lists sit in folds apart from the switches.
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
 import { gearRows, keywordHit, sweepBadge } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
+import { Credits } from './credits'
+import { SpendLimits } from './spend-limits'
+import { PhoneAlerts, phoneAlertsShown } from './phone-alerts'
 import { label } from './look'
+import './gear.css'
 
 export function Switch({ on, onChange, label, text }: { on: boolean; onChange: (next: boolean) => void; label: string; text?: string }) {
   return (
@@ -37,18 +41,22 @@ const IDLE: Array<[string, string]> = [['5', 'After 5 min'], ['15', 'After 15 mi
 
 const SECTIONS = ['Chats', 'Models', 'Accounts', 'Integrations', 'Installed'] as const
 export type Section = typeof SECTIONS[number]
-export type Layout = 'classic' | 'desk'
-const LAYOUTS: Array<[Layout, string]> = [['desk', 'Desk'], ['classic', 'Classic']]
 type Row = { label: string; control: ReactNode; hint?: string; section: Section }
 
 function Line({ row }: { row: Row }) {
+  // A switch or a pick saves at once, so the row says so for a moment.
+  const [saved, setSaved] = useState(0)
+  useEffect(() => { if (!saved) return; const t = setTimeout(() => setSaved(0), 2000); return () => clearTimeout(t) }, [saved])
+  const flash = () => setSaved(Date.now())
   return (
     <div className="hub-set-row">
       <span style={{ display: 'grid', gap: 2, minWidth: 0 }}>
-        <span style={{ color: 'var(--hub-ink)' }}>{row.label}</span>
+        <span style={{ color: 'var(--hub-ink)' }}>{row.label}<span role="status" style={{ marginLeft: 8, fontSize: 12, color: 'var(--hub-green)' }}>{saved ? 'Saved' : ''}</span></span>
         {row.hint && <span style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--hub-ash)' }}>{row.hint}</span>}
       </span>
-      {row.control}
+      <span style={{ display: 'contents' }}
+        onClickCapture={e => { if ((e.target as Element).closest('[role=switch]')) flash() }}
+        onChangeCapture={e => { if ((e.target as Element).tagName === 'SELECT') flash() }}>{row.control}</span>
     </div>
   )
 }
@@ -78,7 +86,7 @@ function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) 
             <button type="button" className="hub-btn" disabled={!ok || busy} onClick={add}>Add</button>
           </span>
         ) }} />
-      <Line row={{ section: 'Installed', label: 'Sweep', hint: [busy ? (s?.progress ? `Sweeping ${s.progress.done} of ${s.progress.total}.` : 'Sweeping now.') : s?.note, `${count('Clean')} clean, ${count('Review')} to review, ${count('Approved')} approved. NVIDIA SkillSpector, no LLM.`].filter(Boolean).join(' '),
+      <Line row={{ section: 'Installed', label: 'Sweep', hint: [busy ? (s?.progress ? `Sweeping ${s.progress.done} of ${s.progress.total}.` : 'Sweeping now.') : s?.note, `${count('Clean')} clean, ${count('Review')} to review, ${count('Reviewed')} reviewed, ${count('Approved')} approved. NVIDIA SkillSpector, no LLM.`].filter(Boolean).join(' '),
         control: <button type="button" className="hub-btn" disabled={busy} onClick={() => send({ type: 'hub-sweep' })}>{busy ? 'Sweeping' : 'Sweep all'}</button> }} />
       {flagged.length > 0 && <>
         <h4 style={sub}>Needs review</h4>
@@ -98,7 +106,7 @@ function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) 
   )
 }
 
-export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number } | null; start?: Section; layout?: Layout; onLayout?: (l: Layout) => void }) {
+export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number } | null; start?: Section }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState<Section>(start)
   const c = hub.controls.claude
@@ -107,26 +115,58 @@ export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: 
   const own = (key: SwitchboardKey, value: boolean | number | string | null) => send({ type: 'hub-switchboard', key, value })
   const query = q.trim().toLowerCase()
   const lead = c.model ?? 'default'
+  const alerts = phoneAlertsShown()
 
   const rows: Row[] = [
-    ...(layout && onLayout ? [{ section: 'Chats' as const, label: 'Layout', hint: 'This device only. Desk puts chats on the left, the chat in the middle and Today, To-do and Git on the right.',
-      control: <Pick label="Layout" options={LAYOUTS} value={layout} onChange={v => onLayout(v as Layout)} /> }] : []),
     { section: 'Chats', label: 'Your name', hint: 'Chats call you by this name. Leave it empty to skip it.',
       // Keyed by the saved name, so a save from another window shows here.
       control: <input key={sb.name} className="hub-select" aria-label="Your name" placeholder="Name" maxLength={40} defaultValue={sb.name} style={{ cursor: 'text' }}
         onBlur={e => { const v = e.target.value.trim(); if (v !== sb.name) own('name', v) }}
         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} /> },
-    { section: 'Chats', label: 'Hide idle chats', hint: 'A chat that stopped and stayed quiet this long leaves the list; Find still has it.',
-      control: <Pick label="Hide idle chats" options={IDLE} value={sb.idleMinutes === null ? 'never' : String(sb.idleMinutes)} onChange={v => own('idleMinutes', v === 'never' ? null : Number(v))} /> },
+    { section: 'Chats', label: 'Hide done chats', hint: 'A done chat quiet this long leaves the list; idle chats always stay. Find still has it.',
+      control: <Pick label="Hide done chats" options={IDLE} value={sb.idleMinutes === null ? 'never' : String(sb.idleMinutes)} onChange={v => own('idleMinutes', v === 'never' ? null : Number(v))} /> },
     { section: 'Chats', label: 'Continue at usage limit', hint: 'When a usage limit resets, Claude picks the chat up again by itself.',
       control: <Switch label="Continue at usage limit" on={hub.keep.autoContinue} onChange={next => set('autoContinueAtUsageLimit', next)} /> },
+    { section: 'Chats', label: 'Pause near the limit', hint: 'When the 5-hour or weekly limit reaches this %, every chat is told to stop and wait; Switchboard resumes them in order a minute after it resets. Terminals stay open.',
+      control: <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+        <Switch label="Pause near the limit" on={sb.pauseAt !== null} onChange={next => own('pauseAt', next ? 99 : null)} />
+        {sb.pauseAt !== null && <input key={sb.pauseAt ?? 99} type="number" min={50} max={100} className="hub-select" aria-label="Pause chats at %" defaultValue={sb.pauseAt ?? 99} style={{ width: 64, cursor: 'text' }}
+          onBlur={e => { const v = Math.round(Number(e.target.value)); if (v >= 50 && v <= 100 && v !== (sb.pauseAt ?? 99)) own('pauseAt', v) }}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} />}
+      </span> },
     { section: 'Chats', label: 'Auto-start chats', hint: 'When nothing runs in this window\'s project, a chat starts on the next to-do item. A chat stopped by a usage limit comes back when it resets.',
       control: <Switch label="Auto-start chats" on={sb.autoStart !== false} onChange={next => own('autoStart', next)} /> },
+    { section: 'Chats', label: 'Fix stuck items', hint: 'Something stuck for twice its limit gets Fix once: a quiet subagent is checked on, a stuck job or process is stopped and the chat told. A chat waiting on you is paused instead.',
+      control: <Switch label="Fix stuck items" on={sb.autoFix !== false} onChange={next => own('autoFix', next)} /> },
+    { section: 'Chats', label: 'Learn automatically', hint: 'Twice a week, under the pause threshold, a background run reviews recent chats and tests rule and role edits; one that beats the old version on held-out cases is applied to claude-mods with an Undo note in the to-do, the rest become to-do proposals. Long chats that end get an after action review. Never commits.',
+      control: <Switch label="Learn automatically" on={sb.learn !== false} onChange={next => own('learn', next)} /> },
+    { section: 'Chats', label: 'Stop a chat\'s dev servers when it ends', hint: 'When a chat ends for good, the dev servers and test browsers it started stop too. Never port 3000 or 3131, a chat waiting out a usage limit, or anything another live chat uses.',
+      control: <Switch label="Stop a chat's dev servers when it ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
+    { section: 'Chats', label: 'Show agent browsers', hint: 'Browsers agents drive through Playwright open in a window you can see. Off runs them headless, so nothing lands on your screen. Applies to chats started after the change.',
+      control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
+    { section: 'Chats', label: 'Pop-up notices in VS Code', hint: 'Done, question, stuck and AWS sign-in notices pop up in VS Code with a button. Off shows them in the status bar; the Mac notice, the Needs you strip and the phone push still come.',
+      control: <Switch label="Pop-up notices in VS Code" on={sb.toasts === true} onChange={next => own('toasts', next)} /> },
+    { section: 'Chats', label: 'Ask before actions (Claude)', hint: 'Claude chats ask before running commands and tools. Off runs them without asking and also trusts project MCP servers. Applies to chats started or resumed after the change. Chats you reach from the Claude app (Remote Control) pick it up the next time Remote Control restarts.',
+      control: <Switch label="Ask before actions (Claude)" on={!!sb.askClaude} onChange={next => own('askClaude', next)} /> },
+    { section: 'Chats', label: 'Ask before actions (Codex)', hint: 'Codex chats ask before running commands, inside its sandbox. Off runs them without asking or a sandbox. Applies to chats started or resumed after the change.',
+      control: <Switch label="Ask before actions (Codex)" on={!!sb.askCodex} onChange={next => own('askCodex', next)} /> },
+    { section: 'Chats', label: 'One window', hint: hub.windowTabs?.mac === false ? 'Needs macOS.' : 'Every VS Code window shows as a tab of one window; Merge all, Split all, Show and Pop out sit above the chat list. Quit and reopen VS Code after changing it. Off puts your old setting back.',
+      control: <Switch label="One window" on={!!sb.oneWindow} onChange={next => own('oneWindow', next)} /> },
+    { section: 'Chats', label: 'Keep Switchboard app running', hint: 'Starts this Mac\'s Switchboard page again if it stops, waiting longer each time it keeps crashing. Off leaves it stopped.',
+      control: <Switch label="Keep Switchboard app running" on={sb.keepApp !== false} onChange={next => own('keepApp', next)} /> },
+    { section: 'Chats', label: 'Test anti-copy hardening (experimental)', hint: 'Tries BLA\'s anti-clone hardening on a copy of your build and tells you if the app still works. Off by default.',
+      control: <Switch label="Test anti-copy hardening (experimental)" on={!!sb.hardenBuild} onChange={next => own('hardenBuild', next)} /> },
     { section: 'Chats', label: 'Fresh branch for new chats', hint: 'A chat that continues from a full one starts on its own git branch.',
       control: <Switch label="Fresh branch for new chats" on={hub.keep.freshBranch} onChange={next => send({ type: 'hub-keep', freshBranch: next })} /> },
     { section: 'Chats', label: 'Brief for new chats', hint: 'New chats first read what other chats in the project are doing.',
       control: <Switch label="Brief for new chats" on={sb.brief} onChange={next => own('brief', next)} /> },
+    { section: 'Chats', label: 'Phone mode', hint: 'Call me instead of asking in chats: questions, stuck and finished chats, and usage pauses and resumes ring your phone.',
+      control: <Switch label="Phone mode" on={sb.phone === true} onChange={next => own('phone', next)} /> },
     { section: 'Chats', label: 'Push to your phone', hint: 'When a chat finishes.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
+    ...(alerts ? [{ section: 'Chats' as const, label: 'Phone alerts', hint: alerts === 'hint'
+      ? 'On iPhone, tap Share then Add to Home Screen, open Switchboard from there and turn this on.'
+      : 'AWS sign-in heads-ups on this device, even with the app closed.',
+      control: alerts === 'switch' ? <PhoneAlerts /> : null }] : []),
     { section: 'Chats', label: 'Keep phone access in Apple Notes', hint: 'One private note, "Switchboard access", with the code and links; updated when they change. Off stops updates.',
       control: <Switch label="Keep phone access in Apple Notes" on={sb.accessNote} onChange={next => own('accessNote', next)} /> },
     { section: 'Chats', label: 'Notify when a chat needs input', hint: 'When a chat stops to ask you something.', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
@@ -229,6 +269,15 @@ export function Gear({ hub, send, problem, start = 'Chats', layout, onLayout }: 
               {!hits.length && !accountsHit && !listHits.length && <p style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>Nothing matches.</p>}
             </>
           : body(at)}
+        {!query && at === 'Integrations' && <SpendLimits hub={hub} send={send} />}
+        <details className="hub-fold-list" style={{ marginTop: 16 }}
+          onToggle={e => { const d = e.currentTarget; if (d.open) requestAnimationFrame(() => d.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })) }}>
+          <summary>
+            <b aria-hidden>›</b>
+            <span style={{ flex: 1, minWidth: 0, color: 'var(--hub-ink)' }}>About and credits</span>
+          </summary>
+          <div style={{ margin: '0 0 10px 22px' }}><Credits /></div>
+        </details>
       </div>
     </section>
   )

@@ -1,3 +1,44 @@
 Switchboard is a personal fork of Agent Flow (https://github.com/patoles/agent-flow) by Simon Patole, used under the Apache License 2.0.
 Agent Flow is a trademark of Simon Patole. Switchboard is not affiliated with or endorsed by the Agent Flow project.
 Changes from upstream: the Hub tab, the timeline, talking to chats, Remote Control, the Switchboard name and icons.
+
+The ecc-agents subagents are from ECC (https://github.com/affaan-m/ECC) by Affaan Mustafa, copied with dashes normalized under the MIT License, Copyright (c) 2026 Affaan Mustafa. The license text ships with them in ecc-agents/LICENSE.
+
+Set up installs these third-party skills from their own repos; none are bundled:
+- pixelfx (https://github.com/patch-gg/pixelfx) by Patch, MIT License.
+- humanizer (https://github.com/blader/humanizer) by Siqi Chen, MIT License.
+- last30days (https://github.com/mvanhorn/last30days-skill) by Matt Van Horn, MIT License.
+- find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc., MIT License.
+- Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License.
+- Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong, MIT License.
+
+Pixel Agents (https://github.com/pablodelucca/pixel-agents), MIT License.
+The Board page (web/components/switchboard/board.tsx) borrows its idea of an animated pixel character per agent; no code is copied.
+The Board page embeds Silkscreen (web/app/fonts/silkscreen.css), Copyright 2001 Jason Kottke (https://kottke.org/plus/type/silkscreen), used under the SIL Open Font License 1.1 (https://openfontlicense.org).
+
+archify (https://github.com/tt-a1i/archify) by tt-a1i, Apache License 2.0, and diagram-design (https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery, MIT License, are installed by Set up from their own repos; no code from them ships here.
+
+Also installed by Set up from their own repos, not bundled: superpowers (https://github.com/obra/superpowers) by Jesse Vincent, ponytail (https://github.com/DietrichGebert/ponytail) by Dietrich Gebert, impeccable (https://github.com/pbakaus/impeccable) by Paul Bakaus, and grill-me by Matt Pocock (https://github.com/mattpocock/skills).
+
+Set up also fetches into ~/.claude/skills, not bundled, each MIT License with its own copyright line:
+- emilkowalski/skills (https://github.com/emilkowalski/skills), Copyright (c) 2026 Emil Kowalski.
+- Leonxlnx/taste-skill-classics (https://github.com/Leonxlnx/taste-skill-classics) and Leonxlnx/imagegen-skills (https://github.com/Leonxlnx/imagegen-skills), Copyright (c) 2026 Leonxlnx.
+
+Set up installs Anthropic's official plugins (https://github.com/anthropics/claude-plugins-official): code-review, context7, frontend-design and playwright. They are not bundled.
+
+kit/design-md holds the DESIGN.md files from awesome-design-md (https://github.com/VoltAgent/awesome-design-md) by VoltAgent, MIT License, Copyright (c) 2026 VoltAgent. The license text ships in extension/kit/design-md/LICENSE.
+kit/design-md/INDEX.md and the starnet-station, colony-sim-rooms, tactics-hud and palace-vermilion entries are original to Switchboard: written descriptions with source links, no copied images.
+
+The Desk layout embeds Hanken Grotesk (web/app/fonts/hanken.css), Copyright 2020 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk), used under the SIL Open Font License 1.1 (https://openfontlicense.org).
+
+Kit skills that ship in claude-mods/kit/skills and are copied with their LICENSE files:
+- aar is adapted from aar-loop by Cooper Simson, MIT License, Copyright (c) 2026 Cooper Simson.
+- awwwards: references/rubric.md is adapted from claude-skill-awwwards (https://github.com/tponscr-debug/claude-skill-awwwards) by Thomas Pons, MIT License, Copyright (c) 2026 Thomas Pons.
+- accessibility, click-path-audit and e2e-testing are from ECC (https://github.com/affaan-m/ECC) by Affaan Mustafa, MIT License, Copyright (c) 2026 Affaan Mustafa.
+- accessible-motion, gsap-greensock, hover-interactions, page-transitions and scroll-animations are by Dylan Tarre, MIT License, Copyright (c) 2024 Dylan Tarre.
+- image-to-code-skill is by Leonxlnx, MIT License, Copyright (c) 2026 Leonxlnx.
+- extract-design-md, extract-static-html and taste-design are from stitch-skills (https://github.com/google-labs-code/stitch-skills) by Google, Apache License 2.0; the first two are modified.
+- web-design-guidelines names Vercel as its author; claude-x-jev and jev-setup-project name Charles J Dove (Jev, TypeSafe). skill-inspector runs NVIDIA SkillSpector, which is not bundled.
+- caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0, is fetched by Set up into ~/.claude/skills; not bundled.
+
+The Git panel's invisible character cleanup on commit is an idea from watermarks-remover (https://github.com/guillaumemeyer/watermarks-remover) by Guillaume Meyer, MIT License; no code is copied.

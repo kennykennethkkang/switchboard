@@ -299,11 +299,11 @@ export function deleteAwsProfile(name: string, file = AWS_CONFIG, now = Date.now
 
 /**
  * The BROWSER script Python's webbrowser runs so `aws login` opens in one Chrome profile; the folder comes from the env.
- * None on Windows: webbrowser would run a .cmd through cmd.exe, which splits the sign-in URL at its &s.
+ * -g: an agent's aws login opens Chrome behind whatever is in front. None on Windows: webbrowser would run a .cmd through cmd.exe, which splits the sign-in URL at its &s.
  */
 export function openChromeScript(platform: NodeJS.Platform = process.platform): string | undefined {
   if (platform === 'win32') return undefined
-  const [plain, own] = platform === 'darwin' ? ['/usr/bin/open -a "Google Chrome"', '/usr/bin/open -na "Google Chrome" --args'] : ['google-chrome', 'google-chrome']
+  const [plain, own] = platform === 'darwin' ? ['/usr/bin/open -g -a "Google Chrome"', '/usr/bin/open -gna "Google Chrome" --args'] : ['google-chrome', 'google-chrome']
   return `#!/bin/sh\nif [ -z "$SWITCHBOARD_CHROME_DIR" ]; then exec ${plain} "$1"; fi\nexec ${own} --profile-directory="$SWITCHBOARD_CHROME_DIR" "$1"\n`
 }
 

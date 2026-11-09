@@ -10,6 +10,7 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { branchProblem, commitArgs, git, gitOp, githubRepo, parseRepoStatus, pickFiles, readRepo, syncAction } from '../src/hub/git'
 import { commandProblem } from '../src/hub/routes'
+import { fillRepos } from '../src/hub/progress'
 
 describe('git args', () => {
   it('builds a commit with and without a description', () => {
@@ -28,8 +29,8 @@ describe('git args', () => {
   })
 
   it('reads the GitHub page from https and ssh remotes', () => {
-    for (const url of ['https://github.com/kenny/agent-flow.git', 'https://github.com/kenny/agent-flow', 'git@github.com:kenny/agent-flow.git', 'ssh://git@github.com/kenny/agent-flow.git', 'https://me@github.com/kenny/agent-flow.git'])
-      assert.equal(githubRepo(url), 'https://github.com/kenny/agent-flow', url)
+    for (const url of ['https://github.com/kenny/switchboard.git', 'https://github.com/kenny/switchboard', 'git@github.com:kenny/switchboard.git', 'ssh://git@github.com/kenny/switchboard.git', 'https://me@github.com/kenny/switchboard.git'])
+      assert.equal(githubRepo(url), 'https://github.com/kenny/switchboard', url)
     assert.equal(githubRepo('https://gitlab.com/kenny/x.git'), undefined)
     assert.equal(githubRepo('git@github.com:kenny/../x.git'), undefined)
   })
@@ -124,6 +125,60 @@ describe('git ops end to end', () => {
     assert.equal((await gitOp(a, { op: 'commit', files: [], summary: 'x' })).ok, false)
   })
 
+  it('strips invisible characters from committed text files and the message', async () => {
+    const c = path.join(root, 'c')
+    sh(root, 'init', '-q', '-b', 'main', 'c')
+    sh(c, 'config', 'user.email', 't@t'); sh(c, 'config', 'user.name', 'T'); sh(c, 'config', 'commit.gpgsign', 'false')
+    const emoji = 'hi \u{1F468}\u200D\u{1F469}\u200D\u{1F467}\n'
+    const bin = Buffer.from([0x50, 0, 0xe2, 0x80, 0x8b, 0x0a])
+    fs.writeFileSync(path.join(c, 'notes.md'), 'a\u200Bb\n')
+    fs.writeFileSync(path.join(c, 'emoji.md'), emoji)
+    fs.writeFileSync(path.join(c, 'pic.dat'), bin)
+    fs.writeFileSync(path.join(c, 'CLAUDE.md'), 'x\u200By\n')
+    sh(c, 'add', 'notes.md')
+    const r = await gitOp(c, { op: 'commit', files: ['notes.md', 'emoji.md', 'pic.dat', 'CLAUDE.md'], summary: '\uFEFFAdd\u200B notes', description: 'Body\u2060\nCo-Authored-By: X <x@x>' })
+    assert.equal(r.ok, true, r.text)
+    assert.match(r.text, /Removed 4 invisible characters/)
+    assert.equal(sh(c, 'log', '-1', '--format=%s%n%b'), 'Add notes\nBody')
+    assert.equal(sh(c, 'show', 'HEAD:notes.md'), 'ab')
+    assert.equal(fs.readFileSync(path.join(c, 'notes.md'), 'utf8'), 'ab\n')
+    assert.equal(fs.readFileSync(path.join(c, 'emoji.md'), 'utf8'), emoji)
+    assert.deepEqual(fs.readFileSync(path.join(c, 'pic.dat')), bin)
+    assert.equal(fs.readFileSync(path.join(c, 'CLAUDE.md'), 'utf8'), 'x\u200By\n')
+    assert.equal(sh(c, 'status', '--porcelain'), '')
+
+    // Lines already in HEAD stay as they are; only added lines are cleaned.
+    fs.writeFileSync(path.join(c, 'old.md'), 'keep\u200Bme \u202Bbidi\u202C\n')
+    sh(c, 'add', 'old.md'); sh(c, 'commit', '-qm', 'old')
+    fs.appendFileSync(path.join(c, 'old.md'), 'new\u200Bline\n')
+    const o = await gitOp(c, { op: 'commit', files: ['old.md'], summary: 'More' })
+    assert.equal(o.ok, true, o.text)
+    assert.match(o.text, /Removed 1 invisible character$/)
+    assert.equal(fs.readFileSync(path.join(c, 'old.md'), 'utf8'), 'keep\u200Bme \u202Bbidi\u202C\nnewline\n')
+  })
+
+  it('puts cleaned files back when a hook rejects the commit', async () => {
+    const c = path.join(root, 'c'), hook = path.join(c, '.git', 'hooks', 'pre-commit')
+    fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+    fs.writeFileSync(path.join(c, 'notes.md'), 'z\u200B\n')
+    const r = await gitOp(c, { op: 'commit', files: ['notes.md'], summary: 'Nope' })
+    assert.equal(r.ok, false)
+    assert.match(r.text, /put back/)
+    assert.equal(fs.readFileSync(path.join(c, 'notes.md'), 'utf8'), 'z\u200B\n')
+    fs.rmSync(hook)
+
+    // Same on the card's commit and push.
+    const ahook = path.join(a, '.git', 'hooks', 'pre-commit')
+    fs.writeFileSync(ahook, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+    fs.writeFileSync(path.join(a, 'skip.txt'), 'q\u200B\n')
+    const s = await gitOp(a, { op: 'ship', files: (await readRepo(a)).ship!.files, summary: 'Nope', confirmed: true })
+    fs.rmSync(ahook)
+    assert.equal(s.ok, false)
+    assert.match(s.text, /put back/)
+    assert.equal(fs.readFileSync(path.join(a, 'skip.txt'), 'utf8'), 'q\u200B\n')
+    sh(a, 'reset', '-q'); fs.writeFileSync(path.join(a, 'skip.txt'), 'x\n')
+  })
+
   it('asks before pushing to main, then pushes to the upstream remote', async () => {
     const no = await gitOp(a, { op: 'sync' })
     assert.equal(no.ok, false)
@@ -197,5 +252,42 @@ describe('git ops end to end', () => {
     assert.equal(r.ok, true, r.text)
     assert.equal(r.text, 'Committed 1 file to main and pushed to origin/main')
     assert.equal(sh(root, '--git-dir=remote.git', 'log', '-1', '--format=%s', 'main'), 'Wip')
+  })
+  it('pushes the current branch only, asking first on main', async () => {
+    fs.writeFileSync(path.join(a, 'p.txt'), 'p\n')
+    assert.equal((await gitOp(a, { op: 'commit', files: ['p.txt'], summary: 'P' })).ok, true)
+    assert.match((await gitOp(a, { op: 'push' })).text, /confirm the push to origin\/main/i)
+    const r = await gitOp(a, { op: 'push', confirmed: true })
+    assert.equal(r.ok, true, r.text)
+    assert.equal(r.text, 'Pushed 1 commit to origin/main')
+    assert.equal(sh(root, '--git-dir=remote.git', 'log', '-1', '--format=%s', 'main'), 'P')
+    assert.match((await gitOp(a, { op: 'push', confirmed: true })).text, /nothing to push/i)
+  })
+
+  it('offers every finished chat\'s message, plus the files none named, until a commit', async () => {
+    fs.writeFileSync(path.join(a, 'n1.txt'), '1\n')
+    fs.writeFileSync(path.join(a, 'n2.txt'), '2\n')
+    fs.mkdirSync(path.join(a, '.claude'), { recursive: true }); fs.writeFileSync(path.join(a, '.claude', 'x.json'), '{}')
+    fillRepos([{ rootUri: { fsPath: a }, inputBox: { value: '' } }], { sessionId: 'S', cwd: a, state: 'done', commit: 'Add n1\n\n- n1.txt' }, new Map(), new Set())
+    const v = await readRepo(a)
+    assert.equal(v.pending?.text, 'Add n1\n\n- n1.txt\n- Also changed: n2.txt')
+    assert.deepEqual(v.ship?.files.sort(), ['n1.txt', 'n2.txt'])
+    assert.equal((await gitOp(a, { op: 'commit', files: v.ship!.files, summary: 'Add n1' })).ok, true)
+    assert.equal((await readRepo(a)).pending, undefined)
+  })
+
+  it('drops a pending message committed from elsewhere, read before or not, and keeps a chat that finished after', async () => {
+    const box = [{ rootUri: { fsPath: a }, inputBox: { value: '' } }]
+    const done = (sessionId: string, commit: string) => ({ sessionId, cwd: a, state: 'done' as const, commit })
+    fs.writeFileSync(path.join(a, 'm1.txt'), '1\n')
+    fillRepos(box, done('M', 'Add m1\n\n- m1.txt'), new Map(), new Set())
+    // Committed in another window or VS Code's own box, with no read in between.
+    sh(a, 'add', 'm1.txt'); sh(a, 'commit', '-qm', 'Add m1')
+    assert.equal((await readRepo(a)).pending, undefined)
+    fs.writeFileSync(path.join(a, 'm2.txt'), '2\n')
+    fillRepos(box, done('N', 'Add m2\n\n- m2.txt'), new Map(), new Set())
+    assert.equal((await readRepo(a)).pending?.text, 'Add m2\n\n- m2.txt')
+    sh(a, 'add', 'm2.txt'); sh(a, 'commit', '-qm', 'Add m2')
+    assert.equal((await readRepo(a)).pending, undefined)
   })
 })

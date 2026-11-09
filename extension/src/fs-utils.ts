@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -58,10 +59,29 @@ export function foldPathCase(p: string): string {
 
 /** A lock file every window sees; the release, or undefined while another holder's is younger than staleMs (a crashed one's is taken over). */
 export function tryLock(lock: string, staleMs = 60_000): (() => void) | undefined {
-  try { fs.mkdirSync(path.dirname(lock), { recursive: true }); fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }) } catch {
-    try { if (Date.now() - fs.statSync(lock).mtimeMs < staleMs) return undefined; fs.writeFileSync(lock, String(process.pid)) } catch { return undefined }
+  // pid plus a nonce: two locks in one process are still told apart on release.
+  const me = `${process.pid}:${randomUUID()}`
+  const take = () => { try { fs.writeFileSync(lock, me, { flag: 'wx' }); return true } catch { return false } }
+  const stale = (f: string, ms: number) => { try { return Date.now() - fs.statSync(f).mtimeMs >= ms } catch { return false } }
+  try { fs.mkdirSync(path.dirname(lock), { recursive: true }) } catch { return undefined }
+  if (!take()) {
+    if (!stale(lock, staleMs)) return undefined
+    // Takeover goes through a wx gate so only one contender clears the stale file and re-creates it.
+    // ponytail: a gate left by a crash mid-takeover is cleared after 10 s.
+    const gate = `${lock}.takeover`
+    if (stale(gate, 10_000)) {
+      // Rename, not rm: only one contender moves the old gate. A moved gate that turns out fresh was a live one; put it back.
+      const aside = `${gate}.${me.replace(':', '-')}`
+      try { fs.renameSync(gate, aside); if (stale(aside, 10_000)) fs.rmSync(aside); else fs.renameSync(aside, gate) } catch { /* another contender moved it */ }
+    }
+    try { fs.writeFileSync(gate, me, { flag: 'wx' }) } catch { return undefined }
+    try {
+      if (!stale(lock, staleMs) && fs.existsSync(lock)) return undefined
+      fs.rmSync(lock, { force: true })
+      if (!take()) return undefined
+    } finally { fs.rmSync(gate, { force: true }) }
   }
-  return () => fs.rmSync(lock, { force: true })
+  return () => { try { if (fs.readFileSync(lock, 'utf8') === me) fs.rmSync(lock) } catch { /* gone already */ } }
 }
 
 const nap = new Int32Array(new SharedArrayBuffer(4))

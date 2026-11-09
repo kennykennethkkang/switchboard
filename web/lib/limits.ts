@@ -1,5 +1,5 @@
 /** The header's 5h and weekly meters, merged across live chats. */
-import type { SessionLive } from './hub-types'
+import type { KeptLimits, LimitPause, SessionLive } from './hub-types'
 
 /** level: 'none' with no data, 'high' from 80%, 'out' from 100%, by the raw value. */
 export type Meter = { kind: string; label: string; percent?: number; level?: 'none' | 'high' | 'out'; reset?: string }
@@ -22,10 +22,30 @@ export function resetText(at: number, now = Date.now()): string {
   return `${d.toDateString() === new Date(now).toDateString() ? '' : `${DAYS[d.getDay()]} `}${time}`
 }
 
-/** Both windows, always. Per window: the latest reset window wins, then the highest % in it; a window whose reset has passed reads 0. */
-export function limitMeters(live: SessionLive[], now = Date.now()): Meter[] {
+/** "2h 5m", "12m", "under 1m" until at. */
+export function countdown(at: number, now = Date.now()): string {
+  const m = Math.ceil((at - now) / 60_000), h = Math.floor(m / 60)
+  return at - now < 60_000 ? 'under 1m' : h ? `${h}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`
+}
+
+/** "3 chats queued, resume at 11:51 PM (in 2h 5m)". */
+export function pauseLine(p: LimitPause, now = Date.now()): string {
+  const n = p.chats.length
+  return `Paused at ${p.percent}%: ${n} chat${n === 1 ? '' : 's'} queued${p.resumeAt ? `, resume at ${resetText(p.resumeAt, now)} (in ${countdown(p.resumeAt, now)})` : ''}`
+}
+
+/**
+ * Both windows, always. Per window: the latest reset window wins, then the highest % in it; a window whose reset has passed reads 0.
+ * kept (limits.json) fills a window no live chat reports, and a limit hit reads out until its reset.
+ */
+export function limitMeters(live: SessionLive[], now = Date.now(), kept?: KeptLimits): Meter[] {
+  const out = kept?.out && (kept.out.resetsAt ?? Infinity) > now ? kept.out : undefined
+  // The window the hit was on: one at 100%, else the 5h one.
+  const outKind = out && ([...live.flatMap(c => c.limits), ...kept!.windows].find(l => l.percentUsed >= 100)?.kind ?? 'five_hour')
   return KINDS.map(([kind, label]) => {
-    const all = live.flatMap(c => c.limits).filter(l => l.kind === kind).map(l => ({ pct: l.percentUsed, at: resetAt(l.resetsAt) }))
+    if (kind === outKind) return { kind, label, percent: 100, level: 'out' as const, reset: `Limit reached${out!.resetsAt ? `, resets ${resetText(out!.resetsAt, now)} (in ${countdown(out!.resetsAt, now)})` : ''}` }
+    const fed = live.flatMap(c => c.limits).filter(l => l.kind === kind)
+    const all = (fed.length ? fed : kept?.windows.filter(l => l.kind === kind) ?? []).map(l => ({ pct: l.percentUsed, at: resetAt(l.resetsAt) }))
     // Chats can disagree by seconds on one reset: anything within 5 min of the latest is the same window.
     const latest = Math.max(...all.map(l => l.at ?? -Infinity))
     const same = Number.isFinite(latest) ? all.filter(l => l.at !== undefined && l.at >= latest - 5 * 60_000) : all

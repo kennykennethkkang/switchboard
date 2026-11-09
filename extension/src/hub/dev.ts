@@ -14,8 +14,8 @@ import type { DevProject, Server } from './types'
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
 const SHIFT = 10000
-// The browser app (local.ts spawnApp) runs from the agent-flow folder; it is never that project's dev server.
-// Skipped by port, so a hand-run copy on another port shows as agent-flow's server; check the pid's args if that bites.
+// The browser app (local.ts spawnApp) runs from the switchboard folder; it is never that project's dev server.
+// Skipped by port, so a hand-run copy on another port shows as switchboard's server; check the pid's args if that bites.
 const APP_PORT = 3131
 
 /** `<pm> run dev` when package.json has a dev script; the lockfile names the package manager. */

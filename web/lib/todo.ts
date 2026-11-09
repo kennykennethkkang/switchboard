@@ -1,5 +1,5 @@
 // The to-do panel's pure parts.
-import type { ChatRow, TodoItem, TodoList } from './hub-types'
+import type { AiId, ArchivedChat, ChatRow, TodoItem, TodoList } from './hub-types'
 
 // Windows paths (a drive letter first): either slash, either case.
 const fold = (p: string) => (/^[a-z]:[\\/]/i.test(p) ? p.replace(/\\/g, '/').toLowerCase() : p)
@@ -63,3 +63,26 @@ export const runLanded = (todo: TodoItem[], ids: string[], was: Map<string, stri
 
 /** Finish up: Kenneth's own hand steps (why 'you'), from the tray, then accepted before. */
 export const finishUp = (list: TodoList) => [...list.suggested ?? [], ...list.todo].filter(t => t.why === 'you')
+
+const AI: Record<AiId, string> = { claude: 'Claude', codex: 'Codex', hermes: 'Hermes' }
+/** Which AI ran a chat: "Codex", or "Claude to Codex" when its handoff chain changed AI. Unknown chat: undefined. */
+export function aiPath(id: string | undefined, chats: ChatRow[], archive: ArchivedChat[] = []): string | undefined {
+  const live = chats.find(c => c.sessionId === id), gone = archive.find(a => a.sessionId === id)
+  if (!live && !gone) return undefined
+  const chain = live?.chain ?? gone?.origin
+  const steps = chain ? archive.filter(a => a.origin === chain).sort((a, b) => a.version - b.version).map(a => a.ai) : gone ? [gone.ai] : []
+  if (live) steps.push(live.ai ?? 'claude')
+  return steps.filter((ai, i) => ai !== steps[i - 1]).map(ai => AI[ai] ?? ai).join(' to ')
+}
+
+/** Top-level ids after moving id by step (-1 up, 1 down) or to a place (index). */
+export function moved(ids: string[], id: string, to: number): string[] {
+  const out = ids.filter(x => x !== id), at = Math.max(0, Math.min(out.length, to))
+  return ids.includes(id) ? [...out.slice(0, at), id, ...out.slice(at)] : ids
+}
+
+/** The project with the most open items and your steps, or undefined when every list is empty. */
+export const busiestTodo = (todos: Record<string, TodoList>) => {
+  const [best] = Object.entries(todos).map(([f, l]) => [f, openCount(l) + finishUp(l).length] as const).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
+  return best?.[0]
+}

@@ -15,7 +15,7 @@ export const coverage = (p: ChatProgress, i: number) => { const s = p.covered?.[
 export const missedCount = (p?: ChatProgress) => p?.covered?.length !== p?.asked?.length ? 0 : (p?.asked ?? []).filter((_, i) => coverage(p!, i) === 'missed').length
 /** Done, but a request went uncovered: teal, not the full green. Left items are future work in the to-do. */
 export const almostDone = (p?: ChatProgress) => p?.state === 'done' && missedCount(p) > 0
-export const ALMOST = { label: 'Almost done', color: 'var(--hub-teal)', soft: 'var(--hub-teal-soft)', key: 'teal' as Key }
+export const ALMOST = { label: 'Ready to approve', color: 'var(--hub-yellow)', soft: 'var(--hub-yellow-soft)', key: 'teal' as Key }
 /** The roles in plan order; the ring follows it. */
 export const ORDER = ['researcher', 'engineer', 'qa', 'designer', 'ops', 'growth']
 export const repoOf = (cwd: string) => cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd

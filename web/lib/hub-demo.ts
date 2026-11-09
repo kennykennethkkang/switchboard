@@ -4,6 +4,7 @@
  */
 import type { HubCommand } from './vscode-bridge'
 import { runIds } from './todo'
+import { projectName, splitVersion } from './archive'
 import type { ChangedFile, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, ToolCall } from './hub-types'
 import type { RunCall, RunDetail } from './runs'
 import type { ChatAnswer, ChatAsk, ChatMessage, ChatOutputs } from './chat-view'
@@ -15,7 +16,7 @@ export const emptyHub = (): HubState => ({
   projects: [],
   controls: {
     claude: { tui: 'default', statusLine: false, push: false, needInput: false },
-    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, name: '' },
+    switchboard: { hooks: false, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '' },
     statusLineReady: false,
   },
   chats: [], rcServers: [], ais: [], starred: [], progress: [], archive: [],
@@ -39,7 +40,19 @@ const DAY = 86_400_000
 const REREAD = [128.0, 0, 0, 428.2, 699.1, 1281.7, 1631.5, 685.5, 1751.8, 929.7, 1436.5, 229.7, 1306.3, 236.0]
 const CALLS = [185, 0, 0, 869, 1212, 2486, 2885, 1240, 3011, 1790, 2702, 401, 5698, 704]
 
+/** Opt-in board fx: ?demo=pause holds three chats (resume=<s> sets when they resume), ?demo=unlink ends the clash link after 6 s. */
+export function demoFx(search: string, now: number): { pause?: HubState['pause']; unlinkAt?: number } {
+  const q = new URLSearchParams(search), on = new Set((q.get('demo') ?? '').split(',')), resume = Number(q.get('resume')) || 83 * 60 + 4
+  return {
+    ...(on.has('pause') ? { pause: { kind: 'five_hour', percent: 96, resumeAt: now + resume * 1e3, chats: [{ sessionId: 'd-work' }, { sessionId: 'd-wrap' }, { sessionId: 'd-almost' }] } } : {}),
+    ...(on.has('unlink') ? { unlinkAt: now + 6e3 } : {}),
+  }
+}
+let unlinkAt: number | undefined
+
 export function demoHub(now = Date.now()): HubState {
+  const fx = demoFx(typeof location === 'undefined' ? '' : location.search, now)
+  unlinkAt = fx.unlinkAt
   const day = (i: number) => {
     const d = new Date(now - (13 - i) * DAY)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -48,8 +61,15 @@ export function demoHub(now = Date.now()): HubState {
     ...emptyHub(),
     controls: {
       claude: { model: 'opus', tui: 'fullscreen', statusLine: false, push: true, needInput: true },
-      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, name: '' },
+      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '' },
       statusLineReady: true,
+    },
+    uploads: {
+      Armasu: { count: 3, last: [
+        { name: 'login-bug.png', at: now - 20 * 60e3, size: '412 KB', chat: 'Fix login redirect v4' },
+        { name: 'outfit-copy.md', at: now - 2 * 3600e3, size: '6 KB', chat: 'Outfit picker copy' },
+      ] },
+      switchboard: { count: 1, last: [{ name: 'court-sketch.jpg', at: now - 26 * 3600e3, size: '1.2 MB', chat: 'Hub AIs and starred' }] },
     },
     projects: [
       { name: 'Armasu', path: '/Users/k/Documents/GitHub/Armasu', kind: 'repo', isOpen: true },
@@ -59,18 +79,18 @@ export function demoHub(now = Date.now()): HubState {
     ],
     // A browser has no window of its own, so no thisWindow; claude-mods has no window open and lands in Other.
     windows: [
-      { workspace: '/Users/k/GitHub/agent-flow', name: 'agent-flow', color: 'violet' },
+      { workspace: '/Users/k/GitHub/switchboard', name: 'switchboard', color: 'violet' },
       { workspace: '/Users/k/GitHub/Armasu', name: 'Armasu', color: 'amber' },
     ],
     chats: [
-      { pid: 1, sessionId: 'd-work', takes: true, name: 'Fix login redirect v4', chain: 'Fix login redirect', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
-      { pid: 2, sessionId: 'd-done', takes: true, name: 'Hub AIs and Starred', cwd: '/Users/k/GitHub/agent-flow', link: '', live: true, why: [] },
+      { pid: 1, sessionId: 'd-work', ai: 'codex', takes: true, name: 'Fix login redirect v4', chain: 'Fix login redirect', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
+      { pid: 2, sessionId: 'd-done', takes: true, name: 'Hub AIs and Starred', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
       { pid: 3, sessionId: 'd-ask', takes: true, name: 'Outfit picker copy', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
-      { pid: 6, sessionId: 'd-almost', takes: true, name: 'Finished receipt', cwd: '/Users/k/GitHub/agent-flow', link: '', live: true, why: [] },
-      { pid: 5, sessionId: 'd-wrap', takes: true, name: 'Accurate Done state', cwd: '/Users/k/GitHub/agent-flow', link: '', live: true, why: [] },
+      { pid: 6, sessionId: 'd-almost', takes: true, name: 'Finished receipt', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
+      { pid: 5, sessionId: 'd-wrap', takes: true, name: 'Accurate Done state', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
       { pid: 4, sessionId: 'd-idle', name: 'Kit cleanup', cwd: '/Users/k/GitHub/claude-mods', link: '', live: true, why: [] },
     ],
-    // Armasu has Jev set up with the AI-tell check off; agent-flow has none, so its card offers Set up Jev.
+    // Armasu has Jev set up with the AI-tell check off; switchboard has none, so its card offers Set up Jev.
     jevProjects: {
       '/Users/k/GitHub/Armasu': { project: 'armasu', jobs: { done: true, gate: true, tells: false, route: true }, costUsd: 0.00081, runs: [
         { job: 'gate', at: now - 2 * 60e3, items: 1, costUsd: 0.00002, result: 'ask' },
@@ -79,7 +99,8 @@ export function demoHub(now = Date.now()): HubState {
         { job: 'route', at: now - 70 * 60e3, items: 8, costUsd: 0.0002 },
       ] },
     },
-    // Several items, one prerequisite, one in progress, one from a finished chat, one whose chat ended; agent-flow's show as "in other projects".
+    mirofish: { simId: 'sim-demo-7', step: 'rounds', round: 7, rounds: 10, percent: 70, startedAt: new Date(now - 18 * 60e3).toISOString(), elapsedMs: 18 * 60e3, etaMs: Math.round(18 * 60e3 * 3 / 7), reportReady: false },
+    // Several items, one prerequisite, one in progress, one from a finished chat, one whose chat ended; switchboard's show as "in other projects".
     todos: {
       '/Users/k/GitHub/Armasu': { sync: { state: 'synced', canSync: true }, todo: [
         { id: 'dt1', text: 'Add CSV export to the receipts page', at: now - 3 * DAY },
@@ -94,13 +115,19 @@ export function demoHub(now = Date.now()): HubState {
         { id: 'ds2', text: 'Show tax lines on receipts once the API returns them', at: now - 40 * 60e3, from: 'd-done', why: 'blocked' },
         { id: 'ds3', text: 'Move receipts to the new PDF library', at: now - 2 * DAY, from: 'd-old', why: 'scope' },
       ] },
-      '/Users/k/GitHub/agent-flow': { sync: { state: 'local', why: 'public repo', canSync: true }, todo: [
+      '/Users/k/GitHub/switchboard': { sync: { state: 'local', why: 'public repo', canSync: true }, todo: [
         { id: 'da1', text: 'Rebuild the vsix and reload VS Code', at: now - 4 * 60e3, from: 'd-almost' },
       ], suggested: [
         { id: 'da2', text: 'Check the phone layout on a real device', at: now - 4 * 60e3, from: 'd-almost', why: 'you' },
         { id: 'da3', text: 'add dark mode to the settings page', at: now - 3 * 60e3, from: 'd-almost', why: 'missed' },
       ] },
     },
+    ...(fx.pause ? { pause: fx.pause } : {}),
+    // One link Kenneth made on the cards, one from an edit clash on the same file.
+    links: [
+      { from: 'd-ask', to: ['d-work'], reason: 'Kenneth linked these in Switchboard', auto: false, since: now - 6 * 60e3 },
+      { from: 'd-wrap', to: ['d-almost'], reason: '/Users/k/GitHub/switchboard/extension/src/hub/hub-service.ts', auto: true, since: now - 2 * 60e3 },
+    ],
     // The hung test run that started this check: a subagent's pnpm test, two hours on one core.
     stuck: [
       { id: 'job:d-wrap:t9', kind: 'job', sessionId: 'd-wrap', what: 'Subagent background job "Run the extension tests": no new output', since: now - 124 * 60e3, cpu: 98, rss: 1.4 * 1024 ** 3, pid: 48213, started: now - 131 * 60e3, command: 'pnpm test', last: 'Bash pnpm test' },
@@ -109,6 +136,7 @@ export function demoHub(now = Date.now()): HubState {
     progress: [
       { sessionId: 'd-work', cwd: '/Users/k/GitHub/Armasu', state: 'working', startedAt: now - 30 * 60e3, at: now,
         roles: [...demoRuns(11_000, now), JEV_ROLE],
+        helpers: [{ ai: 'perplexity', label: 'search', state: 'working', since: now - 90e3, last: now - 4e3, count: 3 }],
         // Timed so the estimate shows: 8 and 16 min done, 6 min into the third.
         tasks: [
           { id: '1', subject: 'Find where the redirect loops', status: 'completed', role: 'researcher', startedAt: now - 30 * 60e3, doneAt: now - 22 * 60e3 },
@@ -125,7 +153,7 @@ export function demoHub(now = Date.now()): HubState {
         ],
         tests: { command: 'npx tsx --test auth/*.test.ts', ok: false, at: now - 2 * 60e3, failed: 2, total: 538, first: 'redirects once after a Safari login',
           tail: ['ℹ tests 538', 'ℹ pass 536', 'ℹ fail 2', 'ℹ duration_ms 4210', '✖ failing tests:', '✖ redirects once after a Safari login (4.1ms)', '  AssertionError: expected 1 redirect, got 3', '✖ keeps the session cookie on refresh (2.7ms)'] } },
-      { sessionId: 'd-done', cwd: '/Users/k/GitHub/agent-flow', state: 'done', startedAt: now - 42 * 60e3, at: now - 60e3,
+      { sessionId: 'd-done', cwd: '/Users/k/GitHub/switchboard', state: 'done', startedAt: now - 42 * 60e3, at: now - 60e3,
         roles: (['researcher', 'engineer', 'qa'] as const).map((role, i) => ({ id: `${role[0]}1`, role, state: 'done' as const, startedAt: now - (40 - i * 10) * 60e3 })),
         tasks: [{ id: '1', subject: 'Types', status: 'completed' }, { id: '2', subject: 'AI registry', status: 'completed' }],
         commit: 'feat(hub): multi-AI chats and Starred chats\n\n- Codex chats beside Claude in one list\n- Star a chat and resume it later\n\nCo-Authored-By: Claude <noreply@anthropic.com>', finishedAt: now - 60e3, finishing: true,
@@ -137,7 +165,7 @@ export function demoHub(now = Date.now()): HubState {
           { tool: 'Bash', target: 'pnpm test', role: 'qa', at: now - 2 * 60e3 },
         ] },
       // Finished, but one request is not covered: almost done, in teal. Its Left items are in the to-do.
-      { sessionId: 'd-almost', cwd: '/Users/k/GitHub/agent-flow', state: 'done', startedAt: now - 70 * 60e3, at: now - 4 * 60e3,
+      { sessionId: 'd-almost', cwd: '/Users/k/GitHub/switchboard', state: 'done', startedAt: now - 70 * 60e3, at: now - 4 * 60e3,
         roles: (['researcher', 'engineer', 'qa', 'designer'] as const).map((role, i) => ({ id: `${role[0]}2`, role, state: 'done' as const, startedAt: now - (65 - i * 12) * 60e3 })),
         tasks: [{ id: '1', subject: 'Parse the standup', status: 'completed', role: 'engineer' }, { id: '2', subject: 'Receipt on the card', status: 'completed', role: 'designer' }, { id: '3', subject: 'QA pass', status: 'completed', role: 'qa' }],
         commit: 'Show what is left on a finished chat', finishedAt: now - 4 * 60e3, finishing: true,
@@ -145,7 +173,7 @@ export function demoHub(now = Date.now()): HubState {
         report: { done: ['Standup parsed from the last message', 'Almost done chip in teal', 'Receipt on the card and the picture'], left: ['Rebuild the vsix and reload VS Code', 'Check the phone layout on a real device'] },
         tools: [{ tool: 'Bash', target: 'npm test', role: 'qa', at: now - 5 * 60e3 }] },
       // The lead stopped with a commit block, but an engineer and a test run still go, so it is not finished.
-      { sessionId: 'd-wrap', cwd: '/Users/k/GitHub/agent-flow', state: 'working', waiting: true, finishing: true, startedAt: now - 25 * 60e3, at: now - 20e3,
+      { sessionId: 'd-wrap', cwd: '/Users/k/GitHub/switchboard', state: 'working', waiting: true, finishing: true, startedAt: now - 25 * 60e3, at: now - 20e3,
         // Three past engineer runs give the time left a range.
         roles: [{ id: 'r1', role: 'researcher', state: 'done', startedAt: now - 24 * 60e3, at: now - 20 * 60e3 },
           ...[[24, 12], [22, 8], [20, 10]].map(([from, len], i) => ({ id: `e0${i}`, role: 'engineer', state: 'done' as const, startedAt: now - from * 60e3, at: now - (from - len) * 60e3 })),
@@ -158,9 +186,12 @@ export function demoHub(now = Date.now()): HubState {
         ],
         commit: 'fix(hub): done only when nothing runs' },
       { sessionId: 'd-ask', cwd: '/Users/k/GitHub/Armasu', state: 'needs-you', startedAt: now - 5 * 60e3, at: now,
-        roles: [{ id: 'g1', role: 'designer', state: 'active', startedAt: now - 4 * 60e3 }],
-        tasks: [{ id: '1', subject: 'Draft the picker labels', status: 'completed', role: 'designer' }, { id: '2', subject: 'Pick the closet name', status: 'in_progress', role: 'designer' }, { id: '3', subject: 'Ship copy for review', status: 'pending', role: 'growth' }],
-        question: "Keep 'Closet' or rename it to 'Wardrobe'?" },
+        roles: [{ id: 'g1', role: 'designer', state: 'active', startedAt: now - 4 * 60e3 }, { id: 'g2', role: 'engineer-codex', state: 'active', startedAt: now - 2 * 60e3 }],
+        helpers: [{ ai: 'jev', label: 'score closet-names', state: 'done', since: now - 4 * 60e3, last: now - 3 * 60e3, count: 2 }],
+        tasks: [{ id: '1', subject: 'Draft the picker labels', status: 'completed', role: 'designer' }, { id: '4', subject: 'Wire the picker labels', status: 'in_progress', role: 'engineer-codex' }, { id: '2', subject: 'Pick the closet name', status: 'in_progress', role: 'designer' }, { id: '3', subject: 'Ship copy for review', status: 'pending', role: 'growth' }],
+        question: "Keep 'Closet' or rename it to 'Wardrobe'?",
+        ask: { id: 'toolu_demo_closet', kind: 'question', tool: 'AskUserQuestion', options: [],
+          questions: [{ header: 'Name', question: "Keep 'Closet' or rename it to 'Wardrobe'?", options: ['Keep Closet', 'Rename to Wardrobe', 'Use Wardrobe in the app, Closet in docs'], details: ['No changes; matches the docs', 'Renames labels, routes and copy', 'App says Wardrobe, docs keep Closet'] }] } },
       { sessionId: 'd-idle', cwd: '/Users/k/GitHub/claude-mods', state: 'idle', startedAt: now - 90 * 60e3, at: now - 30 * 60e3,
         roles: [], tasks: [{ id: '1', subject: 'Drop old presets', status: 'pending' }] },
     ],
@@ -169,7 +200,7 @@ export function demoHub(now = Date.now()): HubState {
       { id: 'codex', name: 'Codex', installed: false, detail: 'CLI not installed: npm i -g @openai/codex', chats: 0 },
     ],
     starred: [
-      { sessionId: 'd1b7e00d-d8c7-429e-a4b3-4420e8b32e67', ai: 'claude', name: 'agentFlow', cwd: '/Users/k/Documents/GitHub/agent-flow', starredAt: now - DAY, live: false,
+      { sessionId: 'd1b7e00d-d8c7-429e-a4b3-4420e8b32e67', ai: 'claude', name: 'boardChat', cwd: '/Users/k/Documents/GitHub/switchboard', starredAt: now - DAY, live: false,
         digest: { lastPrompt: 'add codex to the hub', resume: 'claude --resume d1b7e00d-d8c7-429e-a4b3-4420e8b32e67', updatedAt: now - 3600_000 } },
     ],
     // The working chat's three earlier chats, each closed when it filled up, and one older chain.
@@ -287,6 +318,9 @@ let listenAt = 0
 const DEMO_HEARD = 'what is running'
 
 export function demoTick(h: HubState, now: number): HubState {
+  if (h.pause?.resumeAt && now >= h.pause.resumeAt) h = { ...h, pause: undefined }
+  // Pure, since strict mode runs state updaters twice.
+  if (unlinkAt && now >= unlinkAt && h.links?.some(l => l.auto)) h = { ...h, links: h.links.filter(l => !l.auto) }
   if (h.voice === 'listening' && now - listenAt > 3500) h = { ...h, voice: null, heard: { text: DEMO_HEARD, at: now } }
   const i = Math.floor((now % 20_000) / (20_000 / 3)), role = ROLES[i]
   const pick = CALLS_BY_ROLE[role][Math.floor(now / 900) % 4]
@@ -378,6 +412,14 @@ const demoMerge = (now: number): Pick<RepoView, 'pr' | 'merge' | 'ci'> => {
 /** The browser demo has no extension behind it, so the Hub's own settings apply here. */
 export function demoApply(h: HubState, c: HubCommand): HubState {
   switch (c.type) {
+    // Like approveChat: an approved row in the archive; the card leaves the live list.
+    case 'hub-approve': {
+      const chat = h.chats.find(x => x.sessionId === c.sessionId), p = h.progress.find(x => x.sessionId === c.sessionId)
+      if (!chat || h.archive?.some(a => a.sessionId === c.sessionId)) return h
+      const { origin, version } = splitVersion(chat.name)
+      const row = { sessionId: chat.sessionId, ai: chat.ai ?? 'claude', name: chat.name ?? origin, origin, version, cwd: chat.cwd, project: projectName(chat), startedAt: p?.startedAt, archivedAt: Date.now(), approvedAt: Date.now(), ...(p?.commit ? { commit: p.commit } : {}) }
+      return { ...h, archive: [row, ...(h.archive ?? [])] }
+    }
     // A full chat always continues fresh, so only the branch switch applies.
     case 'hub-keep': return c.freshBranch === undefined ? h : { ...h, keep: { ...h.keep, freshBranch: c.freshBranch } }
     case 'hub-setting': {
@@ -421,6 +463,12 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     case 'hub-pick-tools': return h.tools ? { ...h, tools: { ...h.tools, pick: { goal: c.text, folder: c.path, profile: demoPick(h, c.text) } } } : h
     case 'hub-chat-tools': return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.tools } } } : h
     case 'hub-focus-chat': return h
+    case 'hub-terminal': return h
+    case 'hub-summary': {
+      const name = h.chats.find(x => x.sessionId === c.sessionId)?.name ?? 'This chat'
+      const text = `Demo: ${name} is a Switchboard demo chat. It has worked through its first tasks and is waiting on the last one. A real summary comes from one short Haiku call on the transcript.`
+      return { ...h, summaries: { ...h.summaries, [c.sessionId]: { text, at: Date.now() } } }
+    }
     case 'hub-changes': {
       const cwd = h.chats.find(x => x.sessionId === c.sessionId)?.cwd ?? ''
       return { ...h, changes: { sessionId: c.sessionId, cwd, files: CHANGES[c.sessionId] ?? [], at: Date.now() }, repo: demoRepo(h, c.sessionId) }
@@ -430,6 +478,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const done = (text: string, patch: Partial<RepoView> = {}) => ({ ...h, repo: { ...r, ...patch, result: { text: `Demo: ${text}`, ok: true, at: Date.now() } } })
       if (c.op === 'commit') return done(`committed ${c.files?.length ?? 0} files to ${r.branch}`, { files: r.files.filter(f => !c.files?.includes(f.path)), ahead: r.ahead + 1, sync: { kind: 'push', label: `Push ${r.ahead + 1}` } })
       if (c.op === 'ship') return done(`committed ${r.files.length} files and pushed to ${r.upstream}`, { files: [], ship: { files: [], kept: [] }, ahead: 0, outgoing: [], lanes: r.lanes && { ...r.lanes, commits: [] }, sync: { kind: 'fetch', label: 'Fetch' } })
+      if (c.op === 'push') return done(r.ahead ? `pushed ${r.ahead} commits to ${r.upstream}` : 'nothing to send', { ahead: 0, outgoing: [], sync: { kind: 'fetch', label: 'Fetch' } })
       if (c.op === 'sync') return done(`pushed ${r.ahead} commits to ${r.upstream}`, { ahead: 0, sync: { kind: 'fetch', label: 'Fetch' } })
       if (c.op === 'rerun' && r.ci) return done(`re-running the failed jobs in ${r.ci.workflow}`, { ci: { ...r.ci, status: 'in_progress', conclusion: undefined, jobs: r.ci.jobs.map(j => j.conclusion === 'success' ? j : { name: j.name, status: 'queued' }) } })
       return done(`git ${c.op} would run here`)
@@ -544,6 +593,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     case 'hub-todo-restore':
     case 'hub-todo-accept':
     case 'hub-todo-dismiss':
+    case 'hub-todo-move':
     case 'hub-todo-run': {
       // Like the extension, the first item for a project with no list starts one.
       const list = h.todos?.[c.path] ?? (c.type === 'hub-todo-add' ? { todo: [] } : undefined)
@@ -551,6 +601,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const set = (l: typeof list) => ({ ...h, todos: { ...h.todos, [c.path]: l } })
       const now = Date.now(), id = `dt-${now.toString(36)}`
       if (c.type === 'hub-todo-add') return c.text.trim() ? set({ ...list, todo: [...list.todo, { id, text: c.text.trim(), at: now }] }) : h
+      if (c.type === 'hub-todo-move') { const at = new Map(c.ids.map((id, i) => [id, i])); return set({ ...list, todo: list.todo.map((t, i) => ({ t, k: at.get(t.id) ?? c.ids.length + i })).sort((x, y) => x.k - y.k).map(x => x.t) }) }
       if (c.type === 'hub-todo-edit') return set({ ...list, todo: list.todo.map(t => (t.id === c.id ? { ...t, text: c.text.trim() || t.text, at: now } : t)) })
       if (c.type === 'hub-todo-remove') {
         const t = list.todo.find(x => x.id === c.id) ?? list.suggested?.find(x => x.id === c.id)
@@ -580,7 +631,10 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     case 'hub-awake': return { ...h, awake: c.on }
     // The demo has no processes: Stop and Dismiss both take the item off.
     case 'hub-stuck-stop':
-    case 'hub-stuck-dismiss': return { ...h, stuck: h.stuck?.filter(i => i.id !== c.id) }
+    case 'hub-stuck-dismiss':
+    case 'hub-stuck-fix': return { ...h, stuck: h.stuck?.filter(i => i.id !== c.id) }
+    case 'hub-wait-for': return { ...h, links: [...(h.links ?? []).filter(l => l.from !== c.from || l.to.join() !== c.to), { from: c.from, to: [c.to], reason: 'Kenneth linked these in Switchboard', auto: false, since: Date.now() }] }
+    case 'hub-unlink': return { ...h, links: h.links?.flatMap(l => { const to = l.from === c.from ? l.to.filter(t => t !== c.to) : l.to; return to.length ? [{ ...l, to }] : [] }) }
     case 'hub-rc-server': return { ...h, rcServers: h.rcServers.map(r => (r.folder === c.folder ? { ...r, on: c.on } : r)) }
     default: return h
   }
@@ -642,7 +696,7 @@ function demoLead(p: ChatProgress, now: number): RunDetail {
   }
 }
 
-const DEMO_SHOT = '/Users/k/GitHub/agent-flow/.playwright-mcp/hub-1440.png'
+const DEMO_SHOT = '/Users/k/GitHub/switchboard/.playwright-mcp/hub-1440.png'
 // A small drawn page, so the demo shows an image without shipping one.
 const SHOT_SVG = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" fill="#0d0d0d"/><rect x="0" y="0" width="640" height="40" fill="#121212"/><circle cx="24" cy="20" r="6" fill="#59d499"/><rect x="40" y="14" width="120" height="12" rx="6" fill="#434345"/><rect x="16" y="56" width="180" height="328" rx="8" fill="#101111" stroke="#242728"/><rect x="28" y="72" width="156" height="44" rx="6" fill="#121212" stroke="#242728"/><rect x="28" y="124" width="156" height="44" rx="6" fill="#121212" stroke="#242728"/><rect x="212" y="56" width="412" height="328" rx="8" fill="#101111" stroke="#242728"/><rect x="232" y="80" width="200" height="14" rx="7" fill="#f4f4f6"/><rect x="232" y="108" width="360" height="10" rx="5" fill="#434345"/><rect x="232" y="128" width="300" height="10" rx="5" fill="#434345"/><rect x="232" y="168" width="96" height="28" rx="14" fill="#ffffff"/></svg>')}`
 const DEMO_LINES: ChatMessage[] = [
@@ -694,7 +748,7 @@ export function demoChat(h: HubState, session: string, what: 'outputs' | 'transc
     ],
     tests: [{ command: 'pnpm test', ok: false, failed: 1, total: 538, first: 'ais.test.ts lists both AIs' }, { command: 'pnpm run lint && pnpm test', ok: true, total: 538 }],
     errors: [{ tool: 'Bash', text: 'Exit code 1\n1 failing: ais.test.ts lists both AIs' }],
-    files: ['/Users/k/GitHub/agent-flow/extension/src/hub/ais.ts', '/Users/k/GitHub/agent-flow/extension/src/hub/starred.ts', '/Users/k/GitHub/agent-flow/extension/src/hub/types.ts'],
+    files: ['/Users/k/GitHub/switchboard/extension/src/hub/ais.ts', '/Users/k/GitHub/switchboard/extension/src/hub/starred.ts', '/Users/k/GitHub/switchboard/extension/src/hub/types.ts'],
     shots: [DEMO_SHOT],
   }
   return { outputs }

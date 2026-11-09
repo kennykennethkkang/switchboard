@@ -7,7 +7,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { upperDrive } from '../fs-utils'
-import type { Project } from './types'
+import type { AiId, Project } from './types'
 
 // Cached for the window's life, so a folder git-inited later keeps its old name until reload.
 const tops = new Map<string, string | undefined>()
@@ -24,7 +24,7 @@ export function repoTop(cwd: string): string | undefined {
   return top
 }
 
-/** A chat's project: its repo's name, so agent-flow/extension reads agent-flow; else the folder's last part. */
+/** A chat's project: its repo's name, so switchboard/extension reads switchboard; else the folder's last part. */
 export const projectName = (cwd: string) => path.basename(repoTop(cwd) ?? cwd) || cwd
 
 export function mergeProjects(repos: string[], claudeDirs: string[], open?: string): Project[] {
@@ -74,6 +74,14 @@ export function cloneTarget(input: string): { url: string; name: string } | unde
 
 // Quoted for the shell, so git judges the rest of the name itself; only a flag, an empty name or whitespace is refused here.
 const BRANCH = /^(?!-)[^\s\x00-\x1f]+$/
+
+/** Settings, Ask before actions: on brings the CLI's own approval prompts back for new and resumed chats. hub-panel sets it. */
+export const ask = { claude: false, codex: false }
+
+// Like Claude chats in bypassPermissions: no approval prompt and no sandbox; resume takes the flags after its name.
+// Codex runs a hooks.json hook only with a trust hash it computes itself, so ours (hooks-config.ts) need the trust bypass even when asking.
+const codexFlags = () => [...(ask.codex ? [] : ['--dangerously-bypass-approvals-and-sandbox']), '--dangerously-bypass-hook-trust']
+export const codexArgs = (args: string[]) => args[0] === 'resume' ? ['resume', ...codexFlags(), ...args.slice(1)] : [...codexFlags(), ...args]
 
 /**
  * `claude` with the first message, Remote Control under a name (the flag takes an
@@ -165,6 +173,21 @@ const stamp = (now: number) => new Date(now).toISOString().slice(0, 16)
 /** `YYYY-MM-DD-HHMM-<project>-<label>-<id8>.md`, UTC, the name usage-meter gives its notes. */
 export const handoffFile = (project: string, label: string, sessionId: string, now = Date.now()) =>
   `${stamp(now).replace('T', '-').replace(':', '')}-${slug(project)}-${slug(label)}-${sessionId.slice(0, 8)}.md`
+
+const AI_NAME: Record<AiId, string> = { claude: 'Claude', codex: 'Codex', hermes: 'Hermes' }
+const EDITS = /^(Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/
+
+/** The first message of a chat handed to the other AI: goal, last summary, files touched. */
+export function crossNote(o: { from: AiId; project: string; cwd: string; asked?: string[]; done?: string[]; tools?: { tool: string; target?: string }[] }): string {
+  const files = [...new Set((o.tools ?? []).filter(t => EDITS.test(t.tool) && t.target).map(t => t.target!))].slice(-20)
+  return [
+    `Handoff from ${AI_NAME[o.from]} in ${o.project} (${o.cwd}).`, '',
+    `Goal: ${o.asked?.at(-1)?.slice(0, 500) ?? '(not recorded)'}`, '',
+    'Last summary:', ...(o.done?.length ? o.done.map(d => `- ${d}`) : ['(none)']), '',
+    `Files touched: ${files.join(', ') || '(none recorded)'}`, '',
+    'Read the repo state, check the work so far, then carry on.',
+  ].join('\n')
+}
 
 /** The note Switchboard writes for a full Codex chat, which has no usage mod to write one. */
 export function codexNote(o: { project: string; cwd: string; branch: string; plan?: string; prompt?: string }, now = Date.now()): string {

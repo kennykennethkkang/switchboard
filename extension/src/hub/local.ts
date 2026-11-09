@@ -3,6 +3,7 @@
  * installed plugins and skills, and connections. The parsers are pure
  * (tested); the readers run a command or read a file and never throw.
  */
+import { isTempDir } from './temp'
 import { execFile, spawn } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -537,7 +538,29 @@ export async function pluginMcp(claude = CLAUDE): Promise<Connection[]> {
   return out
 }
 
-export async function installed(claude = CLAUDE): Promise<Installed[]> {
+/** Skill name to where it came from, per kit/setup.json: switchboard for Kenneth's own, the author for a bundled third-party one, owner/repo for a fetched one. Beside dist/ in the VSIX, two up from src/hub in tests. */
+// Third-party skills shipped in "own": their author, not switchboard. Keep in step with NOTICE.
+const OWN_AUTHORS: Record<string, string> = Object.fromEntries([
+  ...['accessibility', 'click-path-audit', 'e2e-testing'].map(n => [n, 'ECC (Affaan Mustafa)']),
+  ...['accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations'].map(n => [n, 'Dylan Tarre']),
+])
+
+function kitSources(): Record<string, string> {
+  for (const f of [path.join(__dirname, '..', 'kit', 'setup.json'), path.join(__dirname, '..', '..', 'kit', 'setup.json')]) {
+    try {
+      const k = JSON.parse(fs.readFileSync(f, 'utf8')) as { own?: string[]; skills?: { repo: string; names: string[] }[]; tools?: { skill?: { repo: string; name: string } }[] }
+      return Object.fromEntries([
+        ...(k.own ?? []).map(n => [n, OWN_AUTHORS[n] ?? 'switchboard']),
+        ...(k.skills ?? []).flatMap(r => r.names.map(n => [n, r.repo])),
+        ...(k.tools ?? []).flatMap(t => t.skill ? [[t.skill.name, t.skill.repo]] : []),
+      ])
+    } catch { /* next */ }
+  }
+  return {}
+}
+
+/** sources: skill name to its source label; the rest are the user's. */
+export async function installed(claude = CLAUDE, sources = kitSources()): Promise<Installed[]> {
   const out: Installed[] = []
   for (const p of await plugins(claude)) {
     const skills = p.dir ? await pluginNames(p.dir, p.manifest) : []
@@ -549,7 +572,7 @@ export async function installed(claude = CLAUDE): Promise<Installed[]> {
     for (const name of await list(dir)) {
       if (name.startsWith('.') || !fs.existsSync(path.join(claude, dir, name, 'SKILL.md'))) continue
       const description = enabled ? await skillDescription(path.join(claude, dir, name)) : undefined
-      out.push({ kind: 'skill', name, enabled, ...(description ? { description } : {}) })
+      out.push({ kind: 'skill', name, enabled, source: sources[name] ?? 'user', ...(description ? { description } : {}) })
     }
   }
   for (const f of await list('agents')) {
@@ -668,7 +691,7 @@ export async function projectFolders(repoRoots: string[]): Promise<{ repos: stri
   const global = await readJson(path.join(HOME, '.claude.json'))
   // Scratch and temp folders are where chats ran, not projects to come back to.
   const claude = Object.keys((global?.projects ?? {}) as object)
-    .filter(p => p !== HOME && !/[\\/](tmp|private[\\/]tmp|var[\\/]folders)[\\/]/.test(p) && fs.existsSync(p))
+    .filter(p => p !== HOME && !isTempDir(p) && fs.existsSync(p))
   return { repos, claude }
 }
 

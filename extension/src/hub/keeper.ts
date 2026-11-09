@@ -7,6 +7,14 @@ import { copyChanged } from './questions'
 
 export const KEEPER_LABEL = 'com.kenneth.switchboard.app'
 const SCRIPT = 'app-keeper.mjs'
+const DIR = path.join(os.homedir(), '.claude', 'switchboard')
+
+/** Settings, Keep Switchboard app running: off leaves app.nokeep for the keeper, which then starts nothing. */
+export function keepApp(on: boolean, dir = DIR): void {
+  const f = path.join(dir, 'app.nokeep')
+  if (on) fs.rmSync(f, { force: true })
+  else { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f, '') }
+}
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const read = (f: string) => { try { return fs.readFileSync(f, 'utf8') } catch { return undefined } }

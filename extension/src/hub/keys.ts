@@ -1,5 +1,5 @@
 /**
- * API keys for the gemini and Jev skills. The key lives in the macOS Keychain (service switchboard,
+ * API keys for the gemini and Jev skills, the Perplexity MCP and project .env setup (Zep). The key lives in the macOS Keychain (service switchboard,
  * account = the env var name), elsewhere in a 0600 file under ~/.claude/switchboard/keys/.
  * keys.json next to it holds only the last four and the last test, which is all the UI ever gets.
  */
@@ -10,13 +10,15 @@ import * as path from 'path'
 import { writeJsonAtomic } from '../hook-entries'
 import type { ApiKey, ApiKeyName } from './types'
 
-export const KEY_NAMES: ApiKeyName[] = ['GEMINI_API_KEY', 'OPENROUTER_API_KEY']
+export const KEY_NAMES: ApiKeyName[] = ['GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'PERPLEXITY_API_KEY', 'ZEP_API_KEY']
 const SB = path.join(os.homedir(), '.claude', 'switchboard')
 export const KEYS_META = path.join(SB, 'keys.json')
 const SERVICE = 'switchboard'
-// Both providers' keys are letters, digits, '.', - and _; anything else is a paste gone wrong.
+// Every provider's keys are letters, digits, '.', - and _; anything else is a paste gone wrong.
 // security keeps only the first 128 chars from stdin.
 const SHAPE = /^[A-Za-z0-9._-]{16,128}$/
+// Zep keys are JWT-like and run past 128.
+const LONG_SHAPE = /^[A-Za-z0-9._-]{16,512}$/
 
 export type Run = (cmd: string, args: string[], input?: string) => { code: number; out: string }
 const spawn: Run = (cmd, args, input) => {
@@ -36,7 +38,13 @@ export function keyStore(o: { platform?: NodeJS.Platform; run?: Run; dir?: strin
         return r.code === 0 && r.out.trim() ? r.out.trim() : undefined
       },
       // -w last with no value: security asks for it twice on stdin, so it never shows in ps.
-      set: (n, v) => { if (run('security', ['add-generic-password', '-U', ...who(n), '-w'], `${v}\n${v}\n`).code !== 0) throw new Error('the Keychain did not save it') },
+      // Past 128 chars that prompt truncates, so long keys go as a security -i command line, still on stdin.
+      set: (n, v) => {
+        const r = v.length > 128
+          ? run('security', ['-i'], `add-generic-password -U ${who(n).join(' ')} -w "${v}"\n`)
+          : run('security', ['add-generic-password', '-U', ...who(n), '-w'], `${v}\n${v}\n`)
+        if (r.code !== 0) throw new Error('the Keychain did not save it')
+      },
       remove: n => { run('security', ['delete-generic-password', ...who(n)]) },
     }
   }
@@ -58,7 +66,8 @@ export const isKeyName = (n: unknown): n is ApiKeyName => KEY_NAMES.includes(n a
 
 export function keyProblem(name: string, value: string): string | undefined {
   if (!isKeyName(name)) return 'no such key'
-  if (!SHAPE.test(value)) return "that does not look like an API key (16 to 128 characters: letters, digits, '.', '-' or '_')"
+  const long = name === 'ZEP_API_KEY'
+  if (!(long ? LONG_SHAPE : SHAPE).test(value)) return `that does not look like an API key (16 to ${long ? 512 : 128} characters: letters, digits, '.', '-' or '_')`
   return undefined
 }
 
@@ -125,7 +134,8 @@ export function reconcileKeys(store: KeyStore, file = KEYS_META): void {
 export async function testKey(name: ApiKeyName, key: string, get: typeof fetch = fetch, now = Date.now()): Promise<NonNullable<ApiKey['checked']>> {
   const [url, headers]: [string, Record<string, string>] = name === 'GEMINI_API_KEY'
     ? ['https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', { 'x-goog-api-key': key }]
-    : ['https://openrouter.ai/api/v1/key', { Authorization: `Bearer ${key}` }]
+    : name === 'ZEP_API_KEY' ? ['https://api.getzep.com/api/v2/projects/info', { Authorization: `Api-Key ${key}` }]
+    : [name === 'PERPLEXITY_API_KEY' ? 'https://api.perplexity.ai/v1/models' : 'https://openrouter.ai/api/v1/key', { Authorization: `Bearer ${key}` }]
   try {
     const r = await get(url, { headers, signal: AbortSignal.timeout(10_000) })
     if (r.ok) return { ok: true, at: now }

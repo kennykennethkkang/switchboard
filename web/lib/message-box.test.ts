@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { boxNote, sendFailure } from './message-box'
+import { boxNote, sendFailure, withKeywords } from './message-box'
 import type { ChatRow } from './hub-types'
 
 const row = (extra: Partial<ChatRow>): ChatRow => ({ pid: 1, sessionId: 's1', cwd: '/w', link: '', live: true, why: [], ...extra })
@@ -31,5 +31,18 @@ describe('send failure', () => {
     assert.equal(sendFailure(a, null), undefined)
     assert.equal(sendFailure(undefined, { text: 'send failed: x', at: 1, for: a }), undefined)
     assert.equal(sendFailure(a, { text: 'star failed: x', at: 1 }), undefined)
+  })
+})
+
+describe('thinking keywords', () => {
+  it('adds the toggled keywords to this send only, after the text', () => {
+    assert.equal(withKeywords('fix it', { ultrathink: true, ultracode: false }), 'fix it ultrathink')
+    assert.equal(withKeywords('fix it', { ultrathink: true, ultracode: true }), 'fix it ultrathink ultracode')
+    assert.equal(withKeywords('fix it', { ultrathink: false, ultracode: false }), 'fix it')
+  })
+
+  it('leaves an empty message empty, and a typed keyword as typed', () => {
+    assert.equal(withKeywords('', { ultrathink: true, ultracode: true }), '')
+    assert.equal(withKeywords('ultrathink this', { ultrathink: false, ultracode: false }), 'ultrathink this')
   })
 })

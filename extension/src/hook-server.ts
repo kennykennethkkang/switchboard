@@ -11,7 +11,7 @@ import { summarizeInput, summarizeResult, extractFilePath, buildDiscovery } from
 import { estimateTokenCost } from './token-estimator'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
-import { handleHubRequest, handleUpload, tokenHeader, type HubReply } from './hub/routes'
+import { handleHubRequest, handleUpload, handleVoice, tokenHeader, type HubReply } from './hub/routes'
 import { EDIT_TOOLS, editGuard, noteEdit } from './hub/brain'
 
 const log = createLogger('HookServer')
@@ -28,6 +28,9 @@ const log = createLogger('HookServer')
 /** Port 0 = let OS assign a random available port */
 
 interface HookPayload {
+  role_run?: string
+  /** The Claude chat whose Bash started the role run (its CLAUDE_CODE_SESSION_ID). */
+  role_parent?: string
   session_id: string
   transcript_path?: string
   cwd?: string
@@ -49,11 +52,23 @@ interface HookPayload {
   [key: string]: unknown
 }
 
-/** The file an edit tool call writes, when it has a cwd to resolve against. */
-function editedFile(p: HookPayload): string | undefined {
+const PATCH_FILE = /^\*\*\* (?:(?:Update|Add|Delete) File|Move to):\s*(.+?)\s*$/gm
+
+/** The files an edit tool call writes, when it has a cwd to resolve against. Codex's apply_patch names them in the patch text. */
+function editedFiles(p: HookPayload): string[] {
+  if (!p.cwd) return []
+  const input: unknown = p.tool_input
+  if (p.tool_name === 'apply_patch') {
+    const text = typeof input === 'string' ? input : Object.values(p.tool_input ?? {}).filter(v => typeof v === 'string').join('\n')
+    return [...new Set([...text.matchAll(PATCH_FILE)].map(m => m[1]))]
+  }
   const file = p.tool_input?.file_path ?? p.tool_input?.notebook_path
-  return p.cwd && EDIT_TOOLS.has(p.tool_name ?? '') && typeof file === 'string' && file ? file : undefined
+  return EDIT_TOOLS.has(p.tool_name ?? '') && typeof file === 'string' && file ? [file] : []
 }
+
+// ponytail: no parent id (Bash outside Claude Code) leaves the run's own id, which has no progress row, so it is never warned.
+/** Whose edit this is: a role run's edits belong to the chat that started it. */
+const editor = (p: HookPayload) => (p.role_run && p.role_parent) || p.session_id
 
 export class HookServer implements vscode.Disposable {
   private server: http.Server | null = null
@@ -93,6 +108,13 @@ export class HookServer implements vscode.Disposable {
           })
           return
         }
+        if (req.method === 'POST' && (req.url === '/hub/voice' || req.url?.startsWith('/hub/voice?'))) {
+          void handleVoice(hub, req.url, req.headers['content-type'], req, tokenHeader(req.headers)).then(r => {
+            res.writeHead(r.status, { 'Content-Type': r.contentType ?? 'text/plain; charset=utf-8' })
+            res.end(r.body, () => { if (!req.readableEnded) req.destroy() })
+          }, () => { res.writeHead(500).end() })
+          return
+        }
         if (req.url === '/hub' || req.url?.startsWith('/hub/') || req.url?.startsWith('/hub?')) {
           this.serveHub(req, res)
           return
@@ -127,8 +149,11 @@ export class HookServer implements vscode.Disposable {
                   log.warn('Invalid hook payload: missing session_id or hook_event_name')
                 } else {
                   const mirror = req.headers['x-switchboard-mirror'] === '1'
-                  if (!mirror) reply = this.guard(parsed as HookPayload)
-                  this.handleHook(parsed as HookPayload, mirror)
+                  const p = parsed as HookPayload
+                  if (!mirror) reply = this.guard(p)
+                  if (p.hook_event_name === 'PostToolUse') for (const f of editedFiles(p)) noteEdit(this.edits, editor(p), p.cwd!, f)
+                  // A role run is a subagent of a chat, not a chat.
+                  if (!(parsed as HookPayload).role_run) this.handleHook(parsed as HookPayload, mirror)
                 }
               } catch (e) {
                 log.error('Failed to parse payload:', e)
@@ -189,9 +214,9 @@ export class HookServer implements vscode.Disposable {
 
   /** A PreToolUse deny for an edit that would land on another open chat's fresh edit, else ''. */
   private guard(payload: HookPayload): string {
-    const file = editedFile(payload)
-    if (payload.hook_event_name !== 'PreToolUse' || !file) return ''
-    const why = editGuard(hub.get(), this.edits, this.tried, payload.session_id, payload.cwd!, file)
+    if (payload.hook_event_name !== 'PreToolUse') return ''
+    let why: string | undefined
+    for (const f of editedFiles(payload)) if ((why = editGuard(hub.get(), this.edits, this.tried, editor(payload), payload.cwd!, f, Date.now(), !!payload.role_run))) break
     return why ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: why } }) : ''
   }
 
@@ -215,8 +240,6 @@ export class HookServer implements vscode.Disposable {
 
   private handleHook(payload: HookPayload, mirror = false): void {
     this._onRaw.fire({ payload: payload as unknown as Record<string, unknown>, mirror })
-    const file = editedFile(payload)
-    if (payload.hook_event_name === 'PostToolUse' && file) noteEdit(this.edits, payload.session_id, payload.cwd!, file)
     // A mirror feeds only the hub's progress; the owning window draws and notifies.
     if (mirror) return
     const eventName = payload.hook_event_name

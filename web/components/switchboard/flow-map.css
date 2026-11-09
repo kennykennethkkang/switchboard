@@ -1,0 +1,126 @@
+/* Flow map: full-screen dialog on the hub tokens, so it follows the theme. */
+.fm { --fm-folder: var(--hub-blue); --fm-file: var(--hub-mute); --fm-chat: var(--hub-yellow); --fm-skill: var(--hub-green); --fm-plugin: var(--hub-violet); --fm-mod: var(--hub-red); --fm-role: var(--hub-teal);
+  position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+  background: var(--hub-canvas); color: var(--hub-body); font: 400 14px/1.5 var(--hub-sans); overflow: hidden; }
+.fm::backdrop { background: var(--hub-canvas); }
+.fm[open] { display: grid; grid-template: auto minmax(0, 1fr) / minmax(0, 1fr); }
+.fm[open][data-picked] { grid-template-columns: minmax(0, 1fr) 360px; }
+.fm-bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-surface); }
+.fm-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin-right: auto; }
+.fm-title h2 { margin: 0; font: 600 16px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.fm-title p { margin: 0; color: var(--hub-mute); font-size: 13px; }
+.fm-title select { font: 400 13px/1.2 var(--hub-sans); color: var(--hub-body); background: var(--hub-elev); border: 1px solid var(--hub-hair); border-radius: 6px; padding: 5px 8px; }
+.fm-mode { display: flex; gap: 3px; padding: 3px; border-radius: 10px; border: 1px solid var(--hub-hair); background: var(--hub-canvas); }
+.fm-mode button { font: 500 13px/1 var(--hub-sans); padding: 7px 12px; border: 0; border-radius: 6px; background: none; color: var(--hub-mute); cursor: pointer; }
+.fm-mode button[aria-pressed='true'] { background: var(--hub-elev); color: var(--hub-ink); box-shadow: inset 0 0 0 1px var(--hub-hair); }
+.fm button:focus-visible, .fm select:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
+.fm-find { position: relative; width: min(280px, 32vw); }
+.fm-find svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--hub-ash); pointer-events: none; }
+.fm-find input { width: 100%; box-sizing: border-box; font: 400 14px/1.2 var(--hub-sans); padding: 8px 10px 8px 30px; border-radius: 8px; border: 1px solid var(--hub-hair); background: var(--hub-elev); color: var(--hub-ink); }
+.fm-find input::placeholder { color: var(--hub-ash); }
+.fm-find input:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
+
+.fm-main { position: relative; min-height: 0; min-width: 0; }
+.fm-note { margin: 0; padding: 48px 24px; text-align: center; color: var(--hub-mute); }
+.fm-foot { position: absolute; left: 12px; bottom: 8px; margin: 0; font-size: 12px; color: var(--hub-ash); pointer-events: none; font-variant-numeric: tabular-nums; }
+
+.fm-flow { position: absolute; inset: 0; }
+.fm .react-flow { --xy-background-color: var(--hub-canvas); --xy-edge-stroke: var(--hub-hair-strong); --xy-controls-button-background-color: var(--hub-surface); --xy-controls-button-background-color-hover: var(--hub-elev); --xy-controls-button-color: var(--hub-body); --xy-controls-button-color-hover: var(--hub-ink); --xy-controls-button-border-color: var(--hub-hair); }
+.fm .react-flow__controls { right: 12px; left: auto; bottom: 12px; margin: 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--hub-hair); box-shadow: none; }
+.fm .react-flow__attribution { --xy-attribution-background-color: transparent; margin: 4px 8px; padding: 0; font: 10px var(--hub-sans); opacity: 0.6; }
+.fm .react-flow__attribution a { color: var(--hub-ash); }
+.fm .react-flow__handle { opacity: 0; width: 1px; height: 1px; min-width: 0; min-height: 0; border: 0; pointer-events: none; }
+.fm .react-flow__node { transition: opacity 180ms var(--hub-ease-out); }
+.fm .react-flow__edge { transition: opacity 180ms var(--hub-ease-out); }
+.fm .react-flow__edge-textwrapper { display: none; }
+.fm .react-flow__edge-text { fill: var(--hub-ink); font: 600 10px var(--hub-sans); }
+.fm .react-flow__edge-textbg { fill: var(--hub-surface); }
+.fm-edge .react-flow__edge-path { stroke-width: 1.25; stroke-opacity: 0.5; transition: stroke-width 180ms var(--hub-ease-out), stroke-opacity 180ms var(--hub-ease-out); }
+.fm-edge.import .react-flow__edge-path { stroke: var(--hub-mute); stroke-opacity: 0.45; }
+.fm-edge.used .react-flow__edge-path { stroke: var(--fm-plugin); stroke-opacity: 0.35; stroke-dasharray: 4 3; }
+.fm-edge.touched .react-flow__edge-path { stroke: var(--fm-chat); }
+/* A big map would be a hairball at rest: lines stay faint until a part is focused. */
+.fm-flow[data-dense] .fm-edge .react-flow__edge-path { stroke-opacity: 0.12; }
+/* Focus: everything but the focused part and its neighbours fades; the style tag lights those back up. */
+.fm-flow[data-focus] .react-flow__node:not(.fm-lane-n) { opacity: 0.14; }
+.fm-flow[data-focus] .react-flow__edge { opacity: 0.03; }
+@keyframes fm-march { to { stroke-dashoffset: -14; } }
+
+.fm-lane { display: flex; align-items: baseline; gap: 8px; width: max-content; font: 500 12px/1 var(--hub-sans); letter-spacing: 0.4px; color: var(--hub-mute); white-space: nowrap; }
+.fm-lane b { font-weight: 400; color: var(--hub-ash); font-variant-numeric: tabular-nums; }
+.fm .react-flow__node.fm-lane-n { pointer-events: none; }
+
+.fm-node { all: unset; display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: 216px; height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-body); cursor: pointer; transition: border-color 140ms var(--hub-ease-out), background-color 140ms var(--hub-ease-out); }
+.fm-node:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+.fm-node[data-hit] { border-color: var(--hub-yellow); background: var(--hub-yellow-soft); }
+.fm-node > span { display: grid; min-width: 0; line-height: 1.25; }
+.fm-node b { font: 500 13px/1.25 var(--hub-sans); color: var(--hub-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fm-node small { font-size: 11px; color: var(--hub-mute); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+@media (hover: hover) and (pointer: fine) { .fm-node:hover { border-color: var(--hub-hair-strong); background: var(--hub-elev); } }
+.fm-node:active { transform: scale(0.98); }
+.fm-flow[data-enter] .fm-node { animation: fm-in 420ms var(--hub-ease-out) both; }
+@keyframes fm-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+.fm i { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--fm-file); }
+.fm [data-kind='folder'] i { background: var(--fm-folder); border-radius: 2px; }
+.fm [data-kind='chat'] i { background: var(--fm-chat); }
+.fm [data-kind='skill'] i { background: var(--fm-skill); }
+.fm [data-kind='plugin'] i { background: var(--fm-plugin); }
+.fm [data-kind='mod'] i { background: var(--fm-mod); }
+.fm [data-kind='role'] i { background: var(--fm-role); }
+
+.fm-card { animation: fm-card-in 240ms var(--hub-ease-out); min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; border-left: 1px solid var(--hub-hair); background: var(--hub-surface); display: grid; align-content: start; gap: 10px; }
+@keyframes fm-card-in { from { opacity: 0; transform: translateX(12px); } }
+.fm-card-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.fm-card-h small { font: 500 12px/1.4 var(--hub-sans); letter-spacing: 0.4px; color: var(--hub-mute); }
+.fm-card h3 { margin: 2px 0 0; font: 600 16px/1.35 var(--hub-sans); color: var(--hub-ink); overflow-wrap: anywhere; }
+.fm-card p { margin: 0; color: var(--hub-body); }
+.fm-card h4 { margin: 8px 0 0; font: 500 12px/1.5 var(--hub-sans); letter-spacing: 0.4px; color: var(--hub-mute); }
+.fm-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fm-card li { font-size: 13px; overflow-wrap: anywhere; }
+.fm-hist li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 8px 0; border-top: 1px solid var(--hub-hair); }
+.fm-hist time { color: var(--hub-mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+.fm-hist small { grid-column: 1 / -1; color: var(--hub-mute); font-size: 12px; }
+.fm-card .fm-quiet { color: var(--hub-mute); font-size: 13px; }
+.fm-card > .hub-btn { justify-self: start; }
+
+.fm-list { height: 100%; overflow-y: auto; padding: 12px 16px 40px; box-sizing: border-box; display: grid; align-content: start; gap: 16px; }
+.fm-list h4 { display: flex; gap: 8px; margin: 0 0 6px; font: 500 12px/1.5 var(--hub-sans); letter-spacing: 0.4px; color: var(--hub-mute); }
+.fm-list h4 b { font-weight: 400; color: var(--hub-ash); }
+.fm-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.fm-list li { display: flex; gap: 4px; }
+.fm-list li > button:first-child { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--hub-body); font: 400 14px/1.3 var(--hub-sans); text-align: left; cursor: pointer; }
+.fm-list li > button:first-child span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.fm-list li > button:first-child small { color: var(--hub-mute); font-variant-numeric: tabular-nums; }
+.fm-list li > button[aria-pressed='true'] { background: var(--hub-elev); color: var(--hub-ink); }
+.fm-open { min-width: 56px; border: 1px solid var(--hub-hair); border-radius: 6px; background: none; color: var(--hub-mute); font: 500 12px var(--hub-sans); cursor: pointer; }
+
+.fm-legend { position: absolute; left: 12px; bottom: 36px; z-index: 5; max-width: calc(100% - 96px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px; border-radius: 10px; border: 1px solid var(--hub-hair); background: var(--hub-surface); font-size: 12px; color: var(--hub-mute); }
+.fm-legend ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px; }
+.fm-legend button { display: flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--hub-body); font: 500 12px/1 var(--hub-sans); cursor: pointer; transition: background-color 140ms var(--hub-ease-out), color 140ms var(--hub-ease-out), opacity 140ms var(--hub-ease-out); }
+.fm-legend button b { font-weight: 400; color: var(--hub-ash); font-variant-numeric: tabular-nums; }
+.fm-legend button[aria-pressed='false'] { color: var(--hub-ash); opacity: 0.7; }
+.fm-legend button[aria-pressed='false'] i { background: none; box-shadow: inset 0 0 0 1px var(--hub-ash); }
+@media (hover: hover) and (pointer: fine) { .fm-legend button:hover { background: var(--hub-elev); } }
+.fm-key { padding: 0 8px 0 12px !important; border-left: 1px solid var(--hub-hair); gap: 12px !important; pointer-events: none; }
+.fm-key li { display: flex; align-items: center; gap: 6px; }
+.fm-legend path { stroke-width: 1.5; stroke: var(--hub-mute); }
+.fm-legend path.touched { stroke: var(--fm-chat); }
+.fm-legend path.used { stroke: var(--fm-plugin); stroke-dasharray: 4 3; }
+@media (pointer: coarse) {
+  .fm-mode button, .fm-title select, .fm-find input, .fm .hub-btn { min-height: 44px; }
+  .fm-list li > button:first-child, .fm-open { min-height: 44px; }
+  .fm .react-flow__controls-button { width: 44px; height: 44px; }
+  .fm-legend button { min-height: 44px; }
+}
+@media (max-width: 600px) {
+  .fm-bar { flex-wrap: wrap; padding: 10px 16px; }
+  .fm-mode { order: 2; }
+  .fm-find { order: 3; width: 100%; }
+  .fm[open][data-picked] { grid-template: auto minmax(0, 1fr) minmax(0, 55%) / minmax(0, 1fr); }
+  .fm-card { border-left: 0; border-top: 1px solid var(--hub-hair); }
+  .fm-foot { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-node, .fm .react-flow__node, .fm .react-flow__edge, .fm-edge .react-flow__edge-path, .fm-legend button { transition: none; }
+  .fm-node, .fm-card, .fm .react-flow__edge-path { animation: none !important; }
+}

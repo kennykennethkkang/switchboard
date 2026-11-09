@@ -1,5 +1,5 @@
 /**
- * The standalone app's way to the hub: /hub/state, /hub/voice, /hub/graph, /hub/runs, /hub/command and /hub/upload are passed to
+ * The standalone app's way to the hub: /hub/state, /hub/voice (GET, and a phone's clip POSTed), /hub/graph, /hub/runs, /hub/command and /hub/upload are passed to
  * a VS Code window's hook server, found through ~/.claude/switchboard/*.json, with
  * the window's token added here so it never reaches the browser. Only the app's
  * own page may call it: a custom header (no form can send one), the same Origin
@@ -20,6 +20,8 @@ const MAX_BODY = 64 * 1024
 const UPLOAD_MAX = 100 * 1024 * 1024
 // How long a cut off upload may keep sending before the socket is dropped.
 const LINGER_MS = 5_000
+// Same cap as routes.ts handleVoice.
+const CLIP_MAX = 5 * 1024 * 1024
 // A tool pick or a sync with origin runs well past 5 s; the panel never times them out, so the app waits too.
 const COMMAND_MS = 120_000
 
@@ -58,7 +60,7 @@ export function commandFolder(body: string): string | undefined {
 }
 
 // The mic records the room, and a spoken reply (hub-jarvis with voice) plays in it; the rest reach keys, sign-ins, AWS, setup, links opened on the Mac, dev servers and pushes.
-const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser'])
+const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser', 'hub-harden'])
 
 /** A command that only this Mac may send, never the phone. */
 export function macOnly(body: string): boolean {
@@ -104,9 +106,11 @@ export function hostOk(h: http.IncomingHttpHeaders, port: number, lan?: Lan): bo
 
 /** names: this Mac's MagicDNS name, the only Host a phone may use. plain: served over http (no tailnet certs). */
 export type Lan = { secret: string; names: string[]; plain?: boolean }
-import { phoneCode } from '../../extension/src/hub/lan'
+import { phoneCode, type MacNames } from '../../extension/src/hub/lan'
 import { MAC_ONLY_GIT, type GitOp } from '../../web/lib/hub-types'
-export { macNames, phoneCode, tailscaleName, tailscaleProblem } from '../../extension/src/hub/lan'
+export { macNames, macNamesRead, phoneCode, tailscaleName, tailscaleProblem } from '../../extension/src/hub/lan'
+/** Hosts the phone may use: the ts.net name and its short MagicDNS form. plain: what serve runs, else no tailnet certs. */
+export const lanNames = (m: MacNames, serving?: 'https' | 'http') => ({ names: m.tailscale ? [m.tailscale, m.tailscale.split('.')[0]] : [], plain: serving ? serving === 'http' : !m.https })
 
 const PROXIED = ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-host', 'tailscale-user-login']
 /** The app listens on loopback only and the phone comes through tailscale serve, so the socket says nothing:
@@ -289,11 +293,12 @@ const CHAT_READS = new Set(['/hub/chat/outputs', '/hub/chat/transcript', '/hub/c
 export async function proxyHub(req: http.IncomingMessage, res: http.ServerResponse, port: number, workspace: string, lan?: Lan, list = windows): Promise<void> {
   let u: URL
   try { u = new URL(req.url ?? '/', 'http://x') } catch { res.writeHead(400).end(); return }
-  const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs'
+  const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs' : req.method === 'GET' && u.pathname === '/hub/flowmap' ? 'flowmap'
     : req.method === 'GET' && CHAT_READS.has(u.pathname) ? u.pathname.slice('/hub/'.length) : req.method === 'POST' && u.pathname === '/hub/command' ? 'command'
-    : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : undefined
+    : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : req.method === 'POST' && u.pathname === '/hub/voice' ? 'clip' : undefined
   if (!route || !allowed(req.headers, port, lan)) { res.writeHead(route ? 403 : 404).end(); return }
   if (route === 'upload') return proxyUpload(req, res, u, workspace, list)
+  if (route === 'clip') return proxyClip(req, res, workspace, list)
   let body = ''
   for await (const chunk of req) {
     body += chunk
@@ -316,7 +321,7 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
     if (holder) win = holder
   }
   // Reads pass their own fields only, so a token the page put in the query never reaches the window.
-  const fields = route === 'runs' ? ['session', 'role'] : route === 'chat/outputs' ? ['session'] : route === 'chat/transcript' ? ['session', 'before'] : route === 'chat/shot' ? ['session', 'path'] : []
+  const fields = route === 'runs' ? ['session', 'role'] : route === 'flowmap' ? ['cwd'] : route === 'chat/outputs' ? ['session'] : route === 'chat/transcript' ? ['session', 'before'] : route === 'chat/shot' ? ['session', 'path'] : []
   const query = new URLSearchParams(fields.flatMap(k => { const v = u.searchParams.get(k); return v === null ? [] : [[k, v]] })).toString()
   const up = http.request({ host: '127.0.0.1', port: win.port, method: req.method, path: `/hub/${route}${query ? `?${query}` : ''}`, headers: { 'Content-Type': 'application/json', 'X-Switchboard-Token': win.hubToken }, timeout: route === 'state' || route === 'voice' ? 5000 : COMMAND_MS }, r => {
     const head = { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' }
@@ -337,6 +342,26 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
   up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
   up.on('timeout', () => up.destroy())
   up.end(body)
+}
+
+/** A phone mic clip: buffered (5 MB cap) and sent on with its own Content-Type. Allowed from the phone; spoken replies stay on the Mac. */
+async function proxyClip(req: http.IncomingMessage, res: http.ServerResponse, workspace: string, list: typeof windows): Promise<void> {
+  const parts: Buffer[] = []
+  let size = 0
+  for await (const c of req) {
+    size += (c as Buffer).length
+    if (size > CLIP_MAX) { res.writeHead(413, { 'Content-Type': 'text/plain' }).end('The clip is over 5 MB.'); req.destroy(); return }
+    parts[parts.length] = c as Buffer
+  }
+  const win = pickWindow(await list(), workspace)
+  if (!win) { res.writeHead(502).end(); return }
+  const up = http.request({ host: '127.0.0.1', port: win.port, method: 'POST', path: '/hub/voice', headers: { 'Content-Type': req.headers['content-type'] ?? '', 'X-Switchboard-Token': win.hubToken }, timeout: COMMAND_MS }, r => {
+    res.writeHead(r.statusCode ?? 502, { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' })
+    pipeline(r, res, err => { if (err) res.destroy() })
+  })
+  up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
+  up.on('timeout', () => up.destroy())
+  up.end(Buffer.concat(parts))
 }
 
 /** POST /hub/upload?cwd=&name=&session=, streamed to the window holding cwd: never buffered, cut off past 100 MB. */

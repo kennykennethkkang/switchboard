@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { demoApply, demoChat, demoHub, demoRunDetails, demoTick, demoUpload } from './hub-demo'
+import { demoApply, demoChat, demoFx, demoHub, demoRunDetails, demoTick, demoUpload } from './hub-demo'
 
 test('a demo New chat puts a working chat on top, named from the goal', () => {
   const h = demoApply(demoHub(), { type: 'hub-new-chat', path: '/Users/k/Documents/GitHub/Armasu', text: 'fix the closet door animation on settings page', remote: false })
@@ -255,4 +255,36 @@ test('a demo Finish up step ticked and put back stays a Finish up step', () => {
   assert.equal(ticked.from, step.from)
   const h2 = demoApply(h1, { type: 'hub-todo-restore', path, id: step.id })
   assert.equal(h2.todos![path].todo.at(-1)?.why, 'you')
+})
+
+test('demo board fx are opt-in: pause and unlink only from the query', () => {
+  assert.deepEqual(demoFx('', 1000), {})
+  assert.equal(demoHub().pause, undefined)
+  const fx = demoFx('?demo=pause,unlink&resume=10', 1000)
+  assert.deepEqual(fx.pause?.chats.map(c => c.sessionId), ['d-work', 'd-wrap', 'd-almost'])
+  assert.equal(fx.pause?.resumeAt, 11_000)
+  assert.equal(fx.unlinkAt, 7000)
+  const h = { ...demoHub(1000), pause: fx.pause }
+  assert.equal(demoTick(h, 10_000).pause?.kind, 'five_hour')
+  assert.equal(demoTick(h, 11_000).pause, undefined)
+})
+
+test('a demo unlink drops one target from a link to several', () => {
+  const h = { ...demoHub(), links: [{ from: 'a', to: ['b', 'c'], reason: 'r', auto: false, since: 1 }] }
+  const one = demoApply(h, { type: 'hub-unlink', from: 'a', to: 'b' })
+  assert.deepEqual(one.links?.map(l => l.to), [['c']])
+  assert.deepEqual(demoApply(one, { type: 'hub-unlink', from: 'a', to: 'c' }).links, [])
+})
+
+test('hub-summary fills a demo summary for that chat', () => {
+  const h = demoApply(demoHub(), { type: 'hub-summary', sessionId: 'd-work' })
+  assert.match(h.summaries?.['d-work']?.text ?? '', /Fix login redirect/)
+})
+
+test('demo Approve moves the chat to History as approved', () => {
+  const h = demoApply(demoHub(), { type: 'hub-approve', sessionId: 'd-done' })
+  const a = h.archive?.find(x => x.sessionId === 'd-done')
+  assert.ok(a?.approvedAt)
+  assert.equal(a?.name, 'Hub AIs and Starred')
+  assert.equal(demoApply(h, { type: 'hub-approve', sessionId: 'd-done' }).archive?.filter(x => x.sessionId === 'd-done').length, 1)
 })

@@ -123,7 +123,7 @@ describe('aws status and helpers', () => {
   it('picks the profile of the deepest project folder holding a path', () => {
     const projects = { '/u/GitHub': 'live', '/u/GitHub/Armasu': 'yo' }
     assert.equal(profileFor(projects, '/u/GitHub/Armasu/web'), 'yo')
-    assert.equal(profileFor(projects, '/u/GitHub/agent-flow'), 'live')
+    assert.equal(profileFor(projects, '/u/GitHub/switchboard'), 'live')
     assert.equal(profileFor(projects, '/u/GitHubX'), undefined)
   })
 
@@ -146,7 +146,9 @@ describe('aws status and helpers', () => {
   })
 
   it('writes a BROWSER script on macOS and Linux only; a .cmd would split a URL at &', () => {
-    assert.match(openChromeScript('darwin')!, /\/usr\/bin\/open -na "Google Chrome" --args --profile-directory="\$SWITCHBOARD_CHROME_DIR" "\$1"/)
+    // -g: an aws login an agent runs opens Chrome behind what Kenneth is doing
+    assert.match(openChromeScript('darwin')!, /exec \/usr\/bin\/open -g -a "Google Chrome" "\$1"/)
+    assert.match(openChromeScript('darwin')!, /\/usr\/bin\/open -gna "Google Chrome" --args --profile-directory="\$SWITCHBOARD_CHROME_DIR" "\$1"/)
     assert.match(openChromeScript('linux')!, /google-chrome --profile-directory="\$SWITCHBOARD_CHROME_DIR" "\$1"/)
     assert.equal(openChromeScript('win32'), undefined)
   })
@@ -155,7 +157,7 @@ describe('aws status and helpers', () => {
     const url = 'https://signin.aws.amazon.com/a'
     assert.deepEqual(chromeCall(url, '', 'darwin', {}, () => false), { cmd: '/usr/bin/open', args: ['-a', 'Google Chrome', url] })
     assert.deepEqual(chromeCall(url, '', 'linux', {}, () => false), { cmd: 'google-chrome', args: [url] })
-    assert.match(openChromeScript('darwin')!, /if \[ -z "\$SWITCHBOARD_CHROME_DIR" \]; then exec \/usr\/bin\/open -a "Google Chrome" "\$1"; fi/)
+    assert.match(openChromeScript('darwin')!, /if \[ -z "\$SWITCHBOARD_CHROME_DIR" \]; then exec \/usr\/bin\/open -g -a "Google Chrome" "\$1"; fi/)
     assert.match(openChromeScript('linux')!, /if \[ -z "\$SWITCHBOARD_CHROME_DIR" \]; then exec google-chrome "\$1"; fi/)
   })
 

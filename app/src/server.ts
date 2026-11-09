@@ -11,7 +11,9 @@ import { exec, execFile, execFileSync } from 'child_process'
 import { createRelay } from '../../scripts/relay'
 import { serveStatic } from './static'
 import { portTaken } from './port'
-import { codeLogin, deniedAs, deviceAsks, forwardedIp, lanFor, lanGate, lanSetCookie, liveToken, macNames, phoneSecret, proxyHub, signInPage, tellWindows, uaSummary, waitPage, windows, type Lan } from './hub-proxy'
+import { pushRoute } from './push'
+import { openCmd } from './open'
+import { codeLogin, deniedAs, deviceAsks, forwardedIp, lanFor, lanGate, lanNames, lanSetCookie, liveToken, macNames, macNamesRead, phoneSecret, proxyHub, signInPage, tellWindows, uaSummary, waitPage, windows, type Lan } from './hub-proxy'
 import { phoneServeArgs, readMacNames, tailscaleBin } from '../../extension/src/hub/lan'
 
 interface ServerOptions {
@@ -91,7 +93,7 @@ export async function startServer(options: ServerOptions) {
 
   // What tailscale serve puts the app on: https, http (no tailnet certs) or nothing yet.
   let serving: 'https' | 'http' | undefined
-  // lan: undefined for the Mac itself (lanFor), else the phone through tailscale serve; only the ts.net Host is accepted.
+  // lan: undefined for the Mac itself (lanFor), else the phone through tailscale serve; only the Mac's MagicDNS names are accepted.
   const handle = (lan: Lan | undefined, req: http.IncomingMessage, res: http.ServerResponse) => {
     const gate = lanGate(req.headers, req.url ?? '/', port, lan)
     if (gate === 'deny') {
@@ -124,6 +126,9 @@ export async function startServer(options: ServerOptions) {
       return
     }
 
+    // Phone alerts: manifest, service worker, VAPID key and subscribe
+    if (pushRoute(req, res)) return
+
     // Static files (UI)
     if (req.method === 'GET') {
       return serveStatic(req, res)
@@ -134,12 +139,13 @@ export async function startServer(options: ServerOptions) {
   }
   // One bad request must not take the app down: with --lan the tailnet reaches it.
   // Kicks off the first read now; each call after reuses it and rereads in the background every few minutes.
-  if (options.lan) macNames()
-  const names = () => { const n = macNames().tailscale; return n ? [n] : [] }
+  // Waits for the first read: until it lands every phone request would be refused.
+  if (options.lan) { macNames(); await macNamesRead() }
   const server = http.createServer((req, res) => {
     try {
       // A rebound name (DNS rebinding) or a proxy the app did not set up is never the Mac; without --lan there is no phone.
-      const lan = lanFor(req.headers, port, secret, names(), serving === 'http')
+      const { names, plain } = lanNames(macNames(), serving)
+      const lan = lanFor(req.headers, port, secret, names, plain)
       if (lan && !options.lan) { res.writeHead(403).end(); return }
       handle(lan, req, res)
     } catch { if (!res.headersSent) res.writeHead(400); res.end() }
@@ -176,7 +182,7 @@ export async function startServer(options: ServerOptions) {
       } catch (err) { console.log(`tailscale serve failed: ${(err as Error).message}`); return }
       serving = want
       if (n.https) clearInterval(retry)
-      console.log(`Phone access on ${want}://${n.tailscale}/ (Tailscale; secret link in the Switchboard panel)${n.https ? '' : '. Phone copy buttons need HTTPS on the tailnet.'}`)
+      console.log(`Phone access on ${want}://${n.tailscale}/ (Tailscale; secret link in the Switchboard panel)${n.https ? '' : '. Copy buttons and the mic need HTTPS on the tailnet; everything else works.'}`)
     }
     const retry = setInterval(() => void servePhone(), 60_000)
     retry.unref()
@@ -210,7 +216,7 @@ function openURL(url: string) {
     // 'start' is a shell builtin on Windows; must use exec, not execFile
     exec(`start "" "${url}"`)
   } else {
-    const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
-    execFile(cmd, [url], () => {})
+    const c = openCmd(url)
+    if (c) execFile(c.cmd, c.args, () => {})
   }
 }

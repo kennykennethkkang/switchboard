@@ -8,7 +8,7 @@ import { execFile } from 'child_process'
 import * as path from 'path'
 import { repoTop } from './projects'
 import { claudeBinary } from './setup'
-import type { BoardProject, HubState, Server, SessionLive, Suggestion } from './types'
+import type { BoardProject, ChatLink, HubState, Server, SessionLive, Suggestion } from './types'
 
 const CLASH_MS = 60 * 60 * 1000
 const FULL_AT = 0.85
@@ -161,15 +161,35 @@ export function noteEdit(edits: Map<string, number>, session: string, cwd: strin
   edits.set(`${session}\n${norm(path.resolve(cwd, file))}`, now)
 }
 
+/** chat-wait refuses the same edit and names chats_wait; its message wins. Only a Claude chat runs the mod, never a Codex chat or role run. */
+const chatWaitGuards = (state: HubState, self: string, cwd: string, target: string, roleRun: boolean, now: number) =>
+  !roleRun && state.chats.find(c => c.sessionId === self)?.ai !== 'codex'
+  && (state.installed.some(i => i.kind === 'mod' && i.enabled && i.name.split('@')[0] === 'chat-wait')
+    || !!state.links?.some(l => l.from === self && l.auto && now - l.since < GUARD_MS && norm(path.resolve(cwd, l.reason)) === target))
+
+/** Whether `from` waits on `to`, directly or through other links. */
+export function waitsOn(links: ChatLink[] | undefined, from: string, to: string): boolean {
+  const seen = new Set<string>(), next = [from]
+  while (next.length) {
+    const at = next.pop()
+    for (const id of (links ?? []).filter(l => l.from === at).flatMap(l => l.to)) {
+      if (id === to) return true
+      if (!seen.has(id)) { seen.add(id); next.push(id) }
+    }
+  }
+  return false
+}
+
 /**
  * Why `self` should not edit `file` yet: another open chat in the project edited it after self did, in the last ten minutes.
  * `tried` holds the denials; a retry on the same file within two minutes goes through, so it never deadlocks.
  */
-export function editGuard(state: HubState, edits: Map<string, number>, tried: Map<string, number>, self: string, cwd: string, file: string, now = Date.now()): string | undefined {
+export function editGuard(state: HubState, edits: Map<string, number>, tried: Map<string, number>, self: string, cwd: string, file: string, now = Date.now(), roleRun = false): string | undefined {
   prune(tried, RETRY_MS, now)
   const target = norm(path.resolve(cwd, file))
   const key = `${self}\n${target}`
   if (tried.has(key)) return undefined
+  if (chatWaitGuards(state, self, cwd, target, roleRun, now)) return undefined
   const home = projectOf(state, cwd)
   const mine = edits.get(key) ?? 0
   for (const [k, at] of edits) {

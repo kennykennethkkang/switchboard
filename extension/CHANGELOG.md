@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.21.7
+
+- Git guard: Switchboard installs a pre-commit and pre-push guard in every project repo it lists, refusing commits and pushes from Claude and Codex chats; the Commit and Push buttons, the phone and your own terminals still work
+- Chat terminals carry SWITCHBOARD_CHAT so Codex chats are covered; a repo with core.hooksPath or its own hooks is left alone; uninstall removes only Switchboard's guard; a hook symlink is never written through
+- Switchboard's own git ops drop chat markers, so Commit and Push still work in a window opened from a chat
+
+## 0.21.6
+
+- One layout: Classic is back as the only design, cleaned up; the Desk layout and its Settings switch are gone
+- "Ready to approve" everywhere a finished chat waits on you, with a yellow warning when a request is not covered; Today's Done counts only approved chats and "Your moves" lead with what to do
+- Ask cards name the asking chat, show option descriptions, wrap on phones and send every answer path; multi-question cards say how many
+- Finished and stopped chats say what they did and what is left; clearer ages ("last reply 21 min ago") and counts that agree
+- Celestial Court: a Claude realm for Claude's agents (Codex-led chats too), a memory library with health warnings, and places for keys, to-do, Remote Control, learn runs, projects and uploads; labels never cover each other, and 90 chats lay out
+- MiroFish card: rounds, elapsed and estimate, report stage and a preview while a crowd run works; saving the OpenRouter or Zep key fills MiroFish's .env
+- Temp chats and learn runs stay out of the chat list and Flow tabs; the stuck watcher leaves quiet dev servers alone
+
+## 0.21.5
+
+- Phone over Tailscale: works on plain http (no Secure cookie there) and the short MagicDNS name; Send, Commit, Push, uploads and the mic all pass from the phone
+- Source Control: one pending message per repo grows with every finished chat until the commit, an "Also changed" line names files no chat covered, every change is included by default, Push shows after Commit and after a reload
+- Busy bar across the top and a pulse on the pressed button while a command runs
+- Nothing an agent or timer does takes focus; updates show Reload ready instead of reloading
+- No permission prompts in any start, resume or handoff path; Settings toggles bring them back for Claude or Codex, and Keep Switchboard app running turns the keeper off (with crash backoff)
+- To-do: Needs you, Up next, From finished chats and Finished; 5 s Undo (Undo all), 2000 character items that expand on click, no duplicates or chatty asks, a note when old items are cleared
+- Flow map: code, work (chats, skills, plugins, mods) or both, with a plain card per part; only known project folders
+- Drafts: the message box, New chat, the to-do add box and the commit message keep what was typed
+- Usage limits: the meter says Limit reached with the reset time instead of no data; at 99% (Settings) chats pause and resume on their own after the reset
+- Spend limits in Settings: tools with prepaid credit run without asking, Gemini runs under a monthly cap, AWS and Stitch still ask
+- Needs you strip, Ready to ship chip and the next to-do on the home screen; the open chat survives a reload
+- Codex Transcript tab, Jarvis mic on the phone, Test anti-copy hardening (experimental, off), About and credits, skill sources by author, deep-research skill
+- Sweep: a triage verdict (APPROVE, CAUTION or REJECT with a why) shows a Reviewed badge with the why as its tooltip until the files change; holds still need Approve, and an approval for older files brings back Review and its Approve button; Settings counts reviewed items
+- Chats: idle chats never auto-hide; Archive in each card's menu; History becomes Archive with Bring back and Resume
+- Codex chats start and resume with --dangerously-bypass-approvals-and-sandbox, so Bash never asks
+- Stuck items: quiet subagents, idle background jobs, CPU and memory hogs in a chat's process tree
+- Board page with the Silkscreen font and the journey-west pixel skin
+- Set up adds ecc-agents, crowd-ab and self-improve, plus pixelfx, humanizer, last30days, archify, diagram-design, find-skills, Scrapling and Agent Reach; own skills mirrored to ~/.agents/skills for Codex
+- Uninstall removes Codex hooks.json entries and the switchboard-app folder
+- Renamed to Switchboard: switchboard-app and switchboard-web packages, SWITCHBOARD_* env vars (AGENT_FLOW_RUNTIME still read), discovery folder ~/.claude/switchboard-app
+- repo-rules: decodes \u and \x escapes before the hub check, and refuses hub posts whose body or URL is built at run time ($(...), backticks, $VAR, @file, a variable holding /hub/ when the command posts); reading hub state through a variable stays open, and a 50 KB command checks in under a millisecond
+- Calm desk: header cut to Find, meters, Push, New chat and one menu; Jarvis and the project filter inside Cmd+K; chat list grouped as Needs you, Ready to approve, Working, Idle and History; Tools behind a button by Send; Today, To-do, Git and Dev servers in a right drawer; Classic unchanged
+- Board: Celestial Court with chat courtyards, a petition path the camera follows, and realms for Codex, Jev, Perplexity and Gemini work beside the chat that started it
+- Chat-wait: a chat can wait on another (Wait for... in the chat menu, chips, an Orbit arc, auto links when two chats edit one file) and continues when the other ends clean
+- Usage pause: frosted pause banner with Resume now and Cancel; a hand resume is no longer undone by the next tick
+- Phone mode: Call me rings the phone for questions, stuck, done and pause events, one call per machine
+- Codex roles: engineer-codex and qa-codex run Codex with full bypass, no second chat; apply_patch edits go through the same-file guard
+- Learning ready card: self-improve wins wait for Approve or Discard, applied only against the candidate's hash
+- Keys: Perplexity and Zep with live checks; saving OpenRouter or Zep fills listed MiroFish projects' .env without overwriting set values
+- Temp chats and learn runs hidden from the hub; Approve only on the kit closing question; reaped pids checked by start time
+- Commit cleaner strips invisible watermark characters from added lines and the message
+
 ## 0.21.4
 
 - To-do redesigned as a compact list: one line per item, a round tick to finish, click the text to edit, one short note per row, counts as badges, no hint paragraphs

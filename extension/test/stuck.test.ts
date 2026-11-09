@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { STUCK, canStop, detect, newWatch, parsePs, redact, sampleDue, snoozed, stopTree, type Proc } from '../src/hub/stuck'
+import { STUCK, canStop, detect, fixDue, fixText, loops, waitsOnUser, newWatch, parsePs, redact, sampleDue, snoozed, stopTree, type Proc } from '../src/hub/stuck'
 import type { ChatProgress, ChatRow } from '../src/hub/types'
 
 const MIN = 60_000
@@ -41,6 +41,14 @@ test('job: with no output file, plain age over 30 min', () => {
   const [item] = detect(input({ progress: [job(T0 - 31 * MIN)], procs: [] }), newWatch(), T0)
   assert.equal(item.kind, 'job')
   assert.equal(item.since, T0 - 31 * MIN)
+})
+
+test('job: a dev server is quiet by design, so silence never flags it; a test run still does', () => {
+  const quiet = (command: string, label?: string) => detect(input({ progress: [prog({ subJobs: [{ id: 'j1', agent: 'a1', command, ...(label ? { label } : {}), startedAt: T0 - 40 * MIN }] })], procs: [], outAt: new Map([['j1', T0 - 31 * MIN]]) }), newWatch(), T0)
+  for (const c of ['npx next dev -p 3010 > /tmp/dev.log 2>&1', 'pnpm dev', 'npm run dev', 'vite --port 5173', 'python3 -m http.server 8000', 'npm run backend', 'uvicorn app:app --reload']) assert.deepEqual(quiet(c), [], c)
+  assert.deepEqual(quiet('bash run.sh', 'Start Next dev server on 3010'), [])
+  assert.equal(quiet('pnpm test').length, 1)
+  assert.equal(quiet('npm run devtools-check').length, 1)
 })
 
 test('job: with an output file, 15 min with no new output; a finished one never counts', () => {
@@ -123,7 +131,7 @@ test('redact: secrets go before the cut, the rest stays readable', () => {
   const r = redact('curl -H "Authorization: Bearer abc123def" https://u:pw@x.io?token=s3cr3t OPENAI_API_KEY=sk-abcdefghijk1234 run a4f9e2c1b7d3a4f9e2c1b7d3a4f9e2c1ff')
   for (const s of ['abc123def', 'pw@', 's3cr3t', 'sk-abcdefghijk1234', 'a4f9e2c1b7d3a4f9e2c1b7d3a4f9e2c1ff']) assert.ok(!r.includes(s), `${s} left in ${r}`)
   assert.match(r, /^curl -H/)
-  assert.equal(redact('/Users/k/Documents/GitHub/-Users-kennykennethkkang-Documents-GitHub-agent-flow x'), '/Users/k/Documents/GitHub/-Users-kennykennethkkang-Documents-GitHub-agent-flow x')
+  assert.equal(redact('/Users/k/Documents/GitHub/-Users-kennykennethkkang-Documents-GitHub-switchboard x'), '/Users/k/Documents/GitHub/-Users-kennykennethkkang-Documents-GitHub-switchboard x')
   assert.equal(Array.from(redact('x'.repeat(300))).length, 120)
 })
 
@@ -151,6 +159,7 @@ test('routes: the stuck commands take a session and an id, behind the token like
   const { HubService } = await import('../src/hub/hub-service')
   assert.equal(commandProblem({ type: 'hub-stuck-stop', sessionId: 's', id: 'proc:s:1:2' }), undefined)
   assert.equal(commandProblem({ type: 'hub-stuck-dismiss', sessionId: 's', id: 'a' }), undefined)
+  assert.equal(commandProblem({ type: 'hub-stuck-fix', sessionId: 's', id: 'agent:s:a1' }), undefined)
   assert.match(commandProblem({ type: 'hub-stuck-stop', sessionId: 's', pid: 42 })!, /id/)
   const h = new HubService()
   h.runner = () => true
@@ -209,4 +218,75 @@ test('sampling cadence: every 30 s while a chat works, every 5 min when all are 
   assert.equal(sampleDue(T0, true, T0 + 30_000), true)
   assert.equal(sampleDue(T0, false, T0 + 4 * MIN), false)
   assert.equal(sampleDue(T0, false, T0 + 5 * MIN), true)
+})
+
+test('fixText: agent asks the lead to SendMessage or redo; job and process say what was stopped', () => {
+  const agent = { id: 'agent:s:a1b2', kind: 'agent' as const, sessionId: 's', what: 'engineer subagent: no tool call', since: T0 - 12 * MIN }
+  assert.equal(fixText(agent, T0), 'Subagent engineer (a1b2) has been quiet 12 min. Check its last output; if it is waiting or looping, SendMessage it to continue with a narrower next step, or stop it and redo the step yourself.')
+  const job = { id: 'job:s:j1', kind: 'job' as const, sessionId: 's', what: 'Background job "tests": no new output', since: T0 - 20 * MIN, pid: 200, command: 'pnpm test' }
+  const stopped = fixText(job, T0, true)
+  assert.match(stopped, /^Switchboard stopped background job "tests": no new output for 20 min \(pnpm test\)\./)
+  assert.match(stopped, /rerun it .*timeout.*run_in_background/)
+  assert.match(fixText({ ...job, pid: undefined }, T0, false), /^Background job "tests": no new output for 20 min \(pnpm test\)\. Stop it/)
+  const proc = { id: 'proc:s:300:1', kind: 'process' as const, sessionId: 's', what: 'Process using a lot of CPU', since: T0 - 6 * MIN, pid: 300, command: 'node x' }
+  assert.match(fixText(proc, T0, true), /^Switchboard stopped process using a lot of CPU for 6 min \(pid 300: node x\)\./)
+})
+
+test('fixDue: once each, after twice the kind threshold', () => {
+  const at = (kind: 'agent' | 'job' | 'process', min: number, what = '') => ({ id: `${kind}:${min}`, kind, sessionId: 's', what, since: T0 - min * MIN })
+  const done = new Set<string>()
+  const items = [at('agent', 19), at('agent', 21), at('job', 29, 'x: no new output'), at('job', 31, 'x: no new output'), at('job', 59, 'x: no end'), at('process', 9), at('process', 11)]
+  assert.deepEqual(fixDue(items, done, T0).map(i => i.id), ['agent:21', 'job:31', 'process:11'])
+  assert.deepEqual(fixDue(items, done, T0), [])
+})
+
+test('dueFix: only owned chats, shown (not dismissed) items, once each', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  h.hook({ session_id: 's', hook_event_name: 'SessionStart', cwd: '/r' }, T0)
+  const old = (id: string, sessionId = 's') => ({ id, kind: 'agent' as const, sessionId, what: 'qa subagent: no tool call', since: T0 - 30 * MIN })
+  h.setStuck([old('agent:s:a'), old('agent:s:b'), old('agent:x:c', 'x')], T0)
+  h.snooze('agent:s:b', T0)
+  assert.deepEqual(h.dueFix(T0).fix.map(i => i.id), ['agent:s:a'])
+  assert.deepEqual(h.dueFix(T0), { fix: [], paused: [] })
+})
+
+test('waitsOnUser: an ask or needs-you only; a loop is not a wait', () => {
+  assert.equal(waitsOnUser(prog()), undefined)
+  assert.match(waitsOnUser(prog({ state: 'needs-you', question: 'Which port?' }))!, /Which port\?/)
+  assert.match(waitsOnUser(prog({ asks: [{ id: 'q', kind: 'permission', tool: 'Bash', preview: 'rm x', options: [] }] }))!, /permission for Bash/)
+  const call = { tool: 'Bash', target: 'curl :8080', role: 'qa', at: T0 }
+  assert.equal(waitsOnUser(prog({ tools: Array(8).fill(call) })), undefined)
+})
+
+test('loops: six identical calls, never polling ones', () => {
+  const call = { tool: 'Bash', target: 'curl :8080', role: 'qa', at: T0 }
+  assert.equal(loops(prog({ tools: Array(6).fill(call) })), 'Bash curl :8080')
+  assert.equal(loops(prog({ tools: Array(5).fill(call) })), undefined)
+  for (const poll of [{ tool: 'BashOutput', target: 'b1' }, { tool: 'TaskOutput' }, { tool: 'Monitor' }, { tool: 'ScheduleWakeup' }, { tool: 'Bash', target: 'sleep 30' }, { tool: 'Bash', target: 'wait' }])
+    assert.equal(loops(prog({ tools: Array(8).fill({ ...call, ...poll }) })), undefined, poll.tool)
+  const agent = { id: 'agent:s:a1', kind: 'agent' as const, sessionId: 's', what: 'qa subagent: no tool call', since: T0 - 12 * MIN }
+  assert.match(fixText(agent, T0, false, 'Bash curl :8080'), /repeated Bash curl :8080/)
+})
+
+test('waiting on user -> no auto-fix, no nudge, one notice', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  h.hook({ session_id: 's', hook_event_name: 'SessionStart', cwd: '/r' }, T0)
+  const state = (o: Partial<ChatProgress>) => h.set({ progress: h.get().progress.map(p => (p.sessionId === 's' ? { ...p, ...o } : p)) }, T0)
+  state({ state: 'needs-you', question: 'Deploy now?' })
+  const job = (id: string) => ({ id, kind: 'job' as const, sessionId: 's', what: 'Background job: no end', since: T0 - 90 * MIN, pid: 5, started: 1 })
+  h.setStuck([job('job:s:j'), job('job:s:k')], T0)
+  assert.deepEqual(h.unseenStuck(), [])
+  const first = h.dueFix(T0)
+  assert.deepEqual(first.fix, [])
+  // One notice for the chat, however many items it has.
+  assert.deepEqual(first.paused.map(p => p.sessionId), ['s'])
+  assert.match(first.paused[0].why, /Deploy now\?/)
+  assert.deepEqual(h.dueFix(T0 + MIN), { fix: [], paused: [] })
+  // Answered: the chat works again, so the items can be fixed; a new wait gets a new notice.
+  state({ state: 'working', question: undefined })
+  assert.deepEqual(h.dueFix(T0 + 2 * MIN).fix.map(i => i.id), ['job:s:j', 'job:s:k'])
+  state({ state: 'needs-you', question: 'Again?' })
+  assert.equal(h.dueFix(T0 + 3 * MIN).paused.length, 1)
 })

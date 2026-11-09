@@ -1,7 +1,7 @@
 /**
  * Unit tests for settings.json hook handling.
  *
- * The invariant: Agent Flow only ever touches its own hooks. Other tools
+ * The invariant: Switchboard only ever touches its own hooks. Other tools
  * register loopback HTTP hooks too (#73), and a settings file we can't parse
  * must never be overwritten.
  */
@@ -12,8 +12,8 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import {
-  isLegacyAgentFlowHookUrl, isAgentFlowHook, hasAgentFlowHook,
-  mergeAgentFlowHooks, migrateLegacyHttpHooks, removeAgentFlowHooks,
+  isLegacyHookUrl, isSwitchboardHook, hasSwitchboardHook,
+  mergeSwitchboardHooks, CODEX_HOOK_EVENTS, migrateLegacyHttpHooks, removeSwitchboardHooks,
   readSettingsFile, writeJsonAtomic, HOOK_EVENTS, missingHookEvents,
 } from '../src/hook-entries'
 
@@ -21,36 +21,38 @@ const HOOK_CMD = '"/usr/bin/node" "/home/u/.claude/switchboard/hook.js"'
 const foreignHttp = () => ({ hooks: [{ type: 'http', url: 'http://127.0.0.1:19847/hook/9207692e/session-start' }] })
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-hooks-'))
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-hooks-'))
 }
 
-describe('isLegacyAgentFlowHookUrl', () => {
+describe('isLegacyHookUrl', () => {
   it('matches only the bare hook server origin', () => {
-    assert.equal(isLegacyAgentFlowHookUrl('http://127.0.0.1:52341'), true)
-    assert.equal(isLegacyAgentFlowHookUrl('http://127.0.0.1:52341/'), true)
-    assert.equal(isLegacyAgentFlowHookUrl('http://127.0.0.1:19847/hook/abc/stop'), false)
-    assert.equal(isLegacyAgentFlowHookUrl('http://127.0.0.1:8080/?x=1'), false)
-    assert.equal(isLegacyAgentFlowHookUrl('http://localhost:52341'), false)
-    assert.equal(isLegacyAgentFlowHookUrl(undefined), false)
+    assert.equal(isLegacyHookUrl('http://127.0.0.1:52341'), true)
+    assert.equal(isLegacyHookUrl('http://127.0.0.1:52341/'), true)
+    assert.equal(isLegacyHookUrl('http://127.0.0.1:19847/hook/abc/stop'), false)
+    assert.equal(isLegacyHookUrl('http://127.0.0.1:8080/?x=1'), false)
+    assert.equal(isLegacyHookUrl('http://localhost:52341'), false)
+    assert.equal(isLegacyHookUrl(undefined), false)
   })
 })
 
-describe('isAgentFlowHook', () => {
+describe('isSwitchboardHook', () => {
   it('matches our command hook on POSIX and Windows paths', () => {
-    assert.equal(isAgentFlowHook({ hooks: [{ command: HOOK_CMD }] }), true)
-    assert.equal(isAgentFlowHook({ hooks: [{ command: '"C:\\node.exe" "C:\\Users\\u\\.claude\\switchboard\\hook.js"' }] }), true)
+    assert.equal(isSwitchboardHook({ hooks: [{ command: HOOK_CMD }] }), true)
+    assert.equal(isSwitchboardHook({ hooks: [{ command: '"C:\\node.exe" "C:\\Users\\u\\.claude\\switchboard\\hook.js"' }] }), true)
   })
 
   it("does not match other tools' hooks", () => {
-    assert.equal(isAgentFlowHook(foreignHttp()), false)
-    assert.equal(isAgentFlowHook({ hooks: [{ command: 'other-tool notify' }] }), false)
+    assert.equal(isSwitchboardHook(foreignHttp()), false)
+    assert.equal(isSwitchboardHook({ hooks: [{ command: 'other-tool notify' }] }), false)
     // Agent Flow's own forwarder stays Agent Flow's, for its own uninstall to remove.
-    assert.equal(isAgentFlowHook({ hooks: [{ command: '"/usr/bin/node" "/home/u/.claude/agent-flow/hook.js"' }] }), false)
-    assert.equal(isAgentFlowHook({}), false)
+    assert.equal(isSwitchboardHook({ hooks: [{ command: '"/usr/bin/node" "/home/u/.claude/agent-flow/hook.js"' }] }), false)
+    // The browser app's forwarder is scripts/setup.js's to replace, not the extension's.
+    assert.equal(isSwitchboardHook({ hooks: [{ command: '"/usr/bin/node" "/home/u/.claude/switchboard-app/hook.js"' }] }), false)
+    assert.equal(isSwitchboardHook({}), false)
   })
 })
 
-describe('mergeAgentFlowHooks', () => {
+describe('mergeSwitchboardHooks', () => {
   it('replaces our entries and keeps everything else', () => {
     const settings: Record<string, unknown> = {
       permissions: { allow: ['Bash(ls)'] },
@@ -61,8 +63,8 @@ describe('mergeAgentFlowHooks', () => {
       },
     }
     const entry = { hooks: [{ type: 'command', command: HOOK_CMD, timeout: 2 }] }
-    mergeAgentFlowHooks(settings, entry, ['SessionStart', 'Stop'])
-    mergeAgentFlowHooks(settings, entry, ['SessionStart', 'Stop'])
+    mergeSwitchboardHooks(settings, entry, ['SessionStart', 'Stop'])
+    mergeSwitchboardHooks(settings, entry, ['SessionStart', 'Stop'])
 
     const hooks = settings.hooks as Record<string, unknown[]>
     assert.deepEqual(hooks.SessionStart, [foreignHttp(), entry])
@@ -72,26 +74,26 @@ describe('mergeAgentFlowHooks', () => {
   })
 })
 
-describe('removeAgentFlowHooks', () => {
+describe('removeSwitchboardHooks', () => {
   it('drops only our entries and the events they leave empty', () => {
     const ours = { hooks: [{ type: 'command', command: HOOK_CMD }] }
     const agentFlow = { hooks: [{ type: 'command', command: 'node /home/u/.claude/agent-flow/hook.js' }] }
     const settings: Record<string, unknown> = { model: 'opus', hooks: { Stop: [ours, foreignHttp()], SessionStart: [ours], PreToolUse: [agentFlow] } }
-    removeAgentFlowHooks(settings)
+    removeSwitchboardHooks(settings)
     assert.deepEqual(settings, { model: 'opus', hooks: { Stop: [foreignHttp()], PreToolUse: [agentFlow] } })
   })
 
   it('removes the hooks key once nothing is left in it', () => {
     const settings: Record<string, unknown> = { hooks: { Stop: [{ hooks: [{ type: 'command', command: HOOK_CMD }] }] } }
-    assert.deepEqual(removeAgentFlowHooks(settings), {})
+    assert.deepEqual(removeSwitchboardHooks(settings), {})
   })
 })
 
-describe('hasAgentFlowHook', () => {
+describe('hasSwitchboardHook', () => {
   it('is false when only another tool has loopback hooks', () => {
-    assert.equal(hasAgentFlowHook({ hooks: { SessionStart: [foreignHttp()] } }), false)
-    assert.equal(hasAgentFlowHook({ hooks: { SessionStart: [{ hooks: [{ command: HOOK_CMD }] }] } }), true)
-    assert.equal(hasAgentFlowHook({}), false)
+    assert.equal(hasSwitchboardHook({ hooks: { SessionStart: [foreignHttp()] } }), false)
+    assert.equal(hasSwitchboardHook({ hooks: { SessionStart: [{ hooks: [{ command: HOOK_CMD }] }] } }), true)
+    assert.equal(hasSwitchboardHook({}), false)
   })
 })
 
@@ -105,7 +107,7 @@ describe('missingHookEvents', () => {
     const settings: Record<string, unknown> = { hooks, permissions: { allow: ['Bash'] } }
     assert.deepEqual(missingHookEvents(settings, HOOK_EVENTS), ['UserPromptSubmit'])
     const before = JSON.parse(JSON.stringify(settings))
-    mergeAgentFlowHooks(settings, ours(), missingHookEvents(settings, HOOK_EVENTS))
+    mergeSwitchboardHooks(settings, ours(), missingHookEvents(settings, HOOK_EVENTS))
     assert.deepEqual(missingHookEvents(settings, HOOK_EVENTS), [])
     assert.deepEqual((settings.hooks as Record<string, unknown>).UserPromptSubmit, [foreignHttp(), ours()])
     for (const e of HOOK_EVENTS) if (e !== 'UserPromptSubmit') assert.deepEqual((settings.hooks as Record<string, unknown>)[e], before.hooks[e])
@@ -191,5 +193,18 @@ describe('HOOK_EVENTS', () => {
 describe('StopFailure', () => {
   it('is registered so a turn ended by a usage limit leaves Working', () => {
     assert.ok((HOOK_EVENTS as readonly string[]).includes('StopFailure'))
+  })
+})
+
+describe('CODEX_HOOK_EVENTS', () => {
+  it('is a subset of the Claude events, so the hook server reads them the same way', () => {
+    for (const e of CODEX_HOOK_EVENTS) assert.ok((HOOK_EVENTS as readonly string[]).includes(e), e)
+  })
+  it('merges into a codex hooks.json and keeps the user entries', () => {
+    const user = { hooks: [{ type: 'command', command: 'my-logger' }] }
+    const out = mergeSwitchboardHooks({ hooks: { Stop: [user] } }, { hooks: [{ type: 'command', command: 'node /x/switchboard/hook.js', timeout: 5 }] }, CODEX_HOOK_EVENTS) as { hooks: Record<string, unknown[]> }
+    assert.equal(out.hooks.Stop.length, 2)
+    assert.deepEqual(out.hooks.Stop[0], user)
+    assert.deepEqual(Object.keys(out.hooks).sort(), [...CODEX_HOOK_EVENTS].sort())
   })
 })

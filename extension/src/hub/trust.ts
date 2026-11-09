@@ -16,7 +16,7 @@ const log = createLogger('Trust')
  * Who vouches for a folder: this window's folders while VS Code trusts its workspace, and others, the workspaces of
  * other live windows that say they are trusted (trustedWindowRoots). A folder outside all of them is never trusted.
  */
-export type TrustGuard = { trusted: boolean; roots: string[]; others?: string[] }
+export type TrustGuard = { trusted: boolean; roots: string[]; others?: string[]; ask?: boolean }
 
 /** The workspaces of live Switchboard windows whose discovery file says VS Code trusts them. */
 export const trustedWindowRoots = (dir?: string) => readWindows(dir).filter(w => w.trusted === true).map(w => w.workspace)
@@ -64,18 +64,42 @@ function vouched(key: string, roots: string[]): boolean {
 }
 
 /**
+ * Claude Code's own lock on the file (proper-lockfile: a <file>.lock folder, stale after 10s untouched), held for fn.
+ * Waits up to about a second, then throws: the launch goes on and Claude asks itself.
+ */
+function locked(file: string, fn: () => void): void {
+  const lock = `${file}.lock`
+  for (let i = 0; ; i++) {
+    try { fs.mkdirSync(lock); break } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+      // Every pass counts, so a lock that cannot be cleared still gives up.
+      if (i >= 40) throw new Error(`${lock} held`)
+      try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmdirSync(lock); continue } } catch { /* gone, or not ours to clear: wait */ }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
+    }
+  }
+  try { fn() } finally { try { fs.rmdirSync(lock) } catch { /* gone already */ } }
+}
+
+/**
  * Never throws: a launch goes on untrusted rather than not at all, and Claude asks itself. Writes only for a trusted
  * workspace and a folder it vouches for: a trusted folder runs its own .claude hooks with nobody watching. A file it cannot read is left alone.
  */
 export function trustFolder(cwd: string, guard: TrustGuard, file = path.join(os.homedir(), '.claude.json'), home = os.homedir()): void {
+  // With Ask before actions on, the trust prompt is one of the asks.
+  if (guard.ask) return
   try {
     const dir = trustKey(fs.realpathSync(cwd))
     if (!vouched(dir, [...(guard.trusted ? guard.roots : []), ...guard.others ?? []])) return
     if (dir === fs.realpathSync(home) || dir === path.parse(dir).root) return
-    // Claude rewrites this file often: read right before the write to keep the window small.
-    const j = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects?: Record<string, Record<string, unknown>> }
-    if (j.projects?.[dir]?.hasTrustDialogAccepted === true) return
-    writeJsonAtomic(file, { ...j, projects: { ...j.projects, [dir]: { ...j.projects?.[dir], hasTrustDialogAccepted: true } } })
+    const read = () => JSON.parse(fs.readFileSync(file, 'utf8')) as { projects?: Record<string, Record<string, unknown>> }
+    if (read().projects?.[dir]?.hasTrustDialogAccepted === true) return
+    // Every live chat rewrites this file: read again under Claude's lock, right before the write.
+    locked(file, () => {
+      const j = read()
+      if (j.projects?.[dir]?.hasTrustDialogAccepted === true) return
+      writeJsonAtomic(file, { ...j, projects: { ...j.projects, [dir]: { ...j.projects?.[dir], hasTrustDialogAccepted: true } } })
+    })
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not trust ${cwd}:`, err)
   }

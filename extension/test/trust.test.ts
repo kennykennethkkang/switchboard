@@ -30,6 +30,41 @@ describe('trustFolder', () => {
     assert.deepEqual(j.projects[C], { hasTrustDialogAccepted: true })
   })
 
+  it('writes nothing with Ask before actions on', () => {
+    fs.writeFileSync(file, JSON.stringify({ projects: {} }))
+    trustFolder(A, { ...ok, ask: true }, file, tmp)
+    assert.deepEqual(read(), { projects: {} })
+  })
+
+  it('waits on a fresh Claude lock, clears a stale one, and frees it after', () => {
+    const lock = `${file}.lock`
+    fs.writeFileSync(file, JSON.stringify({ projects: {} }))
+    fs.mkdirSync(lock)
+    const t = Date.now()
+    trustFolder(A, ok, file, tmp)
+    assert.ok(Date.now() - t >= 900, 'waited')
+    assert.deepEqual(read(), { projects: {} }, 'held lock: no write')
+    const old = new Date(Date.now() - 60_000)
+    fs.utimesSync(lock, old, old)
+    trustFolder(A, ok, file, tmp)
+    assert.equal(read().projects[A].hasTrustDialogAccepted, true)
+    assert.ok(!fs.existsSync(lock))
+  })
+
+  it('gives up on a stale lock it cannot clear', () => {
+    const lock = `${file}.lock`
+    fs.writeFileSync(file, JSON.stringify({ projects: {} }))
+    fs.mkdirSync(lock)
+    fs.writeFileSync(path.join(lock, 'x'), '')
+    const old = new Date(Date.now() - 60_000)
+    fs.utimesSync(lock, old, old)
+    const t = Date.now()
+    trustFolder(A, ok, file, tmp)
+    assert.ok(Date.now() - t < 5000, 'bounded')
+    assert.deepEqual(read(), { projects: {} })
+    fs.rmSync(lock, { recursive: true })
+  })
+
   it('leaves the file alone when already trusted', () => {
     fs.writeFileSync(file, JSON.stringify({ projects: { [A]: { hasTrustDialogAccepted: true } } }))
     fs.utimesSync(file, 1, 1)

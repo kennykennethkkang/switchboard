@@ -6,14 +6,21 @@ import { execFile } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 import { cliPath } from './ais'
+import { cleanInvisible } from './clean-text'
 import { insideCwd } from './local'
+import { dropPending, leftovers, pendingAt } from './progress'
 import type { GitOp, LaneCommit, RepoFile, RepoView } from './types'
 
 const QUICK = 15_000
 const SLOW = 60_000
 const MAIN = /^(main|master)$/
 // No credential prompt, no editor, and status skips index.lock so the refresh never races an op. Pathspecs go literal per call (LIT): set globally it breaks stash -u.
-const ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_EDITOR: 'true', GH_PROMPT_DISABLED: '1', GIT_OPTIONAL_LOCKS: '0' }
+// A window opened by `code` from a chat inherits its markers; the git guard would then refuse the buttons.
+export const gitEnv = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+  const { CLAUDECODE: _a, CLAUDE_CODE_SESSION_ID: _b, SWITCHBOARD_CHAT: _c, ...rest } = env
+  return { ...rest, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_EDITOR: 'true', GH_PROMPT_DISABLED: '1', GIT_OPTIONAL_LOCKS: '0' }
+}
+const ENV = gitEnv(process.env)
 const LIT = '--literal-pathspecs'
 const FORCE = /^(--force(-with-lease|-if-includes)?(=.*)?|-[a-zA-Z]*f[a-zA-Z]*|\+.*)$/
 
@@ -263,6 +270,52 @@ const shown = (f: RepoFile) => (f.from ? `${f.from} → ${f.path}` : f.path)
 const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\0') === [...b].sort().join('\0')
 const isLink = (p: string) => { try { return fs.lstatSync(p).isSymbolicLink() } catch { return false } }
 
+// Never rewritten: binaries and lockfiles.
+const RAW = /\.(vsix|png|jpe?g|gif|webp|ico|pdf|zip|gz|tgz|woff2?|ttf|otf|mp[34]|mov|wasm|exe|dll|so|dylib)$|(^|\/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|Cargo\.lock|poetry\.lock)$/i
+
+type Scrubbed = { n: number; saved: Map<string, Buffer> }
+
+/** Strips invisible characters from the lines this commit adds (lines already in HEAD stay as they are), in the working tree before staging.
+ *  Skips symlinks, files with a NUL in the first 8 KB, and anything not plain UTF-8. saved: originals, for putBack. */
+async function scrub(root: string, files: RepoFile[]): Promise<Scrubbed> {
+  const got: Scrubbed = { n: 0, saved: new Map() }
+  for (const f of files) {
+    if (f.status === 'deleted' || RAW.test(f.path)) continue
+    const full = path.join(root, f.path)
+    if (!(await fs.promises.lstat(full).catch(() => undefined))?.isFile()) continue
+    const buf = await fs.promises.readFile(full)
+    if (buf.subarray(0, 8192).includes(0)) continue
+    const raw = buf.toString('utf8')
+    if (!Buffer.from(raw).equals(buf)) continue
+    // ponytail: line multiset, not a real diff; a moved line counts as old.
+    const head = await git(root, ['show', `HEAD:${f.from ?? f.path}`])
+    const old = new Map<string, number>()
+    if (head.ok) for (const l of head.out.split('\n')) old.set(l, (old.get(l) ?? 0) + 1)
+    let count = 0
+    const text = raw.split('\n').map((l, i) => {
+      const k = old.get(l)
+      if (k) { old.set(l, k - 1); return l }
+      const c = cleanInvisible(l, i === 0)
+      count += c.count
+      return c.text
+    }).join('\n')
+    if (!count) continue
+    got.saved.set(full, buf)
+    await fs.promises.writeFile(full, text)
+    got.n += count
+  }
+  return got
+}
+
+/** A failed add or commit: restore what scrub changed and stage it as it was. */
+async function putBack(root: string, s: Scrubbed, paths: string[], err: string): Promise<GitResult> {
+  if (!s.saved.size) return no(err)
+  for (const [full, buf] of s.saved) await fs.promises.writeFile(full, buf)
+  await stage(root, paths)
+  return no(`${err}; cleaned files were put back`)
+}
+const removed = (n: number) => (n ? `. Removed ${plural(n, 'invisible character')}` : '')
+
 /** git add -A on the paths git can match: a staged rename's old path is gone from disk and index, and add fails on it. */
 async function stage(root: string, paths: string[]): Promise<Ran> {
   if (!paths.length) return { ok: true, out: '', err: '' }
@@ -343,9 +396,11 @@ export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView
   const sent = s.upstream ?? baseRef
   const outgoing = sent ? parseNumstat((await git(root, [LIT, 'diff', '--numstat', '-z', `${sent}...HEAD`])).out) : undefined
   const ci = github && gh && s.branch && s.upstream ? await runFor(root, github, (await pushTarget(root, s)).name, gh).catch(() => undefined) : undefined
+  const ship = (({ take, kept }) => ({ files: take.map(f => f.path), kept: kept.map(shown) }))(shipFiles(s.files))
+  const p = pendingAt(root, (await git(root, ['rev-parse', '-q', '--verify', 'HEAD'])).out.trim() || undefined)
   return {
-    merge, ...(lanes ? { lanes } : {}), ...(outgoing ? { outgoing } : {}),
-    ship: (({ take, kept }) => ({ files: take.map(f => f.path), kept: kept.map(shown) }))(shipFiles(s.files)),
+    merge, ...(lanes ? { lanes } : {}), ...(outgoing ? { outgoing } : {}), ship,
+    ...(p ? { pending: { text: leftovers(p.text, ship.files), last: p.last, at: p.at } } : {}),
     name: path.basename(root), branch: s.branch, upstream: s.upstream, ahead: s.ahead, behind: s.behind, files: s.files, branches: heads, sync: syncAction(s),
     log: log.out.split('\n').filter(Boolean).map(l => { const [hash, subject, when] = l.split('\t'); return { hash, subject: subject ?? '', when: when ?? '' } }),
     stashes: stash.out.split('\n').filter(Boolean).length, github, pr, ...(ci ? { ci } : {}), at: Date.now(),
@@ -375,7 +430,8 @@ export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitRe
   switch (c.op) {
     case 'commit':
     case 'commit-push': {
-      const args = commitArgs(c.summary ?? '', c.description ?? '')
+      const sum = cleanInvisible(c.summary ?? '', false), desc = cleanInvisible(cleanMessage(c.description ?? ''), false)
+      const args = commitArgs(sum.text, desc.text)
       if (typeof args === 'string') return no(args)
       if (!s.branch) return no('Not on a branch (detached HEAD), so nothing was committed')
       const files = pickFiles(s.files, c.files ?? [])
@@ -384,15 +440,19 @@ export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitRe
       const ask = c.op === 'commit-push' ? pushConfirm(t) : undefined
       if (ask) return no(ask)
       const paths = files.flatMap(f => (f.from ? [f.from, f.path] : [f.path]))
+      // Agent files the user checked still go in, untouched.
+      const sc = await scrub(root, shipFiles(files).take)
+      const gone = sum.count + desc.count + sc.n
       const add = await stage(root, paths)
-      if (!add.ok) return no(why(add))
+      if (!add.ok) return putBack(root, sc, paths, why(add))
       // The paths again so anything else already staged stays out of this commit. Hooks may run, hence the long timeout.
       const made = await git(root, [LIT, ...args, '--', ...paths], SLOW)
-      if (!made.ok) return no(why(made))
+      if (!made.ok) return putBack(root, sc, paths, why(made))
+      dropPending(root)
       const done = `Committed ${plural(files.length, 'file')} to ${s.branch}`
-      if (c.op === 'commit') return { ok: true, text: done }
+      if (c.op === 'commit') return { ok: true, text: done + removed(gone) }
       const p = await push(root, t)
-      return p.ok ? { ok: true, text: `${done} and pushed to ${t.remote}/${t.name}` } : no(`${done}, but the push failed: ${why(p)}`)
+      return p.ok ? { ok: true, text: `${done} and pushed to ${t.remote}/${t.name}${removed(gone)}` } : no(`${done}, but the push failed: ${why(p)}${removed(gone)}`)
     }
     case 'ship': {
       // The card's one press: every change but agent files, then push. Never pulls, never forces.
@@ -412,9 +472,10 @@ export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitRe
       if (!ls.ok) return no(`Can't reach ${t.remote} (${why(ls)}), so nothing was committed`)
       const tip = ls.out.split('\t')[0].trim()
       if (tip && !(await git(root, ['merge-base', '--is-ancestor', tip, 'HEAD'])).ok) return no(`Pull first: ${t.remote}/${t.name} has commits this branch does not`)
-      let done = ''
+      let done = '', gone = 0
       if (take.length) {
-        const args = commitArgs(c.summary ?? '', cleanMessage(c.description ?? ''))
+        const sum = cleanInvisible(c.summary ?? '', false), desc = cleanInvisible(cleanMessage(c.description ?? ''), false)
+        const args = commitArgs(sum.text, desc.text)
         if (typeof args === 'string') return no(args)
         // Agent files out of the index, the rest in, then commit the index as it stands. --no-renames: a rename lists both sides.
         const out = kept.flatMap(f => (f.from ? [f.from, f.path] : [f.path]))
@@ -423,16 +484,32 @@ export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitRe
           const r = await git(root, [LIT, 'reset', '-q', '--', ...staged])
           if (!r.ok) return no(why(r))
         }
-        const add = await stage(root, take.filter(f => !held.has(f.path)).map(f => f.path))
-        if (!add.ok) return no(why(add))
+        const ship = take.filter(f => !held.has(f.path))
+        const sc = await scrub(root, ship), shipPaths = ship.map(f => f.path)
+        gone = sum.count + desc.count + sc.n
+        const add = await stage(root, shipPaths)
+        if (!add.ok) return putBack(root, sc, shipPaths, why(add))
         const made = await git(root, args, SLOW)
-        if (!made.ok) return no(why(made))
+        if (!made.ok) return putBack(root, sc, shipPaths, why(made))
+        dropPending(root)
         done = `Committed ${plural(take.length, 'file')} to ${s.branch}`
       }
       const p = await push(root, t)
       const left = kept.length ? `; left out ${kept.map(shown).join(', ')}` : ''
-      if (!p.ok) return no(`${done ? `${done}, but the push failed` : 'The push failed'}: ${why(p)}`)
-      return { ok: true, text: `${done ? `${done} and pushed` : `Pushed ${s.branch}`} to ${t.remote}/${t.name}${left}` }
+      if (!p.ok) return no(`${done ? `${done}, but the push failed` : 'The push failed'}: ${why(p)}${removed(gone)}`)
+      return { ok: true, text: `${done ? `${done} and pushed` : `Pushed ${s.branch}`} to ${t.remote}/${t.name}${left}${removed(gone)}` }
+    }
+    case 'push': {
+      // The phone's push: the current branch to its own upstream, fast-forward only (git refuses anything else without force).
+      if (!s.branch) return no('Not on a branch (detached HEAD)')
+      const t = await pushTarget(root, s)
+      if (!t.publish && !s.ahead) return no('Nothing to push')
+      if (s.behind && !t.publish) return no(`Pull first: ${s.upstream} has ${plural(s.behind, 'commit')} this branch does not`)
+      const ask = pushConfirm(t)
+      if (ask) return no(ask)
+      const p = await push(root, t)
+      if (!p.ok) return no(why(p))
+      return { ok: true, text: t.publish ? `Published ${s.branch} to ${t.remote}/${t.name}` : `Pushed ${plural(s.ahead, 'commit')} to ${t.remote}/${t.name}` }
     }
     case 'sync': {
       if (!s.branch) return no('Not on a branch (detached HEAD)')

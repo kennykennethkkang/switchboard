@@ -322,7 +322,7 @@ describe('browser link', () => {
       stop: (pid: number) => { stopped.push(pid); up = false }, lan: async () => null, listeners: async () => (up ? [60] : []),
       command: async () => cmd, bundle, stage, version: '0.2.0', refresh: true, tries: 3, waitMs: 1, pidFile: pidFile(),
     })
-    await run('node /Users/k/agent-flow/app/dist/app.js -p 3131')
+    await run('node /Users/k/switchboard/app/dist/app.js -p 3131')
     assert.deepEqual(stopped, [])
     await run(`Code Helper (Plugin) ${path.join(stage, 'app.js')} -p 3131 --no-open --lan`)
     assert.deepEqual(stopped, [60])

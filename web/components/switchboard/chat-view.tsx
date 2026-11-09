@@ -127,7 +127,7 @@ function Transcript({ sessionId, demo, body }: { sessionId: string; demo?: HubSt
   if (t === undefined) return <p className="cv-mute" role="status">Reading the transcript…</p>
   if (t === null) return <p className="cv-mute">No transcript for this chat on this Mac.</p>
   if (typeof t === 'string') return <p className="cv-mute">Could not read the transcript: {t}</p>
-  if (t.transcript === 'unsupported') return <p className="cv-mute">Codex chats have no transcript here yet.</p>
+  if (t.transcript === 'unsupported') return <p className="cv-mute">No Codex rollout for this chat on this Mac.</p>
   return (
     <div className="cv-tr">
       {t.before !== null ? <button type="button" className="hub-btn cv-earlier" disabled={busy} onClick={() => void earlier()}>{busy ? 'Loading…' : 'Load earlier'}</button>

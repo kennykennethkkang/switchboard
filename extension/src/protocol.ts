@@ -1,6 +1,7 @@
 import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub/types'
 import type { MemoryGraph } from './hub/graph'
 import type { RunDetail } from './hub/runs'
+import type { FlowMap } from './hub/flowmap'
 import type { ChatOutputs, ChatTranscript } from './hub/chat-view'
 /**
  * Message protocol between VS Code extension host and webview.
@@ -65,6 +66,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'graph'; id: string; graph?: MemoryGraph; problem?: string }
   /** The answer to runs-get. */
   | { type: 'runs'; id: string; runs?: RunDetail[]; problem?: string }
+  /** The answer to flowmap-get. */
+  | { type: 'flowmap'; id: string; map?: FlowMap; problem?: string }
   /** The answer to chat-get: the one asked for, a shot as a data URL; none of them for an unknown chat. */
   | { type: 'chat'; id: string; outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; problem?: string }
 
@@ -93,6 +96,8 @@ export type WebviewToExtensionMessage =
   | { type: 'graph-get'; id: string }
   /** The node drawer asks for a role's runs in a chat; answered by 'runs' with the same id. */
   | { type: 'runs-get'; id: string; sessionId: string; role: string }
+  /** The Flow map asks for cwd's map; answered by 'flowmap' with the same id. */
+  | { type: 'flowmap-get'; id: string; cwd: string }
   /** The chat view asks for a chat's outputs, a transcript page or one screenshot; answered by 'chat' with the same id. */
   | { type: 'chat-get'; id: string; sessionId: string; what: 'outputs' | 'transcript' | 'shot'; before?: number; path?: string }
   | { type: 'hub-send'; sessionId: string; text: string }
@@ -104,13 +109,20 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
   | { type: 'hub-switchboard'; key: SwitchboardKey; value: boolean | number | string | null }
   | { type: 'hub-compact'; sessionId: string }
+  | { type: 'hub-pause'; action: 'resume' | 'cancel' }
+  | { type: 'hub-hand-to'; sessionId: string }
+  | { type: 'hub-ai-login'; ai: AiId }
   | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
   | { type: 'hub-star'; sessionId: string; ai: AiId; on: boolean }
   | { type: 'hub-resume'; sessionId: string; ai: AiId }
+  | { type: 'hub-archive'; sessionId: string }
+  | { type: 'hub-unarchive'; sessionId: string }
+  | { type: 'hub-approve'; sessionId: string }
   | { type: 'hub-open-note'; sessionId: string }
   | { type: 'hub-focus-chat'; sessionId: string }
+  | { type: 'hub-terminal'; id: number; act: 'show' | 'close' }
   | { type: 'hub-keep'; onFull?: 'compact' | 'fresh'; freshBranch?: boolean }
   | { type: 'hub-aws-login'; profile: string; chrome?: string }
   | { type: 'hub-aws-default'; profile: string }
@@ -132,6 +144,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-key-save'; name: ApiKeyName; value: string }
   | { type: 'hub-key-test'; name: ApiKeyName }
   | { type: 'hub-key-remove'; name: ApiKeyName }
+  | { type: 'hub-env-setup'; folder: string }
   | { type: 'hub-kit-export' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
@@ -140,17 +153,27 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-handoff'; sessionId: string }
   /** The SkillSpector sweep: name rescans one tool, none sweeps everything installed. */
   | { type: 'hub-sweep'; name?: string }
+  | { type: 'hub-spend'; key: string; mode: 'provider' | 'cap' | 'ask'; monthlyUsd?: number }
   | { type: 'hub-sweep-approve'; name: string }
+  /** A Learning ready card: ok applies it, false discards it. */
+  | { type: 'hub-learn'; id: string; ok: boolean }
+  | { type: 'hub-summary'; sessionId: string; refresh?: boolean }
   | { type: 'hub-sweep-fix'; name: string }
   /** Add a plugin or skill from GitHub: owner/repo or an https://github.com link, swept on the way in. */
   | { type: 'hub-tool-add'; repo: string }
   | { type: 'hub-dev-start'; folder: string }
   | { type: 'hub-dev-stop'; folder: string }
+  | { type: 'hub-window-tab'; op: 'merge' | 'split' | 'popout' | 'show'; workspace?: string }
   | { type: 'hub-awake'; on: boolean }
   | { type: 'hub-device'; id: string; allow: boolean }
   /** A stuck item (HubState.stuck) by id: stop its process (re-checked under the chat's claude), or dismiss it for 30 min. */
   | { type: 'hub-stuck-stop'; sessionId: string; id: string }
   | { type: 'hub-stuck-dismiss'; sessionId: string; id: string }
+  /** Fix: stop its process when it has one, then tell the chat what happened and what to do next. */
+  | { type: 'hub-stuck-fix'; sessionId: string; id: string }
+  /** from waits on to: told to call chats_wait and go on once to finishes clean. */
+  | { type: 'hub-wait-for'; from: string; to: string }
+  | { type: 'hub-unlink'; from: string; to: string }
   | { type: 'hub-changes'; sessionId: string }
   | { type: 'hub-open-diff'; sessionId: string; file: string }
   | { type: 'hub-search'; q: string }
@@ -159,6 +182,7 @@ export type WebviewToExtensionMessage =
   /** The Jarvis mic: on records the Mac mic, off stops it; the transcript lands in the box as HubState.heard. */
   | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
+  | { type: 'hub-harden'; sessionId: string }
   | { type: 'hub-todo-add'; path: string; text: string }
   | { type: 'hub-todo-edit'; path: string; id: string; text: string }
   | { type: 'hub-todo-remove'; path: string; id: string }
@@ -167,6 +191,7 @@ export type WebviewToExtensionMessage =
   /** A suggestion a finished chat left: into the to-do, or gone. */
   | { type: 'hub-todo-accept'; path: string; id: string }
   | { type: 'hub-todo-dismiss'; path: string; id: string }
+  | { type: 'hub-todo-move'; path: string; ids: string[] }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
   | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
   | { type: 'hub-todo-sync'; path: string; on: boolean }

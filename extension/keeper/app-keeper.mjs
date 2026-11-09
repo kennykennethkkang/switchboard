@@ -1,5 +1,6 @@
 // Keeps the Switchboard browser app up. launchd runs this (src/hub/keeper.ts installs it); it starts the app
 // the way the extension last did (app.args) when nothing answers on its port, and otherwise waits.
+// app.nokeep (Settings, Keep Switchboard app running off) stops it starting anything; an app that keeps dying at start is retried less and less often.
 import { execFile, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
@@ -24,8 +25,10 @@ const listeners = port => new Promise(done => execFile(fs.existsSync('/usr/sbin/
 const alive = pid => { try { process.kill(pid, 0); return true } catch (e) { return e.code === 'EPERM' } }
 const fresh = (file, ms) => { try { return Date.now() - fs.statSync(file).mtimeMs < ms } catch { return false } }
 
-export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), everyMs = 2000, misses = 3, log = console.log } = {}) {
-  let down = 0, stopped = false, timer
+const BACKOFF_MAX = 5 * 60_000
+
+export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), everyMs = 2000, misses = 3, backoffMs = 5000, log = console.log } = {}) {
+  let down = 0, stopped = false, timer, fails = 0, waitUntil = 0
 
   const start = async (launch, port) => {
     const file = path.join(dir, 'app.log')
@@ -42,18 +45,25 @@ export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), 
     child.once('exit', () => { gone = true })
     for (let i = 0; i < 50 && !gone && !(await answers(port)); i++) await sleep(200)
     // A click's start that took the port first makes this one exit; its pid in app.pid stays.
-    if (gone || !alive(child.pid)) log('the app exited; trying again later')
-    else if ((await listeners(port)).includes(child.pid)) fs.writeFileSync(path.join(dir, 'app.pid'), String(child.pid))
+    if (gone || !alive(child.pid)) {
+      const wait = Math.min(BACKOFF_MAX, backoffMs * 2 ** fails++)
+      waitUntil = Date.now() + wait
+      log(`the app exited; trying again in ${Math.round(wait / 1000)} s`)
+      return
+    }
+    fails = 0
+    if ((await listeners(port)).includes(child.pid)) fs.writeFileSync(path.join(dir, 'app.pid'), String(child.pid))
     else log(`port ${port} is held, but not by the app it started (${child.pid}); app.pid left as is`)
   }
 
   const tick = async () => {
+    if (fs.existsSync(path.join(dir, 'app.nokeep')) || Date.now() < waitUntil) return
     let launch
     try { launch = JSON.parse(fs.readFileSync(path.join(dir, 'app.args'), 'utf8')) } catch { return }
     if (!Array.isArray(launch?.args) || !fs.existsSync(launch.args[0])) return
     const port = Number(launch.args[launch.args.indexOf('-p') + 1]) || 3131
     // ensureWeb holds app.lock while it stops and starts the app for an update; past a minute it is left over.
-    if ((await answers(port)) || fresh(path.join(dir, 'app.lock'), 60_000)) { down = 0; return }
+    if ((await answers(port)) || fresh(path.join(dir, 'app.lock'), 60_000)) { down = 0; fails = 0; return }
     if (++down < misses) return
     down = 0
     await start(launch, port)

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gearRows, keywordHit, roleModels } from './gear-rows'
-import type { Connection, Installed } from './hub-types'
+import { gearRows, keywordHit, roleModels, sweepBadge, sweepTip } from './gear-rows'
+import type { Connection, Installed, SweepRecord } from './hub-types'
 import { demoHub } from './hub-demo'
 
 const installed: Installed[] = [
@@ -80,4 +80,21 @@ test('a swept plugin or skill shows its sweep badge; one with no result shows no
   assert.deepEqual(r.Plugins, ['superpowers (2, review)', 'code-review (1)', 'codex (2, approved)', 'github (off)'])
   assert.deepEqual(r.Skills, ['phone (clean)', 'skill-inspector'])
   assert.deepEqual(r.Mods, ['usage-meter'])
+})
+
+test('a human review quiets the sweep badge until the files change', () => {
+  const rec: SweepRecord = { kind: 'plugin', path: '/p', digest: 'd1', scannedAt: 1, state: 'review', severity: 'CRITICAL', reviewed: { verdict: 'CAUTION', why: 'shells out to git', at: 2, digest: 'd1' } }
+  assert.equal(sweepBadge(rec), 'Reviewed')
+  assert.equal(sweepTip(rec), 'CAUTION: shells out to git')
+  assert.equal(sweepBadge({ ...rec, digest: 'd2' }), 'Review')
+  assert.equal(sweepTip({ ...rec, digest: 'd2' }), undefined)
+  // A hold still needs Approve, so it keeps the Review badge and its button.
+  assert.equal(sweepBadge({ ...rec, hold: true }), 'Review')
+  assert.equal(sweepBadge({ ...rec, hold: true, approvedAt: 3, approvedDigest: 'd1' }), 'Approved')
+  // An approval for older files does not count: Review and its Approve button come back.
+  assert.equal(sweepBadge({ ...rec, digest: 'd2', reviewed: { ...rec.reviewed!, digest: 'd2' }, hold: true, approvedAt: 3, approvedDigest: 'd1' }), 'Review')
+  const rows = gearRows({ installed: [{ kind: 'plugin', name: 'x@m', enabled: true, description: 'X tool' } as Installed], connections: [], sweep: { busy: false, tools: { 'x@m': rec } } }, '')
+  const plugins = rows.find(r => r.label === 'Plugins')!
+  assert.match(plugins.names[0], /\(reviewed\)/)
+  assert.equal(plugins.tips[0], 'X tool. CAUTION: shells out to git')
 })

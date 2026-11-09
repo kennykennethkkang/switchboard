@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Standalone setup script for Agent Flow.
+ * Standalone setup script for the Switchboard browser app.
  *
  * Performs the same hook configuration that the VS Code extension does on
  * activation, so developers can run the webview in dev mode without needing
  * to launch the extension in the debugger first.
  *
  * What it does:
- *   1. Installs the hook forwarding script at ~/.claude/agent-flow/hook.js
+ *   1. Installs the hook forwarding script at ~/.claude/switchboard-app/hook.js
  *   2. Configures Claude Code hooks in ~/.claude/settings.json
  */
 'use strict'
@@ -17,14 +17,16 @@ const path = require('path')
 const os = require('os')
 const { execFileSync } = require('child_process')
 
-const DISCOVERY_DIR = path.join(os.homedir(), '.claude', 'agent-flow')
+const DISCOVERY_DIR = path.join(os.homedir(), '.claude', 'switchboard-app')
 const HOOK_SCRIPT_PATH = path.join(DISCOVERY_DIR, 'hook.js')
 const SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json')
 
 const HOOK_TIMEOUT_S = 2
 const HOOK_SAFETY_MARGIN_MS = 500
 const HOOK_FORWARD_TIMEOUT_MS = 1000
-const HOOK_COMMAND_MARKER = 'agent-flow/hook.js'
+const HOOK_COMMAND_MARKER = 'switchboard-app/hook.js'
+// Written before the rename; still ours, so setup swaps them for the new one.
+const LEGACY_COMMAND_MARKERS = ['agent-flow/hook.js']
 
 // ─── Resolve node path ──────────────────────────────────────────────────────
 
@@ -43,7 +45,8 @@ function resolveNodePath() {
 
 function getHookScriptContent() {
   return `#!/usr/bin/env node
-// Agent Flow hook forwarder v4: installed by the Agent Flow setup script.
+// Switchboard hook forwarder v6: installed by the Switchboard setup script.
+// v6: SWITCHBOARD_ROLE_RUN tags the event role_run (plus role_parent), so a Codex role run is no chat of its own.
 // Claude Code invokes this as a command hook. It reads a discovery directory to
 // find live extension instances, checks their PIDs, and forwards the event via
 // HTTP POST. Dead instances are cleaned up automatically.
@@ -55,7 +58,7 @@ const os = require('os');
 
 setTimeout(() => process.exit(0), ${HOOK_TIMEOUT_S * 1000 - HOOK_SAFETY_MARGIN_MS});
 
-const DIR = path.join(os.homedir(), '.claude', 'agent-flow');
+const DIR = path.join(os.homedir(), '.claude', 'switchboard-app');
 const IS_WIN = process.platform === 'win32';
 
 function normPath(p) {
@@ -73,9 +76,14 @@ let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', c => { input += c; });
 process.stdin.on('end', () => {
-  let cwd;
-  try { cwd = JSON.parse(input).cwd; } catch { process.exit(0); }
+  let cwd, ev;
+  try { ev = JSON.parse(input); cwd = ev.cwd; } catch { process.exit(0); }
   if (!cwd) process.exit(0);
+  if (process.env.SWITCHBOARD_ROLE_RUN) {
+    ev.role_run = process.env.SWITCHBOARD_ROLE_RUN;
+    if (process.env.CLAUDE_CODE_SESSION_ID) ev.role_parent = process.env.CLAUDE_CODE_SESSION_ID;
+    input = JSON.stringify(ev);
+  }
 
   const resolvedCwd = normPath(cwd);
 
@@ -161,9 +169,21 @@ const HOOK_EVENTS = [
   'SubagentStart', 'SubagentStop', 'Notification', 'PermissionRequest', 'Stop', 'StopFailure', 'SessionEnd',
 ]
 
-function isAgentFlowHook(entry) {
+// Mirrors CODEX_HOOK_EVENTS in extension/src/hook-entries.ts.
+const CODEX_HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop']
+const CODEX_HOOKS_PATH = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'hooks.json')
+
+function hookPath(h) {
+  return h.command?.replace(/\\/g, '/') ?? ''
+}
+
+function isCurrentHook(entry) {
+  return !!entry?.hooks?.some(h => hookPath(h).includes(HOOK_COMMAND_MARKER))
+}
+
+function isSwitchboardHook(entry) {
   return !!entry?.hooks?.some(h =>
-    h.command?.replace(/\\/g, '/').includes(HOOK_COMMAND_MARKER) ||
+    [HOOK_COMMAND_MARKER, ...LEGACY_COMMAND_MARKERS].some(m => hookPath(h).includes(m)) ||
     (typeof h.url === 'string' && LEGACY_HOOK_URL_RE.test(h.url)),
   )
 }
@@ -205,7 +225,7 @@ function writeJsonAtomic(target, value) {
 }
 
 /** Returns true if hooks were written, false if the settings file was left alone. */
-function configureHooks(settingsPath = SETTINGS_PATH, hookCommand) {
+function configureHooks(settingsPath = SETTINGS_PATH, hookCommand, events = HOOK_EVENTS) {
   if (!hookCommand) hookCommand = `"${resolveNodePath()}" "${HOOK_SCRIPT_PATH}"`
   const hookEntry = { hooks: [{ type: 'command', command: hookCommand, timeout: HOOK_TIMEOUT_S }] }
 
@@ -217,15 +237,21 @@ function configureHooks(settingsPath = SETTINGS_PATH, hookCommand) {
   }
 
   const existingHooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {}
-  for (const event of HOOK_EVENTS) {
+  for (const event of events) {
     const existing = Array.isArray(existingHooks[event]) ? existingHooks[event] : []
-    existingHooks[event] = [...existing.filter(entry => !isAgentFlowHook(entry)), hookEntry]
+    existingHooks[event] = [...existing.filter(entry => !isSwitchboardHook(entry)), hookEntry]
   }
   settings.hooks = existingHooks
 
   writeJsonAtomic(settingsPath, settings)
-  console.log('Configured Claude Code hooks in:', settingsPath)
+  console.log('Configured hooks in:', settingsPath)
   return true
+}
+
+/** Same entry in Codex's hooks.json; skipped when Codex has no home folder. */
+function configureCodexHooks(hooksPath = CODEX_HOOKS_PATH, hookCommand) {
+  if (!fs.existsSync(path.dirname(hooksPath))) return false
+  return configureHooks(hooksPath, hookCommand, CODEX_HOOK_EVENTS)
 }
 
 // ─── Detection ──────────────────────────────────────────────────────────────
@@ -237,7 +263,7 @@ function isAlreadySetup(settingsPath = SETTINGS_PATH, hookScriptPath = HOOK_SCRI
   const hooks = settings?.hooks
   if (!hooks || typeof hooks !== 'object') return false
   return Object.values(hooks).some(entries =>
-    Array.isArray(entries) && entries.some(entry => isAgentFlowHook(entry)),
+    Array.isArray(entries) && entries.some(isCurrentHook),
   )
 }
 
@@ -246,26 +272,28 @@ function isAlreadySetup(settingsPath = SETTINGS_PATH, hookScriptPath = HOOK_SCRI
 /** Ensure hooks are configured, skip silently if already set up. */
 function ensureSetup() {
   // An older hook.js sends no token and every hook gets a 403; ensureHookScript skips when it matches.
-  if (isAlreadySetup()) { ensureHookScript(); return }
+  if (isAlreadySetup()) { ensureHookScript(); configureCodexHooks(); return }
   console.log('Setting up agent hooks...')
   ensureHookScript()
   configureHooks()
+  configureCodexHooks()
   console.log('')
 }
 
-module.exports = { ensureSetup, isAgentFlowHook, configureHooks, isAlreadySetup }
+module.exports = { ensureSetup, getHookScriptContent, isSwitchboardHook, configureHooks, configureCodexHooks, isAlreadySetup, CODEX_HOOK_EVENTS }
 
 // Run directly: node scripts/setup.js [--force]
 if (require.main === module) {
   const force = process.argv.includes('--force')
 
   if (!force && isAlreadySetup()) {
-    console.log('Agent Flow is already set up. Run with --force to reconfigure.')
+    console.log('Switchboard is already set up. Run with --force to reconfigure.')
     process.exit(0)
   }
 
-  console.log('Setting up Agent Flow...\n')
+  console.log('Setting up Switchboard...\n')
   ensureHookScript()
   if (!configureHooks()) process.exit(1)
-  console.log('\nDone! New sessions will stream events to Agent Flow.')
+  configureCodexHooks()
+  console.log('\nDone! New sessions will stream events to Switchboard.')
 }

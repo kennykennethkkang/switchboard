@@ -2,6 +2,8 @@
 
 ## Trademarks
 
+This policy is Simon Patole's, carried over from [Agent Flow](https://github.com/patoles/agent-flow). Switchboard follows it: it uses its own name and icons and describes itself only as a fork of Agent Flow.
+
 The name **"Agent Flow"** and any associated logos are trademarks of Simon Patole.
 
 ## What This Means
@@ -31,8 +33,8 @@ If you fork or create a derivative work of Agent Flow, you must:
 2. Remove any Agent Flow logos or branding
 3. Clearly indicate that your project is a fork or derivative of Agent Flow
 
-This is the same approach used by projects like Firefox, Rust, and Kubernetes — the code is open, but the brand is protected.
+This is the same approach used by projects like Firefox, Rust, and Kubernetes: the code is open, but the brand is protected.
 
 ## Questions
 
-If you have questions about whether a specific use of the Agent Flow trademarks is permitted, please open an issue in this repository.
+If you have questions about whether a specific use of the Agent Flow trademarks is permitted, please open an issue in the [Agent Flow repository](https://github.com/patoles/agent-flow).

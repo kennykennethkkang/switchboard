@@ -1,0 +1,2 @@
+/* Settings text and number fields; globals only size selects for touch. */
+@media (pointer: coarse) { .hub-set-row input.hub-select { min-height: 44px; } }

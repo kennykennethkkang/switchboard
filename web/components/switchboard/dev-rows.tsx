@@ -33,7 +33,7 @@ export function DevRows({ dev, tailscale, isVSCode, send }: { dev: DevProject[];
                       <span className="hub-chip" style={{ color: 'var(--hub-green)', background: 'var(--hub-green-soft)' }}><i aria-hidden />:{d.port}</span>
                       <button type="button" className="hub-btn sm" disabled={!openable} onClick={() => open(d)}
                         title={openable ? undefined : 'Not on the tailnet yet: open it on the Mac'}>Open</button>
-                      {d.link && <button type="button" className="hub-btn sm" aria-expanded={qr === d.folder} onClick={() => setQr(qr === d.folder ? undefined : d.folder)}>Phone</button>}
+                      {d.link && <button type="button" className="hub-btn sm" aria-expanded={qr === d.folder} onClick={() => setQr(qr === d.folder ? undefined : d.folder)}>Open on phone</button>}
                       <button type="button" className="hub-btn sm" onClick={() => send({ type: 'hub-dev-stop', folder: d.folder })}>Stop</button>
                     </>
                   : <button type="button" className="hub-btn sm" title={`${d.command} in ${d.project}`} onClick={() => send({ type: 'hub-dev-start', folder: d.folder })}>

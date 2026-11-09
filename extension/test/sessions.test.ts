@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { ask } from '../src/hub/projects'
 import { chatRows, newer, RC_NAME, rcInList, rcPattern, rcRunning, rcRunningNow, rcServerCommand, rcTargets } from '../src/hub/sessions'
 
 const NOW = 1_800_000_000_000
@@ -66,6 +67,8 @@ describe('rcServerCommand', () => {
   it('starts the one machine-wide server, sharing its folder, that never prompts', () => {
     assert.equal(RC_NAME, 'Mac')
     assert.equal(rcServerCommand(), "claude remote-control --name 'Mac' --spawn same-dir --permission-mode bypassPermissions")
+    ask.claude = true
+    try { assert.equal(rcServerCommand(), "claude remote-control --name 'Mac' --spawn same-dir --permission-mode default") } finally { ask.claude = false }
     assert.ok(new RegExp(rcPattern(RC_NAME)).test(rcServerCommand().replace(/'/g, '')))
   })
 })

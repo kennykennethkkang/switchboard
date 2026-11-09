@@ -7,21 +7,21 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { chainBase, chainVersion, chatLabel, cloneTarget, codexNote, freshPrompt, handoffFile, labelNote, mergeProjects, newChatCommand, nextChainName, projectName, repoTop, scriptBody, scriptLine, stillRunning } from '../src/hub/projects'
+import { ask, chainBase, chainVersion, chatLabel, codexArgs, cloneTarget, codexNote, crossNote, freshPrompt, handoffFile, labelNote, mergeProjects, newChatCommand, nextChainName, projectName, repoTop, scriptBody, scriptLine, stillRunning } from '../src/hub/projects'
 
 describe('projectName', () => {
   it('names a folder by the git repo holding it, else its last part', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-repo-'))
     try {
-      fs.mkdirSync(path.join(tmp, 'agent-flow', '.git'), { recursive: true })
-      fs.mkdirSync(path.join(tmp, 'agent-flow', 'extension', 'src'), { recursive: true })
+      fs.mkdirSync(path.join(tmp, 'switchboard', '.git'), { recursive: true })
+      fs.mkdirSync(path.join(tmp, 'switchboard', 'extension', 'src'), { recursive: true })
       // A worktree or submodule has a .git file.
       fs.mkdirSync(path.join(tmp, 'wt', 'app'), { recursive: true })
       fs.writeFileSync(path.join(tmp, 'wt', '.git'), 'gitdir: /x')
       fs.mkdirSync(path.join(tmp, 'plain'))
-      assert.equal(projectName(path.join(tmp, 'agent-flow', 'extension')), 'agent-flow')
-      assert.equal(projectName(path.join(tmp, 'agent-flow', 'extension', 'src')), 'agent-flow')
-      assert.equal(repoTop(path.join(tmp, 'agent-flow', 'extension')), path.join(tmp, 'agent-flow'))
+      assert.equal(projectName(path.join(tmp, 'switchboard', 'extension')), 'switchboard')
+      assert.equal(projectName(path.join(tmp, 'switchboard', 'extension', 'src')), 'switchboard')
+      assert.equal(repoTop(path.join(tmp, 'switchboard', 'extension')), path.join(tmp, 'switchboard'))
       assert.equal(projectName(path.join(tmp, 'wt', 'app')), 'wt')
       assert.equal(projectName(path.join(tmp, 'plain')), 'plain')
       assert.equal(repoTop(path.join(tmp, 'plain')), undefined)
@@ -42,8 +42,8 @@ describe('projects', () => {
 
   it('accepts GitHub repos as owner/repo or a URL and refuses anything else', () => {
     assert.deepEqual(cloneTarget('kennykennethkkang/Armasu'), { url: 'https://github.com/kennykennethkkang/Armasu.git', name: 'Armasu' })
-    assert.deepEqual(cloneTarget('https://github.com/patoles/agent-flow'), { url: 'https://github.com/patoles/agent-flow.git', name: 'agent-flow' })
-    assert.deepEqual(cloneTarget('git@github.com:patoles/agent-flow.git'), { url: 'git@github.com:patoles/agent-flow.git', name: 'agent-flow' })
+    assert.deepEqual(cloneTarget('https://github.com/patoles/switchboard'), { url: 'https://github.com/patoles/switchboard.git', name: 'switchboard' })
+    assert.deepEqual(cloneTarget('git@github.com:patoles/switchboard.git'), { url: 'git@github.com:patoles/switchboard.git', name: 'switchboard' })
     assert.equal(cloneTarget('https://evil.example/x/y'), undefined)
     assert.equal(cloneTarget('a/b; rm -rf ~'), undefined)
     assert.equal(cloneTarget('../../etc'), undefined)
@@ -153,4 +153,35 @@ describe('handoff notes', () => {
     assert.match(note, /Folder: \/u\/Armasu\nBranch: main\nPlan: \/u\/Armasu\/p\.md\n/)
     assert.ok(note.includes('x'.repeat(500)) && !note.includes('x'.repeat(501)))
   })
+})
+
+describe('crossNote', () => {
+  it('seeds the other AI with goal, summary and files', () => {
+    const n = crossNote({ from: 'claude', project: 'switchboard', cwd: '/r/switchboard', asked: ['first ask', 'Fix the login row'], done: ['Added detect'], tools: [{ tool: 'Edit', target: 'src/a.ts' }, { tool: 'Bash', target: 'pnpm test' }, { tool: 'Write', target: 'src/a.ts' }, { tool: 'apply_patch', target: 'src/b.ts' }] })
+    assert.match(n, /^Handoff from Claude in switchboard/)
+    assert.match(n, /Goal: Fix the login row/)
+    assert.match(n, /- Added detect/)
+    assert.match(n, /Files touched: src\/a\.ts, src\/b\.ts$/m)
+    assert.doesNotMatch(n, /pnpm test/)
+  })
+  it('says so when there is nothing to carry', () => {
+    const n = crossNote({ from: 'codex', project: 'p', cwd: '/p' })
+    assert.match(n, /^Handoff from Codex in p/)
+    assert.match(n, /Goal: \(not recorded\)/)
+  })
+})
+
+it('starts and resumes Codex chats with no approval prompts and our hooks trusted', () => {
+  const flags = ['--dangerously-bypass-approvals-and-sandbox', '--dangerously-bypass-hook-trust']
+  assert.deepEqual(codexArgs(['Fix login']), [...flags, 'Fix login'])
+  assert.deepEqual(codexArgs([]), flags)
+  assert.deepEqual(codexArgs(['resume', 'abc']), ['resume', ...flags, 'abc'])
+})
+
+it('Ask before actions on for Codex: approvals come back, our hooks stay trusted', () => {
+  ask.codex = true
+  try {
+    assert.deepEqual(codexArgs(['Fix login']), ['--dangerously-bypass-hook-trust', 'Fix login'])
+    assert.deepEqual(codexArgs(['resume', 'abc']), ['resume', '--dangerously-bypass-hook-trust', 'abc'])
+  } finally { ask.codex = false }
 })

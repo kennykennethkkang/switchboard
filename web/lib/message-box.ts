@@ -14,3 +14,10 @@ export function boxNote(chat: ChatRow): string | undefined {
 export function sendFailure(sent: HubCommand | undefined, problem: { text: string; at: number; for?: HubCommand } | null): string | undefined {
   return sent && problem?.for === sent ? problem.text : undefined
 }
+
+export type Keywords = { ultrathink: boolean; ultracode: boolean }
+/** Claude Code's prompt keywords, added at the end for one send: ultrathink thinks harder this turn, ultracode runs a multi-agent workflow. */
+export function withKeywords(text: string, on: Keywords): string {
+  const add = (['ultrathink', 'ultracode'] as const).filter(k => on[k])
+  return text && add.length ? `${text} ${add.join(' ')}` : text
+}

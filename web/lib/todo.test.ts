@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { finishUp, inside, openCount, openElsewhere, ordered, runCount, runIds, runLanded, runTargets, withHome } from './todo'
+import { aiPath, busiestTodo, moved, finishUp, inside, openCount, openElsewhere, ordered, runCount, runIds, runLanded, runTargets, withHome } from './todo'
 import type { ChatRow, TodoItem } from './hub-types'
 
 const t = (id: string, before?: string): TodoItem => ({ id, text: id, at: 1, ...(before ? { before } : {}) })
@@ -61,5 +61,31 @@ describe('run landed', () => {
     const list: TodoItem[] = [{ id: 'a', text: 'A', at: 1 }, { id: 'p', text: 'P', at: 1, before: 'a' }, { id: 'pp', text: 'PP', at: 1, before: 'p' }, { id: 'x', text: 'X', at: 1 }]
     assert.deepEqual([...runIds(list, ['a', 'gone'])].sort(), ['a', 'p', 'pp'])
     assert.equal(runCount(list, ['a']), 3)
+  })
+})
+
+describe('aiPath and moved', () => {
+  const chat = (sessionId: string, more: Partial<ChatRow> = {}): ChatRow => ({ pid: 1, sessionId, cwd: '/r', link: '', live: true, why: [], ...more })
+  const arch = (v: number, ai: 'claude' | 'codex') => ({ sessionId: `v${v}`, ai, name: 'x', origin: 'Fix', version: v, cwd: '/r', project: 'r', archivedAt: v })
+  it('names the AI, and the change when a handoff moved it', () => {
+    assert.equal(aiPath('c', [chat('c')]), 'Claude')
+    assert.equal(aiPath('c', [chat('c', { ai: 'codex' })]), 'Codex')
+    assert.equal(aiPath('c', [chat('c', { ai: 'codex', chain: 'Fix' })], [arch(2, 'claude'), arch(1, 'claude')]), 'Claude to Codex')
+    assert.equal(aiPath('v2', [], [arch(1, 'codex'), arch(2, 'claude')]), 'Codex to Claude')
+    assert.equal(aiPath('nope', [chat('c')]), undefined)
+  })
+  it('moves an id up, down or to a place, clamped', () => {
+    assert.deepEqual(moved(['a', 'b', 'c'], 'c', 1), ['a', 'c', 'b'])
+    assert.deepEqual(moved(['a', 'b', 'c'], 'a', 9), ['b', 'c', 'a'])
+    assert.deepEqual(moved(['a', 'b', 'c'], 'b', -3), ['b', 'a', 'c'])
+    assert.deepEqual(moved(['a'], 'z', 0), ['a'])
+  })
+})
+
+describe('busiestTodo', () => {
+  const item = (id: string, why?: 'you'): TodoItem => ({ id, text: id, ...(why ? { why } : {}) }) as TodoItem
+  it('picks the project with the most open items plus your steps; none open gives undefined', () => {
+    assert.equal(busiestTodo({ '/a': { todo: [item('1')] }, '/b': { todo: [item('2'), item('3', 'you')] }, '/c': { todo: [] } }), '/b')
+    assert.equal(busiestTodo({ '/a': { todo: [] } }), undefined)
   })
 })

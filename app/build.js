@@ -8,12 +8,13 @@
 
 const { execSync } = require('child_process')
 const esbuild = require('esbuild')
+const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
 const APP_DIR = __dirname
 
-console.log('Building Agent Flow app...\n')
+console.log('Building Switchboard app...\n')
 
 // 1. Build the webview UI
 console.log('[1/2] Building webview...')
@@ -21,6 +22,9 @@ execSync('npx vite build --config vite.config.app.ts', {
   cwd: path.join(ROOT, 'web'),
   stdio: 'inherit',
 })
+
+// Home-screen icons for the manifest; vite empties the folder, so after it.
+for (const f of ['apple-icon.png', 'icon.svg']) fs.copyFileSync(path.join(ROOT, 'web', 'public', f), path.join(APP_DIR, 'dist', 'webview', f))
 
 // 2. Bundle the app
 console.log('\n[2/2] Bundling app...')

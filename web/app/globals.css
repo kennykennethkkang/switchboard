@@ -348,7 +348,7 @@ html { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 @media (pointer: coarse) { .hub-btn, .hub-switch, .hub-seg > button, .hub select, .hub-search { min-height: 44px; } .hub-btn { min-width: 44px; } }
 /* iOS zooms into any field under 16px. */
 @media (pointer: coarse) { .hub :is(input:not([type=checkbox], [type=radio]), textarea, select), .hub-palette > input { font-size: 16px !important; } }
-/* Fixed red, white text at 5.6:1 in both themes, like .desk-badge[data-alert]. */
+/* Fixed red, white text at 5.6:1 in both themes. */
 .hub .hub-btn.danger { background: #c4202b; border-color: #c4202b; color: #ffffff; }
 @media (hover: hover) and (pointer: fine) { .hub .hub-btn.danger:hover:not(:disabled) { background: #a81b25; border-color: #a81b25; opacity: 1; } }
 .hub-btn:disabled, .hub-link:disabled { opacity: 0.45; cursor: default; }
@@ -408,7 +408,7 @@ span.hub-done { cursor: default; }
 button.hub-done:active > span { transform: scale(0.9); }
 .hub-done:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 0; }
 .hub-todo-group { min-width: 0; container-type: inline-size; }
-/* A narrow column (the desk rail, a phone): two lines before the cut, so the item still reads. */
+/* A narrow column (the rail, a phone): two lines before the cut, so the item still reads. */
 @container (max-width: 360px) { .hub-todo-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
 @container (max-width: 300px) { .hub-todo > li:has(.hub-todo-acts) { flex-wrap: wrap; row-gap: 0; } li:has(.hub-todo-acts) > .hub-todo-text { flex: 1 1 0; } li > .hub-todo-acts { flex: 0 0 calc(100% - 38px); margin: -4px 0 4px 28px; } }
 .hub-todo-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
@@ -434,7 +434,7 @@ button.hub-done:active > span { transform: scale(0.9); }
 @media (prefers-reduced-motion: reduce) { .hub-done > span, .hub-done > span > svg { transition: none; } button.hub-done:active > span { transform: none; } }
 @media (pointer: coarse) { .hub-check { min-height: 44px; align-items: center !important; padding-top: 0 !important; } .hub-check > input[type='checkbox'] { width: 20px; height: 20px; margin: 0 !important; } }
 
-.hub-app { display: grid; grid-template-columns: 300px minmax(0, 1fr); }
+.hub-app { display: grid; grid-template-columns: 340px minmax(0, 1fr); }
 .hub-rail { border-right: 1px solid var(--hub-hair); }
 @media (max-width: 760px) {
   .hub-app { grid-template-columns: minmax(0, 1fr); }
@@ -533,7 +533,7 @@ button.hub-done:active > span { transform: scale(0.9); }
 @media (pointer: coarse) { .hub-fold-list > summary { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .hub-fold-list > summary > b, .hub-set-nav button, .hub-tabs > button { transition-property: opacity, background-color, color; } }
 
-/* The header, the card menu and the device bars, shared by both layouts. */
+/* The header, the card menu and the device bars. */
 .hub-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-canvas); }
 .hub-brand { display: flex; gap: 8px; align-items: center; font: 600 15px/1 var(--hub-sans); color: var(--hub-ink); }
 .hub-brand > i { width: 10px; height: 10px; border-radius: 50%; background: var(--hub-blue); box-shadow: 0 0 0 3px var(--hub-blue-soft); }
@@ -546,8 +546,8 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub .hub-limit[data-level='high'] { color: var(--hub-yellow); }
 .hub .hub-limit[data-level='out'] { color: var(--hub-red); }
 .hub-awake[aria-pressed='true'] { border-color: var(--hub-green); color: var(--hub-ink); }
-.hub:not(.desk) .hub-gear { display: inline-flex; align-items: center; padding: 8px 10px; }
-.hub:not(.desk) .hub-btn:not(.hub-gear) .hub-ic { display: none; }
+.hub .hub-gear { display: inline-flex; align-items: center; padding: 8px 10px; }
+.hub .hub-btn:not(.hub-gear) .hub-ic { display: none; }
 .hub-stuck { padding: 8px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-surface); display: grid; gap: 6px; min-width: 0; }
 .hub-stuck h2 { margin: 0; font: var(--hub-caps-font, 500 12px/1 var(--hub-mono)); text-transform: var(--hub-caps-case, uppercase); letter-spacing: var(--hub-caps-track, 0.4px); color: var(--hub-caps-color, var(--hub-ash)); }
 .hub-stuck h2 span { color: var(--hub-mute); margin-left: 4px; }
@@ -560,9 +560,7 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub-stuck-meta { font: 400 12px/1.4 var(--hub-mono); color: var(--hub-ash); overflow-wrap: anywhere; }
 .hub-stuck-meta code { font: inherit; }
 .hub-stuck-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.desk > .hub-stuck { grid-column: 1 / -1; }
 .hub-jarvis { padding: 10px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-surface); display: grid; min-width: 0; }
-.desk > .hub-jarvis { grid-column: 1 / -1; }
 .hub-jarvis-live:not(:empty) { margin-top: 8px; }
 .hub-jarvis-bar { display: flex; align-items: center; gap: 8px; max-width: 760px; width: 100%; box-sizing: border-box; padding: 0 4px 0 12px; border: 1px solid var(--hub-hair-strong); border-radius: 8px; background: var(--hub-canvas); color: var(--hub-ash); transition: border-color 150ms ease-out; }
 .hub-jarvis-bar:focus-within { border-color: var(--hub-blue); }
@@ -602,8 +600,6 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub-tip-at { position: relative; min-width: 0; }
 .hub-tip-box { position: relative; }
 .hub-tip { position: absolute; left: 0; top: 100%; padding-top: 6px; z-index: 5; width: min(520px, calc(100vw - 32px)); }
-.desk-right .hub-tip-at { position: static; }
-.desk-right .hub-tip { right: 0; width: auto; top: calc(100% - 10px); padding-top: 16px; }
 .hub-more { position: relative; display: inline-flex; align-items: center; }
 .hub-more-btn {
   width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--hub-mute); cursor: pointer;
@@ -631,7 +627,7 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub-more-said:empty { display: none; }
 .hub-commit:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 
-/* Modal sheets (Desk's New chat and Settings): native dialogs, so the page behind is inert. */
+/* Modal sheets: native dialogs, so the page behind is inert. */
 .hub-sheet {
   width: min(600px, calc(100% - 32px)); max-width: none; max-height: 84vh; margin: 8vh auto auto; padding: 0; overflow: hidden; color: var(--hub-body);
   background: var(--hub-card); border: 1px solid var(--hub-hair-strong); border-radius: 16px; box-shadow: var(--hub-shadow-pop);
@@ -656,172 +652,12 @@ button.hub-done:active > span { transform: scale(0.9); }
 }
 @media (prefers-reduced-motion: reduce) { .hub-menu, .hub-sheet, .hub-more-btn { transition-property: opacity, background-color; } }
 
-/* Desk (preview): three panes, neutral greys, Hanken Grotesk. Every component is the Classic one; only tokens and placement change. */
-.hub.desk {
-  --hub-canvas: #0d0d0d; --hub-surface: #0a0a0a; --hub-elev: #111111; --hub-card: #161616;
-  --hub-hair: #1f1f1f; --hub-hair-strong: #2e2e2e; --hub-field: #666666;
-  --hub-ink: #ededed; --hub-body: #c4c4c4; --hub-mute: #a1a1a1; --hub-ash: #8f8f8f;
-  --hub-blue: #3d9bff; --hub-red: #ff5f66; --hub-green: #3cc47a; --hub-teal: #3ec6d3; --hub-yellow: #f0a33a; --hub-violet: #a78bfa;
-  --hub-w-violet: #b48cff; --hub-w-amber: #f3a740; --hub-w-teal: #3fd0c4; --hub-w-rose: #ff6fae; --hub-w-lime: #a5d94c; --hub-w-cobalt: #6f8dff;
-  --hub-blue-soft: rgba(61, 155, 255, 0.13); --hub-red-soft: rgba(255, 95, 102, 0.12); --hub-green-soft: rgba(60, 196, 122, 0.12);
-  --hub-teal-soft: rgba(62, 198, 211, 0.12); --hub-yellow-soft: rgba(240, 163, 58, 0.12);
-  --hub-primary: #ededed; --hub-on-primary: #0a0a0a;
-  --desk-hover: #161616; --desk-selected: #1d1d1d;
-  --hub-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --hub-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
-  --hub-r-panel: 12px; --hub-pad-panel: 16px;
-  --hub-caps-font: 600 13px/1.3 var(--hub-sans); --hub-caps-case: none; --hub-caps-track: -0.005em; --hub-caps-color: var(--hub-ink);
-  --hub-label-font: 500 12px/1.4 var(--hub-sans); --hub-label-case: none; --hub-label-track: 0px;
-  --desk-top: 52px;
-}
-body.vscode-light .hub.desk, body.vscode-high-contrast-light .hub.desk {
-  --hub-canvas: #ffffff; --hub-surface: #fafafa; --hub-elev: #ffffff; --hub-card: #ffffff;
-  --hub-hair: #ebebeb; --hub-hair-strong: #d9d9d9; --hub-field: #8f8f8f;
-  --hub-ink: #171717; --hub-body: #3d3d3d; --hub-mute: #5c5c5c; --hub-ash: #6b6b6b;
-  --hub-blue: #0b6fde; --hub-red: #d1242f; --hub-green: #16763f; --hub-teal: #0b7285; --hub-yellow: #9a5400; --hub-violet: #6d4cd6;
-  --hub-w-violet: #7c4ddb; --hub-w-amber: #a85800; --hub-w-teal: #0f8a80; --hub-w-rose: #c22e78; --hub-w-lime: #4d7c0f; --hub-w-cobalt: #3553d6;
-  --hub-blue-soft: rgba(11, 111, 222, 0.09); --hub-red-soft: rgba(209, 36, 47, 0.08); --hub-green-soft: rgba(26, 127, 69, 0.09);
-  --hub-teal-soft: rgba(11, 114, 133, 0.09); --hub-yellow-soft: rgba(154, 84, 0, 0.09);
-  --hub-primary: #171717; --hub-on-primary: #ffffff;
-  --desk-hover: #f2f2f2; --desk-selected: #ececec; color-scheme: light;
-}
-@media (prefers-color-scheme: light) {
-  body:not([class*='vscode-']) .hub.desk {
-    --hub-canvas: #ffffff; --hub-surface: #fafafa; --hub-elev: #ffffff; --hub-card: #ffffff;
-    --hub-hair: #ebebeb; --hub-hair-strong: #d9d9d9; --hub-field: #8f8f8f;
-    --hub-ink: #171717; --hub-body: #3d3d3d; --hub-mute: #5c5c5c; --hub-ash: #6b6b6b;
-    --hub-blue: #0b6fde; --hub-red: #d1242f; --hub-green: #16763f; --hub-teal: #0b7285; --hub-yellow: #9a5400; --hub-violet: #6d4cd6;
-    --hub-w-violet: #7c4ddb; --hub-w-amber: #a85800; --hub-w-teal: #0f8a80; --hub-w-rose: #c22e78; --hub-w-lime: #4d7c0f; --hub-w-cobalt: #3553d6;
-    --hub-blue-soft: rgba(11, 111, 222, 0.09); --hub-red-soft: rgba(209, 36, 47, 0.08); --hub-green-soft: rgba(26, 127, 69, 0.09);
-    --hub-teal-soft: rgba(11, 114, 133, 0.09); --hub-yellow-soft: rgba(154, 84, 0, 0.09);
-    --hub-primary: #171717; --hub-on-primary: #ffffff;
-    --desk-hover: #f2f2f2; --desk-selected: #ececec; color-scheme: light;
-  }
-}
-.hub.desk {
-  min-height: 100dvh; display: grid; grid-template-columns: 288px minmax(0, 1fr) 368px; align-content: start;
-  background: var(--hub-surface); color: var(--hub-body); font: 400 14px/1.55 var(--hub-sans); font-feature-settings: normal;
-  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-}
-.desk > .hub-top, .desk > .hub-device { grid-column: 1 / -1; }
-.desk .hub-top {
-  position: sticky; top: 0; z-index: 10; min-height: var(--desk-top); box-sizing: border-box; gap: 8px; padding: 0 16px; flex-wrap: nowrap;
-  background: color-mix(in srgb, var(--hub-canvas) 86%, transparent); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
-}
-.desk .hub-brand { margin-right: 8px; letter-spacing: -0.01em; white-space: nowrap; }
-.desk .hub-brand > i { width: 16px; height: 16px; box-sizing: border-box; border: 4.5px solid var(--hub-ink); background: none; box-shadow: none; }
-.desk .hub-find { min-width: 220px; justify-content: flex-start; color: var(--hub-ash); background: var(--hub-surface); }
-.desk .hub-find kbd { margin-left: auto; font: 500 11px/1 var(--hub-sans); color: var(--hub-ash); border: 1px solid var(--hub-hair-strong); border-radius: 4px; padding: 2px 5px; }
-.desk .hub-note { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-/* Stacked, so both fit beside the buttons; the buttons keep their size. */
-.desk .hub-limits { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 6px; }
-.desk .hub-top .hub-btn { flex-shrink: 0; white-space: nowrap; }
-.desk .hub-limit { font: 400 12px/1 var(--hub-sans); color: var(--hub-ash); }
-.desk .hub-limit > i { display: block; width: 44px; height: 4px; border-radius: 2px; background: var(--hub-hair-strong); overflow: hidden; }
-.desk .hub-limit > i > b { display: block; height: 100%; background: var(--hub-mute); transform-origin: left; transition: transform 300ms var(--hub-ease-out); }
-.desk .hub-limit:is([data-level='high'], [data-level='out']) > i > b { background: currentColor; }
-.desk .hub-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 12px; box-sizing: border-box;
-  border-radius: 6px; font: 500 13px/1.2 var(--hub-sans); letter-spacing: 0; border-color: var(--hub-hair-strong); background: var(--hub-elev);
-  transition: transform 140ms var(--hub-ease-out), background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-.desk .hub-btn.primary { background: var(--hub-primary); border-color: var(--hub-primary); color: var(--hub-on-primary); }
-.desk .hub-btn.sm { min-height: 28px; padding: 0 10px; font-size: 12px; }
-.desk .hub-btn.icon, .desk .hub-gear { width: 32px; padding: 0; }
-.desk .hub-awake[aria-pressed='true'] { color: var(--hub-green); border-color: color-mix(in srgb, var(--hub-green) 45%, var(--hub-hair-strong)); }
-@media (hover: hover) and (pointer: fine) {
-  .desk .hub-btn:hover:not(:disabled) { background: var(--desk-hover); border-color: var(--hub-hair-strong); }
-  .desk .hub-btn.primary:hover:not(:disabled) { background: var(--hub-primary); opacity: 0.88; }
-  .desk .hub-card:hover { background: var(--desk-hover); }
-  .desk .hub-card[aria-pressed='true']:hover { background: var(--desk-selected); }
-  .desk .hub-link:hover { background: var(--desk-hover); }
-  .desk .hub-menu > button:hover { background: var(--desk-hover); }
-}
-@media (pointer: coarse) { .desk .hub-btn, .desk .hub-btn.sm { min-height: 44px; min-width: 44px; } .desk .hub-btn.icon, .desk .hub-gear { width: 44px; } }
-.desk .hub-chip { font: 500 12px/1 var(--hub-sans); padding: 4px 8px; }
-.desk .hub-chip.ver { padding: 3px 6px; font-size: 11px; }
-.desk .hub-link { font-family: var(--hub-sans); }
-.desk .hub-search { font: 400 13px/1.2 var(--hub-sans); padding: 8px 10px; border-color: var(--hub-hair-strong); background: var(--hub-canvas); }
-.desk .hub-select { border-radius: 6px; border-color: var(--hub-hair-strong); }
-.desk .hub-card { border-radius: 8px; padding: 10px 12px; }
-.desk .hub-card[aria-pressed='true'] { background: var(--desk-selected); border-color: transparent; }
-.desk .hub-menu > button:focus-visible { background: var(--desk-hover); }
-.desk .hub-more-btn:hover { background: var(--desk-hover); }
-/* A section head's second half is its meta: quieter than the title. */
-.desk :is(h2, h3, h4) > span:last-child:not(:first-child), .desk summary > span:last-child:not(:first-child) { font: 400 12px/1.3 var(--hub-sans); color: var(--hub-ash); letter-spacing: 0; }
-.desk mark { color: var(--hub-blue); }
-
-.desk-rail, .desk-right {
-  position: sticky; top: var(--desk-top); height: calc(100dvh - var(--desk-top)); box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain;
-  display: grid; align-content: start; gap: 16px; background: var(--hub-surface); min-width: 0;
-}
-.desk-rail { padding: 16px 12px 32px; border-right: 1px solid var(--hub-hair); }
-.desk-right { padding: 16px; border-left: 1px solid var(--hub-hair); gap: 12px; }
-.desk-sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 0 4px; margin-bottom: -8px; }
-.desk-sec-h > h2 { margin: 0; font: 600 13px/1.3 var(--hub-sans); color: var(--hub-ink); letter-spacing: -0.005em; }
-.desk-sec-h > span { font: 400 12px/1 var(--hub-sans); color: var(--hub-ash); font-variant-numeric: tabular-nums; }
-.desk-center { min-width: 0; padding: 4px 4px 32px; display: grid; align-content: start; }
-.desk .hub-pic { padding: 20px 20px 16px; }
-.desk #pic-name { letter-spacing: -0.015em; font-weight: 600 !important; }
-.desk .hub-stage { max-height: 460px; }
-.desk-today, .desk-todo, .desk-git { display: grid; gap: 12px; min-width: 0; align-content: start; }
-/* The To-do is shared and for later, not this chat's Tasks: a dashed, recessed surface says so. Inline panel styles need the !important. */
-.desk-todo > section { border-style: dashed !important; border-color: var(--hub-hair-strong) !important; background: var(--hub-surface) !important; }
-.desk-empty { padding: 14px 16px; border: 1px dashed var(--hub-hair-strong); border-radius: 12px; color: var(--hub-ash); font-size: 13px; }
-.desk-tabs { display: none; }
-@media (min-width: 1600px) { .hub.desk { grid-template-columns: 288px minmax(0, 1fr) 400px; } }
-@media (max-width: 1180px) and (min-width: 761px) {
-  .hub.desk { grid-template-columns: 248px minmax(0, 1fr); }
-  .desk-rail { grid-row: span 2; }
-  .desk-right { grid-column: 2; position: static; height: auto; overflow: visible; border-left: 0; padding: 0 24px 40px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .desk-git { grid-column: 1 / -1; }
-  .desk .hub-find { min-width: 0; }
-  .desk .hub-top .hub-btn:not(.primary):not(.hub-find) .hub-lbl, .desk .hub-note { display: none; }
-  .desk .hub-top .hub-btn:not(.primary):not(.hub-find) { width: 32px; padding: 0; }
-}
-@media (max-width: 760px) {
-  .hub.desk { display: block; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-  .desk .hub-top { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-  .desk .hub-top .hub-lbl, .desk .hub-find kbd { display: none; }
-  .desk .hub-limits { order: 10; flex-basis: 100%; flex-direction: row; flex-wrap: wrap; margin-left: 0; }
-  .desk .hub-find { min-width: 0; width: 36px; padding: 0; justify-content: center; }
-  .desk .hub-new { margin-left: auto; }
-  .desk .hub-note { order: 9; flex-basis: 100%; white-space: normal; }
-  .desk .hub-top .hub-btn:not(.primary) { width: 36px; padding: 0; }
-  .desk-rail, .desk-center, .desk-todo, .desk-git { display: none; }
-  /* Asks and Jarvis belong with the chat list; other tabs start at their pane. */
-  .desk:not([data-tab='chats']) > :is(.hub-stuck, .hub-jarvis) { display: none; }
-  .desk-right { position: static; height: auto; overflow: visible; border: 0; padding: 0; display: block; }
-  .desk[data-tab='chats'] .desk-rail { display: grid; position: static; height: auto; overflow: visible; border: 0; padding: 16px; }
-  .desk[data-tab='chat'] .desk-center { display: grid; padding: 0 0 16px; }
-  .desk[data-tab='todo'] .desk-todo, .desk[data-tab='git'] .desk-git { display: grid; padding: 16px; }
-  .desk .hub-pic { padding: 16px; }
-  .desk-tabs {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-    padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hub-hair);
-    background: color-mix(in srgb, var(--hub-canvas) 90%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  }
-  .desk-tabs > button {
-    position: relative; min-height: 52px; display: grid; justify-items: center; align-content: center; gap: 4px; border: 0; border-radius: 8px; background: none;
-    color: var(--hub-ash); font: 500 11px/1 var(--hub-sans); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color 150ms ease;
-  }
-  .desk-tabs > button[aria-current='page'] { color: var(--hub-ink); }
-  .desk-tabs > button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
-  .desk-tabs .hub-ic { width: 20px; height: 20px; }
-}
-.desk-badge { position: absolute; top: 5px; left: calc(50% + 6px); min-width: 16px; height: 16px; box-sizing: border-box; padding: 0 4px; border-radius: 8px; background: var(--hub-hair-strong); color: var(--hub-ink); font: 600 10px/16px var(--hub-sans); font-variant-numeric: tabular-nums; }
-/* A fixed red dark enough for white 10px text in both themes (about 5.6:1). */
-.desk-badge[data-alert] { background: #c4202b; color: #ffffff; }
-@media (prefers-reduced-motion: reduce) { .desk .hub-btn { transition-property: opacity, background-color, border-color, color; } .desk .hub-btn:active { transform: none; } }
-/* Desk field borders reach 3:1 on the dark cards; inline field styles need the !important. */
-.desk :is(textarea, select, input:not([type='checkbox'], [type='radio'])):not(.hub-palette > input) { border-color: var(--hub-field) !important; }
-/* The message box sits inside the chat picture, which pads it already. */
-.hub-pic > form { padding: 0 !important; }
-/* Desk's rail is narrow: a long chat name wraps to two lines instead of losing its end. */
-.desk .hub-card-top { align-items: flex-start !important; }
-.desk .hub-card-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; letter-spacing: -0.005em !important; }
-.desk .hub-card-top .hub-chip { margin-top: 1px; }
-/* Ask card toggles (multiSelect options, Other): ticked reads at a glance in both layouts and themes. */
+.hub .hub-call[aria-pressed='true'], .hub .hub-call[aria-pressed='true']:hover:not(:disabled) { background: var(--hub-blue-soft); border-color: var(--hub-blue); color: var(--hub-ink); }
+.hub-phone-mode { margin: 0; display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-canvas); font: 400 12px/1.4 var(--hub-sans); color: var(--hub-mute); }
+.hub-phone-mode > i { width: 6px; height: 6px; border-radius: 50%; background: var(--hub-blue); flex: none; }
+/* The message box sits inside the chat picture, which pads it already; .cp-msg pads itself. */
+.hub-pic > form:not(.cp-msg) { padding: 0 !important; }
+/* Ask card toggles (multiSelect options, Other): ticked reads at a glance in both themes. */
 .hub .hub-opt[aria-pressed='true'], .hub .hub-opt[aria-pressed='true']:hover:not(:disabled) { background: var(--hub-blue-soft); border-color: var(--hub-blue); color: var(--hub-ink); }
 .hub .hub-opt[aria-pressed='true']::before { content: '\2713' / ''; margin-right: 6px; color: var(--hub-blue); font-weight: 600; }
 
@@ -838,8 +674,7 @@ body.vscode-light .hub.desk, body.vscode-high-contrast-light .hub.desk {
 
 /* Memory: rail of filters, the graph or list, then the picked item. Always dark. */
 .mem { position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--hub-canvas); color: var(--hub-body); overflow: hidden; }
-/* It opens inside .desk, whose light theme would leak these in; .hub-dark only resets --hub-*. */
-.mem { --desk-hover: #161616; --desk-selected: #1d1d1d; --hub-field: #666666; color-scheme: dark; }
+.mem { --hub-field: #666666; color-scheme: dark; }
 .mem[open] { display: grid; grid-template-columns: 264px minmax(0, 1fr); }
 .mem[open][data-picked] { grid-template-columns: 264px minmax(0, 1fr) 380px; }
 .mem::backdrop { background: var(--hub-canvas); }
@@ -936,3 +771,129 @@ body.vscode-light .hub.desk, body.vscode-high-contrast-light .hub.desk {
   .mem .hub-btn.icon { width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .mem button { transition: none; } }
+
+/* Busy: a 2px bar up top while a command is out, and a pulse on the button that sent it. */
+.hub-busy-bar {
+  position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; height: 2px; z-index: 9999; pointer-events: none; overflow: hidden;
+  opacity: 0; transition: opacity 200ms ease;
+}
+.hub-busy-bar[data-on] { opacity: 1; transition-duration: 0ms; }
+.hub-busy-bar::after {
+  content: ''; position: absolute; inset: 0; width: 35%; background: var(--hub-blue); border-radius: 2px;
+  animation: hub-busy-slide 1100ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes hub-busy-slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+[data-pending] { cursor: progress; animation: hub-pending 900ms ease-in-out infinite alternate; }
+@keyframes hub-pending { to { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .hub-busy-bar::after { animation: none; width: 100%; opacity: 0.7; }
+  [data-pending] { animation: none; opacity: 0.6; }
+}
+
+/* Usage pause banner: frosted while held (matches the Board's frozen pause), green for 4 s once it lifts. */
+.hub-pause { --c: var(--hub-blue); --frost: color-mix(in srgb, var(--hub-blue) 30%, #fff); position: relative; isolation: isolate; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-bottom: 1px solid color-mix(in srgb, var(--c) 35%, var(--hub-hair)); background: color-mix(in srgb, var(--c) 8%, var(--hub-surface)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--frost) 45%, transparent); min-width: 0; }
+@starting-style { .hub-pause { opacity: 0; transform: translateY(-4px); } }
+.hub-pause { transition-property: background-color, border-color, opacity, transform; transition-duration: 240ms; transition-timing-function: var(--hub-ease-out); }
+/* Frost gathers at the edges like a cold window; the middle stays clear for the text. */
+.hub-pause::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(60deg, color-mix(in srgb, var(--frost) 28%, transparent) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-60deg, color-mix(in srgb, var(--frost) 28%, transparent) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, color-mix(in srgb, var(--frost) 18%, transparent), transparent 80%);
+  -webkit-mask-image: linear-gradient(90deg, #000, transparent 28%, transparent 72%, #000); mask-image: linear-gradient(90deg, #000, transparent 28%, transparent 72%, #000); }
+/* Crack lines, only shown while the ice breaks. */
+.hub-pause::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0;
+  background: linear-gradient(115deg, transparent 49.6%, var(--frost) 50%, transparent 50.4%) 0 0 / 38% 100% no-repeat,
+    linear-gradient(68deg, transparent 49.6%, var(--frost) 50%, transparent 50.4%) 100% 0 / 34% 100% no-repeat; }
+.hub-pause[data-state='resumed'] { --c: var(--hub-green); transition-delay: 400ms, 400ms, 0s, 0s; }
+.hub-pause[data-state='resumed']::before { animation: hub-thaw 600ms var(--hub-ease-out) forwards; }
+.hub-pause[data-state='resumed']::after { animation: hub-crack 600ms ease-out forwards; }
+.hub-carp { display: inline-block; vertical-align: -4px; margin-right: 6px; flex: none; }
+.hub-pause[data-state='resumed'] .hub-carp { position: absolute; animation: hub-carp-hop 600ms var(--hub-ease-out) forwards; }
+@keyframes hub-thaw { 40% { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(1.02); } }
+@keyframes hub-crack { 0% { opacity: 0; } 20%, 45% { opacity: 0.9; } to { opacity: 0; } }
+@keyframes hub-carp-hop { 0% { transform: none; opacity: 1; } 45% { transform: translate(8px, -9px) rotate(-12deg); opacity: 1; } to { transform: translate(18px, 2px) rotate(10deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .hub-pause[data-state='resumed']::before, .hub-pause[data-state='resumed'] .hub-carp { animation: hub-fade 300ms ease-out forwards; }
+  .hub-pause[data-state='resumed']::after { animation: none; }
+  .hub-pause[data-state='resumed'] { transition-delay: 0s; }
+}
+@keyframes hub-fade { to { opacity: 0; } }
+.hub-chip.hub-frost-chip { color: color-mix(in srgb, var(--hub-blue) 80%, var(--hub-ink)); background: linear-gradient(160deg, color-mix(in srgb, var(--hub-blue) 7%, var(--hub-surface)), color-mix(in srgb, var(--hub-blue) 15%, var(--hub-surface))); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hub-blue) 30%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent); flex-shrink: 0; }
+.hub-pause > i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.hub-pause-text { display: grid; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.hub-pause-text > strong { font: 500 14px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.hub-pause-text > span { font: 400 12px/1.4 var(--hub-mono); color: var(--hub-ash); }
+.hub-pause-acts { display: flex; gap: 6px; flex: none; }
+
+/* Wait links: amber chips with a live dot; the Waiting on ones sit over the card's foot (they hold the unlink x). */
+.hub-wait { color: var(--hub-yellow); background: var(--hub-yellow-soft); max-width: 100%; justify-self: start; overflow: hidden; }
+.hub-wait > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.hub-wait[data-dir='in'] { color: var(--hub-body); background: transparent; box-shadow: inset 0 0 0 1px var(--hub-hair-strong); }
+.hub-wait[data-dir='in'] > i { background: var(--hub-yellow); }
+.hub-wait > i { flex: none; animation: hub-wait-live 1.4s ease-in-out infinite alternate; }
+@keyframes hub-wait-live { from { opacity: 1; } to { opacity: 0.35; } }
+.hub-wait-gap { display: block; height: 20px; }
+.hub-wait-at { position: absolute; left: 13px; right: 13px; bottom: 13px; display: grid; gap: 4px; pointer-events: none; }
+.hub-wait-at > .hub-wait { height: 20px; padding-right: 2px; }
+.hub-wait-x { position: relative; display: grid; place-items: center; width: 16px; height: 16px; margin-left: 2px; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; pointer-events: auto; flex: none; }
+.hub-wait-x::before { content: ''; position: absolute; inset: -6px; }
+.hub-wait-x:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) { .hub-wait-x:hover { background: color-mix(in srgb, currentColor 18%, transparent); } }
+@media (pointer: coarse) { .hub-wait-x::before { inset: -14px; } }
+.hub-menu-h { padding: 6px 10px 2px; font: 500 11px/1 var(--hub-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--hub-ash); }
+.hub-menu > .hub-menu-back { color: var(--hub-mute); }
+.hub-menu-why { max-width: 240px; padding: 2px 10px 6px; font: 400 12px/1.4 var(--hub-sans); color: var(--hub-red); }
+
+/* Orbit: a dashed arc from the lead to each linked chat's pill; it flows toward the chat being waited on. */
+.ov-pic { position: relative; }
+.ov-wait { position: absolute; inset: 0; pointer-events: none; }
+.ov-wait > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ov-wait path { fill: none; stroke: var(--hub-yellow); stroke-width: 1; stroke-linecap: round; stroke-dasharray: 3 5; opacity: 0.6; animation: ov-wait-flow 900ms linear infinite; transition: stroke 200ms ease, opacity 700ms ease 300ms; }
+.ov-wait path[data-end] { stroke: var(--hub-green); stroke-dasharray: none; animation: ov-wait-fade 1100ms ease forwards; }
+@keyframes ov-wait-flow { to { stroke-dashoffset: -8; } }
+@keyframes ov-wait-fade { 0%, 30% { opacity: 1; } 100% { opacity: 0; } }
+.ov-wait > .hub-wait { position: absolute; max-width: 30%; translate: 0 -50%; background: color-mix(in srgb, var(--hub-yellow) 14%, var(--hub-canvas)); }
+.ov-wait > .hub-wait[data-dir='out'] { right: 12px; }
+.ov-wait > .hub-wait[data-dir='in'] { left: 12px; background: var(--hub-canvas); }
+.ov-wait > .hub-wait[data-end] { color: var(--hub-green); background: color-mix(in srgb, var(--hub-green) 14%, var(--hub-canvas)); box-shadow: none; animation: ov-wait-fade 1100ms ease forwards; }
+.ov-wait > .hub-wait[data-end] > i { animation: none; background: var(--hub-green); }
+@media (prefers-reduced-motion: reduce) {
+  .hub-pause { transition-property: background-color, opacity; }
+  @starting-style { .hub-pause { transform: none; } }
+  .hub-wait > i, .ov-wait path { animation: none; }
+  .ov-wait path[data-end], .ov-wait > .hub-wait[data-end] { animation: ov-wait-fade 1100ms linear forwards; }
+}
+
+/* Cmd+K palette extras: filter chips, Ask Jarvis, the mic beside the input, the reply below. */
+.hub-palette[data-ask] { position: relative; width: min(560px, 100%); }
+.hub-palette[data-ask] > input { padding-right: 64px; font-family: var(--hub-sans); }
+.pal-filter { padding: 8px 14px 0; border-bottom: 1px solid var(--hub-hair); }
+.pal-filter .hub-filter { margin-bottom: 8px !important; }
+.hub-palette li.pal-ask { justify-content: flex-start; color: var(--hub-mute); }
+.hub-palette li.pal-ask b { color: var(--hub-ink); font-weight: 500; }
+.pal-mics { position: absolute; top: 4px; right: 6px; display: flex; align-items: center; gap: 6px; }
+.pal-mics:empty { display: none; }
+.pal-mics > .hub-jarvis-mic { min-height: 32px; padding: 0 8px; border: 0; background: none; color: var(--hub-mute); display: inline-grid; place-items: center; cursor: pointer; border-radius: 6px; }
+.pal-mics > .hub-jarvis-mic[aria-pressed='true'] { color: var(--hub-red); }
+.pal-mics > .hub-jarvis-mic[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+.hub-jarvis-pal .hub-jarvis-live:not(:empty) { margin: 0; padding: 10px 14px; border-top: 1px solid var(--hub-hair); }
+.hub-jarvis-pal .hub-jarvis-out { max-width: none; border: 0; padding: 0; background: none; }
+@media (pointer: coarse) { .pal-mics { top: 0; right: 0; } .pal-mics > .hub-jarvis-mic { min-height: 44px; min-width: 44px; } }
+
+/* Rail cards: a long chat name wraps to two lines instead of losing its end. */
+.hub-rail .hub-card-top { align-items: flex-start !important; }
+.hub-rail .hub-card-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.hub-rail .hub-card-top .hub-chip { margin-top: 1px; flex: none; }
+.hub-rail .hub-approve { padding-top: 4px; }
+/* Phone: the header goes to icons (each keeps its aria-label), the strip's actions get their own row. */
+@media (max-width: 760px) {
+  .hub-top { gap: 8px; padding: 8px 12px; }
+  .hub .hub-top .hub-btn .hub-ic { display: inline; }
+  .hub-top .hub-btn:not(.primary) .hub-lbl, .hub-top .hub-find kbd, .hub-top .hub-ship-name { display: none; }
+  .hub-top .hub-btn { min-height: 44px; }
+  .hub-top .hub-btn:not(.primary) { padding: 0; width: 44px; justify-content: center; display: inline-flex; align-items: center; }
+  .hub-top .hub-limits { order: 9; width: 100%; margin-left: 0; }
+  .hub-stuck { padding: 8px 12px; }
+  .hub-stuck-acts, .hub-stuck .hub-approve { flex-basis: 100%; }
+  .hub-stuck .hub-approve > span:last-child { margin-left: 0 !important; }
+}

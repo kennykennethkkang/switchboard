@@ -7,7 +7,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { spawn } from 'child_process'
-import { dueForHandoff, idleHandedOff, matchCodexStarts, readArchive, readChains, recordArchive, recordChain, removeArchive, withChains } from '../src/hub/chains'
+import { archiveRow, backAgain, dueForHandoff, idleHandedOff, matchCodexStarts, readArchive, readChains, recordArchive, recordChain, removeArchive, withChains } from '../src/hub/chains'
 
 /** Another window: holds file's lock until go() is called, then writes body and lets go. Resolves once it holds the lock.
  * Not on a timer: withLock gives up after 100 ms, and a 50 ms hold left a stalled child too little room under the full suite. */
@@ -118,5 +118,17 @@ describe('chains', () => {
     const chats = [row('s-old', '/u/a', 'Fix login', 50), row('s1', '/u/a', 'Fix login', 150), row('s2', '/u/a', 'Same', 150), row('s3', '/u/a', 'Same', 160), row('s4', '/u/b', 'Fix login', 150)]
     assert.deepEqual([...matchCodexStarts(starts, chats, new Set())], [['t1', 's1']])
     assert.deepEqual([...matchCodexStarts(starts, chats, new Set(['s1']))], [])
+  })
+
+  it('makes an archive row from a chat, and brings an ended one back once it runs again', () => {
+    const a = archiveRow({ sessionId: 's1', name: 'Fix login v3', cwd: '/u/switchboard' }, 5, true, 1000)
+    assert.deepEqual(a, { sessionId: 's1', ai: 'claude', name: 'Fix login v3', origin: 'Fix login', version: 3, cwd: '/u/switchboard', project: 'switchboard', startedAt: 5, archivedAt: 1000, ended: true })
+    assert.equal(archiveRow({ sessionId: 's2', cwd: '/u/x', ai: 'codex' }).name, 'x')
+    const mine = archiveRow({ sessionId: 's3', cwd: '/u/x' }, undefined, false, 1000)
+    const chat = (id: string, updatedAt: number, live = true) => ({ pid: 1, sessionId: id, cwd: '/u/x', link: '', live, why: [], updatedAt })
+    // Exit writes just after SessionEnd do not count; Kenneth's own archive rows stay until he brings them back.
+    assert.deepEqual(backAgain([a, mine], [chat('s1', 30_000), chat('s3', 900_000)]), [])
+    assert.deepEqual(backAgain([a, mine], [chat('s1', 900_000, false)]), [])
+    assert.deepEqual(backAgain([a, mine], [chat('s1', 900_000)]), ['s1'])
   })
 })

@@ -10,4 +10,6 @@ You are the engineer. Read the code the task touches before changing it, write a
 
 Usual kit: superpowers:test-driven-development, superpowers:systematic-debugging, superpowers:verification-before-completion, ponytail, context7, claude-api for anything Claude or Anthropic, run to see the app working, e2e-testing when writing Playwright tests, plus the bland and aws-core skills when the task touches them.
 
+Voice: load the caveman skill at normal level (not ultra or wenyan) for narration between tool calls. Write the final Report, qa findings, memory notes, handoffs and commit messages in full plain English. Never use caveman-compress or caveman-commit.
+
 <!-- switchboard generic copy -->

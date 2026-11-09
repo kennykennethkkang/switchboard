@@ -12,7 +12,7 @@ Fully local: transcripts stay on this machine, no network calls, nothing sent an
 ## Arguments
 
 - Days: default 7. "last 3 days" means `--days 3`.
-- Project: optional, a part of the project folder name, `--project agent-flow`.
+- Project: optional, a part of the project folder name, `--project switchboard`.
 
 ## Steps
 
@@ -34,7 +34,7 @@ Fully local: transcripts stay on this machine, no network calls, nothing sent an
 
 4. Write the report (below).
 
-5. File each proposed rule or skill change with `mcp__switchboard__todo_add` (without Switchboard, list them at the end of the report): the exact target file and the exact text to add or replace. Point at the source a rule or skill is built from, not an installed copy: if a `claude-mods` clone exists, that is `kit/rules.md`, `kit/skills/<name>/SKILL.md` or `kit/agents/<role>.md` there, not the copies in `~/.claude` or `agent-flow/extension/kit`. Never apply them.
+5. File each proposed rule or skill change with `mcp__switchboard__todo_add` (without Switchboard, list them at the end of the report): the exact target file and the exact text to add or replace. Point at the source a rule or skill is built from, not an installed copy: if a `claude-mods` clone exists, that is `kit/rules.md`, `kit/skills/<name>/SKILL.md` or `kit/agents/<role>.md` there, not the copies in `~/.claude` or `switchboard/extension/kit`. Never apply them.
 
 6. If a vault exists at `~/Documents/vault`, append the dated report to its `wiki/improve-system.md` following its `README.md` (add it to `wiki/index.md` if the page is new, a dated line in `wiki/log.md` either way). Otherwise the report in the reply is the record. One-line facts that are already settled go to memory the way `aar` does it.
 
@@ -70,6 +70,6 @@ Only when the user asks for it, or picks one from the report: draft a `SKILL.md`
 
 ## Running it twice a week
 
-Suggest, never create: `/schedule` for a cloud routine (for example Monday and Thursday at 9:00) or `/loop` inside a long-running chat. Transcripts are local, so a cloud routine cannot read them; a local run (`/loop`, or a cron or launchd job running `claude -p "/improve-system"`) is the one that works.
+Switchboard does it: with Settings, Learn automatically on (the default), one window runs `claude -p` naming this skill in the agent-flow folder twice a week, when usage is under the pause threshold. That run passes each proposal to `self-improve`; Switchboard applies clear wins and files the rest. Without Switchboard, a cron or launchd job running `claude -p "/improve-system"` works; a cloud `/schedule` routine cannot read the local transcripts.
 
 <!-- switchboard generic copy -->

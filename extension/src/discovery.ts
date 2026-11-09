@@ -162,7 +162,7 @@ const VAR_RE = /\$\{?\w*(KEY|TOKEN|SECRET|PASS|CRED|AUTH)|\$\{?\w*_PAT\b/i
 /** The forwarder script's text; exported for the test that runs it. */
 export function getHookScriptContent(): string {
   return `#!/usr/bin/env node
-// Agent Flow hook forwarder v9, installed by the Agent Flow VS Code extension.
+// Switchboard hook forwarder v11, installed by the Switchboard VS Code extension.
 // Claude Code invokes this as a command hook. It reads a discovery directory to
 // find live extension instances, checks their PIDs, and forwards the event via
 // HTTP POST. Dead instances are cleaned up automatically.
@@ -175,6 +175,8 @@ export function getHookScriptContent(): string {
 // v7: mirror copies give up after 300ms, so a frozen window barely slows the hook.
 // v8: posts carry the window's hubToken; Bash sending a secret over the network is denied.
 // v9: the owning window's reply body, when JSON, is printed as the hook output (the edit guard's deny).
+// v10: SWITCHBOARD_ROLE_RUN in the env tags the event role_run.
+// v11: a role run also carries role_parent, the Claude chat that started it.
 //
 // Discovery dir: ~/.claude/switchboard/
 // Discovery file: {workspace-hash}-{pid}.json  →  { port, pid, workspace }
@@ -214,6 +216,14 @@ process.stdin.on('data', c => { input += c; });
 process.stdin.on('end', () => {
   let cwd, ev;
   try { ev = JSON.parse(input); cwd = ev.cwd; } catch { process.exit(0); }
+  // A Codex run behind an engineer-codex/qa-codex subagent: the lead's chat already shows it.
+  if (process.env.SWITCHBOARD_ROLE_RUN) {
+    ev.role_run = process.env.SWITCHBOARD_ROLE_RUN;
+    if (process.env.CLAUDE_CODE_SESSION_ID) ev.role_parent = process.env.CLAUDE_CODE_SESSION_ID;
+    input = JSON.stringify(ev);
+  }
+  // A learn run Switchboard started headless: the hub drops it, so it never shows as a chat.
+  if (process.env.SWITCHBOARD_HEADLESS) { ev.headless = true; input = JSON.stringify(ev); }
   // Bash never asks, unless it looks like exfiltration; deny rules in settings still win over a hook's allow.
   // writeSync: an async pipe write can be cut off by exit.
   if (ev.hook_event_name === 'PreToolUse' && ev.tool_name === 'Bash') {
@@ -223,6 +233,8 @@ process.stdin.on('end', () => {
     const out = cmd.split(/;|&&|\\|\\||\\n/).some(p => net.test(p) && secret.test(p))
       ? { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'Switchboard blocked this: it sends a secret (key, token, env, credentials) over the network. Ask the user to run it themselves if it is really needed.' }
       : net.test(cmd) && (secret.test(cmd) || ${VAR_RE}.test(cmd)) ? undefined
+      // Codex (its payload has turn_id) reports an allow as a failed hook, and runs Bash without asking anyway.
+      : ev.turn_id !== undefined ? undefined
       : { hookEventName: 'PreToolUse', permissionDecision: 'allow' };
     if (out) fs.writeSync(1, JSON.stringify({ hookSpecificOutput: out }));
   }

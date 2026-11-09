@@ -3,13 +3,17 @@
  * one INDEX.md line per file. Both ways in use saveUpload: the panel's upload-* slices and POST /hub/upload.
  * No vscode here.
  */
+import { EventEmitter } from 'events'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { projectName } from './projects'
+import type { UploadRow, Uploads } from './types'
 
 export const UPLOADS = path.join(os.homedir(), '.claude', 'switchboard', 'uploads')
 export const UPLOAD_MAX = 100 * 1024 * 1024
+/** 'saved' after each file lands and its INDEX.md line is written; the hub rereads then. */
+export const uploadEvents = new EventEmitter()
 
 const README = `# Switchboard uploads
 
@@ -85,7 +89,28 @@ export async function saveUpload(o: UploadTo, data: AsyncIterable<Uint8Array> | 
   const index = path.join(root, project, 'INDEX.md')
   const head = fs.existsSync(index) ? '' : `# Uploads: ${project}\n\nTime | file (relative to this folder) | size | chat\n\n`
   await fs.promises.appendFile(index, `${head}- ${day} ${pad(now.getHours())}:${pad(now.getMinutes())} | ${day}/${path.basename(file)} | ${fmtSize(size)} | ${oneLine(o.chat ?? 'new chat')}\n`, { mode: 0o600 })
+  uploadEvents.emit('saved')
   return file
+}
+
+const LAST = 5
+const LINE = /^- (\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d) \| (.+?) \| (.+?) \| (.*)$/
+
+/** Per project: how many uploads and the newest few, from each INDEX.md. File names only, never paths or contents. */
+export async function readUploads(root = UPLOADS): Promise<Uploads> {
+  const out: Uploads = {}
+  const dirs = await fs.promises.readdir(root, { withFileTypes: true }).catch(() => [])
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue
+    const text = await fs.promises.readFile(path.join(root, d.name, 'INDEX.md'), 'utf8').catch(() => '')
+    const rows: UploadRow[] = []
+    for (const l of text.split('\n')) {
+      const m = LINE.exec(l)
+      if (m) rows.push({ name: path.basename(m[6]), at: new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime(), size: m[7], chat: m[8] })
+    }
+    if (rows.length) out[d.name] = { count: rows.length, last: rows.slice(-LAST).reverse() }
+  }
+  return out
 }
 
 type Slice = { bytes: Uint8Array; written: () => void }

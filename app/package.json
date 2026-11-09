@@ -1,9 +1,9 @@
 {
-  "name": "agent-flow-app",
+  "name": "switchboard-app",
   "version": "0.9.2",
-  "description": "Real-time visualization of AI agent orchestration — standalone web app",
+  "description": "Real-time visualization of AI agent orchestration, standalone web app",
   "bin": {
-    "agent-flow": "dist/app.js"
+    "switchboard": "dist/app.js"
   },
   "files": [
     "dist/"
@@ -14,13 +14,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/patoles/agent-flow.git"
+    "url": "git+https://github.com/kennykennethkkang/switchboard.git"
   },
   "keywords": [
     "agent",
     "visualization",
     "ai",
     "llm",
-    "agent-flow"
+    "switchboard"
   ]
 }

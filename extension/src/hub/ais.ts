@@ -10,10 +10,13 @@ import * as os from 'os'
 import * as path from 'path'
 import { recentSessionDirs } from '../codex-session-watcher'
 import { readChains, withChains } from './chains'
-import { newChatCommand, noteTo, shellQuote, type Shell } from './projects'
+import { codexArgs, newChatCommand, noteTo, shellQuote, type Shell } from './projects'
 import { readChats } from './sessions'
 import { resumeSettingsArg } from './tools'
 import type { AiId, AiStatus, ChatRow } from './types'
+import { createLogger } from '../logger'
+
+const log = createLogger('Ais')
 
 
 /** A message typed into a Codex terminal as one paste, so its newlines do not submit; undefined when it holds a control character other than LF or TAB. */
@@ -76,11 +79,15 @@ export const cliPath = (cli: string) => new Promise<string | undefined>(done => 
 
 export type Ai = {
   name: string
-  detect: () => Promise<{ installed: boolean; detail?: string }>
+  detect: () => Promise<{ installed: boolean; detail?: string; signedIn?: boolean }>
+  /** Run in a terminal to sign in. */
+  loginCommand: string
   chats: () => Promise<ChatRow[]>
   startCommand: (o: { text?: string; name?: string }, shell: Shell) => string
   /** extra: a system note for this resume (the name note); starred digests leave it out. */
   resumeCommand: (sessionId: string, extra?: string) => string
+  /** Left out of the hub entirely until its CLI is on PATH. */
+  optional?: true
 }
 
 const LIVE_MS = 10 * 60 * 1000
@@ -90,6 +97,26 @@ const CODEX_FILES = 20
 // Looked up at most every five minutes per CLI; the chats tick asks every 15 s.
 const PATH_MS = 5 * 60 * 1000
 const pathSeen = new Map<string, { at: number; on: Promise<boolean> }>()
+/** Signed in per the AI's own status command; undefined when the output says neither. */
+export function signedIn(ai: AiId, out: string): boolean | undefined {
+  if (ai === 'codex') return /not logged in/i.test(out) ? false : /logged in/i.test(out) ? true : undefined
+  try { const j = JSON.parse(out); return typeof j?.loggedIn === 'boolean' ? j.loggedIn : undefined } catch { return undefined }
+}
+
+// The status command is a process per call, so it shares the PATH cache's minute.
+const loginSeen = new Map<AiId, { at: number; on: Promise<boolean | undefined> }>()
+const loginState = (ai: AiId, args: string[]) => {
+  const was = loginSeen.get(ai)
+  if (was && Date.now() - was.at < PATH_MS) return was.on
+  const on = cliPath(ai).then(bin => bin ? new Promise<boolean | undefined>(done =>
+    execFile(bin, args, { timeout: 5000 }, (_e, out, err) => done(signedIn(ai, `${out}${err}`)))) : undefined)
+  loginSeen.set(ai, { at: Date.now(), on })
+  return on
+}
+
+/** Drops the cached sign-in state, so the next refresh asks the CLI again. */
+export const forgetLogin = (ai: AiId) => { loginSeen.delete(ai) }
+
 const onPath = (cli: string) => {
   const was = pathSeen.get(cli)
   if (was && Date.now() - was.at < PATH_MS) return was.on
@@ -207,7 +234,8 @@ async function codexChats(): Promise<ChatRow[]> {
 export const AIS: Record<AiId, Ai> = {
   claude: {
     name: 'Claude Code',
-    detect: async () => ({ installed: await onPath('claude') }),
+    detect: async () => (await onPath('claude')) ? { installed: true, signedIn: await loginState('claude', ['auth', 'status']) } : { installed: false },
+    loginCommand: 'claude auth login',
     chats: async () => (await readChats()).map(c => ({ ...c, ai: 'claude' as const })),
     startCommand: (o, shell) => newChatCommand(o, shell),
     // A chat with a tool profile resumes with it: --settings applies on resume too.
@@ -216,14 +244,66 @@ export const AIS: Record<AiId, Ai> = {
   codex: {
     name: 'Codex',
     detect: async () => {
-      if (await onPath('codex')) return { installed: true }
+      if (await onPath('codex')) return { installed: true, signedIn: await loginState('codex', ['login', 'status']) }
       const home = fs.existsSync(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'))
       return { installed: false, detail: home ? 'CLI not installed: npm i -g @openai/codex' : 'Not set up' }
     },
+    // One command so PowerShell 5.1 runs it; the Sign in button's tooltip names --device-auth for a remote machine.
+    loginCommand: 'codex login',
     chats: codexChats,
     startCommand: (o, shell) => (o.text?.trim() ? `codex ${shellQuote(o.text, shell)}` : 'codex'),
-    resumeCommand: id => `codex resume ${id}`,
+    resumeCommand: id => ['codex', ...codexArgs(['resume', id])].join(' '),
   },
+  // Nous Research's hermes-agent: any model (OpenRouter, local endpoint), cron, phone gateway. Started and resumed in a plain terminal.
+  // ponytail: no chat rows yet, its sessions sit in ~/.hermes/state.db (sqlite); read them when Hermes chats need the board.
+  hermes: {
+    name: 'Hermes',
+    optional: true,
+    detect: async () => ({ installed: await onPath('hermes') }),
+    loginCommand: 'hermes setup',
+    chats: async () => [],
+    startCommand: (o, shell) => (o.text?.trim() ? `hermes -q ${shellQuote(o.text, shell)}` : 'hermes'),
+    resumeCommand: id => `hermes --resume ${id}`,
+  },
+}
+
+const HERMES_ASK = 'switchboard-ask'
+
+/** config.yaml with the Switchboard ask server under mcp_servers, at the indent the file already uses; unchanged
+ *  when it is there. undefined when mcp_servers is a flow map, a list, an anchor or anything else not a plain block. */
+export function hermesMcp(yaml: string, server: string): string | undefined {
+  const entry = (i: string) => `${i}${HERMES_ASK}:\n${i}${i}command: node\n${i}${i}args: [${JSON.stringify(server)}]\n`
+  const m = /^mcp_servers:([^\n]*)\n?/m.exec(yaml)
+  if (!m) return `${yaml}${yaml && !yaml.endsWith('\n') ? '\n' : ''}mcp_servers:\n${entry('  ')}`
+  const rest = m[1].replace(/(^|\s)#.*$/, '').trim()
+  if (rest && !/^\{\s*\}$/.test(rest)) return undefined
+  const after = yaml.slice(m.index + m[0].length)
+  const indent = rest ? '  ' : /^(?:[ \t]*(?:#.*)?\r?\n)*( +)[^\s#]/.exec(after)?.[1] ?? '  '
+  if (!rest && new RegExp(`^${indent}${HERMES_ASK}:`, 'm').test(after)) return yaml
+  return `${yaml.slice(0, m.index)}mcp_servers:\n${entry(indent)}${after}`
+}
+
+/**
+ * When Hermes is set up (~/.hermes): copies each ~/.claude/skills folder with a SKILL.md into ~/.hermes/skills/claude-kit
+ * (a copy, since Hermes rewrites skills it uses) and adds the ask server to its config.yaml. False when there is no ~/.hermes.
+ */
+export function shareKitWithHermes(home = os.homedir()): boolean {
+  const hermes = path.join(home, '.hermes'), from = path.join(home, '.claude', 'skills')
+  if (!fs.existsSync(hermes)) return false
+  const to = path.join(hermes, 'skills', 'claude-kit')
+  for (const n of fs.existsSync(from) ? fs.readdirSync(from) : []) {
+    if (fs.existsSync(path.join(from, n, 'SKILL.md'))) fs.cpSync(path.join(from, n), path.join(to, n), { recursive: true, dereference: true })
+  }
+  const config = path.join(hermes, 'config.yaml')
+  const was = fs.existsSync(config) ? fs.readFileSync(config, 'utf8') : ''
+  const now = hermesMcp(was, path.join(home, '.claude', 'switchboard', 'ask', 'ask-server.mjs'))
+  if (now === undefined) log.warn(`Left ${config} alone: its mcp_servers is not a plain block, add ${HERMES_ASK} by hand`)
+  else if (now !== was) {
+    // One backup, from before Switchboard first touched the file.
+    if (was && !fs.existsSync(`${config}.switchboard-bak`)) fs.writeFileSync(`${config}.switchboard-bak`, was)
+    fs.writeFileSync(config, now)
+  }
+  return true
 }
 
 export const isAi = (v: unknown): v is AiId => typeof v === 'string' && Object.hasOwn(AIS, v)
@@ -231,9 +311,10 @@ export const isAi = (v: unknown): v is AiId => typeof v === 'string' && Object.h
 /** Every AI's chats, each in its handoff chain, and a status row per AI. */
 export async function readAis(): Promise<{ chats: ChatRow[]; ais: AiStatus[] }> {
   const ids = Object.keys(AIS) as AiId[]
-  const found = await Promise.all(ids.map(async id => ({ id, d: await AIS[id].detect(), chats: await AIS[id].chats().catch(() => []) })))
+  const all = await Promise.all(ids.map(async id => ({ id, d: await AIS[id].detect(), chats: await AIS[id].chats().catch(() => []) })))
+  const found = all.filter(f => f.d.installed || !AIS[f.id].optional)
   return {
     chats: withChains(found.flatMap(f => f.chats), readChains()),
-    ais: found.map(f => ({ id: f.id, name: AIS[f.id].name, installed: f.d.installed, detail: f.d.detail, chats: f.chats.filter(c => c.live).length })),
+    ais: found.map(f => ({ id: f.id, name: AIS[f.id].name, installed: f.d.installed, detail: f.d.detail, signedIn: f.d.signedIn, chats: f.chats.filter(c => c.live).length })),
   }
 }

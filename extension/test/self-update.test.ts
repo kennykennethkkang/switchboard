@@ -36,7 +36,6 @@ test('startSelfUpdate: installs and reloads only for a production install whose 
   let listing = '', landed: string | undefined, throws = false
   const lock = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-lock-')), 'self-update.lock')
   let state = new Map<string, unknown>()
-  let leave: (s: { focused: boolean }) => void = () => {}
   let answer: string | undefined = 'Install'
   const fake = {
     ExtensionMode: { Production: 1, Development: 2 },
@@ -46,7 +45,8 @@ test('startSelfUpdate: installs and reloads only for a production install whose 
       if (landed && c.endsWith('installExtension')) fs.writeFileSync(listing, row(landed))
     } },
     Uri: { file: (p: string) => ({ fsPath: p }) },
-    window: { state: { focused: false }, showInformationMessage: async (m: string) => { if (m.endsWith('Install it?')) { calls.push('ask'); return answer } return undefined }, onDidChangeWindowState: (f: (s: { focused: boolean }) => void) => { leave = f; return { dispose() {} } } },
+    StatusBarAlignment: { Left: 1 },
+    window: { state: { focused: false }, showInformationMessage: async (m: string) => { if (m.endsWith('Install it?')) { calls.push('ask'); return answer } return undefined }, createStatusBarItem: () => ({ show() { calls.push('reload ready') } }) },
   }
   const orig = Module._load
   Module._load = function (req: string, ...a: unknown[]) { return req === 'vscode' ? fake : orig.call(this, req, ...a) }
@@ -74,11 +74,13 @@ test('startSelfUpdate: installs and reloads only for a production install whose 
     assert.deepEqual(await run(1, row('0.17.9')), ['pull', 'ask', 'workbench.extensions.installExtension'], 'install did not land: no reload')
     assert.deepEqual(await run(1, row('0.17.9')), ['pull'], 'same version is not tried again')
     state = new Map()
-    assert.deepEqual(await run(1, row('0.17.9'), '0.17.10'), ['pull', 'ask', 'workbench.extensions.installExtension', 'workbench.action.reloadWindow'])
+    assert.deepEqual(await run(1, row('0.17.9'), '0.17.10'), ['pull', 'ask', 'workbench.extensions.installExtension', 'workbench.action.reloadWindow'], 'Install was a click: reload now')
     // the row stays ahead of the running version (reload did not take): next start does not reload again
     assert.deepEqual(await run(1, row('0.17.10')), ['pull'], 'reloads at most once per version')
-    leave({ focused: false })
-    assert.deepEqual(calls.splice(0), [], 'leaving the window does not reload with nothing pending')
+    state = new Map()
+    answer = undefined
+    assert.deepEqual(await run(1, row('0.17.10')), ['pull', 'reload ready'], 'installed elsewhere: offers a reload, never reloads on its own')
+    answer = 'Install'
     state = new Map()
     throws = true
     assert.deepEqual(await run(1, row('0.17.9')), ['pull', 'ask', 'workbench.extensions.installExtension'])
@@ -96,7 +98,7 @@ test('startSelfUpdate: installs and reloads only for a production install whose 
   }
 })
 
-test('startSelfUpdate: a reload held back while focused happens at the next check once the window is in the background', async (t) => {
+test('startSelfUpdate: a version installed elsewhere never reloads by itself, focused or not', async (t) => {
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path')
   const Module = require('module')
   const id = 'kennykennethkkang.switchboard'
@@ -106,7 +108,8 @@ test('startSelfUpdate: a reload held back while focused happens at the next chec
     ExtensionMode: { Production: 1 },
     commands: { executeCommand: async (c: string) => { calls.push(c) } },
     Uri: { file: (p: string) => ({ fsPath: p }) },
-    window: { state: win, showInformationMessage: async () => undefined, onDidChangeWindowState: () => ({ dispose() {} }) },
+    StatusBarAlignment: { Left: 1 },
+    window: { state: win, showInformationMessage: async () => undefined, createStatusBarItem: () => ({ show() { calls.push('reload ready') } }) },
   }
   const orig = Module._load
   Module._load = function (req: string, ...a: unknown[]) { return req === 'vscode' ? fake : orig.call(this, req, ...a) }
@@ -118,13 +121,13 @@ test('startSelfUpdate: a reload held back while focused happens at the next chec
     const state = new Map<string, unknown>()
     const ctx = { globalState: { get: (k: string) => state.get(k), update: async (k: string, v: unknown) => { state.set(k, v) } }, extensionMode: 1, extension: { packageJSON: { version: '0.17.10' }, id }, extensionPath: path.join(exts, `${id}-0.17.10`), subscriptions: [] as { dispose(): void }[] }
     await startSelfUpdate(ctx as never, kit, async () => {}, path.join(exts, 'self-update.lock'))
-    assert.deepEqual(calls.splice(0), [], 'focused: asks, does not reload')
+    assert.deepEqual(calls.splice(0), ['reload ready'], 'focused: offers, does not reload')
     // Already in the background, so no blur event comes.
     win.focused = false
     // Five minutes plus up to one of jitter.
     t.mock.timers.tick(6 * 60 * 1000)
     await new Promise(r => setImmediate(r))
-    assert.deepEqual(calls.splice(0), ['workbench.action.reloadWindow'])
+    assert.deepEqual(calls.splice(0), [], 'in the background: still no reload')
     for (const s of ctx.subscriptions) s.dispose()
   } finally {
     Module._load = orig

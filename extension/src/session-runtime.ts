@@ -12,6 +12,7 @@
 import * as vscode from 'vscode'
 import type { AgentEvent, SessionInfo } from './protocol'
 import { VisualizerPanel } from './webview-provider'
+import { hub } from './hub/hub-service'
 import { SESSION_ID_DISPLAY, STATUS_MESSAGE_DURATION_MS } from './constants'
 import type { TypedDisposable, TypedEvent } from './typed-event-emitter'
 
@@ -71,6 +72,7 @@ export function wireWatcherToPanel(
   const subs: TypedDisposable[] = []
 
   subs.push(watcher.onEvent((event) => {
+    if (event.sessionId && hub.isHeadless(event.sessionId)) return
     const panels = VisualizerPanel.ready()
     if (panels.length === 0) return
     const transformed = options.transformEvent ? options.transformEvent(event) : event
@@ -78,6 +80,7 @@ export function wireWatcherToPanel(
   }))
 
   subs.push(watcher.onSessionDetected((sessionId) => {
+    if (hub.isHeadless(sessionId)) return
     for (const panel of VisualizerPanel.all()) {
       const sessionCount = watcher.getActiveSessions().length
       panel.setConnectionStatus('watching', sessionCount > 1
@@ -90,7 +93,9 @@ export function wireWatcherToPanel(
     )
   }))
 
+  // Learn runs start in this clone, so the watcher sees them live too.
   subs.push(watcher.onSessionLifecycle((lifecycle) => {
+    if (hub.isHeadless(lifecycle.sessionId)) return
     for (const panel of VisualizerPanel.all()) postLifecycle(panel, lifecycle)
   }))
 

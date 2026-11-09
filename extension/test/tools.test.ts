@@ -4,6 +4,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { Installed } from '../src/hub/types'
+import { ask } from '../src/hub/projects'
 import { FLAGGED, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, startProfile, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE } from '../src/hub/tools'
 
 const inv: Installed[] = [
@@ -18,6 +19,8 @@ const inv: Installed[] = [
   { kind: 'skill', name: 'old-one', enabled: false },
   { kind: 'role', name: 'engineer', enabled: true },
 ]
+
+const BY = { permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
 
 test('defaultProfile: every plugin on, mods and archived skills left out', () => {
   assert.deepEqual(defaultProfile(inv), {
@@ -62,7 +65,7 @@ test('cleanProfile: an always-on plugin like superpowers stays on when turned of
 
 test('profileSettings: every plugin written out, only off skills overridden', () => {
   assert.deepEqual(profileSettings({ plugins: { 'a@b': true, 'c@d': false }, skills: { phone: false, x: true } }), {
-    enabledPlugins: { 'a@b': true, 'c@d': false }, skillOverrides: { phone: 'off' }, permissions: { defaultMode: 'bypassPermissions' },
+    enabledPlugins: { 'a@b': true, 'c@d': false }, skillOverrides: { phone: 'off' }, ...BY,
   })
 })
 
@@ -88,9 +91,10 @@ test('chatSettings: a to-do chat starts with Remote Control off, a normal new ch
   assert.deepEqual(JSON.parse(fs.readFileSync(normal, 'utf8')), profileSettings(p))
   assert.ok(!('remoteControlAtStartup' in profileSettings(p)))
   // No tool profile: the off switch goes inline, and a normal chat passes no --settings at all.
-  assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, true, dir)!), { remoteControlAtStartup: false, permissions: { defaultMode: 'bypassPermissions' } })
-  assert.equal(chatSettings(undefined, undefined, false, dir), undefined)
-  assert.equal(chatSettings('2f8fad5b-d9cb-469f-a165-70867728950e', undefined, false, dir), undefined)
+  assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, true, dir)!), { remoteControlAtStartup: false, ...BY })
+  // A normal chat without a profile still gets the bypass inline, so a project's own permission mode cannot bring prompts back.
+  assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, false, dir)!), BY)
+  assert.deepEqual(JSON.parse(chatSettings('2f8fad5b-d9cb-469f-a165-70867728950e', undefined, false, dir)!), BY)
 })
 
 test('no remote is kept per chat: a tools change rewrites the settings with the switch still off', () => {
@@ -112,12 +116,12 @@ test('no remote on resume: with a profile its file, without one the switch inlin
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
   const bare = '2f8fad5b-d9cb-469f-a165-70867728950e'
   chatSettings(bare, undefined, true, dir)
-  assert.equal(resumeSettingsArg(bare, dir, '', 'posix'), ` --settings '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"}}'`)
+  assert.equal(resumeSettingsArg(bare, dir, '', 'posix'), ` --settings '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}'`)
   const withTools = '3f8fad5b-d9cb-469f-a165-70867728950e'
   const file = chatSettings(withTools, { plugins: {}, skills: {} }, true, dir)!
   assert.equal(resumeSettingsArg(withTools, dir, '', 'posix'), ` --settings '${file}'`)
   assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).remoteControlAtStartup, false)
-  assert.equal(resumeSettingsArg('4f8fad5b-d9cb-469f-a165-70867728950e', dir, '', 'posix'), '')
+  assert.equal(resumeSettingsArg('4f8fad5b-d9cb-469f-a165-70867728950e', dir, '', 'posix'), ` --settings '{"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}'`)
 })
 
 test('no remote follows a handoff to the fresh chat, with or without tools; a normal chat hands off as before', () => {
@@ -129,13 +133,13 @@ test('no remote follows a handoff to the fresh chat, with or without tools; a no
   assert.equal(a.off, true)
   assert.equal(isNoRemote(fresh, dir), true)
   assert.equal(JSON.parse(fs.readFileSync(a.settings!, 'utf8')).remoteControlAtStartup, false)
-  assert.deepEqual(handoffSettings(old, fresh2, undefined, dir), { settings: '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"}}', off: true })
+  assert.deepEqual(handoffSettings(old, fresh2, undefined, dir), { settings: '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}', off: true })
   const normal = '8f8fad5b-d9cb-469f-a165-70867728950e', next = '9f8fad5b-d9cb-469f-a165-70867728950e'
   const b = handoffSettings(normal, next, p, dir)
   assert.equal(b.off, false)
   assert.equal(isNoRemote(next, dir), false)
   assert.deepEqual(JSON.parse(fs.readFileSync(b.settings!, 'utf8')), profileSettings(p))
-  assert.deepEqual(handoffSettings(normal, 'a0f8fad5-d9cb-469f-a165-70867728950e', undefined, dir), { settings: undefined, off: false })
+  assert.deepEqual(handoffSettings(normal, 'a0f8fad5-d9cb-469f-a165-70867728950e', undefined, dir), { settings: JSON.stringify(BY), off: false })
 })
 
 test('routes: tool commands checked, a profile must be two maps of booleans', async () => {
@@ -179,7 +183,7 @@ test('toolsNote: tells the chat to read the design references on before UI work'
 })
 
 test('profileSettings: a project skill turned off goes through skillOverrides', () => {
-  assert.deepEqual(profileSettings({ plugins: {}, skills: { 'apple-design': false }, assets: { 'a.md': true } }), { enabledPlugins: {}, skillOverrides: { 'apple-design': 'off' }, permissions: { defaultMode: 'bypassPermissions' } })
+  assert.deepEqual(profileSettings({ plugins: {}, skills: { 'apple-design': false }, assets: { 'a.md': true } }), { enabledPlugins: {}, skillOverrides: { 'apple-design': 'off' }, ...BY })
 })
 
 test('resumeSettingsArg: a profile with assets resumes with the note', () => {
@@ -234,8 +238,9 @@ test('nameNote: names the user when set, nothing when empty', () => {
 test('resumeSettingsArg: an extra note rides along, with or without a profile', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
   const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
-  assert.equal(resumeSettingsArg(id, dir, "Call me O'Neil.", 'posix'), ` --append-system-prompt 'Call me O'\\''Neil.'`)
-  assert.equal(resumeSettingsArg(id, dir, "Call me O'Neil.", 'powershell'), ` --append-system-prompt 'Call me O''Neil.'`)
+  const inl = ` --settings '${JSON.stringify(BY)}'`
+  assert.equal(resumeSettingsArg(id, dir, "Call me O'Neil.", 'posix'), `${inl} --append-system-prompt 'Call me O'\\''Neil.'`)
+  assert.equal(resumeSettingsArg(id, dir, "Call me O'Neil.", 'powershell'), `${inl} --append-system-prompt 'Call me O''Neil.'`)
   const file = saveProfile(id, { plugins: {}, skills: {} }, dir)
   assert.equal(resumeSettingsArg(id, dir, 'Hi.', 'posix'), ` --settings '${file}' --append-system-prompt 'Hi.'`)
   assert.equal(resumeSettingsArg(id, dir, '', 'posix'), ` --settings '${file}'`)
@@ -257,8 +262,8 @@ test('resume quoting: hostile notes stay one argument in POSIX sh and PowerShell
   for (const n of [`x'; calc.exe; #`, `"q"`, '`id`', '$(whoami)', 'a;b', '# c', `O\u2019Neil`]) {
     const arg = resumeSettingsArg(id, dir, n, 'posix')
     const out = execFileSync('sh', ['-c', `printf '[%s]\\n'${arg}`]).toString()
-    assert.equal(out, `[--append-system-prompt]\n[${n}]\n`, n)
-    const ps = resumeSettingsArg(id, dir, n, 'powershell').replace(' --append-system-prompt ', '')
+    assert.equal(out, `[--settings]\n[${JSON.stringify(BY)}]\n[--append-system-prompt]\n[${n}]\n`, n)
+    const ps = resumeSettingsArg(id, dir, n, 'powershell').replace(/^.* --append-system-prompt /, '')
     assert.ok(psToken(ps), `${n} -> ${ps}`)
   }
 })
@@ -320,4 +325,34 @@ test('withLibrary: a profile saved before the library gets every look, off; ones
   const p = { plugins: {}, skills: {}, assets: { 'x.md': true, '/l/stripe/DESIGN.md': true } }
   assert.deepEqual(withLibrary(p, lib).assets, { '/l/airbnb/DESIGN.md': false, 'x.md': true, '/l/stripe/DESIGN.md': true })
   assert.equal(withLibrary({ plugins: {}, skills: {} }, []).assets, undefined)
+})
+
+test('Ask before actions on: new and resumed chats start in default mode, and back off again in bypass', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
+  const id = 'af8fad5b-d9cb-469f-a165-70867728950e'
+  const p = { plugins: {}, skills: {} }
+  const file = saveProfile(id, p, dir)
+  ask.claude = true
+  try {
+    assert.deepEqual(profileSettings(p).permissions, { defaultMode: 'default' })
+    assert.equal('skipDangerousModePermissionPrompt' in profileSettings(p), false)
+    assert.equal('enableAllProjectMcpServers' in profileSettings(p), false)
+    assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, false, dir)!), { permissions: { defaultMode: 'default' } })
+    assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, false, dir)!).permissions, { defaultMode: 'default' })
+    // A chat saved in bypass resumes asking: its settings file is rewritten.
+    assert.equal(resumeSettingsArg(id, dir, '', 'posix'), ` --settings '${file}'`)
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).permissions, { defaultMode: 'default' })
+  } finally { ask.claude = false }
+  resumeSettingsArg(id, dir, '', 'posix')
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), profileSettings(p))
+  // Profile gone, settings file left: the mode is still rewritten, tools kept.
+  fs.rmSync(path.join(dir, `${id}.json`))
+  ask.claude = true
+  try {
+    resumeSettingsArg(id, dir, '', 'posix')
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { enabledPlugins: {}, skillOverrides: {}, permissions: { defaultMode: 'default' } })
+  } finally { ask.claude = false }
+  resumeSettingsArg(id, dir, '', 'posix')
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { enabledPlugins: {}, skillOverrides: {}, ...BY })
+  assert.deepEqual(profileSettings(p), { enabledPlugins: {}, skillOverrides: {}, ...BY })
 })

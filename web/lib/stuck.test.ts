@@ -13,9 +13,9 @@ test('usage reads CPU and memory short, and nothing when neither is known', () =
 })
 
 test('diagnosis names the chat, what, since, use, command and last call, one per line', () => {
-  const d = diagnosis(item, 'agent-flow v3', NOW)
+  const d = diagnosis(item, 'switchboard v3', NOW)
   assert.equal(d, [
-    'Chat: agent-flow v3', 'Stuck: Background job "run tests": no new output', `Since: ${new Date(NOW - 125 * MIN).toTimeString().slice(0, 5)} (2 h)`,
+    'Chat: switchboard v3', 'Stuck: Background job "run tests": no new output', `Since: ${new Date(NOW - 125 * MIN).toTimeString().slice(0, 5)} (2 h)`,
     'Use: CPU 97% · 1.5 GB', 'Process: pid 4242', 'Command: pnpm test', 'Last tool call: Bash pnpm test',
   ].join('\n'))
   assert.equal(diagnosis({ id: 'a', kind: 'agent', sessionId: 's', what: 'qa subagent: no tool call', since: NOW - 12 * MIN }, 'x', NOW), `Chat: x\nStuck: qa subagent: no tool call\nSince: ${new Date(NOW - 12 * MIN).toTimeString().slice(0, 5)} (12 min)`)

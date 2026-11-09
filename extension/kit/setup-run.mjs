@@ -44,9 +44,11 @@ export function commandFor(cmd, args, platform = process.platform) {
   return { cmd, args: args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"` : a)), shell: true }
 }
 
-function run(cmd, args, quiet) {
+/** wait: seconds, after which a command still running is stopped and counts as done (codex mcp add waiting on a browser login). */
+function run(cmd, args, quiet, wait) {
   const c = commandFor(cmd, args)
-  return spawnSync(c.cmd, c.args, { stdio: ['inherit', quiet ? 'ignore' : 'inherit', 'inherit'], shell: c.shell }).status === 0
+  const r = spawnSync(c.cmd, c.args, { stdio: [wait ? 'ignore' : 'inherit', quiet ? 'ignore' : 'inherit', 'inherit'], shell: c.shell, ...(wait ? { timeout: wait * 1000 } : {}) })
+  return r.status === 0 || (!!wait && r.error?.code === 'ETIMEDOUT')
 }
 
 // Not through a shell: the key rides in stdin or env only. The timeout keeps a prompt from hanging Set up.
@@ -91,19 +93,31 @@ function gitClone(repo, dir) {
 // Imported when needed: the --headers copy in ~/.claude/switchboard has no sweep.mjs beside it.
 const sweep = () => import('./sweep.mjs')
 
-/** Clones the repo shallow and sweeps each named skill (by its SKILL.md name) before copying it into ~/.claude/skills. These are kit skills
- * (setup.json), so a flagged one is still copied in on, listed in flagged for review. One already there, on or archived, is the user's and stays. */
+/** Codex reads ~/.agents/skills: a skill on in ~/.claude/skills (not held in skills-archive) is copied there when missing. One already there stays. */
+export function mirrorSkill(n, home = homedir()) {
+  const from = join(home, '.claude', 'skills', n), to = join(home, '.agents', 'skills', n)
+  if (!existsSync(join(from, 'SKILL.md')) || lstatSync(to, { throwIfNoEntry: false })) return false
+  mkdirSync(dirname(to), { recursive: true })
+  // dereference: a claude-mods link lands as a copy.
+  cpSync(from, to, { recursive: true, dereference: true })
+  return true
+}
+
+/** Clones the repo shallow and sweeps each named skill (by its SKILL.md name, under k.path, default skills) before copying it into ~/.claude/skills.
+ * k.file, when given, is read and copied as SKILL.md. These are kit skills (setup.json), so a flagged one is still copied in on, listed in flagged for review.
+ * One already there, on or archived, is the user's and stays. Then each one on is mirrored for Codex (codex lists those). */
 export async function installSkills(k, { home = homedir(), clone = gitClone, log = console.log, scan } = {}) {
   const { intakeSkill } = await sweep()
   const tmp = mkdtempSync(join(tmpdir(), 'sb-skills-'))
-  const out = { added: [], flagged: [], kept: [], missing: [], refused: [] }
+  const out = { added: [], flagged: [], kept: [], missing: [], refused: [], codex: [] }
+  const file = k.file ?? 'SKILL.md'
   try {
     const err = clone(k.repo, join(tmp, 'repo'))
     if (err) { log(`${k.repo}: could not fetch (${err}), skipped.`); return { ...out, error: err } }
-    const root = join(tmp, 'repo', 'skills')
+    const root = join(tmp, 'repo', k.path ?? 'skills')
     const found = {}
     for (const d of existsSync(root) ? readdirSync(root) : []) {
-      const md = join(root, d, 'SKILL.md')
+      const md = join(root, d, file)
       // A linked skill folder is refused by its folder name; existsSync would follow it.
       if (lstatSync(join(root, d)).isSymbolicLink()) { if (k.names.includes(d)) found[d] = join(root, d); continue }
       const name = existsSync(md) && /^name:\s*["']?([^"'\s]+)/m.exec(readFileSync(md, 'utf8'))?.[1]
@@ -114,12 +128,19 @@ export async function installSkills(k, { home = homedir(), clone = gitClone, log
       else if (!found[n]) { out.missing.push(n); log(`${k.repo}: no skill named ${n}, skipped.`) }
       else {
         let r
+        if (file !== 'SKILL.md' && !lstatSync(found[n]).isSymbolicLink()) {
+          const staged = join(tmp, 'staged', n)
+          cpSync(found[n], staged, { recursive: true })
+          cpSync(join(staged, file), join(staged, 'SKILL.md'))
+          found[n] = staged
+        }
         try { r = await intakeSkill(found[n], n, { home, hold: false, ...(scan ? { scan } : {}) }) } catch (e) { out.refused.push(n); log(`${k.repo}: ${e.message}.`); continue }
         out.added.push(n)
         if (r.state === 'review' && !r.approvedAt) { out.flagged.push(n); log(`Added skill ${n}; the sweep flagged it (${r.severity}, ${r.issues} issues), review it in Switchboard, Settings, Installed.`) }
         else log(`Added skill ${n}${r.state === 'unscanned' ? ` (not swept: ${r.reason})` : ''}`)
       }
     }
+    for (const n of k.names) if (mirrorSkill(n, home)) { out.codex.push(n); log(`Added skill ${n} for Codex`) }
     return out
   } finally { rmSync(tmp, { recursive: true, force: true }) }
 }
@@ -131,14 +152,14 @@ const same = (a, b) => { const fa = files(a), fb = files(b); return fa.join('\n'
 
 const plainName = n => typeof n === 'string' && n !== '' && n !== '.' && n !== '..' && !/[\\/]/.test(n)
 
-/** Copies Switchboard's own skills from the bundle into ~/.claude/skills: a missing one is added, a copy of ours that differs is replaced.
+/** Copies Switchboard's own skills from the bundle into ~/<root> (~/.claude/skills, or ~/.agents/skills for Codex): a missing one is added, a copy of ours that differs is replaced.
  * A symlink (a claude-mods clone) and a copy without GENERIC (the user's own) are never touched. Each goes to a hidden sibling first,
  * so a failed copy leaves the old one; failed lists those, and the rest still run. */
-export function installOwnSkills(k, { home = homedir(), log = console.log } = {}) {
+export function installOwnSkills(k, { home = homedir(), log = console.log, root = join('.claude', 'skills') } = {}) {
   const out = { added: [], refreshed: [], kept: [], linked: [], failed: [] }
   for (const n of k.names) {
     if (!plainName(n)) { out.failed.push(n); log(`${JSON.stringify(n)}: not a plain folder name, skipped.`); continue }
-    const from = join(k.from, n), to = join(home, '.claude', 'skills', n), tmp = join(home, '.claude', 'skills', `.${n}.sb-new-${process.pid}`)
+    const from = join(k.from, n), to = join(home, root, n), tmp = join(home, root, `.${n}.sb-new-${process.pid}`)
     try {
       if (!existsSync(join(from, 'SKILL.md'))) { log(`${n}: not in this build, skipped.`); continue }
       const st = lstatSync(to, { throwIfNoEntry: false })
@@ -175,9 +196,12 @@ async function main(planFile, dry) {
     process.exit(1)
   }
   const failed = []
+  const has = {}, said = new Set()
   for (const s of steps) {
     if (s.say !== undefined) { console.log(s.say); continue }
     if (s.ifExists && !existsSync(expand(s.ifExists))) continue
+    const gone = (s.needs ?? []).find(c => !dry && !(has[c] ??= run(c, ['--version'], true)))
+    if (gone) { if (!said.has(gone)) { said.add(gone); console.log(`${gone} is not installed, so its steps are skipped (${s.label} and on).`) } continue }
     if (s.key) {
       const key = keyFor(s.key)
       if (!key) console.log(`${s.label}: no key in the env, skipped.`)
@@ -186,13 +210,13 @@ async function main(planFile, dry) {
       continue
     }
     if (s.skills) {
-      console.log(`> git clone --depth 1 ${cloneUrl(s.skills.repo)}, copy ${s.skills.names.join(' ')} to ~/.claude/skills`)
+      console.log(`> git clone --depth 1 ${cloneUrl(s.skills.repo)}, copy ${s.skills.names.join(' ')} to ~/.claude/skills and ~/.agents/skills`)
       if (!dry && (await installSkills(s.skills)).error) failed.push(s.label)
       continue
     }
     if (s.own) {
-      console.log(`> copy ${s.own.names.join(' ')} from ${expand(s.own.from)} to ~/.claude/skills, where missing or an older copy of ours`)
-      if (!dry && installOwnSkills(s.own).failed.length) failed.push(s.label)
+      console.log(`> copy ${s.own.names.join(' ')} from ${expand(s.own.from)} to ~/.claude/skills and ~/.agents/skills, where missing or an older copy of ours`)
+      if (!dry && [installOwnSkills(s.own), installOwnSkills(s.own, { root: join('.agents', 'skills') })].some(r => r.failed.length)) failed.push(s.label)
       continue
     }
     if (s.copy) {
@@ -204,7 +228,7 @@ async function main(planFile, dry) {
     const args = s.run.slice(1).map(a => expand(a))
     console.log(`> ${s.quiet ? s.label : [s.run[0], ...args].join(' ')}`)
     if (dry) continue
-    if (run(s.run[0], args, s.quiet)) {
+    if (run(s.run[0], args, s.quiet, s.wait)) {
       if (s.quiet) console.log(`Added ${s.label}`)
       if (s.run[0] === 'claude' && s.run[1] === 'plugin' && s.run[2] === 'install') await sweepPlugin(s.run[3])
     } else failed.push(s.label)

@@ -55,7 +55,7 @@ export function jarvisLocal(s: HubState, q: string, now = Date.now()): string | 
 
 const START = /^(?:please\s+)?(?:start|open|spin up|kick off|launch)\s+(?:a\s+)?(?:new\s+)?chat\b\s*(.*)$/i
 const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-// whisper drops spaces and hyphens: "agent-flow" comes back as "AgentFlow"
+// whisper drops spaces and hyphens: "switchboard" comes back as "Switchboard"
 const loose = (name: string) => name.split(/[\s_-]+/).map(esc).join('[\\s_-]*')
 // "in/for/on X" leading the text, or a closing "in X"; a project word inside the goal ("work on a bug") is goal.
 const lead = (p: Project) => new RegExp(`^(?:in|for|on)\\s+${loose(p.name)}(?=\\s|$|[.,:!?])`, 'i')

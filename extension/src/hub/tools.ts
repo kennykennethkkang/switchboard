@@ -6,12 +6,13 @@
  * hides user and project skills, plugin skills go with their plugin. Mods are never touched.
  * Design references (assets) left on are named to the chat in its appended system note, to read before UI work.
  * The bundled design library (source 'library', absolute paths) is the opposite: off unless turned on by hand.
- * Every chat settings file also sets bypassPermissions, so a project's own permission mode cannot bring prompts back.
+ * Every chat gets --settings with bypassPermissions (or default with Ask before actions on), so a project's own mode cannot change it.
+ * Bypass also approves project .mcp.json servers and skips the bypass warning; asking keeps both prompts.
  */
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { SHELL, shellQuote, type Shell } from './projects'
+import { SHELL, ask, shellQuote, type Shell } from './projects'
 import type { ChatProfile, Installed } from './types'
 import type { HubService } from './hub-service'
 import { LIBRARY, libraryCopies, libraryInventory, projectInventory } from './local'
@@ -86,12 +87,16 @@ export function toolsNote(p: ChatProfile): string {
   return refs.length ? `${TOOLS_NOTE} Before any UI, styling or web design work, read these design references first: ${refs.join(', ')}.` : TOOLS_NOTE
 }
 
-const BYPASS = { permissions: { defaultMode: 'bypassPermissions' } }
+// Read per write, so the Ask before actions switch reaches the next start or resume.
+// Asking also drops the .mcp.json auto-trust: a cloned repo's server runs its own commands.
+const mode = () => ask.claude
+  ? { permissions: { defaultMode: 'default' } }
+  : { permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
 
 export const profileSettings = (p: ChatProfile) => ({
   enabledPlugins: { ...p.plugins },
   skillOverrides: Object.fromEntries(Object.entries(p.skills).filter(([, on]) => !on).map(([k]) => [k, 'off'])),
-  ...BYPASS,
+  ...mode(),
 })
 
 const ID = /^[0-9a-f-]{8,64}$/i
@@ -102,7 +107,7 @@ const fileOf = (id: string, dir: string, ext = 'json') => {
 
 // --settings outranks ~/.claude/settings.json, so this turns auto-connect off for one chat and leaves the user's choice alone.
 const NO_REMOTE = { remoteControlAtStartup: false }
-const NO_REMOTE_ARG = JSON.stringify({ ...NO_REMOTE, ...BYPASS })
+const inline = (noRemote: boolean) => JSON.stringify({ ...(noRemote ? NO_REMOTE : {}), ...mode() })
 
 /** A chat that must never connect to Remote Control (a To-do run) has an empty <id>.noremote here; every writer and reader checks it. */
 export const isNoRemote = (id: string, dir = PROFILES) => ID.test(id) && fs.existsSync(fileOf(id, dir, 'noremote'))
@@ -120,11 +125,11 @@ export function saveProfile(id: string, p: ChatProfile, dir = PROFILES): string 
   return file
 }
 
-/** A new chat's --settings: its profile's file, else the off switch inline for a no-remote chat. noRemote marks the chat for good. */
-export function chatSettings(id: string | undefined, p: ChatProfile | undefined, noRemote = false, dir = PROFILES): string | undefined {
+/** A new chat's --settings: its profile's file, else the mode inline, with the off switch for a no-remote chat. noRemote marks the chat for good. */
+export function chatSettings(id: string | undefined, p: ChatProfile | undefined, noRemote = false, dir = PROFILES): string {
   if (id && noRemote) markNoRemote(id, dir)
   if (id && p) return saveProfile(id, p, dir)
-  return noRemote || (id && isNoRemote(id, dir)) ? NO_REMOTE_ARG : undefined
+  return inline(noRemote || !!(id && isNoRemote(id, dir)))
 }
 
 /** A handoff's fresh chat takes the old one's tools and its Remote Control switch. off: start it without --remote-control too. */
@@ -146,7 +151,7 @@ export function readProfiles(ids: string[], dir = PROFILES): Record<string, Chat
   return out
 }
 
-/** ` --settings '<file>'` for a chat that has a profile, the off switch inline for a no-remote one without, else ''; with picked design references or extra (the name note), --append-system-prompt too. */
+/** ` --settings '<file>'` for a chat that has a profile (rewritten for the current mode), else the mode inline; '' for a bad id; with picked design references or extra (the name note), --append-system-prompt too. */
 export function resumeSettingsArg(id: string, dir = PROFILES, extra = '', shell: Shell = SHELL, lib = LIBRARY): string {
   if (!ID.test(id)) return ''
   const file = fileOf(id, dir, 'settings.json')
@@ -154,8 +159,18 @@ export function resumeSettingsArg(id: string, dir = PROFILES, extra = '', shell:
   const p = has ? savedProfile(id, dir, lib) : undefined
   const note = p ? toolsNote(p) : TOOLS_NOTE
   const append = [note === TOOLS_NOTE ? '' : note, extra].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
-  const settings = has ? file : isNoRemote(id, dir) ? NO_REMOTE_ARG : undefined
-  return `${settings ? ` --settings ${shellQuote(settings, shell)}` : ''}${append ? ` --append-system-prompt ${shellQuote(append, shell)}` : ''}`
+  if (p) saveProfile(id, p, dir)
+  else if (has) remode(file)
+  const settings = has ? file : inline(isNoRemote(id, dir))
+  return ` --settings ${shellQuote(settings, shell)}${append ? ` --append-system-prompt ${shellQuote(append, shell)}` : ''}`
+}
+
+/** A settings file whose profile is unreadable keeps its tools but takes the current mode. */
+function remode(file: string): void {
+  try {
+    const { permissions: _p, skipDangerousModePermissionPrompt: _s, enableAllProjectMcpServers: _e, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8'))
+    fs.writeFileSync(file, `${JSON.stringify({ ...rest, ...mode() }, null, 2)}\n`, { mode: 0o600 })
+  } catch { /* unreadable: left for the CLI to report */ }
 }
 
 /** A chat's saved profile for a resume or handoff; one from before chats started all on is rewritten all on first. */
@@ -197,12 +212,17 @@ export function turnOn(p: ChatProfile, inv: Installed[], name: string, cwd?: str
   return { profile: { ...p, skills: { ...p.skills, [sk.name]: true } }, use: first(roots.map(r => path.join(r, sk.name, 'SKILL.md')), roots[0]) }
 }
 
+/** The same inventory the chat started with (chatInventory), or cleanProfile drops its design references. */
+export async function toolInventory(hub: HubService, session: string): Promise<Installed[]> {
+  const cwd = hub.get().chats.find(c => c.sessionId === session)?.cwd
+  return [...hub.get().installed, ...(cwd ? await projectInventory(cwd).catch(() => []) : []), ...await libraryInventory()]
+}
+
 /** The tool_on tool: on for the chat from now on, saved so a resume or fresh chat keeps it; answers a line for the chat. */
 export async function toolOn(hub: HubService, session: string, name: string): Promise<string> {
   if (!ID.test(session)) throw new Error('this chat has no Switchboard session id')
   const cwd = hub.get().chats.find(c => c.sessionId === session)?.cwd
-  // The same inventory the chat started with (chatInventory), or cleanProfile drops its design references.
-  const inv = [...hub.get().installed, ...(cwd ? await projectInventory(cwd).catch(() => []) : []), ...await libraryInventory()]
+  const inv = await toolInventory(hub, session)
   const on = turnOn(readProfiles([session])[session] ?? defaultProfile(inv), inv, name, cwd)
   if (!on) throw new Error(`nothing installed is named ${name}`)
   const profile = cleanProfile(on.profile, inv)

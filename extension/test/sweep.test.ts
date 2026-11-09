@@ -11,7 +11,7 @@ import { commandProblem, handleHub } from '../src/hub/routes'
 import { HubService } from '../src/hub/hub-service'
 import { installed } from '../src/hub/local'
 import { cleanProfile, defaultProfile, profileSettings, turnOn } from '../src/hub/tools'
-import { approve, digest, held, intakePlugin, needsApproval, intakeSkill, readSweep, repoOf, scan, sweepOne, verdict } from '../kit/sweep.mjs'
+import { approve, digest, markReviewed, held, intakePlugin, needsApproval, intakeSkill, readSweep, repoOf, scan, sweepOne, verdict } from '../kit/sweep.mjs'
 // @ts-expect-error plain .mjs, no types
 import { installSkills, sweepPlugin } from '../kit/setup-run.mjs'
 
@@ -476,5 +476,20 @@ describe('hold rule', () => {
     assert.equal(s.enabledPlugins['off@mkt'], true)
     assert.equal(cleanProfile({ plugins: { 'held@mkt': true }, skills: {} }, inv).plugins['held@mkt'], false)
     assert.throws(() => turnOn({ plugins: {}, skills: {} }, inv, 'held'), /needs approval in Switchboard/)
+  })
+})
+
+describe('sweep review', () => {
+  it('stores the verdict for the current digest and leaves hold and approval alone', () => {
+    const home = tmp(), f = path.join(home, '.claude', 'switchboard', 'sweep.json')
+    fs.mkdirSync(path.dirname(f), { recursive: true })
+    fs.writeFileSync(f, JSON.stringify({ a: { kind: 'skill', path: '/a', digest: 'd1', scannedAt: 1, state: 'review', hold: true } }))
+    const rec = markReviewed(home, 'a', 'APPROVE', 'reads files only')
+    assert.equal(rec?.reviewed?.digest, 'd1')
+    assert.equal(rec?.reviewed?.verdict, 'APPROVE')
+    assert.equal(readSweep(home).a.hold, true)
+    assert.equal(held(readSweep(home).a), true)
+    assert.equal(markReviewed(home, 'missing', 'APPROVE', 'x'), undefined)
+    assert.throws(() => markReviewed(home, 'a', 'MAYBE' as 'APPROVE', 'x'))
   })
 })

@@ -9,7 +9,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
-import { board, brief, editGuard, noteEdit, quickAskArgs, redact, suggest, withBrief } from '../src/hub/brain'
+import { board, brief, editGuard, noteEdit, quickAskArgs, redact, suggest, waitsOn, withBrief } from '../src/hub/brain'
 import { emptyHub } from '../src/hub/hub-service'
 import type { ChatProgress, HubState, SessionLive, StarredChat } from '../src/hub/types'
 
@@ -20,25 +20,25 @@ const chat = (sessionId: string, cwd: string, extra: Partial<SessionLive> = {}):
 const state = (live: SessionLive[], extra: Partial<HubState> = {}): HubState => ({
   ...emptyHub(),
   live,
-  projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: true }, { name: 'agent-flow', path: '/w/agent-flow', kind: 'repo', isOpen: false }],
+  projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: true }, { name: 'switchboard', path: '/w/switchboard', kind: 'repo', isOpen: false }],
   ...extra,
 })
 
 describe('brain board', () => {
   it('groups live chats by project, a subfolder under its project', () => {
-    const b = board(state([chat('a', '/w/Armasu'), chat('b', '/w/Armasu/app', { prompt: 'fix the bag' }), chat('c', '/w/agent-flow')]))
-    assert.deepEqual(b.map(p => [p.project, p.chats.length]), [['Armasu', 2], ['agent-flow', 1]])
+    const b = board(state([chat('a', '/w/Armasu'), chat('b', '/w/Armasu/app', { prompt: 'fix the bag' }), chat('c', '/w/switchboard')]))
+    assert.deepEqual(b.map(p => [p.project, p.chats.length]), [['Armasu', 2], ['switchboard', 1]])
     assert.equal(b[0].chats.find(c => c.sessionId === 'b')?.prompt, 'fix the bag')
   })
 
   it('names a subfolder of a git repo by the repo, even when the subfolder is listed', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-brain-'))
     try {
-      const repo = path.join(tmp, 'agent-flow'), sub = path.join(repo, 'extension')
+      const repo = path.join(tmp, 'switchboard'), sub = path.join(repo, 'extension')
       fs.mkdirSync(path.join(repo, '.git'), { recursive: true })
       fs.mkdirSync(sub)
       const b = board(state([chat('a', sub), chat('b', repo)], { projects: [{ name: 'extension', path: sub, kind: 'project', isOpen: false }] }))
-      assert.deepEqual(b.map(p => [p.project, p.chats.length]), [['agent-flow', 2]])
+      assert.deepEqual(b.map(p => [p.project, p.chats.length]), [['switchboard', 2]])
     } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
   })
 
@@ -79,7 +79,7 @@ describe('brain brief', () => {
   const live = [
     chat('me', '/w/Armasu'),
     chat('other', '/w/Armasu', { label: 'Shop', prompt: 'key sk-abcdefghijklmnopqrstuv in the shop', file: '/w/Armasu/app/shop.ts', fileAt: NOW - 1000 }),
-    chat('far', '/w/agent-flow', { prompt: 'secret agent-flow work', file: '/w/agent-flow/x.ts' }),
+    chat('far', '/w/switchboard', { prompt: 'secret switchboard work', file: '/w/switchboard/x.ts' }),
   ]
   const servers = [{ pid: 2, command: 'next dev', port: 3000, folder: '/w/Armasu' }]
 
@@ -94,26 +94,26 @@ describe('brain brief', () => {
   it('carries the recent plan decisions for the open project', () => {
     const text = brief(state(live, { plan: { ...plan, decisions: ['Gate: off by default'] }, servers }), '/w/Armasu', 'me', NOW)
     assert.match(text, /Recent decisions: Gate: off by default/)
-    assert.doesNotMatch(brief(state(live, { plan: { ...plan, decisions: ['Gate: off by default'] }, servers }), '/w/agent-flow', 'far', NOW), /Recent decisions/)
+    assert.doesNotMatch(brief(state(live, { plan: { ...plan, decisions: ['Gate: off by default'] }, servers }), '/w/switchboard', 'far', NOW), /Recent decisions/)
   })
 
   it('names the starred chats of the same project, with their last prompt or note', () => {
     const star = (sessionId: string, name: string, cwd: string, digest: Partial<StarredChat['digest']>) => ({ sessionId, ai: 'claude' as const, name, cwd, starredAt: 1, live: false, digest: { resume: '', ...digest } })
-    const starred = [star('s1', 'agentFlow', '/w/Armasu', { lastPrompt: 'add codex' }), star('s2', 'Far', '/w/agent-flow', { note: 'elsewhere' }), star('me', 'Self', '/w/Armasu', { note: 'x' })]
+    const starred = [star('s1', 'boardChat', '/w/Armasu', { lastPrompt: 'add codex' }), star('s2', 'Far', '/w/switchboard', { note: 'elsewhere' }), star('me', 'Self', '/w/Armasu', { note: 'x' })]
     const text = brief(state([], { starred }), '/w/Armasu', 'me', NOW)
-    assert.match(text, /Starred: agentFlow: "add codex"/)
+    assert.match(text, /Starred: boardChat: "add codex"/)
     assert.doesNotMatch(text, /Far|Self/)
   })
 
   it('tells a chat nothing about another project, and removes keys', () => {
     const text = brief(state(live, { plan, servers }), '/w/Armasu', 'me', NOW)
-    assert.doesNotMatch(text, /agent-flow/)
+    assert.doesNotMatch(text, /switchboard/)
     assert.doesNotMatch(text, /sk-abc/)
     assert.match(text, /\[removed\]/)
   })
 
   it('lists the project\'s open to-do items with their ids, never another project\'s', () => {
-    const todos = { '/w/Armasu': { todo: [{ id: 'ab12cd34', text: 'Add CSV export', at: 1 }] }, '/w/agent-flow': { todo: [{ id: 'ff00ff00', text: 'Far item', at: 1 }] } }
+    const todos = { '/w/Armasu': { todo: [{ id: 'ab12cd34', text: 'Add CSV export', at: 1 }] }, '/w/switchboard': { todo: [{ id: 'ff00ff00', text: 'Far item', at: 1 }] } }
     const text = brief(state([chat('me', '/w/Armasu')], { todos }), '/w/Armasu/app', 'me', NOW)
     assert.match(text, /Open to-do[^\n]*todo_done[^\n]*\n- ab12cd34: Add CSV export/)
     assert.doesNotMatch(text, /ff00ff00/)
@@ -225,11 +225,37 @@ describe('edit guard', () => {
     assert.ok(editGuard(st(), edited(), new Map(), 'me', '/w/Armasu/src', 'x.ts', NOW))
   })
 
+  it('leaves the deny to chat-wait only for a Claude chat with the mod on', () => {
+    const mod = (enabled: boolean) => [{ kind: 'mod' as const, name: 'chat-wait@kenneth-mods', enabled }]
+    const on = { ...st(), installed: mod(true) }
+    assert.equal(editGuard(on, edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW), undefined)
+    assert.ok(editGuard({ ...st(), installed: mod(false) }, edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW))
+    // Codex chats and role runs never run the mod.
+    const codex = { ...on, chats: [{ sessionId: 'me', cwd: '/w/Armasu', ai: 'codex', live: true } as never] }
+    assert.ok(editGuard(codex, edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW))
+    assert.ok(editGuard(on, edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW, true))
+  })
+
+  it('a link the chat posted skips the guard only for that auto link file', () => {
+    const linked = (auto: boolean, reason: string) => ({ ...st(), links: [{ from: 'me', to: ['them'], reason, auto, since: NOW - MIN }] })
+    assert.equal(editGuard(linked(true, '/w/Armasu/src/x.ts'), edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW), undefined)
+    assert.ok(editGuard(linked(true, '/w/Armasu/src/y.ts'), edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW))
+    assert.ok(editGuard(linked(false, 'needs the API'), edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW))
+  })
+
+  it('waitsOn follows links transitively', () => {
+    const links = [{ from: 'a', to: ['b'], reason: '', auto: false, since: 0 }, { from: 'b', to: ['x', 'c'], reason: '', auto: false, since: 0 }, { from: 'c', to: ['a'], reason: '', auto: false, since: 0 }]
+    assert.equal(waitsOn(links, 'a', 'c'), true)
+    assert.equal(waitsOn(links, 'b', 'b'), true)
+    assert.equal(waitsOn(links.slice(0, 2), 'c', 'a'), false)
+    assert.equal(waitsOn(undefined, 'a', 'b'), false)
+  })
+
   it('lets the edit through otherwise', () => {
     const go = (progress?: ChatProgress[], self = 'me', file = '/w/Armasu/src/x.ts', edits = edited()) =>
       editGuard(st(progress), edits, new Map(), self, '/w/Armasu', file, NOW)
     assert.equal(go(undefined, 'them'), undefined, 'own edit')
-    assert.equal(go([prog('them', { cwd: '/w/agent-flow' }), prog('me')]), undefined, 'other project')
+    assert.equal(go([prog('them', { cwd: '/w/switchboard' }), prog('me')]), undefined, 'other project')
     assert.equal(go(undefined, 'me', '/w/Armasu/src/x.ts', edited(NOW - 11 * MIN)), undefined, 'too old')
     assert.equal(go(undefined, 'me', '/w/Armasu/src/y.ts'), undefined, 'other file')
     assert.equal(go(undefined, 'me', '/w/Armasu/lib/src/x.ts'), undefined, 'same last two parts')

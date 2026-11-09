@@ -7,6 +7,7 @@
 
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -14,7 +15,7 @@ import { readNewFileLines, readFileBytes, tryLock, upperDrive, withLock } from '
 
 describe('upperDrive', () => {
   it('gives one spelling to c:\\ and C:\\, leaving other paths alone', () => {
-    assert.equal(upperDrive('c:\\u\\agent-flow'), 'C:\\u\\agent-flow')
+    assert.equal(upperDrive('c:\\u\\switchboard'), 'C:\\u\\switchboard')
     assert.equal(upperDrive('C:\\u'), 'C:\\u')
     assert.equal(upperDrive('/u/c:x'), '/u/c:x')
   })
@@ -25,7 +26,7 @@ describe('readNewFileLines', () => {
   let file: string
 
   before(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-fs-utils-'))
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-fs-utils-'))
     file = path.join(dir, 'sample.jsonl')
   })
 
@@ -116,6 +117,39 @@ describe('file locks across windows', () => {
     fs.utimesSync(lock, old, old)
     assert.ok(tryLock(lock))
     assert.ok(tryLock(path.join(path.dirname(lock), 'y.lock'), 0))
+  })
+
+  it('a stale lock goes to one of two contenders, and release leaves a lock that is not ours', async () => {
+    const d = dir(), lock = path.join(d, 'x.lock'), src = path.resolve(__dirname, '../src/fs-utils.ts')
+    const child = path.join(d, 'c.ts')
+    fs.writeFileSync(child, `import { tryLock } from ${JSON.stringify(src)}\nconst at = Number(process.argv[2]); while (Date.now() < at) {}\nprocess.stdout.write(tryLock(${JSON.stringify(lock)}) ? 'won' : 'lost')\n`)
+    for (let round = 0; round < 3; round++) {
+      fs.writeFileSync(lock, '1')
+      const old = new Date(Date.now() - 120_000)
+      fs.utimesSync(lock, old, old)
+      const at = String(Date.now() + 1500)
+      const outs = await Promise.all([0, 1, 2].map(() => new Promise<string>(ok => {
+        execFile(process.execPath, [...process.execArgv, child, at], (_e, out) => ok(String(out)))
+      })))
+      assert.equal(outs.filter(o => o === 'won').length, 1, outs.join(' '))
+      fs.rmSync(lock, { force: true })
+    }
+    // a crash left the takeover gate behind: still one winner
+    for (let round = 0; round < 2; round++) {
+      fs.writeFileSync(lock, '1'); fs.writeFileSync(`${lock}.takeover`, '1')
+      const old = new Date(Date.now() - 120_000)
+      fs.utimesSync(lock, old, old); fs.utimesSync(`${lock}.takeover`, old, old)
+      const at = String(Date.now() + 1500)
+      const outs = await Promise.all([0, 1, 2].map(() => new Promise<string>(ok => {
+        execFile(process.execPath, [...process.execArgv, child, at], (_e, out) => ok(String(out)))
+      })))
+      assert.equal(outs.filter(o => o === 'won').length, 1, outs.join(' '))
+      fs.rmSync(lock, { force: true })
+    }
+    const release = tryLock(lock)!
+    fs.writeFileSync(lock, 'someone-else')
+    release()
+    assert.equal(fs.readFileSync(lock, 'utf8'), 'someone-else')
   })
 
   it('withLock runs the edit under the lock and frees it, and waits out a holder only so long', () => {

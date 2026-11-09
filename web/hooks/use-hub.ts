@@ -11,10 +11,14 @@ import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import type { HubState } from '@/lib/hub-types'
 import { demoApply, demoHub, demoTick, demoUpload, emptyHub } from '@/lib/hub-demo'
 import { fetchHub, fetchHubWhy, postCommand, uploadFile } from '@/lib/hub-remote'
+import { keepSame } from '@/lib/hub-share'
 import { UPLOAD_MAX, fmtSize, type Upload } from '@/lib/attach'
+import { noAnswerMs, pending } from './in-flight'
 
 const POLL_MS = 2000
 const IDLE_POLL_MS = 15000
+// The button a click just pressed, for send to mark while its command is out. Only the click's own tick.
+let pressed: HTMLElement | undefined
 
 /** problem: why the last command to the standalone app's hub failed, for the Hub's toast. */
 // The app build sets NEXT_PUBLIC_DEMO to "0": a phone must never mistake sample chats for its own.
@@ -36,8 +40,17 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   useEffect(() => {
     if (!vscodeBridge) return
     const offInit = vscodeBridge.onInit(() => setIsVSCode(true))
-    const offHub = vscodeBridge.onHub(setHub)
+    const offHub = vscodeBridge.onHub(s => { pending.endAll(); setHub(h => keepSame(h, s)) })
     return () => { offInit(); offHub() }
+  }, [])
+
+  useEffect(() => {
+    const press = (e: MouseEvent) => {
+      pressed = (e.target as Element | null)?.closest?.<HTMLElement>('button, [role="button"]') ?? undefined
+      setTimeout(() => { pressed = undefined }, 0)
+    }
+    document.addEventListener('click', press, true)
+    return () => document.removeEventListener('click', press, true)
   }, [])
 
   // Outside VS Code: the standalone app's proxy to a window's hub, every 2 s.
@@ -45,7 +58,7 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   // and the console gets one failed fetch per retry instead of one every 2 s.
   useEffect(() => {
     if (isVSCode) return
-    let stop = false, t: ReturnType<typeof setTimeout> | undefined
+    let stop = false, t: ReturnType<typeof setTimeout> | undefined, raw: HubState | null = null
     const tick = async () => {
       if (vscodeBridge?.isVSCode) return
       // A hidden tab asks nothing; it looks again within 2 s of being shown.
@@ -53,8 +66,10 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
       const { hub: got, why } = await fetchHubWhy()
       if (stop) return
       // A failed poll keeps the last real state on screen; only the dev build falls back to the demo.
-      if (got || !DEMO_OK) setRemote(r => got ?? r)
-      else setRemote(null)
+      // A 304 hands back the same object as last time: nothing to compare.
+      if (got) { if (got !== raw) setRemote(r => keepSame(r, got)) }
+      else if (DEMO_OK) setRemote(null)
+      raw = got
       setDown(got ? undefined : why)
       setTried(true)
       t = setTimeout(tick, got ? POLL_MS : DEMO_OK ? IDLE_POLL_MS : POLL_MS)
@@ -71,14 +86,19 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
     return () => clearInterval(t)
   }, [isDemo])
   const send = useCallback((c: HubCommand) => {
-    if (isDemo) setDemo(d => demoApply(d, c))
+    if (isDemo) { const end = pending.start(pressed); setDemo(d => demoApply(d, c)); end() }
     else if (!isVSCode && remoteRef.current) {
+      const end = pending.start(pressed)
       void postCommand(c).then(why => {
         if (why) setProblem({ text: `${c.type.replace('hub-', '')} failed: ${why}`, at: Date.now(), for: c })
         return fetchHub()
-      }).then(s => s && setRemote(s))
+      }).then(s => s && setRemote(r => keepSame(r, s))).finally(end)
     }
-    else vscodeBridge?.sendHub(c)
+    else if (vscodeBridge) {
+      // VS Code never answers; the next hub state or noAnswerMs lets go.
+      setTimeout(pending.start(pressed, true), noAnswerMs(c.type))
+      vscodeBridge.sendHub(c)
+    }
   }, [isDemo, isVSCode])
   const upload = useCallback<Upload>(async (file, cwd, session, onProgress, signal) => {
     if (file.size > UPLOAD_MAX) return { problem: `over the ${fmtSize(UPLOAD_MAX)} limit` }
@@ -94,5 +114,8 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   // One object per state, so memos downstream hold between renders.
   const live = useMemo(() => got && { ...emptyHub(), ...got }, [got])
   const empty = useMemo(() => emptyHub(), [])
+  // The extension's own long ops keep the busy bar up too.
+  const extBusy = !!(live?.sweep?.busy || live?.jarvis?.busy || live?.repo?.busy || live?.voice === 'transcribing')
+  useEffect(() => pending.setExt(extBusy), [extBusy])
   return { hub: live ?? (isDemo ? demo : empty), isLive: live !== null && !down, isDemo, isVSCode, send, upload, problem, down: isVSCode ? undefined : down }
 }

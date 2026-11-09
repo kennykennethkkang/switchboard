@@ -508,11 +508,14 @@ function Apps({ hub, send }: { hub: HubState; send: Send }) {
   )
 }
 
-const KEY_ROWS: Record<ApiKey['name'], { label: string; url: string }> = {
+const KEY_ROWS: Record<ApiKey['name'], { label: string; url: string; usedBy?: string }> = {
   GEMINI_API_KEY: { label: 'Gemini', url: 'https://aistudio.google.com/apikey' },
-  OPENROUTER_API_KEY: { label: 'Jev / OpenRouter', url: 'https://openrouter.ai/settings/keys' },
+  OPENROUTER_API_KEY: { label: 'OpenRouter', url: 'https://openrouter.ai/keys', usedBy: 'Jev and MiroFish' },
+  PERPLEXITY_API_KEY: { label: 'Perplexity', url: 'https://www.perplexity.ai/account/api/keys' },
+  ZEP_API_KEY: { label: 'Zep', url: 'https://app.getzep.com/', usedBy: 'MiroFish' },
 }
-const KEY_SHAPE = /^[A-Za-z0-9._-]{16,128}$/
+// Zep keys are JWT-like and longer.
+const keyMax = (n: ApiKey['name']) => (n === 'ZEP_API_KEY' ? 512 : 128)
 const ago = (at: number) => {
   const m = Math.round((Date.now() - at) / 60_000)
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(at).toLocaleDateString()
@@ -528,10 +531,11 @@ function KeyStatus({ k }: { k: ApiKey }) {
 function KeyRow({ k, send }: { k: ApiKey; send: Send }) {
   const [v, setV] = useState('')
   const [asking, setAsking] = useState(false)
-  const { label, url } = KEY_ROWS[k.name]
+  const { label, url, usedBy } = KEY_ROWS[k.name]
   const value = v.trim()
-  const bad = !!value && !KEY_SHAPE.test(value)
-  const detail = [k.name, k.saved ? `ends ${k.last4}` : '', k.checked ? `${k.checked.ok ? 'tested' : 'failed'} ${ago(k.checked.at)}` : ''].filter(Boolean).join(' · ')
+  const max = keyMax(k.name)
+  const bad = !!value && !new RegExp(`^[A-Za-z0-9._-]{16,${max}}$`).test(value)
+  const detail = [usedBy && `For ${usedBy}`, k.name, k.saved ? `ends ${k.last4}` : '', k.checked ? `${k.checked.ok ? 'tested' : 'failed'} ${ago(k.checked.at)}` : ''].filter(Boolean).join(' · ')
   return (
     <li className="si-row">
       <span className="si-main">
@@ -545,9 +549,9 @@ function KeyRow({ k, send }: { k: ApiKey; send: Send }) {
         {k.checked && !k.checked.ok && k.checked.reason && <span role="alert" className="si-err">{k.checked.reason}</span>}
         <form className="si-form" style={{ margin: '4px 0 0', width: '100%' }} onSubmit={e => { e.preventDefault(); if (value && !bad) { send({ type: 'hub-key-save', name: k.name, value }); setV('') } }}>
           <input type="password" autoComplete="off" spellCheck={false} aria-label={`${label} API key`} placeholder={k.saved ? 'Paste a new key to replace it' : 'Paste the key'}
-            value={v} maxLength={128} onChange={e => setV(e.target.value)} style={{ flex: '1 1 180px' }} />
+            value={v} maxLength={max} onChange={e => setV(e.target.value)} style={{ flex: '1 1 180px' }} />
           <button type="submit" className="hub-btn primary" disabled={!value || bad}>Save</button>
-          {bad && <span role="alert" className="si-err si-wide">That does not look like a key: 16 to 128 characters, letters, digits, '.', '-' or '_'.</span>}
+          {bad && <span role="alert" className="si-err si-wide">That does not look like a key: 16 to {max} characters, letters, digits, '.', '-' or '_'.</span>}
         </form>
       </span>
       <span className="si-acts">
@@ -564,8 +568,67 @@ function Keys({ hub, send }: { hub: HubState; send: Send }) {
   return (
     <section aria-labelledby="si-keys" className="si-sec">
       <header><h3 id="si-keys">API keys</h3></header>
-      <p className="si-help">Kept in the macOS Keychain. The gemini and Jev skills read them from there; a key in the shell env still wins.</p>
+      <p className="si-help">Kept in the macOS Keychain. The gemini and Jev skills read them from there; a key in the shell env still wins. MiroFish needs OpenRouter and Zep: saving either fills its .env.</p>
       {keys ? <ul role="list" className="si-list">{keys.map(k => <KeyRow key={k.name} k={k} send={send} />)}</ul> : <p className="si-empty">Update the Switchboard extension to save API keys.</p>}
+      {keys && <EnvSetupRow hub={hub} send={send} />}
+    </section>
+  )
+}
+
+/** Writes a project's .env from the saved keys. Only names and filled/missing come back. */
+function EnvSetupRow({ hub, send }: { hub: HubState; send: Send }) {
+  const folders = hub.projects.map(p => p.path)
+  const here = hub.signIns?.window ?? hub.thisWindow
+  const [folder, setFolder] = useState(here && folders.includes(here) ? here : folders[0] ?? '')
+  const r = hub.signIns?.envSetup
+  const open = (url: string) => (e: { preventDefault(): void }) => { if (vscodeBridge?.isVSCode) { e.preventDefault(); send({ type: 'hub-open-url', url }) } }
+  if (!folders.length) return null
+  return (
+    <div className="si-row" style={{ flexWrap: 'wrap' }}>
+      <span className="si-main">
+        <span className="si-title"><strong>Project .env</strong></span>
+        <span className="si-meta">Fills the .env from these keys and .env.example. Values already set stay.</span>
+        <form className="si-form" style={{ margin: '4px 0 0', width: '100%' }} onSubmit={e => { e.preventDefault(); if (folder) send({ type: 'hub-env-setup', folder }) }}>
+          <select aria-label="Project" value={folder} onChange={e => setFolder(e.target.value)} style={{ flex: '1 1 180px' }}>
+            {hub.projects.map(p => <option key={p.path} value={p.path}>{p.name}</option>)}
+          </select>
+          <button type="submit" className="hub-btn primary" disabled={!folder}>Set up .env</button>
+        </form>
+        {r && r.folder === folder && (
+          <span className="si-meta" role="status">
+            {r.filled.length ? `Filled ${r.filled.join(', ')}.` : 'Nothing new to fill.'}
+            {r.kept.length ? ` Kept ${r.kept.join(', ')}.` : ''}
+            {r.missing.length ? <> Missing {r.missing.map((m, i) => {
+              const row = m.key && KEY_ROWS[m.key]
+              return <span key={m.name}>{i ? ', ' : ''}{m.name}{row && <> (<a className="hub-link" href={row.url} target="_blank" rel="noreferrer" onClick={open(row.url)}>get a {row.label} key</a>)</>}</span>
+            })}.</> : ''}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+/** Claude and Codex: installed, signed in, and a Sign in that opens the CLI's own login in a terminal. */
+function Ais({ hub, send }: { hub: HubState; send: Send }) {
+  if (!hub.ais?.length) return null
+  return (
+    <section aria-labelledby="si-ais" className="si-sec">
+      <header><h3 id="si-ais">AI sign-ins</h3></header>
+      <ul role="list" className="si-list">{hub.ais.map(a => (
+        <li key={a.id} className="si-row">
+          <span className="si-main">
+            <span className="si-title">
+              <strong>{a.name}</strong>
+              {!a.installed ? <Chip tone="ash" text="Not installed" /> : a.signedIn === true ? <Chip tone="green" text="Signed in" /> : a.signedIn === false ? <Chip tone="yellow" text="Signed out" /> : <Chip tone="ash" text="Unknown" />}
+            </span>
+            {a.detail && <span className="si-meta">{a.detail}</span>}
+          </span>
+          <span className="si-acts">
+            {a.installed && a.signedIn !== true && <button type="button" className="hub-btn primary" title={a.id === 'codex' ? 'Opens codex login in a terminal; on a remote machine run codex login --device-auth instead' : `Opens ${a.name} sign in in a terminal`} onClick={() => send({ type: 'hub-ai-login', ai: a.id })}>Sign in</button>}
+          </span>
+        </li>
+      ))}</ul>
     </section>
   )
 }
@@ -575,6 +638,7 @@ export function SignIns({ hub, send, problem = null }: { hub: HubState; send: Se
   return (
     <div className="si">
       <ThisProject hub={hub} send={send} />
+      <Ais hub={hub} send={send} />
       <Aws hub={hub} send={send} problem={problem} />
       <Apps hub={hub} send={send} />
       <Keys hub={hub} send={send} />

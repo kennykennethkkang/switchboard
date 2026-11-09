@@ -24,7 +24,8 @@ const FILE = 'todo.json'
 const log = createLogger('Todo')
 const NO_REF = '0'.repeat(40)
 const UNREADABLE = 'remote list unreadable'
-const TEXT_MAX = 300
+// Matches the route's raw cap; the panel says so under its input.
+const TEXT_MAX = 2000
 const ID = () => crypto.randomBytes(4).toString('hex')
 const ID_OK = /^[A-Za-z0-9_-]{1,64}$/
 const okId = (id: unknown): id is string => typeof id === 'string' && ID_OK.test(id) && id !== '__proto__'
@@ -73,7 +74,9 @@ export function parseDoc(raw: string): TodoDoc {
   const todo = rows<TodoItem>(j?.todo, ['chat', 'host', 'from', 'before', 'name', 'why'])
   const ids = new Set(todo.map(t => t.id))
   const left = rows<TodoItem>(j?.left, ['from']).filter(l => !ids.has(l.id) && !Object.hasOwn(removed, l.id))
-  const out = withTicked({ version: 1, todo: [...todo, ...left], removed }, rows<TickedItem>(j?.ticked, ['by', 'from', 'before', 'name', 'why']))
+  const o = (j?.order ?? {}) as { ids?: unknown; at?: unknown }
+  const order = Array.isArray(o.ids) && typeof o.at === 'number' ? { ids: o.ids.filter(okId).slice(0, 500) as string[], at: o.at } : undefined
+  const out = withTicked({ version: 1, todo: [...todo, ...left], removed, ...(order ? { order } : {}) }, rows<TickedItem>(j?.ticked, ['by', 'from', 'before', 'name', 'why']))
   return withSuggested(out, rows<TodoItem>(j?.suggested, ['from', 'name', 'why']))
 }
 
@@ -109,8 +112,20 @@ export function mergeDocs(a: TodoDoc, b: TodoDoc, now = Date.now()): TodoDoc {
     const o = ticked.get(x.id)
     if (!removed.has(BACK(x.id)) && now - x.at < TOMBSTONE_MS && (!o || x.at > o.at)) ticked.set(x.id, x)
   }
-  const out = withTicked({ version: 1, todo: pick(a.todo, b.todo), removed: Object.fromEntries(removed) }, [...ticked.values()])
+  const order = [a.order, b.order].reduce<TodoDoc['order']>((m, o) => (o && (!m || o.at > m.at) ? o : m), undefined)
+  const todo = order ? byOrder(pick(a.todo, b.todo), order.ids) : pick(a.todo, b.todo)
+  const out = withTicked({ version: 1, todo, removed: Object.fromEntries(removed), ...(order ? { order } : {}) }, [...ticked.values()])
   return withSuggested(out, pick(a.suggested ?? [], b.suggested ?? []))
+}
+
+// Listed ids first in that order; the rest keep their place after them.
+const byOrder = (todo: TodoItem[], ids: string[]) => {
+  const at = new Map(ids.map((id, i) => [id, i]))
+  return todo.map((t, i) => ({ t, k: at.get(t.id) ?? ids.length + i })).sort((x, y) => x.k - y.k).map(x => x.t)
+}
+/** hub-todo-move: the panel's new order for the items it shows. */
+export function moveTodo(d: TodoDoc, ids: string[], now = Date.now()): TodoDoc {
+  return { ...d, todo: byOrder(d.todo, ids), order: { ids: ids.slice(0, 500), at: now } }
 }
 
 /** The Put back link: the item is open again under a new id (its old one stays tombstoned on every device). */
@@ -122,9 +137,12 @@ export function restoreTicked(d: TodoDoc, id: string, now = Date.now(), newId = 
   return addTodo(out, text, now, newId, more)
 }
 
+/** Same text as an open item, ignoring case and spacing. */
+export const sameText = (a: string, b: string) => clean(a).toLowerCase() === clean(b).toLowerCase()
+/** Every add path (panel, accept, put back, todo_add) comes here, so an open item is never on the list twice. */
 export function addTodo(d: TodoDoc, text: string, now = Date.now(), id = ID(), more: Partial<TodoItem> = {}): TodoDoc {
   const t = clean(text)
-  return t ? { ...d, todo: [...d.todo, { id, text: t, at: now, ...more }] } : d
+  return t && !d.todo.some(x => sameText(x.text, t)) ? { ...d, todo: [...d.todo, { id, text: t, at: now, ...more }] } : d
 }
 export function editTodo(d: TodoDoc, id: string, text: string, now = Date.now()): TodoDoc {
   const t = clean(text)
@@ -263,20 +281,24 @@ export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
     if (you || !workText(s.text, s.why === 'missed') || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
     else kept.push(s)
   }
-  return out
+  const n = d.todo.length + (d.suggested?.length ?? 0) - out.todo.length - (out.suggested?.length ?? 0)
+  return n ? { ...out, cleared: n } : out
 }
 // For you first, so a Left line that holds one never stands in for it.
 const addLeft = (d: TodoDoc, p: ChatProgress, texts: string[], now: number) => suggest(suggest(d, p, youTexts(p), now, () => 'you', youId), p, texts, now, whyLeft)
 const youId = (chat: string, text: string) => leftId(chat, `you\n${text}`)
 
 const missedId = (chat: string, text: string) => leftId(chat, `missed\n${text}`)
+// Talk to the chat, not work: call me, carry on from a handoff, how is it going.
+const CHATTY = /^(please )?(give me a (phone )?call|call me|phone me|ring me|text me)\b|^(please )?(continue|carry on|pick up|resume) (from|with) |^(so )?(what s|what is|how s|how is|how are|where are|where s|are you|is it) (the )?(status|progress|it going|things going|going|we at|you at|done|finished|up to)\b/
+const chatty = (t: string) => CHATTY.test(t.toLowerCase().replace(/[^a-z0-9/]+/g, ' ').trim())
 /** Kenneth's requests Jev found the Done list does not cover, as suggestions; one Jev now scores covered goes. */
 export function addMissed(d: TodoDoc, p: ChatProgress, now = Date.now()): TodoDoc {
   const scored = p.covered?.length === p.asked?.length ? p.asked ?? [] : []
   const covered = new Set(scored.filter((_, i) => (p.covered?.[i] ?? 0) > MISSED).map(t => clean(workText(t, true) ?? t)))
   const gone = (d.suggested ?? []).filter(x => x.from === p.sessionId && x.why === 'missed' && covered.has(x.text) && x.id === missedId(p.sessionId, x.text))
   const out = gone.reduce((o, x) => dismissSuggestion(o, x.id, now), d)
-  return suggest(out, p, [...new Set(missed(p).map(clean).filter(Boolean))], now, () => 'missed', missedId)
+  return suggest(out, p, [...new Set(missed(p).map(clean).filter(t => t && !chatty(t)))], now, () => 'missed', missedId)
 }
 
 /** Accept: into the to-do keeping where it came from and why; the suggestion stays tombstoned. The new id comes from the old one, so two devices accepting it make one item. */
@@ -722,7 +744,7 @@ const storeOf = (folder: string) => { let s = stores.get(folder); if (!s) stores
 const show = (folder: string, d?: TodoDoc) => {
   const was = hub.get().todos?.[folder]
   const src = d ?? was
-  hub.set({ todos: { ...hub.get().todos, [folder]: { todo: src?.todo ?? [], ticked: src?.ticked, suggested: src?.suggested, sync: syncState.get(folder) } } })
+  hub.set({ todos: { ...hub.get().todos, [folder]: { todo: src?.todo ?? [], ticked: src?.ticked, suggested: src?.suggested, cleared: src?.cleared, sync: syncState.get(folder) } } })
 }
 
 /** Syncs when the repo may (syncMode) and keeps how it went for the panel. */

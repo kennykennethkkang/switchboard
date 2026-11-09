@@ -25,7 +25,7 @@ import { setLogLevel } from '../extension/src/logger'
 import { sseClients } from './sse'
 
 const MAX_EVENT_BUFFER = 5000
-const DISCOVERY_DIR = path.join(os.homedir(), '.claude', 'agent-flow')
+const DISCOVERY_DIR = path.join(os.homedir(), '.claude', 'switchboard-app')
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects')
 
 let relayCreated = false
@@ -353,15 +353,15 @@ export type RelayRuntimeMode = 'claude' | 'codex' | 'auto'
 export interface RelayOptions {
   workspace: string
   verbose?: boolean
-  /** Which runtimes to watch. Defaults to AGENT_FLOW_RUNTIME env var, or 'auto'.
+  /** Which runtimes to watch. Defaults to SWITCHBOARD_RUNTIME (or the older AGENT_FLOW_RUNTIME), or 'auto'.
    *  Mirrors the extension's `agentVisualizer.runtime` setting so users of the
-   *  dev relay and `npx agent-flow-app` have a way to opt out of one runtime. */
+   *  dev relay and `npx switchboard-app` have a way to opt out of one runtime. */
   runtime?: RelayRuntimeMode
 }
 
 function resolveRuntimeMode(explicit?: RelayRuntimeMode): RelayRuntimeMode {
   if (explicit === 'claude' || explicit === 'codex' || explicit === 'auto') return explicit
-  const raw = process.env.AGENT_FLOW_RUNTIME
+  const raw = process.env.SWITCHBOARD_RUNTIME ?? process.env.AGENT_FLOW_RUNTIME
   return raw === 'claude' || raw === 'codex' ? raw : 'auto'
 }
 

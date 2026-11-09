@@ -161,7 +161,7 @@ describe('background subagents (#92)', () => {
 
   it('completes subagents launched before attach once their notification arrives', () => {
     const { session, events, parser, feed } = setup()
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-parser-'))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-parser-'))
     const file = path.join(dir, 'session.jsonl')
     const history = [
       agentToolUse('toolu_old', 'Already done'),
@@ -213,7 +213,7 @@ describe('subagent model (#91)', () => {
 
   it('ignores <synthetic> when picking the session model during prescan', () => {
     const { session, parser } = setup()
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-parser-'))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-parser-'))
     const file = path.join(dir, 'session.jsonl')
     const history = [
       { type: 'assistant', uuid: 'a1', message: { role: 'assistant', model: '<synthetic>', content: [{ type: 'text', text: 'API Error' }] } },
@@ -228,7 +228,7 @@ describe('subagent model (#91)', () => {
 describe('prescan offset', () => {
   it('leaves a half-written last line for the tail reader', () => {
     const { session, parser } = setup()
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-parser-'))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-parser-'))
     const file = path.join(dir, 'session.jsonl')
     const done = JSON.stringify(agentToolUse('toolu_a', 'Done')) + '\n'
     const half = JSON.stringify(agentToolUse('toolu_b', 'Half')).slice(0, 30)

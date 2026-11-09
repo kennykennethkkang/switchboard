@@ -1,7 +1,7 @@
 /** History: closed chats grouped by origin, and kept out of the live list. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { archiveChains, chatProjects, inProjects, projectName, filterChains, hideIdle, historyCount, liveChats, liveVersion, splitVersion } from './archive'
+import { archiveChains, chatProjects, inProjects, projectName, filterChains, hideDone, historyCount, liveChats, liveVersion, splitVersion } from './archive'
 import { demoHub } from './hub-demo'
 import type { ArchivedChat } from './hub-types'
 
@@ -49,27 +49,28 @@ test('counts History as chains and chats', () => {
   assert.equal(historyCount(archiveChains([row('a1', 'Fix', 1, 10)])), '1 chain, 1 chat')
 })
 
-test('hides chats idle longer than the setting, never one that works, waits on you or is picked', () => {
+test('hides done chats quiet longer than the setting, never an idle one, one that works, waits on you or is picked', () => {
   const now = 10 * 3600_000
   const card = (id: string, state: 'working' | 'idle' | 'needs-you' | 'done' | undefined, minsAgo: number, status?: string) =>
     ({ chat: { sessionId: id, cwd: '/u/x', status, updatedAt: now - minsAgo * 60e3 }, progress: state ? { state, at: now - minsAgo * 60e3 } : undefined })
   const cards = [card('work', 'working', 90), card('idle-old', 'idle', 20), card('idle-new', 'idle', 10), card('ask', 'needs-you', 90),
     card('done-old', 'done', 20), card('nohook-old', undefined, 20, 'idle'), card('picked', 'idle', 90)]
-  assert.deepEqual(hideIdle(cards, 15, 'picked', now).map(c => c.chat.sessionId), ['work', 'idle-new', 'ask', 'picked'])
-  assert.equal(hideIdle(cards, null, undefined, now).length, cards.length)
+  assert.deepEqual(hideDone(cards, 15, 'picked', now).map(c => c.chat.sessionId), ['work', 'idle-old', 'idle-new', 'ask', 'nohook-old', 'picked'])
+  assert.deepEqual(hideDone(cards, 15, 'done-old', now).map(c => c.chat.sessionId), ['work', 'idle-old', 'idle-new', 'ask', 'done-old', 'nohook-old', 'picked'])
+  assert.equal(hideDone(cards, null, undefined, now).length, cards.length)
 })
 
 test('lists the projects chats run in, most chats first, and filters by the picked ones', () => {
-  const rows = ['/u/Armasu', '/u/agent-flow', '/u/Armasu/', '/u/claude-mods'].map(cwd => ({ cwd }))
+  const rows = ['/u/Armasu', '/u/switchboard', '/u/Armasu/', '/u/claude-mods'].map(cwd => ({ cwd }))
   // The extension names a repo subfolder's chat by its repo.
-  rows.push({ cwd: '/u/agent-flow/extension', project: 'agent-flow' } as never)
-  assert.deepEqual(chatProjects(rows, []), [{ name: 'agent-flow', count: 2 }, { name: 'Armasu', count: 2 }, { name: 'claude-mods', count: 1 }])
+  rows.push({ cwd: '/u/switchboard/extension', project: 'switchboard' } as never)
+  assert.deepEqual(chatProjects(rows, []), [{ name: 'Armasu', count: 2 }, { name: 'switchboard', count: 2 }, { name: 'claude-mods', count: 1 }])
   // A picked project with no chat left stays listed, so it can be unpicked.
   assert.deepEqual(chatProjects([{ cwd: '/u/Armasu' }], ['Gone']), [{ name: 'Armasu', count: 1 }, { name: 'Gone', count: 0 }])
   assert.equal(inProjects({ cwd: '/u/Armasu' }, []), true)
   assert.equal(inProjects({ cwd: '/u/Armasu/' }, ['Armasu']), true)
-  assert.equal(inProjects({ cwd: '/u/agent-flow' }, ['Armasu']), false)
-  assert.equal(inProjects({ cwd: '/u/agent-flow/extension', project: 'agent-flow' }, ['agent-flow']), true)
-  assert.equal(projectName({ cwd: '/u/agent-flow/extension', project: 'agent-flow' }), 'agent-flow')
+  assert.equal(inProjects({ cwd: '/u/switchboard' }, ['Armasu']), false)
+  assert.equal(inProjects({ cwd: '/u/switchboard/extension', project: 'switchboard' }, ['switchboard']), true)
+  assert.equal(projectName({ cwd: '/u/switchboard/extension', project: 'switchboard' }), 'switchboard')
   assert.equal(projectName({ cwd: '/u/notes/' }), 'notes')
 })

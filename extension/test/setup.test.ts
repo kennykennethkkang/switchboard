@@ -9,10 +9,10 @@ import * as os from 'os'
 import * as path from 'path'
 import { claudeBinary, claudeCall, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
 // @ts-expect-error plain .mjs, no types
-import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, readKey, storeKey } from '../kit/setup-run.mjs'
+import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, mirrorSkill, readKey, storeKey } from '../kit/setup-run.mjs'
 
 const KIT: SetupKit = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'kit', 'setup.json'), 'utf8'))
-const fresh = { plugins: [], marketplaces: [], mcps: [], plain: [] as string[], skills: [] as string[], key21st: false, modsDir: '/ext/kit/mods', skillsDir: '/ext/kit/skills' }
+const fresh = { plugins: [], marketplaces: [], mcps: [], plain: [] as string[], skills: [] as string[], agentsSkills: [] as string[], codex: { plugins: [] as string[], marketplaces: [] as string[], mcps: [] as string[] }, key21st: false, modsDir: '/ext/kit/mods', skillsDir: '/ext/kit/skills' }
 const steps = (o = {}) => setupSteps(KIT, { ...fresh, ...o })
 const runs = (o = {}) => steps(o).flatMap(s => (s.run ? [s.run.join(' ')] : []))
 const text = (o = {}) => JSON.stringify(steps(o))
@@ -22,12 +22,26 @@ const passed = async () => ({ state: 'clean' })
 const ASK = '~/.claude/switchboard/ask/ask-server.mjs'
 
 describe('setup steps', () => {
+  it('bundles every mod setup.json installs, listed in the bundled marketplace', () => {
+    const dir = path.join(__dirname, '..', 'kit', 'mods')
+    const market = JSON.parse(fs.readFileSync(path.join(dir, '.claude-plugin', 'marketplace.json'), 'utf8'))
+    for (const m of KIT.mods) {
+      assert.ok(fs.existsSync(path.join(dir, m, '.claude-plugin', 'plugin.json')), m)
+      assert.ok(market.plugins.some((p: { name: string }) => p.name === m), m)
+    }
+  })
+
+  it('ships the reel picks: pixelfx, humanizer, last30days and find-skills', () => {
+    for (const id of ['pixelfx@pixelfx', 'humanizer@humanizer', 'last30days@last30days-skill']) assert.ok(KIT.plugins.includes(id), id)
+    assert.ok(KIT.skills?.some(k => k.repo === 'vercel-labs/skills' && k.names.includes('find-skills')))
+  })
+
   it('adds every marketplace, plugin, mod and mcp on a fresh machine', () => {
     const r = runs({ key21st: true })
     for (const [name, repo] of Object.entries(KIT.marketplaces)) assert.ok(r.includes(`claude plugin marketplace add ${repo}`), name)
     for (const id of KIT.plugins) assert.ok(r.includes(`claude plugin install ${id}`), id)
     for (const m of KIT.mods) assert.ok(r.includes(`claude plugin install ${m}@kenneth-mods`), m)
-    for (const m of KIT.mcps.filter(x => !x.keyHeader)) assert.ok(r.some(l => l.startsWith(`claude mcp add --scope user --transport http ${m.name} ${m.url}`)), m.name)
+    for (const m of KIT.mcps.filter(x => x.url && !x.keyHeader)) assert.ok(r.some(l => l.startsWith(`claude mcp add --scope user --transport http ${m.name} ${m.url}`)), m.name)
     assert.ok(steps({ key21st: true }).some(x => x.key?.name === '21st'))
     const mods = steps().find(s => s.copy)
     assert.deepEqual(mods?.copy, { from: '/ext/kit/mods', to: MODS })
@@ -41,7 +55,7 @@ describe('setup steps', () => {
     const r = runs({
       plugins: [...KIT.plugins, ...KIT.mods.map(m => `${m}@kenneth-mods`)],
       marketplaces: [...Object.keys(KIT.marketplaces), 'kenneth-mods'],
-      mcps: [...KIT.mcps.map(m => m.name), 'switchboard'],
+      mcps: [...KIT.mcps.map(m => m.name), 'switchboard', 'scrapling'],
       key21st: true,
     }).join('\n')
     assert.doesNotMatch(r, /claude plugin (install|marketplace add)|claude mcp add/)
@@ -80,19 +94,78 @@ describe('setup steps', () => {
 
   it('fetches each skill repo with only the skills not already there', () => {
     const sk = KIT.skills ?? []
-    assert.deepEqual(steps().filter(s => s.skills).map(s => s.skills), sk)
+    const kit = (o = {}) => steps(o).filter(s => s.skills && sk.some(k => k.repo === s.skills!.repo))
+    assert.deepEqual(kit().map(s => s.skills), sk)
     const [first, ...rest] = sk
-    const some = steps({ skills: [first.names[0]] }).filter(s => s.skills)
+    const some = kit({ skills: [first.names[0]], agentsSkills: [first.names[0]] })
     assert.deepEqual(some[0], { label: first.repo, skills: { repo: first.repo, names: first.names.slice(1) } })
-    assert.deepEqual(steps({ skills: sk.flatMap(k => k.names) }).filter(s => s.skills), [])
+    const all = sk.flatMap(k => k.names)
+    assert.deepEqual(kit({ skills: all, agentsSkills: all }), [])
     assert.ok(rest.length > 0)
   })
 
   it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
-    assert.deepEqual(KIT.own, ['aar', 'animation-styles', 'improve-system', 'awwwards'])
-    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'animation-styles', 'improve-system', 'awwwards'] } }])
+    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations'] } }])
     assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
+  })
+
+  it('gives Codex the same marketplaces, plugins, mcps and ask tool, each needing codex', () => {
+    const cx = steps().filter(s => s.run?.[0] === 'codex')
+    const r = cx.map(s => s.run!.join(' '))
+    for (const [name, repo] of Object.entries(KIT.marketplaces)) assert.ok(r.includes(`codex plugin marketplace add ${repo}`), name)
+    for (const id of KIT.plugins) assert.ok(r.includes(`codex plugin add ${id}`), id)
+    for (const m of KIT.mcps.filter(x => x.url && !x.keyHeader)) assert.ok(r.includes(`codex mcp add ${m.name} --url ${m.url}`), m.name)
+    assert.ok(!r.some(l => l.includes('kenneth-mods')))
+    // codex mcp add --url writes the entry, then waits on a browser login; the runner stops waiting after wait seconds.
+    for (const m of KIT.mcps.filter(x => x.url && !x.keyHeader)) assert.deepEqual(cx.find(s => s.run!.includes(m.url!))?.wait, 20, m.name)
+    assert.ok(steps().some(s => s.say?.includes('codex mcp login slack')))
+    assert.deepEqual(cx.find(s => s.run!.includes('switchboard')), { label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK] })
+    for (const s of cx) assert.ok(s.needs?.includes('codex'), s.label)
+    const all = { plugins: KIT.plugins, marketplaces: Object.keys(KIT.marketplaces), mcps: [...KIT.mcps.map(m => m.name), 'switchboard', ...(KIT.tools ?? []).flatMap(t => t.mcp ? [t.mcp.name] : [])] }
+    assert.deepEqual(steps({ codex: all }).filter(s => s.run?.[0] === 'codex'), [])
+  })
+
+  it('installs each python tool with uv, its skill and its mcp for both AIs, all needing uv', () => {
+    const t = (KIT.tools ?? []).find(x => x.uv === 'scrapling[ai]')
+    assert.deepEqual(t, { uv: 'scrapling[ai]', skill: { repo: 'D4Vinci/Scrapling', path: 'agent-skill', name: 'scrapling-official' }, mcp: { name: 'scrapling', command: 'scrapling-mcp' } })
+    assert.ok(KIT.tools?.some(x => x.uv === 'agent-reach' && x.skill?.file === 'SKILL_en.md'))
+    const s = steps()
+    assert.deepEqual(s.find(x => x.run?.join(' ') === 'uv tool install scrapling[ai]'), { label: 'scrapling[ai]', needs: ['uv'], quiet: true, run: ['uv', 'tool', 'install', 'scrapling[ai]'] })
+    assert.deepEqual(s.find(x => x.skills?.names.includes('scrapling-official')), { label: 'D4Vinci/Scrapling', needs: ['uv'], skills: { repo: 'D4Vinci/Scrapling', names: ['scrapling-official'], path: 'agent-skill' } })
+    assert.deepEqual(s.find(x => x.skills?.names.includes('agent-reach'))?.skills, { repo: 'Panniantong/Agent-Reach', names: ['agent-reach'], path: 'agent_reach', file: 'SKILL_en.md' })
+    const bin = '~/.local/bin/scrapling-mcp'
+    assert.ok(s.some(x => x.run?.join(' ') === `claude mcp add --scope user scrapling -- ${bin}` && x.needs?.join() === 'uv'))
+    assert.ok(s.some(x => x.run?.join(' ') === `codex mcp add scrapling -- ${bin}` && x.needs?.join() === 'uv,codex'))
+    const done = steps({ mcps: ['scrapling'], codex: { ...fresh.codex, mcps: ['scrapling'] }, skills: ['scrapling-official', 'agent-reach'], agentsSkills: ['scrapling-official', 'agent-reach'] })
+    assert.ok(!done.some(x => x.skills?.names.some(n => ['scrapling-official', 'agent-reach'].includes(n)) || x.run?.includes('scrapling')))
+  })
+
+  it('adds Perplexity to Claude and Codex only with its key saved, reading the key at launch', () => {
+    const saved = { keys: [{ name: 'PERPLEXITY_API_KEY' as const, saved: true, last4: 'abcd' }] }
+    const mac = steps({ ...saved, platform: 'darwin' })
+    const wrap = 'PERPLEXITY_API_KEY=$(security find-generic-password -s switchboard -a PERPLEXITY_API_KEY -w) exec npx -y @perplexity-ai/mcp-server'
+    assert.deepEqual(mac.find(s => s.label === 'perplexity')?.run, ['claude', 'mcp', 'add', '--scope', 'user', 'perplexity', '--', 'sh', '-c', wrap])
+    assert.deepEqual(mac.find(s => s.label === 'perplexity (Codex)'), { label: 'perplexity (Codex)', needs: ['codex'], run: ['codex', 'mcp', 'add', 'perplexity', '--', 'sh', '-c', wrap] })
+    // The key itself never lands in a step.
+    assert.ok(!mac.some(s => s.run?.join(' ').includes('abcd')))
+    assert.match(steps({ ...saved, platform: 'linux' }).find(s => s.label === 'perplexity')!.run!.at(-1)!, /cat "\$HOME\/\.claude\/switchboard\/keys\/PERPLEXITY_API_KEY"/)
+    assert.ok(!steps().some(s => s.label?.startsWith('perplexity')))
+    assert.match(text(), /perplexity: no key saved, skipped/)
+    assert.ok(!steps({ ...saved, mcps: ['perplexity'], codex: { ...fresh.codex, mcps: ['perplexity'] } }).some(s => s.label?.startsWith('perplexity')))
+    assert.match(JSON.stringify(steps({ ...saved, platform: 'win32' })), /perplexity: not added on Windows/)
+  })
+
+  it('installs caveman as a skill, not as a plugin with hooks', () => {
+    assert.ok(KIT.skills?.some(k => k.repo === 'JuliusBrussee/caveman' && k.names.includes('caveman')))
+    assert.ok(!KIT.plugins.some(p => p.startsWith('caveman')))
+  })
+
+  it('fetches a skill again when only Codex lacks it', () => {
+    const [first] = KIT.skills ?? []
+    const all = first.names
+    assert.deepEqual(steps({ skills: all, agentsSkills: all.slice(1) }).find(s => s.skills?.repo === first.repo)?.skills?.names, [all[0]])
   })
 
   it('carries no absolute path from this machine', () => {
@@ -171,11 +244,50 @@ describe('setup runner', () => {
     fs.mkdirSync(mine, { recursive: true })
     fs.writeFileSync(path.join(mine, 'SKILL.md'), 'my own')
     const r = await installSkills({ repo: 'a/b', names: ['one', 'two', 'three', 'gone'] }, { home, clone: fake, scan: passed, log: () => {} })
-    assert.deepEqual(r, { added: ['one', 'two'], flagged: [], kept: ['three'], missing: ['gone'], refused: [] })
+    assert.deepEqual(r, { added: ['one', 'two'], flagged: [], kept: ['three'], missing: ['gone'], refused: [], codex: ['one', 'two', 'three'] })
     assert.match(fs.readFileSync(path.join(home, '.claude', 'skills', 'two', 'SKILL.md'), 'utf8'), /body renamed/)
     assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'one', 'refs', 'x.md')))
     assert.equal(fs.readFileSync(path.join(mine, 'SKILL.md'), 'utf8'), 'my own')
     fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('mirrors each skill Claude has on into ~/.agents/skills for Codex, never over one already there', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-skills-'))
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const fake = (_repo: string, dir: string) => {
+      put(path.join(dir, 'skills', 'one', 'SKILL.md'), '---\nname: one\n---\nnew\n')
+      put(path.join(dir, 'pkg', 'skill', 'SKILL.md'), '---\nname: reach\n---\nother tongue\n')
+      put(path.join(dir, 'pkg', 'skill', 'SKILL_en.md'), '---\nname: reach\n---\nenglish\n')
+      return ''
+    }
+    put(path.join(home, '.claude', 'skills', 'kept', 'SKILL.md'), 'claude copy')
+    put(path.join(home, '.claude', 'skills', 'theirs', 'SKILL.md'), 'claude copy')
+    put(path.join(home, '.agents', 'skills', 'theirs', 'SKILL.md'), 'codex own')
+    put(path.join(home, '.claude', 'skills-archive', 'held', 'SKILL.md'), 'held')
+    const r = await installSkills({ repo: 'a/b', names: ['one', 'kept', 'theirs', 'held'] }, { home, clone: fake, scan: passed, log: () => {} })
+    assert.deepEqual(r.codex, ['one', 'kept'])
+    const agents = path.join(home, '.agents', 'skills')
+    assert.match(fs.readFileSync(path.join(agents, 'one', 'SKILL.md'), 'utf8'), /new/)
+    assert.equal(fs.readFileSync(path.join(agents, 'kept', 'SKILL.md'), 'utf8'), 'claude copy')
+    assert.equal(fs.readFileSync(path.join(agents, 'theirs', 'SKILL.md'), 'utf8'), 'codex own')
+    assert.ok(!fs.existsSync(path.join(agents, 'held')))
+    assert.equal(mirrorSkill('missing', home), false)
+    // A tool skill: found under its own path, its English file becomes SKILL.md.
+    const t = await installSkills({ repo: 'a/b', names: ['reach'], path: 'pkg', file: 'SKILL_en.md' }, { home, clone: fake, scan: passed, log: () => {} })
+    assert.deepEqual(t.added, ['reach'])
+    for (const root of ['.claude', '.agents']) assert.match(fs.readFileSync(path.join(home, root, 'skills', 'reach', 'SKILL.md'), 'utf8'), /english/)
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('copies own skills into ~/.agents/skills too, by the same rules', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-')), from = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-kit-'))
+    fs.mkdirSync(path.join(from, 'aar'), { recursive: true })
+    fs.writeFileSync(path.join(from, 'aar', 'SKILL.md'), 'aar\n\n<!-- switchboard generic copy -->\n')
+    const r = installOwnSkills({ from, names: ['aar'] }, { home, root: path.join('.agents', 'skills'), log: () => {} })
+    assert.deepEqual(r.added, ['aar'])
+    assert.ok(fs.existsSync(path.join(home, '.agents', 'skills', 'aar', 'SKILL.md')))
+    assert.ok(!fs.existsSync(path.join(home, '.claude', 'skills', 'aar')))
+    for (const d of [home, from]) fs.rmSync(d, { recursive: true, force: true })
   })
 
   it('adds a missing own skill, refreshes an older copy of ours, and leaves links and the user\'s own alone', () => {
@@ -253,9 +365,11 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
-    assert.match(out, /copy aar animation-styles improve-system awwwards from .* to ~\/.claude\/skills/)
+    assert.match(out, /copy aar deep-research animation-styles improve-system awwwards crowd-ab self-improve gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
+    assert.match(out, /codex plugin add superpowers@superpowers-dev/)
+    assert.match(out, /to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.doesNotMatch(out, /secret-key-1/)
     assert.ok(!fs.existsSync(path.join(dir, 'mods')))
     // A plain-text key is moved with no key given, and never printed.
@@ -284,13 +398,16 @@ describe('claude call', () => {
 describe('setup state', () => {
   it('reads installed plugins, marketplaces and user mcps, empty when missing', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-setup-'))
-    assert.deepEqual(setupState(home), { plugins: [], marketplaces: [], mcps: [], plain: [], skills: [] })
+    assert.deepEqual(setupState(home), { plugins: [], marketplaces: [], mcps: [], plain: [], skills: [], agentsSkills: [], codex: { plugins: [], marketplaces: [], mcps: [] } })
     fs.mkdirSync(path.join(home, '.claude', 'plugins'), { recursive: true })
     fs.writeFileSync(path.join(home, '.claude', 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 2, plugins: { 'a@b': [] } }))
     fs.writeFileSync(path.join(home, '.claude', 'plugins', 'known_marketplaces.json'), JSON.stringify({ b: { source: {} } }))
     fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { slack: {} } }))
     fs.mkdirSync(path.join(home, '.claude', 'skills', 'animate'), { recursive: true })
-    assert.deepEqual(setupState(home), { plugins: ['a@b'], marketplaces: ['b'], mcps: ['slack'], plain: [], skills: ['animate'] })
+    fs.mkdirSync(path.join(home, '.agents', 'skills', 'animate'), { recursive: true })
+    fs.mkdirSync(path.join(home, '.codex'), { recursive: true })
+    fs.writeFileSync(path.join(home, '.codex', 'config.toml'), 'model = "x"\n[mcp_servers.figma]\nurl = "u"\n[mcp_servers.figma.env]\nA = "b"\n[mcp_servers."my-srv"]\n[plugins."github@openai-curated"]\nenabled = true\n[marketplaces.superpowers-dev]\nsource = "x"\n[projects."/x"]\n')
+    assert.deepEqual(setupState(home), { plugins: ['a@b'], marketplaces: ['b'], mcps: ['slack'], plain: [], skills: ['animate'], agentsSkills: ['animate'], codex: { plugins: ['github@openai-curated'], marketplaces: ['superpowers-dev'], mcps: ['figma', 'my-srv'] } })
     // A key written into the config in plain text counts as missing, so the next run replaces it.
     fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers: { a: { headers: { 'x-api-key': 'k1' } }, b: { headers: { 'x-api-key': '${API_KEY_21ST}' } }, c: { headersHelper: 'node x' } } }))
     assert.deepEqual(setupState(home).mcps, ['b', 'c'])
@@ -304,8 +421,13 @@ describe('setup key lines', () => {
   it('points a missing key to Sign-ins, not ~/.zshrc', () => {
     const lines = says({ keys: [{ name: 'GEMINI_API_KEY', saved: true, last4: 'wxyz', checked: { ok: true, at: 1 } }, { name: 'OPENROUTER_API_KEY', saved: false }] })
     assert.ok(lines.includes('Gemini key: saved (ends wxyz), works.'))
-    assert.ok(lines.includes('Jev (OpenRouter) key: missing. Paste it in Switchboard: Settings, Accounts, API keys.'))
+    assert.ok(lines.includes('OpenRouter (Jev, MiroFish) key: missing. Get one at https://openrouter.ai/keys and paste it in Switchboard: Settings, Accounts, API keys.'))
     assert.ok(!lines.some(l => l.includes('zshrc')))
+  })
+  it('names MiroFish on the Zep line with its sign-up link, and adds no prompt step', () => {
+    const s = steps({ keys: [{ name: 'ZEP_API_KEY', saved: false }] })
+    assert.ok(s.some(x => x.say === 'Zep (MiroFish) key: missing. Get one at https://app.getzep.com and paste it in Switchboard: Settings, Accounts, API keys.'))
+    assert.ok(!s.some(x => x.key && x.key.name !== '21st'))
   })
   it('says nothing about keys when an older caller passes none', () => {
     assert.ok(!says().some(l => /key:/.test(l)))

@@ -1,11 +1,12 @@
 'use client'
+import type { LinkChip } from '@/lib/wait-links'
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
-import type { Ask, ChatProfile, Choice, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, TaskRow } from '@/lib/hub-types'
+import type { Ask, ChatProfile, Choice, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, TaskRow } from '@/lib/hub-types'
 import { askChoice } from '@/lib/ask'
 import { limitLine, testsPrompt } from '@/lib/checks'
 import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
 import { projectName } from '@/lib/archive'
-import { ago, almostDone, caps, coverage, panel } from './look'
+import { ago, almostDone, coverage } from './look'
 import { OrbitView } from './orbits'
 import { Switch } from './gear'
 import { Check, CopyCommit, Receipt, chipOf, finishedLine, hhmm, plural, stillRunning } from './chat-cards'
@@ -14,6 +15,8 @@ import { CommitText } from './commit-text'
 import { TestsCard } from './check-cards'
 import { onMac } from './dev-rows'
 import { vscodeBridge } from '@/lib/vscode-bridge'
+import { Warn } from './approve'
+import './centre.css'
 
 const TOOLS_KEY = 'switchboard.toolCalls'
 const clock = (at: number) => new Date(at).toTimeString().slice(0, 8)
@@ -21,77 +24,69 @@ const row = { display: 'flex', gap: 8, flexWrap: 'wrap' } as const
 const field = { font: '400 13px/1.4 var(--hub-sans)', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' } as const
 /** "42 min", "1 h 25 min", "under a minute". */
 const dur = (ms: number) => say(ms).replace(/^about /, '')
-const small = caps
-const mono = { font: '400 12px/1.4 var(--hub-mono)', color: 'var(--hub-ash)', whiteSpace: 'nowrap' } as const
+const cap = (s: string) => s.replace(/^./, c => c.toUpperCase())
 
-/** One segment per task, in list order: done green, current blue (yellow once the chat stopped), pending a hairline. */
-function Steps({ tasks, stopped }: { tasks: TaskRow[]; stopped: boolean }) {
-  const done = tasks.filter(t => t.status === 'completed').length, at = tasks.findIndex(t => t.status === 'in_progress')
-  const fill = { completed: 'var(--hub-green)', in_progress: stopped ? 'var(--hub-yellow)' : 'var(--hub-blue)', pending: 'var(--hub-hair-strong)' }
+/** "waiting on Fix login · auth.ts" from the chat's outgoing wait links; undefined when it holds for nobody. */
+export const waitWord = (links: LinkChip[] = []) => {
+  const out = links.filter(l => l.dir === 'out')
+  return out.length ? `waiting on ${out.map(l => l.file ? `${l.name} · ${l.file}` : l.name).join(', ')}` : undefined
+}
+
+/** Tasks as a checkbox list, roles in ash; the head says time left or how long it ran. */
+function Tasks({ p, e, now, models, since, links, running, timeleft }: { p?: ChatProgress; e?: Eta; now: number; models: Record<string, string>; since: string; links: LinkChip[]; running?: string; timeleft?: ReturnType<typeof timeLeft> }) {
+  const tasks = p?.tasks ?? [], stopped = p?.state === 'idle', open = e ? e.total - e.done : 0
+  const role = (t: TaskRow) => t.role ? `${t.role}${models[t.role] ? ` · ${models[t.role]}` : ''}` : ''
+  const done = tasks.filter(t => t.status === 'completed')
+  const hid = done.length > 5 ? done.length - 3 : 0
+  const shown = tasks.filter(t => t.status !== 'completed' || done.indexOf(t) >= hid)
+  const order = { completed: 0, in_progress: 1, pending: 2 }
+  shown.sort((a, b) => order[a.status] - order[b.status])
+  const subs = (p?.roles ?? []).filter(r => r.state === 'active' && p?.running?.includes(r.id))
+  const out = links.filter(l => l.dir === 'out'), into = links.filter(l => l.dir === 'in')
+  const right = !e ? '' : !open ? 'All done' : stopped ? `Stopped, ${open} left` : e.leftMs !== undefined ? `${cap(dur(e.leftMs))} left` : `Running ${dur(e.elapsedMs)}`
   return (
-    <div role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={tasks.length} aria-valuenow={done}
-      aria-valuetext={`${done} of ${tasks.length} done${at >= 0 ? `, on step ${done + 1}` : ''}`} style={{ display: 'flex', gap: 2, height: 6 }}>
-      {tasks.map(t => <i key={t.id} style={{ flex: 1, minWidth: 0, borderRadius: 3, background: fill[t.status] }} />)}
-    </div>
+    <section className="cp-panel" aria-labelledby="cp-tasks-h">
+      <h3 id="cp-tasks-h" className="cp-h"><span>Tasks</span>{right && <small role="status">{right}</small>}</h3>
+      {tasks.length
+        ? <ul className="cp-tasks" data-stopped={stopped || undefined} aria-label={e ? `${e.done} of ${e.total} done` : undefined}>
+            {hid > 0 && <li className="cp-task cp-more">{hid} earlier tasks done</li>}
+            {shown.map(t => <li key={t.id} className="cp-task" data-s={t.status} aria-current={t.id === e?.current?.id ? 'step' : undefined}>
+              <span className="cp-box" aria-hidden>{t.status === 'completed' && <Check size={9} />}</span>
+              <span>
+                <span className="sr-only">{t.status === 'completed' ? 'done: ' : t.status === 'in_progress' ? 'now: ' : 'left: '}</span>{t.subject}
+                {role(t) && <span className="cp-role"> · {role(t)}</span>}
+                {t.status === 'in_progress' && t.startedAt !== undefined && <span className="cp-role"> · for {dur(now - t.startedAt)}</span>}
+                {t.status === 'completed' && t.startedAt !== undefined && t.doneAt !== undefined && <span className="cp-role"> · {dur(t.doneAt - t.startedAt)}</span>}
+              </span>
+            </li>)}
+          </ul>
+        : <p className="cp-empty">No task list yet{stopped ? `. Quiet for ${since}.` : '.'}</p>}
+      {e && open > 0 && !stopped && e.leftMs !== undefined && <p className="cp-empty">At {dur(e.perTaskMs!)} per task so far.</p>}
+      {running && <div role="status" className="cp-run">
+        <p>{running}{timeleft && timeleft !== 'estimating' && <span> · {sayLeft(timeleft)}</span>}</p>
+        <ul>
+          {subs.map(r => <li key={r.id}>{r.role} · since {hhmm(r.startedAt)}</li>)}
+          {(p?.jobs ?? []).map(j => <li key={j.id}>{j.label ?? 'Background command'} · since {hhmm(j.startedAt)}</li>)}
+        </ul>
+      </div>}
+      {(out.length > 0 || into.length > 0) && <p className="cp-foot">
+        {out.length > 0 && <>Waits on {out.map(l => l.file ? `${l.name} (${l.file})` : l.name).join(', ')}</>}
+        {out.length > 0 && into.length > 0 && '. '}
+        {into.length > 0 && <>{into.map(l => l.name).join(', ')} {into.length > 1 ? 'wait' : 'waits'} on this</>}
+      </p>}
+    </section>
   )
 }
 
-/** The working or idle chat's tracker: which step, how long, what is done and what is left. */
-function Progress({ p, e, now, models, since }: { p: ChatProgress; e: Eta; now: number; models: Record<string, string>; since: string }) {
-  const cur = e.current, open = e.total - e.done, stopped = p.state === 'idle'
-  const role = (t: TaskRow) => t.role ? ` · ${t.role}${models[t.role] ? ` · ${models[t.role]}` : ''}` : ''
-  const done = p.tasks.filter(t => t.status === 'completed'), doing = p.tasks.filter(t => t.status === 'in_progress'), pending = p.tasks.filter(t => t.status === 'pending')
-  return <>
-    <h3 style={caps}><span>Tasks in this chat</span>{!stopped && <span>Running {dur(e.elapsedMs)}</span>}</h3>
-    <div style={{ display: 'grid', gap: 4 }}>
-      <p style={{ margin: 0, font: '500 12px/1.3 var(--hub-mono)', color: 'var(--hub-mute)' }}>{e.done} of {e.total} done</p>
-      {cur && <p data-s="in_progress" data-c={p.state} aria-current="step" style={{ margin: 0, display: 'flex', gap: 10, alignItems: 'center', font: '500 18px/1.3 var(--hub-sans)', color: 'var(--hub-ink)', overflowWrap: 'anywhere', textWrap: 'balance' }}><span className="hub-tick" aria-hidden /><span><span className="sr-only">now: </span>{cur.subject}</span></p>}
-      {cur && (cur.role || cur.startedAt !== undefined) && <p style={{ ...mono, margin: 0, paddingLeft: 24, whiteSpace: 'normal' }}>{role(cur).slice(3)}{cur.role && cur.startedAt !== undefined ? ' · ' : ''}{cur.startedAt !== undefined && `for ${dur(now - cur.startedAt)}`}</p>}
-    </div>
-    <Steps tasks={p.tasks} stopped={stopped} />
-    <p role="status" className="hub-num" style={{ margin: 0, fontSize: 14, color: 'var(--hub-body)' }}>
-      {stopped && open ? <span style={{ color: 'var(--hub-yellow)' }}>Stopped with {plural(open, 'task')} left{since !== 'now' ? `, quiet for ${since}` : ''}.</span>
-        : !open ? <span style={{ color: 'var(--hub-green)' }}>Every task done.</span>
-        : e.leftMs !== undefined ? <><span style={{ color: 'var(--hub-ink)', fontWeight: 500 }}>{say(e.leftMs).replace(/^./, c => c.toUpperCase())} left</span> <span style={{ color: 'var(--hub-ash)', fontSize: 13 }}>at {dur(e.perTaskMs!)} per task so far</span></>
-        : <span style={{ color: 'var(--hub-ash)' }}>Estimate after the first task.</span>}
-    </p>
-    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
-      {done.length > 4 && <li style={{ color: 'var(--hub-ash)', fontSize: 12, paddingLeft: 28 }}>{done.length - 3} earlier tasks done</li>}
-      {done.slice(done.length > 4 ? -3 : 0).map(t => <li key={t.id} data-s="completed" style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--hub-ash)', fontSize: 13 }}>
-        <span className="hub-tick" aria-hidden /><span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}><span className="sr-only">done: </span>{t.subject}</span>
-        {t.startedAt !== undefined && t.doneAt !== undefined && <span style={mono}>{dur(t.doneAt - t.startedAt)}</span>}
-      </li>)}
-      {doing.filter(t => t.id !== cur?.id).map(t => <li key={t.id} data-s="in_progress" data-c={p.state} style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--hub-body)', fontSize: 13 }}>
-        <span className="hub-tick" aria-hidden /><span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}><span className="sr-only">also now: </span>{t.subject}<span style={{ color: 'var(--hub-ash)' }}>{role(t)}</span></span>
-      </li>)}
-    </ul>
-    {pending.length > 0 && <div style={{ display: 'grid', gap: 4 }}>
-      <h4 style={small}><span>Not started</span><span>{pending.length}</span></h4>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
-        {pending.map(t => <li key={t.id} data-s="pending" style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--hub-mute)', fontSize: 13 }}>
-          <span className="hub-tick" aria-hidden /><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}><span className="sr-only">left: </span>{t.subject}<span style={{ color: 'var(--hub-ash)' }}>{role(t)}</span></span>
-        </li>)}
-      </ul>
-    </div>}
-  </>
-}
-
-/** The top of Activity for a chat waiting on Kenneth (its open tasks) or an almost done one (the requests it missed).
- *  Working and stopped chats show their tasks in Progress only; a finished chat's leftovers live in the to-do panel. */
-function LeftNow({ p }: { p: ChatProgress }) {
-  const missed = p.state === 'done'
-  const items = missed
-    ? (p.asked ?? []).filter((_, i) => coverage(p, i) === 'missed').map(subject => ({ subject, s: 'missed' }))
-    : p.tasks.filter(t => t.status !== 'completed').sort((a, b) => (a.status === 'in_progress' ? -1 : 0) - (b.status === 'in_progress' ? -1 : 0)).map(t => ({ subject: t.subject, s: t.status as string }))
+/** The requests a finished chat missed, by Jev's check. */
+function Missed({ p }: { p: ChatProgress }) {
+  const items = (p.asked ?? []).filter((_, i) => coverage(p, i) === 'missed')
   if (!items.length) return null
   return (
-    <div style={{ display: 'grid', gap: 6, paddingBottom: 12, borderBottom: '1px solid var(--hub-hair)' }}>
-      <h4 style={small}><span>{missed ? 'Not covered' : 'Open tasks'}</span>{!missed && <span style={{ color: 'var(--hub-red)', textTransform: 'none' }}>waiting on you</span>}</h4>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4, fontSize: 13 }}>
-        {items.slice(0, 3).map((t, i) => <li key={i} data-s={t.s} data-c={p.state} style={{ display: 'flex', gap: 10, alignItems: 'center', color: t.s === 'pending' ? 'var(--hub-mute)' : 'var(--hub-body)' }}>
-          <span className="hub-tick" aria-hidden /><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{t.subject}</span>
-        </li>)}
-        {items.length > 3 && <li style={{ color: 'var(--hub-ash)', paddingLeft: 24 }}>{items.length - 3} more</li>}
+    <div style={{ display: 'grid', gap: 6 }}>
+      <span className="cp-label">Not covered</span>
+      <ul className="cp-tasks">
+        {items.map((t, i) => <li key={i} className="cp-task" data-s="pending"><span className="cp-box" aria-hidden /><span>{t}</span></li>)}
       </ul>
     </div>
   )
@@ -128,30 +123,52 @@ function AskButtons({ ask, onAnswer }: { ask: Ask; onAnswer: (askId: string, cho
   return <>
     {qs.map((q, n) => (
       <div key={n} role="group" aria-label={q.header ?? q.question} style={{ display: 'grid', gap: 6 }}>
-        {qs.length > 1 && <p style={{ margin: 0, fontSize: 13 }}>{q.header && <span style={{ color: 'var(--hub-ash)' }}>{q.header} · </span>}{q.question}</p>}
+        {qs.length > 1 && <p className="cp-subq">{q.header && <span className="cp-role">{q.header} · </span>}{q.question}</p>}
+        {q.multiSelect && <span className="cp-hint">Pick any that apply</span>}
         <div style={row}>
-          {q.options.map((o, i) => <button key={i} type="button" className="hub-btn hub-opt" aria-pressed={together ? picked(n).includes(i) : undefined} onClick={() => pick(n, i)}>{o}</button>)}
-          <button type="button" className="hub-btn hub-opt" aria-pressed={n in others} onClick={() => toggleOther(n)}>Other…</button>
+          {q.options.map((o, i) => <button key={i} type="button" className="hub-btn hub-opt" aria-pressed={together ? picked(n).includes(i) : undefined} onClick={() => pick(n, i)}>{o}{q.details?.[i] ? <span className="hub-opt-d">{q.details[i]}</span> : null}</button>)}
+          <button type="button" className="hub-btn hub-opt cp-other" aria-pressed={n in others} onClick={() => toggleOther(n)}>Other</button>
         </div>
         {n in others && <input type="text" autoFocus maxLength={200} style={field} aria-label={`Other answer for ${q.header ?? q.question}`} placeholder="Type your answer"
           value={others[n]} onChange={e => setOthers({ ...others, [n]: e.target.value })}
           onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229 && choice) onAnswer(ask.id, choice) }} />}
       </div>
     ))}
-    {together && <div><button type="button" className="hub-btn" disabled={!choice} onClick={() => choice && onAnswer(ask.id, choice)}>Submit answers</button></div>}
+    {together && <div><button type="button" className="hub-btn primary" disabled={!choice} onClick={() => choice && onAnswer(ask.id, choice)}>{qs.length > 1 ? 'Send answers' : 'Send answer'}</button></div>}
   </>
+}
+
+/** What a finished or stopped chat did and what is left, one line each. */
+export const outcome = (p: ChatProgress) => {
+  const done = p.report?.done.length ? p.report.done : p.tasks.filter(t => t.status === 'completed').map(t => t.subject)
+  const open = p.tasks.filter(t => t.status !== 'completed').map(t => t.subject)
+  const you = p.report?.you ?? [], left = p.report?.left ?? []
+  const result = done.length ? `${done[0]}${done.length > 1 ? `, and ${done.length - 1} more` : ''}` : undefined
+  const rest = you.length ? `Needs you: ${you.join('; ')}`
+    : open.length ? `${plural(open.length, 'task')} left: ${open.join('; ')}`
+    : left.length ? `${plural(left.length, 'item')} left, in the to-do`
+    : 'Nothing left'
+  return { result, rest, needs: you.length > 0 }
+}
+
+function Outcome({ p }: { p: ChatProgress }) {
+  const o = outcome(p)
+  return <div className="cp-out">
+    <p>{o.result ?? 'Nothing finished yet'}</p>
+    <p data-needs={o.needs || undefined}>{o.rest}</p>
+  </div>
 }
 
 const NO_MODELS: Record<string, string> = {}
 
 /** models: each role's model, for the orbit and the task list. */
 /** profile: the chat's own plugins and skills, when Switchboard started it with a set; onProfile saves a change. */
-/** limits and autoContinue: for the usage-limit card; onSend: queues a message to this chat. */
-/** place: the VS Code window holding the chat, by color. menu: the chat's more actions. message: the message box, above the Tools card. installed, connections, onInstalled, toolsOpen: for the Tools card. */
-export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], limits = [], autoContinue = false, place, menu, message, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend }: {
+/** limits and autoContinue: for the usage-limit note; onSend: queues a message to this chat. note: an extra mute line under the head (a pause). */
+/** place: the VS Code window holding the chat. menu: Outputs and the more menu. message: the message box; given a function, it gets the Tools popover body. */
+export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend, approve, links = [] }: {
   chat: ChatRow; progress?: ChatProgress; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
-  profile?: ChatProfile; flagged?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void
-  place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void
+  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode
+  place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode | ((tools: ReactNode) => ReactNode); note?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void; /** Its wait links, for the Orbit arcs and the waiting word. */ links?: LinkChip[]
 }) {
   const [showTools, setShowTools] = useState(true)
   useEffect(() => { try { if (localStorage.getItem(TOOLS_KEY) === 'off') setShowTools(false) } catch { /* no storage: keep on */ } }, [])
@@ -165,91 +182,112 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
 
   const state = progress?.state ?? 'idle', s = chipOf(progress), name = chat.name ?? projectName(chat)
   const since = ago(progress?.at ?? chat.updatedAt ?? Date.now())
+  // A held chat reads as waiting, never idle.
+  const wait = state === 'done' || state === 'needs-you' ? undefined : waitWord(links)
   // The views redraw when this changes, so it changes only with what they show.
-  const orbit = useMemo(() => ({ id: chat.sessionId, name, state, ago: since, progress, live, models }), [chat.sessionId, name, state, since, progress, live, models])
+  const orbit = useMemo(() => ({ id: chat.sessionId, name, state, ago: since, wait, progress, live, models }), [chat.sessionId, name, state, since, wait, progress, live, models])
   const tasks = progress?.tasks ?? [], now = Date.now(), e = progress && tasks.length ? eta(progress, now) : undefined
   const running = stillRunning(progress), timeleft = progress && timeLeft(progress, all, now)
-  const subs = (progress?.roles ?? []).filter(r => r.state === 'active' && progress?.running?.includes(r.id))
   const feed = [...(progress?.tools ?? [])].reverse().slice(0, 6)
   const cost = [live?.costUsd !== undefined ? `$${live.costUsd.toFixed(2)}` : '', live?.tokens ? `${Math.round(live.tokens / 1000)}k tokens` : ''].filter(Boolean).join(' · ')
+  const role = e?.current?.role
+  const notes = [
+    progress?.limited ? limitLine(limits, autoContinue) : '',
+  ].filter(Boolean)
 
-  let left
-  if (state === 'needs-you') left = <>
-    <h3 style={{ ...caps, color: 'var(--hub-red)' }}><span>{progress?.limited ? 'Usage limit' : 'Needs you'}</span></h3>
-    <p style={{ margin: 0, font: '500 18px/1.3 var(--hub-sans)', color: 'var(--hub-ink)', overflowWrap: 'anywhere', textWrap: 'balance' }}>{progress?.question ?? 'This chat is waiting on you.'}</p>
-    {progress?.limited && <p style={{ margin: 0, color: 'var(--hub-body)', fontSize: 13 }}>{limitLine(limits, autoContinue)}</p>}
-    {progress?.ask && onAnswer && chat.ai !== 'codex' && <AskButtons ask={progress.ask} onAnswer={onAnswer} />}
-    <div><button type="button" className={progress?.ask && onAnswer ? 'hub-btn' : 'hub-btn primary'} onClick={onFocus}>{remote ? 'Open terminal on Mac' : 'Answer in terminal'}</button></div>
-  </>
-  else if (state === 'done' && progress) left = <>
-    <h3 style={caps}><span>{s.label}</span>{progress.finishedAt && <span>{hhmm(progress.finishedAt)}</span>}</h3>
-    <p role="status" style={{ margin: 0, display: 'flex', gap: 10, alignItems: 'center', color: s.color, fontSize: 15 }}>
-      <span style={{ display: 'inline-grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', background: s.color, color: 'var(--hub-canvas)', flex: 'none' }}><Check size={12} /></span>
-      <span>{finishedLine(progress)}.</span>
-    </p>
-    {progress.commit
-      ? <div style={{ display: 'grid', gap: 8, justifyItems: 'start', minWidth: 0 }}>
-          <div style={{ display: 'grid', width: '100%', minWidth: 0 }}><CommitText text={progress.commit} color={s.color} soft={s.soft} /></div>
-          <CopyCommit text={progress.commit} onCopy={onCopy} />
-        </div>
-      : <p style={{ margin: 0, color: 'var(--hub-ash)' }}>No commit message.</p>}
-    <Receipt p={progress} />
-  </>
-  else left = <>
-    {progress && e ? <Progress p={progress} e={e} now={now} models={models} since={since} />
-      : <><h3 style={caps}><span>Tasks in this chat</span></h3><p style={{ margin: 0, color: 'var(--hub-ash)' }}>No task list yet{state === 'idle' ? `. This chat has been quiet for ${since}.` : '.'}</p></>}
-    {running && <div role="status" style={{ display: 'grid', gap: 4, paddingTop: 4, borderTop: '1px solid var(--hub-hair)' }}>
-      <p style={{ margin: 0, color: 'var(--hub-blue)', fontSize: 13 }}>{running}{timeleft && <span style={{ color: 'var(--hub-ash)' }}> · {sayLeft(timeleft)}</span>}</p>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2, font: '400 12px/1.5 var(--hub-mono)', color: 'var(--hub-body)' }}>
-        {subs.map(r => <li key={r.id}>{r.role} <span style={{ color: 'var(--hub-ash)' }}>· since {hhmm(r.startedAt)}</span></li>)}
-        {(progress?.jobs ?? []).map(j => <li key={j.id}>{j.label ?? 'Background command'} <span style={{ color: 'var(--hub-ash)' }}>· since {hhmm(j.startedAt)}</span></li>)}
-      </ul>
-    </div>}
+  const first = state === 'needs-you'
+    ? <section className="cp-card cp-ask" aria-labelledby="cp-q">
+        <span className="cp-label">{progress?.limited ? 'Usage limit' : `${progress?.ask?.sub ? 'A subagent in ' : ''}${name} asks`}</span>
+        <p id="cp-q" className="cp-q">{(progress?.ask?.questions?.length ?? 0) > 1 ? `${progress!.ask!.questions!.length} questions` : progress?.question ?? 'This chat is waiting on you.'}</p>
+        {progress?.ask && onAnswer && chat.ai !== 'codex' && <AskButtons ask={progress.ask} onAnswer={onAnswer} />}
+        <div className="cp-alt"><button type="button" className={progress?.ask && onAnswer ? 'hub-btn sm' : 'hub-btn primary'} onClick={onFocus}>{remote ? 'Open terminal on Mac' : 'Answer in terminal'}</button></div>
+      </section>
+    : state === 'done' && progress
+      ? <section className="cp-card" aria-label={s.label}>
+          <p role="status" className="cp-done" style={{ color: almostDone(progress) ? 'var(--hub-yellow)' : s.color }}>
+            {almostDone(progress)
+              ? <span className="cp-warn"><Warn size={18} /></span>
+              : <span className="cp-tick" style={{ background: s.color }}><Check size={11} /></span>}
+            <span>{finishedLine(progress)}.</span>
+            {progress.finishedAt && <span className="cp-role">{hhmm(progress.finishedAt)}</span>}
+          </p>
+          <Outcome p={progress} />
+          {approve}
+          {almostDone(progress) && <Missed p={progress} />}
+          {progress.commit
+            ? <div style={{ display: 'grid', gap: 8, justifyItems: 'start', minWidth: 0 }}>
+                <div style={{ display: 'grid', width: '100%', minWidth: 0 }}><CommitText text={progress.commit} color={s.color} soft={s.soft} /></div>
+                <CopyCommit text={progress.commit} onCopy={onCopy} />
+              </div>
+            : <p className="cp-empty">No commit message.</p>}
+          <details className="cp-fold">
+            <summary>What you asked and what was done</summary>
+            <Receipt p={progress} />
+          </details>
+        </section>
+      : state === 'idle' && !wait && progress
+        ? <section className="cp-card" aria-label="Where it stopped">
+            <span className="cp-label">Stopped, quiet for {since}</span>
+            <Outcome p={progress} />
+          </section>
+        : null
+
+  const tools = <>
+    <div className="cp-pop-row">
+      <Switch on={showTools} onChange={toggle} label="Tool calls on the Orbit picture" text="Tool calls" />
+      <span className="cp-hint">Shows each tool call as a spark on the Orbit picture</span>
+    </div>
+    {/* Not the bare session id: the message box beside it is keyed by that. */}
+    {chat.ai !== 'codex' && (
+      <ToolsCard key={`tools-${chat.sessionId}`} profile={profile} flagged={flagged} smart={smart} globalOff={globalOff} installed={installed} connections={connections} open={toolsOpen} onProfile={onProfile} onInstalled={onInstalled} />
+    )}
   </>
 
   return (
-    <section aria-labelledby="pic-name" className="hub-pic" style={{ display: 'grid', gap: 16, padding: 20, minWidth: 0, alignContent: 'start' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-        <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
-          <h2 id="pic-name" style={{ margin: 0, font: '500 22px/1.15 var(--hub-sans)', color: 'var(--hub-ink)', textWrap: 'balance' }}>{name}</h2>
-          <p style={{ margin: 0, font: '400 13px/1.4 var(--hub-mono)', color: 'var(--hub-ash)' }}>
-            {place && <span title={`In the ${place.name} window`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: place.color, marginRight: 8 }}><i aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />{place.name}{place.name === projectName(chat) && <span className="sr-only"> window</span>}</span>}
-            {place?.name === projectName(chat) ? '' : projectName(chat)}{place?.name === projectName(chat) ? '· ' : ' · '}<span style={{ color: s.color }}>{s.label}</span> · {since}</p>
+    <section aria-labelledby="pic-name" className="hub-pic cp">
+      <div className="cp-head">
+        <div style={{ minWidth: 0 }}>
+          <h1 id="pic-name" className="cp-title">{name}</h1>
+          <p className="cp-sub">
+            <span><i aria-hidden className="cp-dot" style={{ background: wait ? 'var(--hub-mute)' : s.color }} />{wait ? cap(wait) : approve ? 'Ready to approve' : s.label}</span>
+            <span>
+              {place && <span title={`In the ${place.name} window`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: place.color, marginRight: place.name === projectName(chat) ? 0 : 6 }}><i aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />{place.name}{place.name === projectName(chat) && <span className="sr-only"> window</span>}</span>}
+              {place?.name === projectName(chat) ? '' : projectName(chat)}
+            </span>
+            {role && <span>{role}</span>}
+            {e && <span>{e.done} of {e.total} tasks</span>}
+            <span>{since}</span>
+          </p>
         </div>
-        <div className="hub-pic-acts" style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
-          <Switch on={showTools} onChange={toggle} label="Show tool calls on the map" text="Tool calls" />
-          <button type="button" className="hub-btn" onClick={onFocus}>Open terminal</button>
+        <div className="hub-pic-acts cp-acts">
+          <button type="button" className="hub-btn" onClick={onFocus} title={remote ? 'Brings up its terminal on the Mac' : "Brings up this chat's terminal"}>{remote ? 'Terminal on Mac' : 'Terminal'}</button>
           {menu}
         </div>
       </div>
-      <OrbitView chat={orbit} showTools={showTools} instant={instant} all={all} demo={demo} onFocus={onFocus} onCopy={onCopy} />
+      {(notes.length > 0 || note) && <p className="cp-note">{notes.join(' · ')}{notes.length > 0 && note ? ' · ' : ''}{note}</p>}
+      {first}
       {progress?.tests && !progress.tests.ok && <TestsCard run={progress.tests} onSend={onSend && (() => onSend(testsPrompt(progress.tests!)))} />}
-      <div className="hub-below">
-        <div style={state === 'needs-you' ? { ...panel, border: '1px solid var(--hub-red)', background: 'var(--hub-red-soft)' } : panel}>{left}</div>
-        <div style={panel}>
-          <h3 style={caps}><span>Activity</span><span>{cost}</span></h3>
-          {progress && (state === 'needs-you' || almostDone(progress)) && <LeftNow p={progress} />}
-          {feed.length
-            ? <ul className="hub-feed" aria-label="Latest tool calls, newest first" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6, font: '400 12px/1.5 var(--hub-mono)' }}>
-                {feed.map(c => (
-                  <li key={`${c.at}:${c.tool}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 64px) minmax(0, 80px) minmax(0, 1fr)', gap: 8, color: 'var(--hub-mute)', whiteSpace: 'nowrap' }}>
-                    <span>{clock(c.at)}</span>
-                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
-                      <i aria-hidden style={{ flex: 'none', width: 6, height: 6, borderRadius: '50%', background: c.role === 'lead' ? 'var(--hub-ink)' : c.role === 'jev' ? 'var(--hub-violet)' : 'var(--hub-blue)' }} />
+      <div className="cp-split">
+        <section className="cp-panel cp-agents" aria-label="Agents">
+          <OrbitView chat={orbit} showTools={showTools} instant={instant} all={all} demo={demo} links={links} onFocus={onFocus} onCopy={onCopy} />
+          <details className="cp-fold">
+            <summary>Recent tool calls{feed.length ? ` (${feed.length})` : ''}{cost && <span className="cp-role"> · {cost}</span>}</summary>
+            {feed.length
+              ? <ul className="hub-feed" aria-label="Latest tool calls, newest first" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'grid', gap: 6, font: '400 12px/1.5 var(--hub-mono)' }}>
+                  {feed.map(c => (
+                    <li key={`${c.at}:${c.tool}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 64px) minmax(0, 80px) minmax(0, 1fr)', gap: 8, color: 'var(--hub-mute)', whiteSpace: 'nowrap' }}>
+                      <span>{clock(c.at)}</span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.role}</span>
-                    </span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--hub-body)' }}><span style={{ color: 'var(--hub-yellow)' }}>{c.tool}</span>{c.target ? ` ${c.target}` : ''}</span>
-                  </li>
-                ))}
-              </ul>
-            : <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No tool calls yet.</p>}
-        </div>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--hub-body)' }}><span style={{ color: 'var(--hub-ink)' }}>{c.tool}</span>{c.target ? ` ${c.target}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              : <p className="cp-empty" style={{ marginTop: 8 }}>No tool calls yet.</p>}
+          </details>
+        </section>
+        <Tasks p={progress} e={e} now={now} models={models} since={since} links={links} running={running} timeleft={timeleft} />
       </div>
-      {message}
-      {/* Not the bare session id: the message box beside it is keyed by that. */}
-      {chat.ai !== 'codex' && (
-        <ToolsCard key={`tools-${chat.sessionId}`} profile={profile} flagged={flagged} installed={installed} connections={connections} open={toolsOpen} onProfile={onProfile} onInstalled={onInstalled} />
-      )}
+      {typeof message === 'function' ? message(tools) : <>{message}<div className="cp-panel">{tools}</div></>}
     </section>
   )
 }

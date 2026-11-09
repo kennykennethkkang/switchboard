@@ -12,6 +12,7 @@ import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey
 import { sendSlices } from './attach'
 import type { MemoryGraph } from './memory-graph'
 import type { RunDetail } from './runs'
+import type { FlowMap } from './flow-map'
 import type { ChatAnswer, ChatAsk } from './chat-view'
 
 type InitCallback = () => void
@@ -32,13 +33,20 @@ export type HubCommand =
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
   | { type: 'hub-switchboard'; key: SwitchboardKey; value: boolean | number | string | null }
   | { type: 'hub-compact'; sessionId: string }
+  | { type: 'hub-pause'; action: 'resume' | 'cancel' }
+  | { type: 'hub-hand-to'; sessionId: string }
+  | { type: 'hub-ai-login'; ai: AiId }
   | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
   | { type: 'hub-star'; sessionId: string; ai: AiId; on: boolean }
   | { type: 'hub-resume'; sessionId: string; ai: AiId }
+  | { type: 'hub-archive'; sessionId: string }
+  | { type: 'hub-unarchive'; sessionId: string }
+  | { type: 'hub-approve'; sessionId: string }
   | { type: 'hub-open-note'; sessionId: string }
   | { type: 'hub-focus-chat'; sessionId: string }
+  | { type: 'hub-terminal'; id: number; act: 'show' | 'close' }
   | { type: 'hub-keep'; onFull?: 'compact' | 'fresh'; freshBranch?: boolean }
   | { type: 'hub-aws-login'; profile: string; chrome?: string }
   | { type: 'hub-aws-default'; profile: string }
@@ -60,6 +68,7 @@ export type HubCommand =
   | { type: 'hub-key-save'; name: ApiKeyName; value: string }
   | { type: 'hub-key-test'; name: ApiKeyName }
   | { type: 'hub-key-remove'; name: ApiKeyName }
+  | { type: 'hub-env-setup'; folder: string }
   | { type: 'hub-kit-export' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
@@ -68,22 +77,31 @@ export type HubCommand =
   | { type: 'hub-handoff'; sessionId: string }
   /** The SkillSpector sweep: name rescans one tool, none sweeps everything installed. */
   | { type: 'hub-sweep'; name?: string }
+  | { type: 'hub-spend'; key: string; mode: 'provider' | 'cap' | 'ask'; monthlyUsd?: number }
   | { type: 'hub-sweep-approve'; name: string }
+  /** A Learning ready card: ok applies it, false discards it. */
+  | { type: 'hub-learn'; id: string; ok: boolean }
+  | { type: 'hub-summary'; sessionId: string; refresh?: boolean }
   | { type: 'hub-sweep-fix'; name: string }
   /** Add a plugin or skill from GitHub: owner/repo or an https://github.com link, swept on the way in. */
   | { type: 'hub-tool-add'; repo: string }
   | { type: 'hub-dev-start'; folder: string }
   | { type: 'hub-dev-stop'; folder: string }
+  | { type: 'hub-window-tab'; op: 'merge' | 'split' | 'popout' | 'show'; workspace?: string }
   | { type: 'hub-awake'; on: boolean }
   | { type: 'hub-device'; id: string; allow: boolean }
   | { type: 'hub-stuck-stop'; sessionId: string; id: string }
   | { type: 'hub-stuck-dismiss'; sessionId: string; id: string }
+  | { type: 'hub-stuck-fix'; sessionId: string; id: string }
+  | { type: 'hub-wait-for'; from: string; to: string }
+  | { type: 'hub-unlink'; from: string; to: string }
   | { type: 'hub-changes'; sessionId: string }
   | { type: 'hub-open-diff'; sessionId: string; file: string }
   | { type: 'hub-search'; q: string }
   | { type: 'hub-jarvis'; q: string; voice?: boolean }
   | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
+  | { type: 'hub-harden'; sessionId: string }
   | { type: 'hub-todo-add'; path: string; text: string }
   | { type: 'hub-todo-edit'; path: string; id: string; text: string }
   | { type: 'hub-todo-remove'; path: string; id: string }
@@ -92,6 +110,7 @@ export type HubCommand =
   /** A suggestion a finished chat left: into the to-do, or gone. */
   | { type: 'hub-todo-accept'; path: string; id: string }
   | { type: 'hub-todo-dismiss'; path: string; id: string }
+  | { type: 'hub-todo-move'; path: string; ids: string[] }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
   | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
@@ -123,6 +142,7 @@ class VSCodeBridge {
   private uploads = new Map<string, (m: UploadAck) => void>()
   private graphs = new Map<string, (m: { graph?: MemoryGraph; problem?: string }) => void>()
   private runLists = new Map<string, (m: { runs?: RunDetail[]; problem?: string }) => void>()
+  private flowMaps = new Map<string, (m: { map?: FlowMap; problem?: string }) => void>()
   private chatReads = new Map<string, (m: ChatAnswer) => void>()
   /** False while VS Code keeps this view alive but hidden (sidebar collapsed, tab in the background). */
   shown = true
@@ -216,6 +236,9 @@ class VSCodeBridge {
       case 'runs':
         this.runLists.get(data.id)?.(data)
         break
+      case 'flowmap':
+        this.flowMaps.get(data.id)?.(data)
+        break
       case 'chat':
         this.chatReads.get(data.id)?.(data)
         break
@@ -308,6 +331,16 @@ class VSCodeBridge {
       const t = setTimeout(() => { this.graphs.delete(id); done('VS Code did not answer') }, 20_000)
       this.graphs.set(id, m => { clearTimeout(t); this.graphs.delete(id); done(m.graph ?? m.problem ?? 'no graph') })
       this.postToExtension({ type: 'graph-get', id })
+    })
+  }
+
+  /** cwd's Flow map from the extension, or why not. A big project's first build can take a while. */
+  flowMap(cwd: string): Promise<FlowMap | string> {
+    const id = Math.random().toString(36).slice(2)
+    return new Promise(done => {
+      const t = setTimeout(() => { this.flowMaps.delete(id); done('VS Code did not answer') }, 60_000)
+      this.flowMaps.set(id, m => { clearTimeout(t); this.flowMaps.delete(id); done(m.map ?? m.problem ?? 'no map') })
+      this.postToExtension({ type: 'flowmap-get', id, cwd })
     })
   }
 

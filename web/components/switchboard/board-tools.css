@@ -1,0 +1,48 @@
+/* Tool belt: a lacquer plate on the left edge of the stage, pixel trim from the skin. */
+.bt { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); z-index: 1; display: flex; flex-direction: column; gap: 4px; padding: 6px;
+  background: var(--bt-panel); border: 2px solid var(--bt-trim); border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 4px 4px 0 0 rgba(0, 0, 0, 0.35), inset 0 2px 0 0 rgba(255, 255, 255, 0.08); }
+
+.bt-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 52px; min-height: 52px; padding: 6px 0 4px;
+  border: 2px solid transparent; border-radius: 2px; background: transparent; color: var(--bt-ink); cursor: pointer; font: 400 9px/1 var(--bt-font); letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent; }
+.bt-sprite { width: 28px; height: 28px; image-rendering: pixelated; }
+.bt-short { white-space: nowrap; opacity: 0.9; }
+
+@media (hover: hover) {
+  .bt-item:hover { background: rgba(0, 0, 0, 0.28); border-color: color-mix(in srgb, var(--bt-trim) 60%, transparent); }
+}
+.bt-item[aria-pressed="true"] { background: rgba(0, 0, 0, 0.32); border-color: var(--bt-trim); }
+.bt-item:active { background: rgba(0, 0, 0, 0.4); }
+.bt-item:focus-visible { outline: 2px solid var(--bt-gold); outline-offset: 1px; }
+.bt-item[aria-disabled] { cursor: default; }
+.bt-item[aria-disabled] .bt-sprite, .bt-item[aria-disabled] .bt-short { opacity: 0.4; }
+
+/* Count: a square pixel chip; hot items (someone waiting, usage at 90%) go warn. */
+.bt-badge { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 14px; padding: 0 3px; display: grid; place-items: center;
+  background: var(--bt-trim); color: #1a1423; font: 400 9px/1 var(--bt-font); font-variant-numeric: tabular-nums; box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6); }
+.bt-item[data-hot] .bt-badge { background: var(--bt-hot); color: #fff; }
+
+/* Tip: item name in the skin font, then the plain hint. Hover or keyboard focus. */
+.bt-tip { position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 4px; width: max-content; max-width: 220px;
+  padding: 8px 10px; background: #120f1f; color: #e9e6f2; border: 2px solid var(--bt-trim); border-radius: 2px; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+  font: 400 12px/1.4 var(--hub-sans); text-align: left; letter-spacing: 0; pointer-events: none; z-index: 3; }
+.bt-tip b { color: var(--bt-gold); font: 400 10px/1.3 var(--bt-font); letter-spacing: 0.04em; text-transform: uppercase; }
+.bt-item:focus-visible .bt-tip { display: flex; }
+@media (hover: hover) { .bt-item:hover .bt-tip { display: flex; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bt-item { transition: background-color 120ms var(--hub-ease-out), border-color 120ms var(--hub-ease-out); }
+  /* Pixel hop: two steps, no easing, so it reads as sprite frames. */
+  @media (hover: hover) { .bt-item:hover .bt-sprite { animation: bt-hop 360ms steps(2) 1; } }
+  .bt-item:active .bt-sprite { transform: translateY(1px); }
+  .bt-item[data-id="next"][data-hot] .bt-sprite { animation: bt-drift 1.6s steps(2) infinite; }
+}
+  /* Day and night crossfade, started from the board with a view transition. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 420ms; animation-timing-function: var(--hub-ease-out, ease-out); }
+@keyframes bt-hop { 50% { transform: translateY(-2px); } }
+@keyframes bt-drift { 50% { transform: translateX(2px); } }
+
+/* Phone: bigger cells, tips off (no hover; the visible label and aria-label carry it). */
+@media (pointer: coarse) { .bt-item { width: 56px; min-height: 56px; } .bt-tip { display: none !important; } }
+@media (max-height: 520px) { .bt { flex-direction: row; flex-wrap: wrap; top: 8px; transform: none; max-width: calc(100% - 16px); } }

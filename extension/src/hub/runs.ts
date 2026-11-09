@@ -66,7 +66,7 @@ function textOf(content: unknown): string | undefined {
   return t || undefined
 }
 
-// The section word, then an optional note in brackets ("Changed (agent-flow)"), which is dropped.
+// The section word, then an optional note in brackets ("Changed (switchboard)"), which is dropped.
 const SECTION = /^\s*(#{1,6}\s+|\*\*)?(status|changed or found|changes|changed|findings|found|checks|checked|verified|verification|tests|tested|open items|open questions|open|remaining|left|screenshots?(?: paths)?)\b(?:\s*\([^)]*\))?(\*\*)?\s*(:)?\s*(?:\*\*)?\s*:?\s*(.*)$/i
 type Key = 'status' | 'changed' | 'checked' | 'open' | 'skip'
 function keyOf(w: string): Key {

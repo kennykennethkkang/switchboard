@@ -119,7 +119,7 @@ describe('parseReport', () => {
   })
 
   it('knows the other names for checked, changed and open, and drops a note in brackets', () => {
-    const r = parseReport('**Changed (agent-flow)**\n- a.ts\n**Checks**\n- pnpm test: pass\n### Verified\n- tsc\nTests: 12 pass\nFindings:\n- b.ts:3\n**Open items**\n- none\nRemaining: ship it')
+    const r = parseReport('**Changed (switchboard)**\n- a.ts\n**Checks**\n- pnpm test: pass\n### Verified\n- tsc\nTests: 12 pass\nFindings:\n- b.ts:3\n**Open items**\n- none\nRemaining: ship it')
     assert.deepEqual(r?.changed, ['a.ts', 'b.ts:3'])
     assert.deepEqual(r?.checked, ['pnpm test: pass', 'tsc', '12 pass'])
     assert.deepEqual(r?.open, ['none', 'ship it'])

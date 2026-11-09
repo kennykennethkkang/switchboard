@@ -42,12 +42,12 @@ describe('dev button', () => {
 
   it('sends dev-start to the window holding the folder, else keeps it here', () => {
     const wins = [
-      { pid: 1, port: 9001, hubToken: 'a', workspace: '/r/agent-flow' },
+      { pid: 1, port: 9001, hubToken: 'a', workspace: '/r/switchboard' },
       { pid: 2, port: 9002, hubToken: 'b', workspace: '/r/QR-Test' },
       { pid: 3, port: 9003, hubToken: 'c', workspace: '/r' },
     ]
     assert.equal(devHome(wins, '/r/QR-Test', 1)?.pid, 2)
-    assert.equal(devHome(wins, '/r/agent-flow/web', 2)?.pid, 1)
+    assert.equal(devHome(wins, '/r/switchboard/web', 2)?.pid, 1)
     assert.equal(devHome(wins, '/r/Other', 1)?.pid, 3)
     assert.equal(devHome(wins.slice(0, 2), '/x/Other', 1), undefined)
     assert.equal(devHome(wins, '/r/QR-Test', 2), undefined)
@@ -71,11 +71,11 @@ describe('dev button', () => {
   it('files a repo subfolder row under its repo, keeping the folder name for its terminal', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-dev-'))
     try {
-      const web = path.join(tmp, 'agent-flow', 'web')
-      fs.mkdirSync(path.join(tmp, 'agent-flow', '.git'), { recursive: true })
+      const web = path.join(tmp, 'switchboard', 'web')
+      fs.mkdirSync(path.join(tmp, 'switchboard', '.git'), { recursive: true })
       fs.mkdirSync(web)
       const [row] = devRows([web], () => ({ command: 'pnpm dev' }), [], null)
-      assert.deepEqual([row.project, row.repo], ['web', 'agent-flow'])
+      assert.deepEqual([row.project, row.repo], ['web', 'switchboard'])
     } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
   })
 

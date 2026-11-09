@@ -4,7 +4,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { allowed, codeLogin, macOnly, hostOk, commandSession, deniedAs, deviceAsks, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
+import { allowed, codeLogin, macOnly, hostOk, lanNames, macNames, macNamesRead, commandSession, deniedAs, deviceAsks, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
 import { MAC_ONLY_GIT } from '../../web/lib/hub-types'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
@@ -34,12 +34,12 @@ describe('pickWindow', () => {
     assert.equal(pickWindow(files, '/u/Armasu/web')?.port, 2)
   })
   it('takes the window holding the command folder first, the deepest one, else the usual pick', () => {
-    const files = [w('/u/agent-flow', 9, 1), w('/u/Armasu', 1, 2), w('/u', 5, 3)]
-    assert.equal(pickWindow(files, '/u/agent-flow', undefined, '/u/Armasu')?.port, 2)
-    assert.equal(pickWindow(files, '/u/agent-flow', undefined, '/u/Armasu/web')?.port, 2)
-    assert.equal(pickWindow(files, '/u/agent-flow', undefined, '/u/other')?.port, 3)
-    assert.equal(pickWindow(files, '/u/agent-flow', undefined, '/elsewhere')?.port, 1)
-    assert.equal(pickWindow(files, '/u/agent-flow')?.port, 1)
+    const files = [w('/u/switchboard', 9, 1), w('/u/Armasu', 1, 2), w('/u', 5, 3)]
+    assert.equal(pickWindow(files, '/u/switchboard', undefined, '/u/Armasu')?.port, 2)
+    assert.equal(pickWindow(files, '/u/switchboard', undefined, '/u/Armasu/web')?.port, 2)
+    assert.equal(pickWindow(files, '/u/switchboard', undefined, '/u/other')?.port, 3)
+    assert.equal(pickWindow(files, '/u/switchboard', undefined, '/elsewhere')?.port, 1)
+    assert.equal(pickWindow(files, '/u/switchboard')?.port, 1)
   })
   it('routes to-do and new-chat commands by their path, nothing else', () => {
     assert.equal(commandFolder('{"type":"hub-todo-run","path":"/u/Armasu","ids":["a"]}'), '/u/Armasu')
@@ -59,9 +59,10 @@ describe('pickWindow', () => {
 
 describe('macOnly', () => {
   it('refuses the same git ops the phone hides', () => {
-    for (const op of ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship'])
+    for (const op of ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship', 'push'])
       assert.equal(macOnly(JSON.stringify({ type: 'hub-git', op })), MAC_ONLY_GIT.has(op as never), op)
     assert.equal(MAC_ONLY_GIT.has('commit'), false)
+    assert.equal(macOnly('{"type":"hub-harden","sessionId":"s"}'), true)
   })
   it('keeps the Mac mic off for a phone and lets other commands by', () => {
     assert.equal(macOnly('{"type":"hub-voice","on":true}'), true)
@@ -79,7 +80,7 @@ describe('macOnly', () => {
   it('lets the phone chat, answer, read, upload and keep to-dos', () => {
     for (const type of ['hub-send', 'hub-answer', 'hub-new-chat', 'hub-focus-chat', 'hub-changes', 'hub-todo-add', 'hub-todo-run', 'hub-star', 'hub-search', 'hub-dev-stop', 'hub-setting'])
       assert.equal(macOnly(JSON.stringify({ type })), false, type)
-    for (const op of ['commit', 'stash', 'pop', 'switch', 'create', 'undo', 'rerun']) assert.equal(macOnly(JSON.stringify({ type: 'hub-git', sessionId: 's', op })), false, op)
+    for (const op of ['commit', 'push', 'stash', 'pop', 'switch', 'create', 'undo', 'rerun']) assert.equal(macOnly(JSON.stringify({ type: 'hub-git', sessionId: 's', op })), false, op)
   })
 })
 
@@ -133,6 +134,32 @@ describe('hostOk', () => {
     assert.equal(hostOk({ host: 'mac.tail1.ts.net:3131' }, 3131, lan), false)
     assert.equal(allowed({ host: 'mac.tail1.ts.net', 'x-switchboard': '1', origin: 'http://mac.tail1.ts.net' }, 3131, lan), true)
     assert.equal(allowed({ host: 'mac.tail1.ts.net', 'x-switchboard': '1', origin: 'https://mac.tail1.ts.net' }, 3131, lan), false)
+  })
+  it('takes the short MagicDNS name too, from the same read', () => {
+    assert.deepEqual(lanNames({ tailscale: 'mac.tail1.ts.net', https: false }), { names: ['mac.tail1.ts.net', 'mac'], plain: true })
+    assert.deepEqual(lanNames({ tailscale: 'mac.tail1.ts.net', https: true }), { names: ['mac.tail1.ts.net', 'mac'], plain: false })
+    assert.deepEqual(lanNames({}).names, [])
+    // What serve really runs wins: certs on but the switch to https failed stays plain.
+    assert.equal(lanNames({ tailscale: 'mac.tail1.ts.net', https: true }, 'http').plain, true)
+    assert.equal(lanNames({ tailscale: 'mac.tail1.ts.net', https: false }, 'https').plain, false)
+    const { names, plain } = lanNames({ tailscale: 'mac.tail1.ts.net', https: false })
+    const secret = 'a'.repeat(64)
+    const h = { host: 'mac', 'x-forwarded-for': '100.1.2.3' }
+    const lan = lanFor(h, 3131, secret, names, plain)!
+    assert.equal(lanGate(h, '/?k=' + secret, 3131, lan), 'login')
+    assert.equal(lanGate({ ...h, cookie: 'sb3131=' + secret }, '/hub/command', 3131, lan), 'ok')
+    assert.equal(allowed({ ...h, 'x-switchboard': '1', origin: 'http://mac' }, 3131, lan), true)
+    assert.equal(allowed({ ...h, host: 'mac:80', 'x-switchboard': '1', origin: 'http://mac' }, 3131, lan), true)
+    assert.equal(allowed({ ...h, 'x-switchboard': '1', origin: 'http://evil.test' }, 3131, lan), false)
+    assert.equal(lanGate({ ...h, host: 'mac.evil.test', cookie: 'sb3131=' + secret }, '/', 3131, lan), 'deny')
+  })
+})
+
+describe('macNamesRead', () => {
+  it('waits for the first tailscale read, so startup does not refuse the phone', async () => {
+    macNames()
+    const n = await macNamesRead()
+    assert.deepEqual(macNames(), n)
   })
 })
 
@@ -452,6 +479,32 @@ describe('proxyHub to-do', () => {
 
   it('starts', async () => { await start(up); await start(up2); await start(app); port = (app.address() as AddressInfo).port })
 
+  it('takes a signed-in phone Send and upload over plain http, on the full and short name', async () => {
+    const secret = 'a'.repeat(64)
+    const { names, plain } = lanNames({ tailscale: 'mac.tail1.ts.net', https: false })
+    // As server.ts: gate, then the proxy; tailscale serve adds x-forwarded-for.
+    const phone = http.createServer((req, res) => {
+      const lan = lanFor(req.headers, port, secret, names, plain)
+      if (lanGate(req.headers, req.url ?? '/', port, lan) !== 'ok') { res.writeHead(401).end(); return }
+      void proxyHub(req, res, port, '/p', lan, async () => [{ port: (up.address() as AddressInfo).port, hubToken: 'tok', workspace: '/p', mtimeMs: 1, pid: process.pid }])
+    })
+    await start(phone)
+    const post = (host: string, path: string, body: string, cookie = true) => new Promise<number>((ok, fail) => {
+      const r = http.request({ host: '127.0.0.1', port: (phone.address() as AddressInfo).port, method: 'POST', path, headers: { Host: host, 'X-Switchboard': '1', Origin: `http://${host}`, 'X-Forwarded-For': '100.1.2.3', 'Content-Type': 'application/json', ...(cookie ? { Cookie: `sb${port}=${secret}` } : {}) } }, x => { x.resume(); ok(x.statusCode ?? 0) })
+      r.on('error', fail)
+      r.end(body)
+    })
+    try {
+      for (const host of ['mac.tail1.ts.net', 'mac']) {
+        hops.length = 0
+        assert.equal(await post(host, '/hub/command', JSON.stringify({ type: 'hub-send', sessionId: 's1', text: 'hi' })), 204, host)
+        assert.equal(hops.at(-1)?.url, '/hub/command', host)
+        assert.equal(await post(host, '/hub/upload?cwd=/p&name=a.txt', 'file body'), 204, host)
+        assert.equal(await post(host, '/hub/command', '{"type":"hub-send"}', false), 401, host)
+      }
+    } finally { phone.close() }
+  })
+
   it('hands the to-do lists, ticked and sync included, to every path', async () => {
     for (const host of hosts()) {
       const r = await call(host, 'GET', '/hub/state')
@@ -687,6 +740,49 @@ describe('proxyHub upload', () => {
     })
     assert.equal(r.status, 413)
     await new Promise(ok => setTimeout(ok, 100))
+    assert.equal(got.length, 0)
+  })
+  it('stops', () => { app.closeAllConnections(); up.closeAllConnections(); app.close(); up.close() })
+})
+
+describe('proxyHub voice clip', () => {
+  const got: Array<{ url?: string; body: Buffer; type?: string; token?: string | string[] }> = []
+  const up = http.createServer(async (req, res) => {
+    const parts: Buffer[] = []
+    for await (const c of req) parts[parts.length] = c as Buffer
+    got[got.length] = { url: req.url, body: Buffer.concat(parts), type: req.headers['content-type'], token: req.headers['x-switchboard-token'] }
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"text":"hi"}')
+  })
+  let port = 0
+  const app = http.createServer((req, res) => {
+    void proxyHub(req, res, port, '/p', undefined, async () => [{ port: (up.address() as AddressInfo).port, hubToken: 'tok', workspace: '/p', mtimeMs: 1, pid: process.pid }])
+  })
+  const send = (headers: Record<string, string>, body: Buffer) => new Promise<{ status: number; body: string }>(ok => {
+    const r = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hub/voice?token=evil', headers: { Host: `127.0.0.1:${port}`, ...headers } }, x => {
+      let b = ''
+      x.on('data', c => { b += c })
+      x.on('end', () => ok({ status: x.statusCode ?? 0, body: b }))
+    })
+    r.on('error', () => ok({ status: 0, body: '' }))
+    r.end(body)
+  })
+  it('starts', async () => {
+    await new Promise<void>(ok => up.listen(0, '127.0.0.1', ok))
+    await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+    port = (app.address() as AddressInfo).port
+  })
+  it('passes the clip bytes and type through with the window token', async () => {
+    const bytes = Buffer.from(Array.from({ length: 256 }, (_, i) => i))
+    got.length = 0
+    const r = await send({ 'X-Switchboard': '1', 'Content-Type': 'audio/webm' }, bytes)
+    assert.deepEqual([r.status, r.body], [200, '{"text":"hi"}'])
+    assert.ok(got[0].body.equals(bytes))
+    assert.deepEqual([got[0].url, got[0].type, got[0].token], ['/hub/voice', 'audio/webm', 'tok'])
+  })
+  it('refuses without the header, and a clip over 5 MB', async () => {
+    got.length = 0
+    assert.equal((await send({ 'Content-Type': 'audio/webm' }, Buffer.from('x'))).status, 403)
+    assert.equal((await send({ 'X-Switchboard': '1', 'Content-Type': 'audio/webm' }, Buffer.alloc(5 * 1024 * 1024 + 1))).status, 413)
     assert.equal(got.length, 0)
   })
   it('stops', () => { app.closeAllConnections(); up.closeAllConnections(); app.close(); up.close() })

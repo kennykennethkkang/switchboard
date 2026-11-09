@@ -8,7 +8,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile, moveTodo } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -27,7 +27,7 @@ describe('todo project', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-todo-proj-'))
     const was = hub.get().projects
     try {
-      const repo = path.join(tmp, 'agent-flow'), sub = path.join(repo, 'extension'), plain = path.join(tmp, 'notes')
+      const repo = path.join(tmp, 'switchboard'), sub = path.join(repo, 'extension'), plain = path.join(tmp, 'notes')
       fs.mkdirSync(path.join(repo, '.git'), { recursive: true })
       fs.mkdirSync(sub)
       fs.mkdirSync(path.join(plain, 'a'), { recursive: true })
@@ -105,8 +105,23 @@ describe('todo merge', () => {
     d = removeItem(d, 'aa', 13)
     assert.deepEqual(d.todo, [])
     assert.equal(d.removed.aa, 13)
-    assert.equal(addTodo(emptyDoc(), 'x'.repeat(2000), 1, 'b').todo[0].text.length, 300)
+    assert.equal(addTodo(emptyDoc(), 'x'.repeat(2000), 1, 'b').todo[0].text.length, 2000)
+    assert.equal(addTodo(emptyDoc(), 'x'.repeat(2500), 1, 'b').todo[0].text.length, 2000)
     assert.equal(addTodo(emptyDoc(), '   ', 1, 'b').todo.length, 0)
+  })
+
+  it('never adds an open item twice, whatever the case or spacing', () => {
+    const d = addTodo(emptyDoc(), 'Reload VS Code', 1, 'a')
+    assert.equal(addTodo(d, '  reload   vs CODE ', 2, 'b'), d)
+    assert.equal(addTodo(d, 'Reload VS Code now', 2, 'b').todo.length, 2)
+    // Accepting or putting back a repeat leaves the one open item.
+    const s: TodoDoc = { ...d, suggested: [{ id: 's1', text: 'reload vs code', at: 2, why: 'you' }] }
+    const took = acceptSuggestion(s, 's1', 3)
+    assert.deepEqual(took.todo.map(t => t.id), ['a'])
+    assert.equal(took.suggested, undefined)
+    assert.ok(took.removed.s1)
+    const back = restoreTicked(finishItem(addTodo(d, 'Ship', 2, 'b'), 'a', undefined, 3), 'a', 4, 'c')
+    assert.deepEqual(addTodo(back, 'RELOAD vs code', 5, 'd').todo.map(t => t.text), ['Ship', 'Reload VS Code'])
   })
 })
 
@@ -282,6 +297,12 @@ describe('todo suggestions', () => {
     assert.deepEqual(d.suggested?.map(t => [t.text, t.why, t.from]), [['add dark mode', 'missed', 's1']])
     assert.deepEqual(addMissed(d, p, 6), d)
     assert.equal(addMissed(emptyDoc(), chat({ asked: ['x'] }), 5).suggested, undefined)
+  })
+
+  it('leaves conversational asks out of the missed suggestions', () => {
+    const asked = ['Give me a phone call if anything comes up', 'Call me when it is done', 'Continue from /Users/k/handoff.md', "What's the status?", 'how is it going', 'Are you done yet?', 'add dark mode']
+    const d = addMissed(emptyDoc(), chat({ asked, covered: asked.map(() => 0) }), 5)
+    assert.deepEqual(d.suggested?.map(t => t.text), ['add dark mode'])
   })
 
   it('clears a not covered suggestion once Jev scores that request covered', () => {
@@ -1010,12 +1031,12 @@ describe('suggestion quality', () => {
 
   it('dedupes hand steps across chats by verb and object: one Reload VS Code, but each repo\'s commit', () => {
     const d = doc({ suggested: [sug('a1', 'Reload VS Code so 0.20.1 keeps the note current.', 'you', 'c1', 1), sug('m1', 'Commit claude-mods', 'you', 'c1', 1)] })
-    const out = afterFinish(d, chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Reload VS Code. That picks up the new hook.', 'Commit agent-flow'] } }), [], 2)
-    assert.deepEqual(out.suggested?.map(t => `${t.from} ${t.text}`).sort(), ['c1 Commit claude-mods', 'c2 Commit agent-flow', 'c2 Reload VS Code. That picks up the new hook.'])
+    const out = afterFinish(d, chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Reload VS Code. That picks up the new hook.', 'Commit switchboard'] } }), [], 2)
+    assert.deepEqual(out.suggested?.map(t => `${t.from} ${t.text}`).sort(), ['c1 Commit claude-mods', 'c2 Commit switchboard', 'c2 Reload VS Code. That picks up the new hook.'])
     assert.ok(out.removed.a1)
     // Words after in/to/for are the object: each repo keeps its own step.
     const repos = afterFinish(doc({ suggested: [sug('i1', 'Commit in claude-mods', 'you', 'c1', 1), sug('t1', 'Push to origin', 'you', 'c1', 1)] }),
-      chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Commit in agent-flow', 'Push to the fork'] } }), [], 2)
+      chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Commit in switchboard', 'Push to the fork'] } }), [], 2)
     assert.equal(repos.suggested?.length, 4)
     // A leading "Optional:" or "First," is not the whole step.
     const pre = afterFinish(doc({ suggested: [sug('o1', 'Optional: reload VS Code', 'you', 'c1', 1)] }),
@@ -1040,6 +1061,14 @@ describe('suggestion quality', () => {
     const out = prune(d, 3 * day + 1)
     assert.deepEqual(out.suggested?.map(t => t.id), ['l1'])
     assert.equal(out.removed.y1, 3 * day + 1)
+    assert.equal(out.cleared, 1)
+    assert.equal(prune(d, 2 * day).cleared, undefined)
+  })
+
+  it('prune counts what it cleared in one pass, open duplicates and suggestions together', () => {
+    const d = doc({ todo: [{ id: 'a1', text: 'Add rate limits', at: 1 }, { id: 'a2', text: 'Add rate limits', at: 2, from: 'c1' }],
+      suggested: [sug('y1', 'Reconnect Remote Control in this chat', 'you', 'c1', 0)], cleared: 7 })
+    assert.equal(prune(d, 3 * day + 1).cleared, 2)
   })
 
   it('prune picks the same duplicate on every machine, whatever the list order', () => {
@@ -1084,5 +1113,21 @@ describe('suggestion quality', () => {
     fs.writeFileSync(file, JSON.stringify({ '/repo': true, [path.join(os.tmpdir(), 'sb-claim-x', 'c')]: true, [path.join(fs.realpathSync(os.tmpdir()), 'sb-claim-y', 'c')]: true }))
     assert.deepEqual(readOptIn(file), { '/repo': true })
     fs.rmSync(path.dirname(file), { recursive: true })
+  })
+})
+
+describe('moveTodo', () => {
+  const doc = (ids: string[]) => ({ ...emptyDoc(), todo: ids.map(id => ({ id, text: id, at: 1 })) })
+  it('puts the listed ids first, the rest after in place', () => {
+    assert.deepEqual(moveTodo(doc(['a', 'b', 'c', 'd']), ['c', 'a'], 5).todo.map(t => t.id), ['c', 'a', 'b', 'd'])
+  })
+  it('the newer order wins a merge on either side', () => {
+    const a = moveTodo(doc(['a', 'b', 'c']), ['c', 'b', 'a'], 9), b = moveTodo(doc(['a', 'b', 'c']), ['b', 'a', 'c'], 5)
+    assert.deepEqual(mergeDocs(a, b).todo.map(t => t.id), ['c', 'b', 'a'])
+    assert.deepEqual(mergeDocs(b, a).todo.map(t => t.id), ['c', 'b', 'a'])
+  })
+  it('the order survives a write and read', () => {
+    const d = moveTodo(doc(['a', 'b']), ['b', 'a'], 3)
+    assert.deepEqual(parseDoc(JSON.stringify(d)).order, { ids: ['b', 'a'], at: 3 })
   })
 })

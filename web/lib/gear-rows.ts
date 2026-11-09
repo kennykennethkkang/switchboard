@@ -7,21 +7,29 @@ type Entry = { text: string; key: string; skills?: string[]; tip?: string }
 
 const short = (i: Installed) => i.name.split('@')[0]
 
-/** A plugin's or skill's sweep badge: Clean, Review, Approved or Unscanned. */
-export function sweepBadge(r: SweepRecord | undefined): 'Clean' | 'Review' | 'Approved' | 'Unscanned' {
+// A review only counts for the files it saw, and never stands in for Approve on a hold.
+const reviewed = (r: SweepRecord | undefined) => !!r?.reviewed && r.reviewed.digest === r.digest && !(r.hold && !(r.approvedAt && r.approvedDigest === r.digest))
+
+/** A plugin's or skill's sweep badge: Clean, Review, Reviewed, Approved or Unscanned. */
+export function sweepBadge(r: SweepRecord | undefined): 'Clean' | 'Review' | 'Reviewed' | 'Approved' | 'Unscanned' {
   if (r?.approvedAt && r.approvedDigest === r.digest) return 'Approved'
+  if (r?.state === 'review' && reviewed(r)) return 'Reviewed'
   return r?.state === 'clean' ? 'Clean' : r?.state === 'review' ? 'Review' : 'Unscanned'
 }
+
+/** The triage verdict and why, for a tooltip, while the review counts. */
+export const sweepTip = (r: SweepRecord | undefined) => (r?.reviewed && reviewed(r) ? `${r.reviewed.verdict}: ${r.reviewed.why}` : undefined)
 
 /** The gear's lists of installed things. q is lower case; while set, a row keeps only the names that match. */
 export function gearRows(hub: Pick<HubState, 'installed' | 'connections' | 'sweep'>, q: string): GearRow[] {
   const of = (kind: Installed['kind'], enabled?: boolean) => hub.installed.filter(i => i.kind === kind && (enabled === undefined || i.enabled === enabled))
   // Only plugins and skills are swept; no badge until a sweep has a result for that one.
   const badge = (i: Installed) => ((i.kind === 'plugin' || i.kind === 'skill') && hub.sweep?.tools[i.name] ? sweepBadge(hub.sweep.tools[i.name]).toLowerCase() : '')
-  const plain = (items: Installed[]): Entry[] => items.map(i => ({ text: `${short(i)}${badge(i) ? ` (${badge(i)})` : ''}`, key: i.name, tip: i.description }))
+  const tip = (i: Installed) => [i.description, sweepTip(hub.sweep?.tools[i.name])].filter(Boolean).join('. ') || undefined
+  const plain = (items: Installed[]): Entry[] => items.map(i => ({ text: `${short(i)}${badge(i) ? ` (${badge(i)})` : ''}`, key: i.name, tip: tip(i) }))
   const marked = (items: Installed[]): Entry[] => items.map(i => {
     const notes = [i.skills?.length && String(i.skills.length), !i.enabled && 'off', badge(i)].filter(Boolean).join(', ')
-    return { text: `${short(i)}${notes ? ` (${notes})` : ''}`, key: i.name, skills: (i.skills ?? []).map(s => `${short(i)}:${s}`), tip: i.description }
+    return { text: `${short(i)}${notes ? ` (${notes})` : ''}`, key: i.name, skills: (i.skills ?? []).map(s => `${short(i)}:${s}`), tip: tip(i) }
   })
   const mcp = [...new Set(hub.connections.filter(c => c.kind === 'mcp').map(c => c.name))]
   const lists: Array<[string, string, Entry[]]> = [

@@ -1,0 +1,27 @@
+/* Ready to ship chip in the header, and phone-size tap targets the global coarse rules miss. */
+.hub-ship-chip {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; min-height: 28px; padding: 0 10px;
+  border: 1px solid var(--hub-hair); border-radius: 999px; background: var(--hub-green-soft, transparent);
+  color: var(--hub-ink); font: 500 12px/1 var(--hub-sans); white-space: nowrap; cursor: pointer;
+}
+.hub-ship-chip > i { width: 7px; height: 7px; border-radius: 50%; background: var(--hub-green); }
+.hub-ship-chip:hover { border-color: var(--hub-green); }
+.hub-ship-chip:focus-visible { outline: 2px solid var(--hub-blue, currentColor); outline-offset: 2px; }
+.hub-stuck a.hub-btn { text-decoration: none; }
+
+@media (pointer: coarse), (max-width: 760px) {
+  .hub-ship-chip, .hub .hub-stuck .hub-btn, .hub .ov-seg > button, .hub .hub-switch,
+  .hub form button[aria-pressed], .hub .hub-btn.sm { min-height: 44px !important; }
+  .hub .ov-seg > button, .hub form button[aria-pressed] { min-width: 44px; }
+}
+
+/* Short enough to never need the ellipsis; full text sits in its title. */
+.hub-top > .hub-note[title] { flex-shrink: 0; }
+/* The repo name drops before the usage meters get squeezed. */
+@media (max-width: 1440px) { .hub-ship-name { display: none; } }
+
+/* Ask rows: who asks on top, the question under it, long options wrap. */
+.hub-stuck-who { color: var(--hub-mute); font-size: 12px; }
+.hub-stuck-who b { color: var(--hub-ink); font-weight: 600; }
+.hub-stuck-q { color: var(--hub-ink); font-weight: 500; text-wrap: pretty; }
+.hub-stuck .hub-stuck-opt { white-space: normal; text-align: left; line-height: 1.35; max-width: 100%; overflow-wrap: anywhere; }

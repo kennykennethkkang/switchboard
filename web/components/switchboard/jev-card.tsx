@@ -15,7 +15,7 @@ export function JevCard({ folder, jev, send }: { folder: string; jev?: JevProjec
         {v.jobs.map(j => (
           <li key={j.key} title={j.tip} style={{ font: '500 12px/1 var(--hub-sans)', padding: '5px 8px', borderRadius: 999, border: `1px solid ${j.on ? 'var(--hub-violet)' : 'var(--hub-hair)'}`,
             color: j.on ? 'var(--hub-ink)' : 'var(--hub-ash)' }}>
-            {j.label}{j.on ? <span className="sr-only">, on</span> : ' off'}
+            {j.label}{j.on ? <span className="sr-only"> on</span> : ' off'}
           </li>
         ))}
       </ul>

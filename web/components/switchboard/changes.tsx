@@ -51,7 +51,7 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen }
         </ul>
       </>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {commit && <CopyCommit small text={commit} onCopy={onCopy} />}
+        {commit && !(mine && !files.length) && <CopyCommit small text={commit} onCopy={onCopy} />}
         {target && <button type="button" className="hub-btn sm" onClick={() => onOpen(target.path)}
           title={`Opens ${target.path} against the last commit`}>Open in VS Code diff</button>}
       </div>

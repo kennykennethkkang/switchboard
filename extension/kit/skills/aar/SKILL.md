@@ -31,7 +31,7 @@ A lesson ships only if another agent, months later, could act on it with no judg
 
 Ship:
 - "claude-mods has no package.json; run a mod's tests with `claude plugin test ./usage-meter`."
-- "Editing extension/kit in agent-flow is lost on the next build; edit claude-mods/kit instead."
+- "Editing extension/kit in switchboard is lost on the next build; edit claude-mods/kit instead."
 
 Drop:
 - "Be more careful with builds."
@@ -43,7 +43,7 @@ Push a vague lesson until it is concrete, or drop it. Zero lessons is fine; do n
 
 1. **Memory**, one file per lesson, in this project's memory folder (`~/.claude/projects/<project slug>/memory/`). Read `MEMORY.md` there first; if a memory already covers it, update that file instead of adding one. Run `hub_recall` for the topic first. If the lesson replaces an older one, write the new note with `supersedes: <old-slug>` rather than duplicating or rewriting it; use `contradicts:` if unresolved, and add `related:` or `depends-on:` where they fit. New file: frontmatter with `name`, `description`, `metadata.type: feedback`; body is the rule, then `**Why:**` (what happened in this chat) and `**How to apply:**`. Add a one-line entry to `MEMORY.md`.
 2. **Vault**: append the whole AAR (date, chat, four answers, lessons) to `~/Documents/vault/wiki/aar-<project>.md`. Follow `~/Documents/vault/README.md`: if the page is new, add `- [[aar-<project>]] ...` to `wiki/index.md`; append a dated line to `wiki/log.md` either way. Link memory files by `[[name]]`.
-3. **Skill or rule changes are never applied.** If the next chat will repeat the mistake unless something it loads changes, write a fix plan: exact target file and exact text to add or replace. File it with `mcp__switchboard__todo_add` for the user to approve. Kit rules, skills, agents and mods live in `claude-mods` (`kit/rules.md`, `kit/skills/<name>/SKILL.md`, `kit/agents/<role>.md`), never the copies in `~/.claude` or `agent-flow/extension/kit`.
+3. **Skill or rule changes are never applied.** If the next chat will repeat the mistake unless something it loads changes, write a fix plan: exact target file and exact text to add or replace. File it with `mcp__switchboard__todo_add` for the user to approve. Kit rules, skills, agents and mods live in `claude-mods` (`kit/rules.md`, `kit/skills/<name>/SKILL.md`, `kit/agents/<role>.md`), never the copies in `~/.claude` or `switchboard/extension/kit`.
 
 Not every lesson needs a fix plan. Context only goes to memory and the vault.
 

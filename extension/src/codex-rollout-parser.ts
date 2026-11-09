@@ -26,9 +26,8 @@
  *                   only. event_msg.exec_command_end / patch_apply_end are
  *                   parallel signals and are skipped.
  *
- * Subagents: Codex does not currently expose subagent spawning in rollouts.
- * The parser emits a single orchestrator; if Codex adds spawn_agent / wait_agent
- * in future, add mapping here.
+ * Subagents: Codex has them now (multi_agent), but this parser still emits a
+ * single orchestrator. Map spawn_agent / wait_agent calls here to show them.
  */
 
 import { AgentEvent } from './protocol'
@@ -255,6 +254,27 @@ function extractOutputString(raw: FunctionCallOutputPayload['output']): string {
 function extractPatchFilePath(patch: string): string | undefined {
   const m = patch.match(/^\*\*\* (?:Update File|Add File|Delete File):\s*(.+)$/m)
   return m ? m[1].trim() : undefined
+}
+
+/** One rollout line for the chat view's transcript: real prompts, replies, tool calls and each result's summary. Not redacted; the caller does that. */
+export function codexTranscriptLine(raw: string): { role: 'you' | 'claude' | 'tool'; text: string }[] {
+  let e: unknown
+  try { e = JSON.parse(raw) } catch { return [] }
+  if (!isRecord(e) || e.type !== 'response_item' || !isRecord(e.payload)) return []
+  const p = e.payload
+  if (p.type === 'message' && (p.role === 'user' || p.role === 'assistant')) {
+    const flat = flattenContent(p.content as MessageContent[] | string | undefined)
+    const text = p.role === 'user' ? extractCodexUserText(flat) : flat
+    return text ? [{ role: p.role === 'user' ? 'you' : 'claude', text }] : []
+  }
+  const name = typeof p.name === 'string' ? p.name : 'unknown'
+  if (p.type === 'function_call') return [{ role: 'tool', text: [name, summarizeInput(name, parseArgsJson(p.arguments as string | undefined))].filter(Boolean).join(' ') }]
+  if (p.type === 'custom_tool_call') return [{ role: 'tool', text: [name, typeof p.input === 'string' ? extractPatchFilePath(p.input) : undefined].filter(Boolean).join(' ') }]
+  if (p.type === 'function_call_output' || p.type === 'custom_tool_call_output') {
+    const out = extractOutputString(p.output as FunctionCallOutputPayload['output'])
+    return [{ role: 'tool', text: `${detectError(out) ? 'error' : 'result'}: ${summarizeResult(out)}` }]
+  }
+  return []
 }
 
 // ─── Parser ────────────────────────────────────────────────────────────────

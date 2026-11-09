@@ -86,7 +86,7 @@ describe('key status', () => {
   it('shows only the last four and the last test, never the key', () => {
     const f = fakeSecurity(), meta = path.join(tmp(), 'keys.json')
     const s = keyStore({ platform: 'darwin', run: f.run })
-    assert.deepEqual(keyStatus(meta), [{ name: 'GEMINI_API_KEY', saved: false }, { name: 'OPENROUTER_API_KEY', saved: false }])
+    assert.deepEqual(keyStatus(meta), [{ name: 'GEMINI_API_KEY', saved: false }, { name: 'OPENROUTER_API_KEY', saved: false }, { name: 'PERPLEXITY_API_KEY', saved: false }, { name: 'ZEP_API_KEY', saved: false }])
     saveKey(s, 'GEMINI_API_KEY', ` ${SECRET}\n`, meta)
     assert.equal(f.items.get('GEMINI_API_KEY'), SECRET)
     assert.ok(!fs.readFileSync(meta, 'utf8').includes(SECRET))
@@ -123,6 +123,15 @@ describe('key test', () => {
     assert.match(seen!.url, /^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models/)
     assert.ok(!seen!.url.includes(SECRET))
     assert.equal(seen!.headers['x-goog-api-key'], SECRET)
+  })
+
+  it('asks Perplexity for its model list with a Bearer header', async () => {
+    let seen: { url: string; headers: Record<string, string> } | undefined
+    const key = 'pplx-fakefakefakefakefake'
+    const r = await testKey('PERPLEXITY_API_KEY', key, async (url, init) => { seen = { url: String(url), headers: init?.headers as Record<string, string> }; return new Response('{}', { status: 200 }) }, 3)
+    assert.equal(seen!.url, 'https://api.perplexity.ai/v1/models')
+    assert.equal(seen!.headers.Authorization, `Bearer ${key}`)
+    assert.deepEqual(r, { ok: true, at: 3 })
   })
 
   it('asks OpenRouter for the key with a Bearer header, and redacts a failure', async () => {

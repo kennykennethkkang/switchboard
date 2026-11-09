@@ -27,10 +27,15 @@ export type VoiceIo = {
   /** onDb: the mic's loudness, one reading per CHUNK_MS. */
   record: (onDb: (db: number) => void) => Recording
   transcribe: (r: Recording) => Promise<string>
+  /** A phone's clip (webm, mp4, ogg) as a 16 kHz wav Recording, for transcribe. */
+  fromClip?: (bytes: Uint8Array) => Recording
   /** Plays the line, cutting off any line still playing or still being made. */
   speak: (text: string) => void
   hush: () => void
 }
+
+/** The audio types a phone's MediaRecorder sends: Chrome webm or ogg, iOS Safari mp4. Params like codecs are ignored. */
+export const isClipType = (type: string | undefined) => /^audio\/(webm|mp4|ogg|wav|x-m4a|aac|mpeg)$/.test((type ?? '').split(';')[0].trim().toLowerCase())
 
 const IDLE_MS = 10 * 60_000
 const SWEEP_MS = 60_000
@@ -176,6 +181,24 @@ export function voiceBox(io: VoiceIo, ui: VoiceUi, idleMs = IDLE_MS, everyMs = S
       w.catch(() => {})
       void finish(r, w)
     },
+    /** A phone's clip: its cleaned transcript, '' when nothing was said. Throws a line to show on the phone. */
+    async clip(bytes: Uint8Array): Promise<string> {
+      if (!io.fromClip) throw new Error('This Mac cannot read phone clips.')
+      const gone = io.missing()
+      if (gone) throw new Error(gone)
+      use()
+      const r = io.fromClip(bytes)
+      try {
+        await Promise.all([
+          r.done.catch(err => { throw new Error(`Could not read the clip (${(err as Error).message}).`) }),
+          warm().catch(err => { throw new Error(`Voice services did not start (${(err as Error).message}).`) }),
+        ])
+        return clean(await io.transcribe(r))
+      } finally {
+        r.dispose()
+        use()
+      }
+    },
     /** A question sent from the mic's text: its reply is read out, unless a newer tap or recording came first. */
     answer(p: Promise<JarvisReply | undefined>) {
       const n = turn
@@ -283,6 +306,17 @@ export function macVoice({ home = os.homedir(), log = () => {}, stt = 'http://12
         },
         dispose() { if (p.exitCode === null) p.kill('SIGINT'); gone(d) },
       }
+    },
+    fromClip(bytes) {
+      const d = tmp()
+      const src = path.join(d, 'clip'), file = path.join(d, 'q.wav')
+      // A file, not a pipe: mp4 may need a seek to find its index.
+      const done = new Promise<void>((ok, no) => {
+        try { fs.writeFileSync(src, bytes) } catch (err) { no(err); return }
+        execFile(which('ffmpeg') ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', src, '-t', String(MAX_S), '-ac', '1', '-ar', '16000', '-y', file], { timeout: 30_000 },
+          err => err ? no(new Error(String(err.message).trim().split('\n').pop())) : ok())
+      })
+      return { file, done, stop() {}, dispose() { gone(d) } }
     },
     async transcribe(r) {
       await r.done

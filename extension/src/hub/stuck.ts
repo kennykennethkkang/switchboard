@@ -19,6 +19,10 @@ export const STUCK = {
   startSlackMs: 3000, // etime has 1 s steps and two samples differ a little
 }
 
+// Dev servers and watchers print nothing while idle, so quiet is not stuck; CPU and memory still catch them.
+const SERVER = /\b(next|vite|nuxt|astro|remix|webpack(-dev-server)?|nodemon|uvicorn|gunicorn|flask) (dev|run|serve|start|--|-p|--port|app|\S+:\S+)|\b(npm|pnpm|yarn|bun)( run)? (dev|start|serve|backend|frontend|watch)\b|\bhttp\.server\b|\b(dev|preview) server\b/i
+const isServer = (j: BgJob) => SERVER.test(`${j.command ?? ''} ${j.label ?? ''}`)
+
 /** One ps row. rss in bytes, start in ms since the epoch. */
 export type Proc = { pid: number; ppid: number; cpu: number; rss: number; start: number; command: string }
 
@@ -144,7 +148,7 @@ export function detect(input: Input, w: Watch, now: number): StuckItem[] {
       }
     }
     for (const j of [...(p?.jobs ?? []), ...(p?.subJobs ?? [])]) {
-      if (input.finished.has(j.id)) continue
+      if (input.finished.has(j.id) || isServer(j)) continue
       const out = input.outAt.get(j.id)
       const since = out ?? j.startedAt
       if (now - j.startedAt < STUCK.jobQuietMs || now - since < (out === undefined ? STUCK.jobAgeMs : STUCK.jobQuietMs)) continue
@@ -187,4 +191,49 @@ function shellOf(j: BgJob, mine: { pid: number; ppid: number; command: string; s
 export function snoozed<T extends { id: string }>(items: T[], snoozes: Map<string, number>, now: number): T[] {
   for (const [id, at] of snoozes) if (now - at >= STUCK.snoozeMs) snoozes.delete(id)
   return items.filter(i => !snoozes.has(i.id))
+}
+
+/** How long an item has to look stuck before it shows; auto-fix waits twice this. */
+const limit = (i: StuckItem) => i.kind === 'agent' ? STUCK.agentQuietMs : i.kind === 'process' ? STUCK.cpuForMs : i.what.endsWith('no end') ? STUCK.jobAgeMs : STUCK.jobQuietMs
+
+/** Items stuck for twice their threshold and not fixed yet; each comes back once (done keeps the ids). */
+export function fixDue<T extends StuckItem>(items: T[], done: Set<string>, now: number): T[] {
+  const out = items.filter(i => !done.has(i.id) && now - i.since >= 2 * limit(i))
+  for (const i of out) done.add(i.id)
+  return out
+}
+
+/** The note Fix types into the chat. stopped: its process was stopped first. loop: the call the chat keeps repeating. */
+export function fixText(i: StuckItem, now: number, stopped = false, loop?: string): string {
+  const text = fixBody(i, now, stopped)
+  return loop ? `${text} The chat has repeated ${loop} six times in a row; break that loop.` : text
+}
+
+function fixBody(i: StuckItem, now: number, stopped: boolean): string {
+  const min = Math.max(1, Math.round((now - i.since) / 60_000))
+  if (i.kind === 'agent') {
+    const role = i.what.split(' subagent')[0]
+    return `Subagent ${role} (${i.id.split(':').pop()}) has been quiet ${min} min. Check its last output; if it is waiting or looping, SendMessage it to continue with a narrower next step, or stop it and redo the step yourself.`
+  }
+  const cmd = i.kind === 'process' ? `pid ${i.pid}${i.command ? `: ${i.command}` : ''}` : i.command
+  const head = `${i.what} for ${min} min${cmd ? ` (${cmd})` : ''}.`
+  const rerun = 'If it is still needed, rerun it with a timeout, or with run_in_background and a check on its output.'
+  return stopped ? `Switchboard stopped ${head[0].toLowerCase()}${head.slice(1)} ${rerun}` : `${head} Stop it (TaskStop or KillShell), then rerun it with a timeout if it is still needed.`
+}
+
+/** What the chat waits on Kenneth for, or undefined: a prompt or needs-you. A loop is no wait; see loops. */
+export function waitsOnUser(p?: ChatProgress): string | undefined {
+  if (!p) return undefined
+  const a = p.asks?.[0] ?? p.ask
+  if (a) return a.kind === 'permission' ? `permission for ${a.tool}${a.preview ? `: ${a.preview}` : ''}` : `an answer: ${a.questions?.[0]?.question ?? a.preview ?? a.tool}`
+  return p.state === 'needs-you' ? `an answer: ${p.question ?? 'it needs you'}` : undefined
+}
+
+// Waiting on a job is fine however often it repeats.
+const POLL = /^(BashOutput|TaskOutput|Monitor|ScheduleWakeup)\b|^Bash (sleep|wait)\b/
+
+/** The call a chat repeated six times running, polls left out, or undefined. Fix mentions it to the lead. */
+export function loops(p?: ChatProgress): string | undefined {
+  const last = (p?.tools ?? []).slice(-6).map(t => `${t.tool}${t.target ? ` ${t.target}` : ''}`)
+  return last.length === 6 && last.every(t => t === last[0]) && !POLL.test(last[0]) ? last[0] : undefined
 }

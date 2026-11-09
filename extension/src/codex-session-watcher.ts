@@ -61,6 +61,20 @@ function sessionsRoot(): string {
   return path.join(codexHome(), 'sessions')
 }
 
+/** A Codex chat's rollout by session id, any day; undefined when there is none or the id is not a uuid. root: the sessions folder. */
+export async function codexRolloutFile(id: string, root = sessionsRoot()): Promise<string | undefined> {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return undefined
+  // ponytail: walks every day folder per open; index by id if the sessions folder gets huge.
+  const kids = (d: string) => fs.promises.readdir(d).catch(() => [] as string[])
+  for (const y of (await kids(root)).sort().reverse())
+    for (const m of (await kids(path.join(root, y))).sort().reverse())
+      for (const d of (await kids(path.join(root, y, m))).sort().reverse()) {
+        const hit = (await kids(path.join(root, y, m, d))).find(f => f.startsWith('rollout-') && f.endsWith(`-${id}.jsonl`))
+        if (hit) return path.join(root, y, m, d, hit)
+      }
+  return undefined
+}
+
 /** Walk the past SCAN_DAYS of sessions/YYYY/MM/DD directories relative to `now`.
  *  Codex's CLI partitioning can use either local or UTC dates depending on the
  *  platform; yield both to be safe. The 3-day window + dedup-via-Set makes this

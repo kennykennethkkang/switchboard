@@ -13,14 +13,14 @@ import type { ChatProgress, HubState } from '../src/hub/types'
 
 const NOW = new Date(2026, 9, 31, 15).getTime()
 const prog = (sessionId: string, state: ChatProgress['state'], extra: Partial<ChatProgress> = {}): ChatProgress =>
-  ({ sessionId, cwd: '/w/agent-flow', state, roles: [], tasks: [], startedAt: NOW - 3600e3, at: NOW - 60e3, ...extra })
+  ({ sessionId, cwd: '/w/claude-mods', state, roles: [], tasks: [], startedAt: NOW - 3600e3, at: NOW - 60e3, ...extra })
 
 const hub = (extra: Partial<HubState> = {}): HubState => ({
   ...emptyHub(),
-  projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: false }, { name: 'agent-flow', path: '/w/agent-flow', kind: 'repo', isOpen: true }],
+  projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: false }, { name: 'claude-mods', path: '/w/claude-mods', kind: 'repo', isOpen: true }],
   chats: [
-    { pid: 1, sessionId: 'a', name: 'Fix login', cwd: '/w/agent-flow', link: '', live: true, why: [] },
-    { pid: 2, sessionId: 'b', name: 'Cache layer', cwd: '/w/agent-flow', link: '', live: true, why: [] },
+    { pid: 1, sessionId: 'a', name: 'Fix login', cwd: '/w/claude-mods', link: '', live: true, why: [] },
+    { pid: 2, sessionId: 'b', name: 'Cache layer', cwd: '/w/claude-mods', link: '', live: true, why: [] },
   ],
   installed: [{ kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, skills: ['brainstorming'] }, { kind: 'skill', name: 'code-review', enabled: true }],
   ...extra,
@@ -40,8 +40,8 @@ describe('jarvis local answers', () => {
   })
 
   it('lists the open to-dos by project', () => {
-    const s = hub({ todos: { '/w/agent-flow': { todo: [{ id: 't1', text: 'Ship the box', at: 1 }] }, '/w/Armasu': { todo: [] } } })
-    assert.equal(jarvisLocal(s, 'open todos?', NOW), '1 open to-do.\nagent-flow: Ship the box')
+    const s = hub({ todos: { '/w/claude-mods': { todo: [{ id: 't1', text: 'Ship the box', at: 1 }] }, '/w/Armasu': { todo: [] } } })
+    assert.equal(jarvisLocal(s, 'open todos?', NOW), '1 open to-do.\nclaude-mods: Ship the box')
     assert.equal(jarvisLocal(hub(), 'show my to-do list', NOW), 'No open to-dos.')
   })
 
@@ -73,7 +73,7 @@ describe('jarvis local answers', () => {
 
 describe('jarvis start proposals', () => {
   it('turns "start a chat to" into the open project and the goal', () => {
-    assert.deepEqual(jarvisStart(hub(), 'start a chat to fix the login redirect'), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'fix the login redirect' })
+    assert.deepEqual(jarvisStart(hub(), 'start a chat to fix the login redirect'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix the login redirect' })
   })
 
   it('takes a project named in the text', () => {
@@ -90,7 +90,7 @@ describe('jarvis start proposals', () => {
   })
 
   it('keeps an unknown "for/on X" in the goal on the open project', () => {
-    assert.deepEqual(jarvisStart(hub(), 'start a chat for fixing the login'), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'for fixing the login' })
+    assert.deepEqual(jarvisStart(hub(), 'start a chat for fixing the login'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'for fixing the login' })
     assert.equal(jarvisStart(hub(), 'start a chat on the cache bug')?.goal, 'on the cache bug')
     assert.equal(jarvisStart(hub(), 'start a chat for Armasu to add a size chart')?.project, 'Armasu')
   })
@@ -101,8 +101,8 @@ describe('jarvis start proposals', () => {
   })
 
   it('matches a project name heard without its spaces or hyphens', () => {
-    for (const q of ['start a chat in AgentFlow to fix it', 'start a chat in agent flow to fix it'])
-      assert.deepEqual(jarvisStart(hub(), q), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'fix it' }, q)
+    for (const q of ['start a chat in ClaudeMods to fix it', 'start a chat in claude mods to fix it'])
+      assert.deepEqual(jarvisStart(hub(), q), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix it' }, q)
   })
 
   it('drops a comma before the goal', () => {
@@ -111,29 +111,29 @@ describe('jarvis start proposals', () => {
 
   it('takes a project only right after the start phrase, not from inside the goal', () => {
     const s = hub({ projects: [...hub().projects, { name: 'a', path: '/w/a', kind: 'repo', isOpen: false }, { name: 'web', path: '/w/web', kind: 'repo', isOpen: false }] })
-    assert.deepEqual(jarvisStart(s, 'start a chat to work on a bug'), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'work on a bug' })
-    assert.deepEqual(jarvisStart(s, 'start a chat to fix login on web'), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'fix login on web' })
+    assert.deepEqual(jarvisStart(s, 'start a chat to work on a bug'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'work on a bug' })
+    assert.deepEqual(jarvisStart(s, 'start a chat to fix login on web'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix login on web' })
     assert.equal(jarvisStart(s, 'start a chat in web to fix login')?.project, 'web')
   })
 
   it('takes a closing "in X" on a start and drops it from the goal', () => {
-    const s = hub({ projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: true }, { name: 'agent-flow', path: '/w/agent-flow', kind: 'repo', isOpen: false }] })
-    assert.deepEqual(jarvisStart(s, 'start a chat to fix the tests in agent-flow'), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'fix the tests' })
-    assert.deepEqual(jarvisStart(s, 'Start a chat to fix the tests in AgentFlow.'), { folder: '/w/agent-flow', project: 'agent-flow', goal: 'fix the tests' })
-    assert.equal(jarvisStart(s, 'start a chat to fix login on agent-flow')?.project, 'Armasu')
+    const s = hub({ projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: true }, { name: 'claude-mods', path: '/w/claude-mods', kind: 'repo', isOpen: false }] })
+    assert.deepEqual(jarvisStart(s, 'start a chat to fix the tests in claude-mods'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix the tests' })
+    assert.deepEqual(jarvisStart(s, 'Start a chat to fix the tests in ClaudeMods.'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix the tests' })
+    assert.equal(jarvisStart(s, 'start a chat to fix login on claude-mods')?.project, 'Armasu')
   })
 
   it('takes a run project right after the skill or as a closing "in X"', () => {
     const s = hub({ projects: [...hub().projects, { name: 'web', path: '/w/web', kind: 'repo', isOpen: false }] })
     assert.equal(jarvisStart(s, 'run code-review on web')?.project, 'web')
-    assert.equal(jarvisStart(s, 'run code-review on the diff for web')?.project, 'agent-flow')
+    assert.equal(jarvisStart(s, 'run code-review on the diff for web')?.project, 'claude-mods')
     assert.equal(jarvisStart(s, 'run code-review on the diff in web')?.project, 'web')
   })
 
   it('treats run as a start only for an installed skill', () => {
     assert.equal(jarvisStart(hub(), 'run me through what got done today'), undefined)
     assert.equal(jarvisStart(hub(), 'run code-review on the diff')?.goal, 'run code-review on the diff')
-    assert.equal(jarvisStart(hub(), 'run brainstorming on the cache')?.project, 'agent-flow')
+    assert.equal(jarvisStart(hub(), 'run brainstorming on the cache')?.project, 'claude-mods')
   })
 })
 
@@ -147,7 +147,7 @@ describe('jarvis', () => {
 
   it('proposes a start and never asks the brain for it', async () => {
     const r = await jarvis(hub(), 'start a chat to write the docs', [], never, NOW)
-    assert.deepEqual(r.start, { folder: '/w/agent-flow', project: 'agent-flow', goal: 'write the docs' })
+    assert.deepEqual(r.start, { folder: '/w/claude-mods', project: 'claude-mods', goal: 'write the docs' })
   })
 
   it('asks the brain with the open project as context', async () => {

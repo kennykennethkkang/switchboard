@@ -89,8 +89,8 @@ export const needsApproval = (rec, current = rec?.digest) => !!rec?.hold && (!re
 /** Needs approval for the files it was scanned with. */
 export const held = rec => needsApproval(rec)
 
-// What a rescan never touches: the hold and the approval.
-const kept = prev => Object.fromEntries(['hold', 'approvedAt', 'approvedDigest'].filter(k => prev?.[k] !== undefined).map(k => [k, prev[k]]))
+// What a rescan never touches: the hold, the approval and the review.
+const kept = prev => Object.fromEntries(['hold', 'approvedAt', 'approvedDigest', 'reviewed'].filter(k => prev?.[k] !== undefined).map(k => [k, prev[k]]))
 
 /** Scans one tool unless its files match the last scan. A hold and an approval carry over; the approval only counts for its digest. force: scan anyway. */
 export async function sweepOne(name, kind, dir, { home = homedir(), scan: s = scan, force = false } = {}) {
@@ -104,6 +104,13 @@ export async function sweepOne(name, kind, dir, { home = homedir(), scan: s = sc
 export function approve(name, { home = homedir(), path, digest: d } = {}) {
   const prev = readSweep(home)[name]
   return prev ? save(home, name, { ...prev, ...(path ? { path } : {}), approvedAt: Date.now(), approvedDigest: d ?? prev.digest }) : undefined
+}
+
+/** Records a human triage verdict for the current files. Display only: a hold still needs approve. */
+export function markReviewed(home, name, verdict, why) {
+  if (!['APPROVE', 'CAUTION', 'REJECT'].includes(verdict)) throw new Error(`bad verdict ${verdict}`)
+  const prev = readSweep(home)[name]
+  return prev ? save(home, name, { ...prev, reviewed: { verdict, why: String(why), at: Date.now(), digest: prev.digest } }) : undefined
 }
 
 /** Scans a fetched skill folder, then copies it into ~/.claude/skills, or into skills-archive (off) when it needs review.

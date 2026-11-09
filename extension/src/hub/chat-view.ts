@@ -10,6 +10,8 @@ import { redact } from './brain'
 import { commitMessage, isTestCommand, standup, testOutcome, toolTarget } from './progress'
 import { readRuns } from './runs'
 import type { ChatProgress, Report } from './types'
+import { codexTranscriptLine } from '../codex-rollout-parser'
+import { codexRolloutFile } from '../codex-session-watcher'
 
 const CHUNK = 256 * 1024
 const FINAL_MAX = 20_000
@@ -283,13 +285,18 @@ export async function chatOutputs(session: string, deps: Deps = {}): Promise<Cha
 
 /** role: you, claude, tool (a call or its result, shown muted) or subagent (a task notification). */
 export type ChatMessage = { role: 'you' | 'claude' | 'tool' | 'subagent'; text: string }
-/** transcript: unsupported for a Codex chat, which has no Claude transcript. */
+/** transcript: unsupported for a Codex chat whose rollout is not on this Mac. */
 export type ChatTranscript = { messages: ChatMessage[]; before: number | null; transcript?: 'unsupported' }
 
 const firstLine = (s: string) => { const t = s.trimStart(), nl = t.indexOf('\n'); return clean(nl < 0 ? t : t.slice(0, nl), RESULT_MAX) }
 // The fields toolTarget reads, redacted first: it cuts to 48, which could leave a key's prefix too short to match.
 const TARGET_KEYS = ['command', 'pattern', 'file_path', 'notebook_path', 'path', 'subagent_type', 'description', 'url']
 const safeInput = (input: Obj): Obj => Object.fromEntries(TARGET_KEYS.flatMap(k => typeof input[k] === 'string' ? [[k, redact((input[k] as string).slice(0, 4096))]] : []))
+
+function codexMessagesOf(raw: string): ChatMessage[] {
+  if (raw === SKIPPED) return [{ role: 'tool', text: 'A line over 16 MB was skipped' }]
+  return codexTranscriptLine(raw).map(m => ({ role: m.role, text: clean(m.text, m.role === 'tool' ? RESULT_MAX : MESSAGE_MAX) }))
+}
 
 function messagesOf(raw: string): ChatMessage[] {
   if (raw === SKIPPED) return [{ role: 'tool', text: 'A line over 16 MB was skipped' }]
@@ -315,14 +322,16 @@ function messagesOf(raw: string): ChatMessage[] {
 
 /** Up to 50 messages ending before byte before (default: the end), oldest first; before: for Load earlier, null at the start. Null for an unknown session. */
 export async function chatTranscript(session: string, before?: number, deps: { home?: string } = {}): Promise<ChatTranscript | null> {
-  const file = await transcriptFile(session, deps.home)
+  const claude = await transcriptFile(session, deps.home)
+  const file = claude ?? await codexRolloutFile(session, deps.home && path.join(deps.home, '.codex', 'sessions'))
   if (!file) return null
+  const parse = claude ? messagesOf : codexMessagesOf
   const got: ChatMessage[][] = []
   let cur: number | null = before ?? (await fs.promises.stat(file)).size, count = 0, next: number | null = null
   while (cur !== null && count < PAGE) {
     const page = await pageBack(file, cur, PAGE)
     for (let i = page.lines.length - 1; i >= 0 && count < PAGE; i--) {
-      const msgs = messagesOf(page.lines[i].text)
+      const msgs = parse(page.lines[i].text)
       if (!msgs.length) continue
       got.push(msgs)
       count += msgs.length

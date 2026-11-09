@@ -30,14 +30,18 @@ import {
 } from './discovery'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
+import { archiveRow, readArchive, recordArchive } from './hub/chains'
 import { dailySummary, fillBoxes, notify } from './hub/notify'
-import { onSwitchboard, pendingReload, readBuild } from './hub/self-update'
+import { onSwitchboard, pendingReload, readBuild, reloadReady } from './hub/self-update'
 import { refreshWeb } from './hub/hub-panel'
 import { checkAsked } from './hub/coverage'
 import { postLocal, readWindows } from './hub/dev'
 import { chatEnded, chatFinished, chatMissed, chatResumed } from './hub/todo'
+import { queueAar } from './hub/learn'
+import { stopChatServers } from './hub/reap'
 import type { ChatProgress, ChatState } from './hub/types'
 import { wireWatcherToPanel } from './session-runtime'
+import { smartHook } from './hub/smart-tools'
 import type { AgentRuntime } from './session-runtime'
 
 const log = createLogger('ClaudeRuntime')
@@ -100,15 +104,20 @@ export async function startClaudeRuntime(
   const summary = setInterval(() => dailySummary(), 10 * 60_000)
   const running = { version: context.extension.packageJSON.version as string, build: readBuild(context.extensionPath) }
   const reload = setInterval(() => reloadIfUpdated(context, running), 15_000)
-  context.subscriptions.push({ dispose: () => { clearInterval(summary); clearInterval(reload) } },
-    // A rebuild waiting on chats reloads when the user leaves the window.
-    vscode.window.onDidChangeWindowState(st => { if (!st.focused && waiting?.rebuilds) { waiting.since = 0; reloadIfUpdated(context, running) } }))
+  context.subscriptions.push({ dispose: () => { clearInterval(summary); clearInterval(reload) } })
 
   // Route hook events → panel, but filter out events the watcher already owns
   if (hookPort !== HOOK_SERVER_NOT_STARTED) {
-    context.subscriptions.push(hub.onEnded(p => { chatEnded(p).catch(err => log.warn('To-do update failed:', err)) }))
+    context.subscriptions.push(hub.onEnded(p => {
+      // An ended chat goes to the archive, so it can be resumed from there; never over a handoff row, nor one waiting out a usage limit.
+      if (!p.limited && !hub.get().archive.some(a => a.sessionId === p.sessionId)) try { recordArchive(archiveRow(hub.get().chats.find(c => c.sessionId === p.sessionId) ?? p, p.startedAt, true)); hub.set({ archive: readArchive() }) } catch (err) { log.warn('Archive failed:', err) }
+      chatEnded(p).catch(err => log.warn('To-do update failed:', err))
+      queueAar(p)
+      stopChatServers(p).catch(err => log.warn('Stopping chat servers failed:', err))
+    }))
     hookServer.onRaw(({ payload, mirror }) => {
       const change = hub.hook(payload, Date.now(), mirror)
+      if (!mirror) smartHook(hub, payload).catch(err => log.warn('Smart toggle failed:', err))
       // Every window, mirror or not: each fills the Source Control boxes of the repos it has open.
       fillBoxes(hub.get().progress.find(p => p.sessionId === payload.session_id))
       if (!change) return
@@ -120,6 +129,7 @@ export async function startClaudeRuntime(
       else notify(change)
     })
     hookServer.onEvent((event) => {
+      if (event.sessionId && hub.isHeadless(event.sessionId)) return
       const panels = VisualizerPanel.ready()
       if (panels.length === 0) return
       const panel = { sendEvent: (e: AgentEvent) => { for (const p of panels) p.sendEvent(e) } }
@@ -169,7 +179,7 @@ export async function startClaudeRuntime(
   const dispose = (): void => {
     // Remove our discovery file so the hook script won't forward to a dead port.
     // Hook entries in settings.json are left intact; the command is stable
-    // (node ~/.claude/agent-flow/hook.js) and the script handles dead instances
+    // (node ~/.claude/switchboard/hook.js) and the script handles dead instances
     // gracefully via PID checks. This avoids breaking multi-window setups and
     // means hooks survive VS Code restarts without reconfiguration.
     if (workspace) { removeDiscoveryFile(workspace) }
@@ -197,29 +207,17 @@ async function withCoverage(change: { from?: ChatState; to: ChatProgress }): Pro
   notify({ ...change, to: scored })
 }
 
-/** A newer Switchboard installed, or in a window on the Switchboard checkout any rebuild of it: reload this window
- * once none of its own chats is mid-turn, so nothing in flight is lost. A rebuild waits at most WAIT_MS or until the
- * window loses focus. Once per version (or build) per window, so a copy that will not load cannot loop. */
-const WAIT_MS = 10 * 60_000
-let waiting: { key: string; since: number; rebuilds: boolean } | undefined
+/** A newer Switchboard installed, or in a window on the Switchboard checkout any rebuild of it: offer a reload in the
+ * status bar. Never reloads by itself, since a rebuild usually comes from an agent while the user is mid-task.
+ * Once per version (or build) per window, so a copy that will not load cannot loop. */
 function reloadIfUpdated(context: vscode.ExtensionContext, running: { version: string; build?: string }): void {
   const roots = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
   // Not in a dev host: its build is the checkout's, never the installed one.
   const rebuilds = context.extensionMode === vscode.ExtensionMode.Production && onSwitchboard(roots)
   const key = pendingReload(path.join(os.homedir(), '.vscode', 'extensions'), running, rebuilds)
   if (!key || context.workspaceState.get('reloadedFor') === key) return
-  const reload = () => {
-    waiting = undefined
-    void context.workspaceState.update('reloadedFor', key).then(() => vscode.commands.executeCommand('workbench.action.reloadWindow'))
-  }
-  const busy = hub.get().progress.some(p => p.state === 'working' && roots.some(r => p.cwd === r || p.cwd.startsWith(r + path.sep)))
-  if (waiting?.key !== key) {
-    waiting = { key, since: Date.now(), rebuilds }
-    if (rebuilds) {
-      // The browser app and its pages need not wait for this window's chats.
-      refreshWeb()
-      if (busy) void vscode.window.showInformationMessage('Switchboard rebuilt, reloading when your chats finish.', 'Reload now').then(pick => { if (pick && waiting?.key === key) reload() })
-    }
-  }
-  if (!busy || (waiting.rebuilds && Date.now() - waiting.since >= WAIT_MS)) reload()
+  void context.workspaceState.update('reloadedFor', key)
+  // The browser app and its pages need not wait for this window.
+  if (rebuilds) refreshWeb()
+  reloadReady(vscode, rebuilds ? 'Switchboard rebuilt' : `Switchboard ${key} is installed`)
 }

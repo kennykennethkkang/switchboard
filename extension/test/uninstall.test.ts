@@ -1,6 +1,6 @@
 /**
  * Runs the vscode:uninstall script against a sandboxed HOME and checks it
- * removes only Switchboard's hooks and folder, never Agent Flow's.
+ * removes only Switchboard's hooks and folders (extension and browser app), never Agent Flow's.
  */
 
 import { describe, it } from 'node:test'
@@ -14,17 +14,19 @@ const SCRIPT = path.join(__dirname, '..', 'scripts', 'uninstall.js')
 
 describe('uninstall script', () => {
   it("removes Switchboard's hooks and keeps Agent Flow's and other tools'", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-flow-uninstall-'))
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-uninstall-'))
     const settingsPath = path.join(home, '.claude', 'settings.json')
     const foreign = { hooks: [{ type: 'http', url: 'http://127.0.0.1:19847/hook/9207692e/stop' }] }
     const agentFlow = { hooks: [{ type: 'command', command: `"node" "${home}/.claude/agent-flow/hook.js"` }] }
     fs.mkdirSync(path.join(home, '.claude', 'switchboard'), { recursive: true })
     fs.mkdirSync(path.join(home, '.claude', 'agent-flow'), { recursive: true })
+    fs.mkdirSync(path.join(home, '.claude', 'switchboard-app'), { recursive: true })
     fs.writeFileSync(settingsPath, JSON.stringify({
       model: 'opus',
       hooks: {
         Stop: [foreign, agentFlow, { hooks: [{ type: 'command', command: `"node" "${home}/.claude/switchboard/hook.js"` }] }],
         SessionStart: [{ hooks: [{ type: 'http', url: 'http://127.0.0.1:52341' }] }],
+        PreToolUse: [{ hooks: [{ type: 'command', command: `"node" "${home}/.claude/switchboard-app/hook.js"` }] }],
       },
     }))
 
@@ -35,6 +37,21 @@ describe('uninstall script', () => {
       hooks: { Stop: [foreign, agentFlow] },
     })
     assert.equal(fs.existsSync(path.join(home, '.claude', 'switchboard')), false)
+    assert.equal(fs.existsSync(path.join(home, '.claude', 'switchboard-app')), false)
     assert.equal(fs.existsSync(path.join(home, '.claude', 'agent-flow')), true)
+  })
+
+  it("takes Switchboard's entries out of ~/.codex/hooks.json, keeping the user's", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-uninstall-'))
+    const file = path.join(home, '.codex', 'hooks.json')
+    const theirs = { hooks: [{ type: 'command', command: 'notify-me' }] }
+    const ours = { hooks: [{ type: 'command', command: `"node" "${home}/.claude/switchboard/hook.js"` }] }
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ hooks: { Stop: [theirs, ours], SessionStart: [ours] } }))
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home }
+    delete env.CODEX_HOME
+    execFileSync(process.execPath, [SCRIPT], { env })
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf-8')), { hooks: { Stop: [theirs] } })
+    fs.rmSync(home, { recursive: true, force: true })
   })
 })

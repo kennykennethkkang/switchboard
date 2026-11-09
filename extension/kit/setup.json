@@ -3,7 +3,10 @@
     "superpowers-dev": "obra/superpowers",
     "claude-plugins-official": "anthropics/claude-plugins-official",
     "ponytail": "DietrichGebert/ponytail",
-    "impeccable": "pbakaus/impeccable"
+    "impeccable": "pbakaus/impeccable",
+    "pixelfx": "patch-gg/pixelfx",
+    "humanizer": "blader/humanizer",
+    "last30days-skill": "mvanhorn/last30days-skill"
   },
   "plugins": [
     "superpowers@superpowers-dev",
@@ -12,19 +15,30 @@
     "frontend-design@claude-plugins-official",
     "code-review@claude-plugins-official",
     "context7@claude-plugins-official",
-    "playwright@claude-plugins-official"
+    "playwright@claude-plugins-official",
+    "pixelfx@pixelfx",
+    "humanizer@humanizer",
+    "last30days@last30days-skill"
   ],
-  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper"],
-  "own": ["aar", "animation-styles", "improve-system", "awwwards"],
+  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper", "ecc-agents", "chat-wait", "phone-mode"],
+  "own": ["aar", "deep-research", "animation-styles", "improve-system", "awwwards", "crowd-ab", "self-improve", "gemini", "phone", "accessibility", "click-path-audit", "e2e-testing", "accessible-motion", "hover-interactions", "page-transitions", "scroll-animations"],
   "mcps": [
     { "name": "slack", "url": "https://mcp.slack.com/mcp" },
     { "name": "cloudflare", "url": "https://mcp.cloudflare.com/mcp" },
-    { "name": "21st", "url": "https://21st.dev/api/mcp", "keyHeader": "x-api-key" }
+    { "name": "21st", "url": "https://21st.dev/api/mcp", "keyHeader": "x-api-key" },
+    { "name": "perplexity", "command": ["npx", "-y", "@perplexity-ai/mcp-server"], "keyEnv": "PERPLEXITY_API_KEY" }
   ],
   "skills": [
     { "repo": "emilkowalski/skills", "names": ["animate", "animate-expo", "animation-vocabulary", "apple-design", "ask-sonner", "emil-design-eng", "find-animation-opportunities", "improve-animations", "mobile-native", "pick-ui-library", "prototype", "review-animations", "write-swift"] },
-    { "repo": "Leonxlnx/taste-skill", "names": ["design-taste-frontend"] },
     { "repo": "Leonxlnx/taste-skill-classics", "names": ["minimalist-ui", "industrial-brutalist-ui"] },
-    { "repo": "Leonxlnx/imagegen-skills", "names": ["brandkit", "imagegen-frontend-web", "imagegen-frontend-mobile"] }
+    { "repo": "Leonxlnx/imagegen-skills", "names": ["brandkit", "imagegen-frontend-web", "imagegen-frontend-mobile"] },
+    { "repo": "tt-a1i/archify", "path": ".", "names": ["archify"] },
+    { "repo": "cathrynlavery/diagram-design", "names": ["diagram-design"] },
+    { "repo": "vercel-labs/skills", "names": ["find-skills"] },
+    { "repo": "JuliusBrussee/caveman", "names": ["caveman"] }
+  ],
+  "tools": [
+    { "uv": "scrapling[ai]", "skill": { "repo": "D4Vinci/Scrapling", "path": "agent-skill", "name": "scrapling-official" }, "mcp": { "name": "scrapling", "command": "scrapling-mcp" } },
+    { "uv": "agent-reach", "skill": { "repo": "Panniantong/Agent-Reach", "path": "agent_reach", "name": "agent-reach", "file": "SKILL_en.md" } }
   ]
 }

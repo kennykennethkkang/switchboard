@@ -19,6 +19,8 @@ const HTML_SHELL = `<!DOCTYPE html>
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d0d">
   <title>Switchboard</title>
   <link rel="icon" href="data:,">
+  <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="apple-touch-icon" href="/apple-icon.png">
   <link rel="stylesheet" href="/index.css">
   <style>html, body { height: 100%; margin: 0; padding: 0; }</style>
 </head>
@@ -32,6 +34,8 @@ const MIME_TYPES: Record<string, string> = {
   '.js': 'application/javascript',
   '.css': 'text/css',
   '.html': 'text/html',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
 }
 
 // Read and gzipped once per file: the assets only change with a new build, which restarts the app.

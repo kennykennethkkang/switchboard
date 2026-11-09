@@ -8,7 +8,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { Readable } from 'stream'
-import { SliceUploads, chatLabel, cleanName, saveUpload } from '../src/hub/uploads'
+import { SliceUploads, chatLabel, cleanName, readUploads, saveUpload, uploadEvents } from '../src/hub/uploads'
 import { handleUpload } from '../src/hub/routes'
 import { HubService } from '../src/hub/hub-service'
 
@@ -163,5 +163,35 @@ describe('POST /hub/upload', () => {
     const r = await handleUpload(hub, url(`cwd=${encodeURIComponent(ROOT)}&name=n.txt&token=${hub.token}`), bytes('12345'), (o, d) => saveUpload({ ...o, root, max: 4 }, d))
     assert.equal(r.status, 413)
     assert.match(r.body, /limit/)
+  })
+})
+
+describe('readUploads', () => {
+  it('counts each project and lists its newest few from INDEX.md, names only', async () => {
+    const root = path.join(ROOT, 'read')
+    for (let i = 0; i < 7; i++) await saveUpload({ cwd: '/w/app', name: `f${i}.txt`, chat: i === 6 ? 'Fix login (abc12345)' : undefined, root, now: new Date(2026, 9, 30, 14, i) }, bytes('ab'))
+    await saveUpload({ cwd: '/w/web', name: 'shot.png', root, now }, bytes('x'))
+    const u = await readUploads(root)
+    assert.deepEqual(Object.keys(u).sort(), ['app', 'web'])
+    assert.equal(u.app.count, 7)
+    assert.equal(u.app.last.length, 5)
+    assert.deepEqual(u.app.last[0], { name: 'f6.txt', at: new Date(2026, 9, 30, 14, 6).getTime(), size: '2 B', chat: 'Fix login (abc12345)' })
+    assert.deepEqual(u.app.last.map(r => r.name), ['f6.txt', 'f5.txt', 'f4.txt', 'f3.txt', 'f2.txt'])
+    assert.equal(u.web.last[0].chat, 'new chat')
+    assert.ok(!JSON.stringify(u).includes(root))
+  })
+  it('is empty with no uploads folder, and skips a project with no INDEX.md', async () => {
+    assert.deepEqual(await readUploads(path.join(ROOT, 'none')), {})
+    const root = path.join(ROOT, 'bare')
+    fs.mkdirSync(path.join(root, 'p'), { recursive: true })
+    assert.deepEqual(await readUploads(root), {})
+  })
+  it('tells listeners when a file lands', async () => {
+    let n = 0
+    const on = () => { n++ }
+    uploadEvents.on('saved', on)
+    await saveUpload({ cwd: '/w/app', name: 'x.txt', root: path.join(ROOT, 'ev'), now }, bytes('x'))
+    uploadEvents.off('saved', on)
+    assert.equal(n, 1)
   })
 })

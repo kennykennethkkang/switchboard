@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { limitMeters, resetAt, resetText } from './limits'
+import { countdown, limitMeters, pauseLine, resetAt, resetText } from './limits'
 import type { Limit, SessionLive } from './hub-types'
 
 // Sat 7 Nov 2026, 12:00 local
@@ -70,4 +70,23 @@ test('limitMeters: resets a few seconds apart are one window, highest % wins', (
     chat([{ kind: 'five_hour', percentUsed: 99, resetsAt: iso(120, 0) }]),
   ], now)
   assert.equal(m[0].percent, 97)
+})
+
+test('limitMeters: kept limits fill in with no live chat; a hit reads out until its reset', () => {
+  const r = new Date(2026, 10, 7, 23, 50).getTime()
+  const kept = { at: now, windows: [{ kind: 'five_hour', percentUsed: 97, resetsAt: new Date(r).toISOString() }, { kind: 'seven_day', percentUsed: 40 }] }
+  assert.deepEqual(limitMeters([], now, kept).map(m => m.percent), [97, 40])
+  const out = limitMeters([], now, { ...kept, out: { resetsAt: r } })
+  assert.deepEqual(out[0], { kind: 'five_hour', label: '5h', percent: 100, level: 'out', reset: 'Limit reached, resets 11:50 PM (in 11h 50m)' })
+  assert.equal(out[1].percent, 40)
+  // Past its reset the hit is over.
+  assert.equal(limitMeters([], r + 1, { ...kept, out: { resetsAt: r } })[0].level, undefined)
+  assert.deepEqual(limitMeters([], now).map(m => m.level), ['none', 'none'])
+})
+
+test('pauseLine and countdown', () => {
+  const at = new Date(2026, 10, 7, 23, 51).getTime()
+  assert.equal(pauseLine({ kind: 'five_hour', percent: 99, resumeAt: at, chats: [{ sessionId: 'a' }, { sessionId: 'b' }, { sessionId: 'c' }] }, now), 'Paused at 99%: 3 chats queued, resume at 11:51 PM (in 11h 51m)')
+  assert.equal(countdown(now + 30_000, now), 'under 1m')
+  assert.equal(countdown(now + 12 * 60_000, now), '12m')
 })

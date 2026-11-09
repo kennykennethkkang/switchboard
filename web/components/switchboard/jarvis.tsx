@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { HubState, JarvisReply } from '@/lib/hub-types'
 import { fetchVoice, type VoicePoll } from '@/lib/hub-remote'
 import { appendHeard, stillSpoken, takesHeard } from '@/lib/voice'
+import { PHONE_MIC_NOTE, phoneMic, pickMime, sendClip } from '@/lib/phone-mic'
 import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
+import type { AskBits } from './switcher'
 
 const DRAFT = 'switchboard.jarvisDraft'
 const BARS = 14
@@ -41,13 +43,57 @@ function useMic(on: boolean, demo: boolean) {
   return { levels, polled }
 }
 
+const PHONE_MAX_MS = 30_000
+
+/** A phone browser's own mic: MediaRecorder until a second tap or 30 s, then the clip goes to whisper on the Mac.
+ * No voice flag on the question it fills: a spoken reply plays on the Mac, which a phone may not ask for. */
+function usePhoneMic(want: boolean, heard: (text: string) => void) {
+  const [kind, setKind] = useState<ReturnType<typeof phoneMic>>('none')
+  const [state, setState] = useState<'listening' | 'transcribing'>()
+  const [note, setNote] = useState<string>()
+  const rec = useRef<MediaRecorder>(undefined)
+  useEffect(() => { setKind(want ? phoneMic(window) : 'none') }, [want])
+  useEffect(() => () => rec.current?.stop(), [])
+  const tap = async () => {
+    if (state === 'transcribing') return
+    if (rec.current) { rec.current.stop(); return }
+    setNote(undefined)
+    if (kind === 'insecure') { setNote(PHONE_MIC_NOTE); return }
+    let stream: MediaStream
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }) } catch (err) { setNote(`Could not open the mic (${(err as Error).message}).`); return }
+    const mimeType = pickMime(m => MediaRecorder.isTypeSupported(m))
+    const r = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+    const parts: Blob[] = []
+    const cap = setTimeout(() => r.state !== 'inactive' && r.stop(), PHONE_MAX_MS)
+    r.ondataavailable = e => { if (e.data.size) parts.push(e.data) }
+    r.onstop = async () => {
+      clearTimeout(cap)
+      stream.getTracks().forEach(t => t.stop())
+      rec.current = undefined
+      setState('transcribing')
+      // Safari leaves blob types empty; the recorder's own type is the real one.
+      const out = await sendClip(new Blob(parts, { type: r.mimeType || mimeType || 'audio/mp4' }))
+      setState(undefined)
+      if ('text' in out) heard(out.text)
+      else setNote(out.problem)
+    }
+    rec.current = r
+    r.start()
+    setState('listening')
+  }
+  return { can: kind !== 'none', state, note, tap: () => void tap() }
+}
+
 /** One line to ask the hub or tell it to start work; a start waits for Confirm, nothing runs on Enter alone.
- * mic: the page runs on the Mac (VS Code or localhost), where hub-voice records; a phone gets no mic. */
-export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo = false, send }: { reply?: JarvisReply | null; voice?: HubState['voice']; heard?: HubState['heard']; mic: boolean; demo?: boolean; send: (c: HubCommand) => void }) {
+ * mic: the page runs on the Mac (VS Code or localhost), where hub-voice records; a phone browser records itself (usePhoneMic).
+ * bare: inside the Cmd+K switcher, which owns the text and the input; this adds the mic and the reply. */
+export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo = false, send, bare }: { reply?: JarvisReply | null; voice?: HubState['voice']; heard?: HubState['heard']; mic: boolean; demo?: boolean; send: (c: HubCommand) => void; bare?: AskBits }) {
   // Kept in sessionStorage so a reload for a new build does not drop an unsent question.
-  const [q, setQRaw] = useState(() => { try { return sessionStorage.getItem(DRAFT) ?? '' } catch { return '' } })
-  const setQ = (v: string) => { setQRaw(v); try { if (v) sessionStorage.setItem(DRAFT, v); else sessionStorage.removeItem(DRAFT) } catch { /* private mode */ } }
-  const input = useRef<HTMLInputElement>(null)
+  const [draft, setQRaw] = useState(() => { try { return sessionStorage.getItem(DRAFT) ?? '' } catch { return '' } })
+  const q = bare ? bare.value : draft
+  const setQ = (v: string) => { if (bare) { bare.onValue(v); return } setQRaw(v); try { if (v) sessionStorage.setItem(DRAFT, v); else sessionStorage.removeItem(DRAFT) } catch { /* private mode */ } }
+  const own = useRef<HTMLInputElement>(null)
+  const input = bare?.input ?? own
   const { levels, polled } = useMic(!!stateVoice, demo)
   const voice = polled ? polled.voice : stateVoice
   const heard = [stateHeard, polled?.heard].reduce((a, b) => (b && (!a || b.at > a.at) ? b : a), undefined as HubState['heard'])
@@ -55,6 +101,7 @@ export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo 
   const tapped = useRef<number>(undefined)
   // The last transcript put in the box: while the draft holds it, the reply is read out too.
   const lastHeard = useRef<string>(undefined)
+  const phone = usePhoneMic(!mic && !demo && !vscodeBridge?.isVSCode, text => setQ(appendHeard(input.current?.value ?? '', text)))
   useEffect(() => {
     // A recording that ended with nothing to take (an error, Didn't catch that) lets go of the tap.
     if (voice || tapped.current === undefined) return
@@ -88,13 +135,8 @@ export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo 
     lastHeard.current = undefined
     setQ('')
   }
-  return (
-    <section className="hub-jarvis" aria-label="Jarvis">
-      <form className="hub-jarvis-bar" onSubmit={e => { e.preventDefault(); ask() }}>
-        <svg aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5 6.5 8 3 11.5M8.5 11.5H13" /></svg>
-        <input ref={input} type="text" aria-label="Ask Jarvis" placeholder="Ask Jarvis, or say start a chat to…" value={q} maxLength={2000}
-          enterKeyHint="send" autoComplete="off" spellCheck={false} onChange={e => setQ(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Escape' && reply && !reply.busy) { e.preventDefault(); clear() } }} />
+  if (bare) bare.askRef.current = ask
+  const mics = <>
         {voice === 'listening' && (
           <span className="hub-jarvis-meter" aria-hidden>{levels.map((l, i) => <span key={i} style={{ transform: `scaleY(${0.15 + l * 0.85})` }} />)}</span>
         )}
@@ -110,11 +152,18 @@ export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo 
             <svg aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" /><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V14.5" /></svg>
           </button>
         )}
-        <button type="submit" className="hub-btn" disabled={!q.trim()}>Ask</button>
-      </form>
+        {phone.can && (
+          <button type="button" className="hub-btn hub-jarvis-mic" aria-label="Speak to Jarvis" title="Speak to Jarvis" aria-pressed={phone.state === 'listening'} aria-disabled={phone.state === 'transcribing'} onClick={phone.tap}>
+            <svg aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" /><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V14.5" /></svg>
+          </button>
+        )}
+  </>
+  const live = <>
       {/* Mounted from the start so a screen reader hears the first Thinking… */}
       <div aria-live="polite" className="hub-jarvis-live">
         {voice && <div className="hub-jarvis-out"><span className="hub-jarvis-busy">{voice === 'listening' ? 'Listening… stops when you pause, or tap the mic.' : 'Transcribing…'}</span></div>}
+        {!voice && phone.state && <div className="hub-jarvis-out"><span className="hub-jarvis-busy">{phone.state === 'listening' ? 'Listening… tap the mic when you are done.' : 'Transcribing…'}</span></div>}
+        {!voice && !phone.state && phone.note && <div className="hub-jarvis-out"><p>{phone.note}</p></div>}
         {reply && !voice && (
           <div className="hub-jarvis-out">
             <span className="hub-jarvis-q">{reply.q}</span>
@@ -128,6 +177,19 @@ export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo 
           </div>
         )}
       </div>
+  </>
+  if (bare) return <div className="hub-jarvis-pal"><span className="pal-mics">{mics}</span>{live}</div>
+  return (
+    <section className="hub-jarvis" aria-label="Jarvis">
+      <form className="hub-jarvis-bar" onSubmit={e => { e.preventDefault(); ask() }}>
+        <svg aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5 6.5 8 3 11.5M8.5 11.5H13" /></svg>
+        <input ref={input} type="text" aria-label="Ask Jarvis" placeholder="Ask Jarvis, or say start a chat to…" value={q} maxLength={2000}
+          enterKeyHint="send" autoComplete="off" spellCheck={false} onChange={e => setQ(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Escape' && reply && !reply.busy) { e.preventDefault(); clear() } }} />
+        {mics}
+        <button type="submit" className="hub-btn" disabled={!q.trim()}>Ask</button>
+      </form>
+      {live}
     </section>
   )
 }

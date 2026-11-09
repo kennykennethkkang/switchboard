@@ -9,11 +9,11 @@ const keep = (extra: Partial<CacheKeep>): CacheKeep => ({ sessionId: 's1', state
 describe('cache chip', () => {
   it('says warm with the minutes left, cold once lapsed, and nothing when off or unknown', () => {
     const all = [keep({}), keep({ sessionId: 's2', state: 'cold' }), keep({ sessionId: 's3', state: 'off' }), keep({ sessionId: 's4', warmUntil: 10 })]
-    assert.equal(cacheChip(all, 's1', 0)?.label, 'warm 42m')
+    assert.equal(cacheChip(all, 's1', 0)?.label, 'cache warm 42 min')
     assert.match(cacheChip(all, 's1', 0)?.title ?? '', /312k tokens/)
-    assert.equal(cacheChip(all, 's2', 0)?.label, 'cold')
+    assert.equal(cacheChip(all, 's2', 0)?.label, 'cache cold')
     assert.equal(cacheChip(all, 's3', 0), undefined)
-    assert.equal(cacheChip(all, 's4', 20)?.label, 'cold')
+    assert.equal(cacheChip(all, 's4', 20)?.label, 'cache cold')
     assert.equal(cacheChip(all, 'nope', 0), undefined)
     assert.equal(cacheChip(undefined, 's1', 0), undefined)
   })
