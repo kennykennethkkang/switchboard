@@ -806,6 +806,46 @@
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
+  },
+  {
+   "id": "2e9c37da",
+   "text": "Also another issue is that the celestial court does not properly represent all components inside of switchboard. Please make sure that memory and everything related with it is visually shown here also",
+   "at": 1794205298759,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
+  },
+  {
+   "id": "333783f8",
+   "text": "Fallback: check the MiroFish confusion test agent; when done, send top findings to designer/engineer, qa, then standup.",
+   "at": 1794205298759,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
+  },
+  {
+   "id": "6d6ddcb8",
+   "text": "<agent-message from=\"a19fcc42cf00bc992\"> Court engineer: my next dev in web/ is on port 3010 (pid 12436). I'll stop it when I finish unless you want it kept up for others. I'm only in board/court file",
+   "at": 1794205298759,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
+  },
+  {
+   "id": "b9b7da84",
+   "text": "Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design make sure there are no issues with the",
+   "at": 1794205298759,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
+  },
+  {
+   "id": "1ad3ccb0",
+   "text": "Switchboard stopped subagent background job \"Start Next dev server on 3010\": no new output for 30 min (npx next dev -p 3010 > /***). If it is still needed, rerun it with a timeout, or with run_in_back",
+   "at": 1794205298759,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
   }
  ]
 }
