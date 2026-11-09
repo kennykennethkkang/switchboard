@@ -136,6 +136,13 @@
    "at": 1794217418707,
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
+  },
+  {
+   "id": "07a47e6c",
+   "text": "Proposed kit edit (caveman A/B 2026-11-09, vault wiki/caveman-ab.md): caveman narration gave no quality or token gain over 20 runs, and the caveman skill is not installed anywhere, so the role files' Voice line is a no-op. Remove the \"Voice: load the caveman skill...\" paragraph from claude-mods kit/agents/{engineer,qa,ops,designer,growth,researcher,Explore}.md and the \"Caveman is for subagent narration only\" bullet from kit/rules.md.",
+   "at": 1794217591950,
+   "from": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "name": "Fix Site Using Attached PDF v2"
   }
  ],
  "removed": {
@@ -313,6 +320,94 @@
   "dc5c0e0f": 1794217454972,
   "556a609b": 1794217590271
  },
+ "ticked": [
+  {
+   "id": "556a609b",
+   "text": "The caveman A/B before widening its scope (to-do da240ba3).",
+   "at": 1794217590271,
+   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
+  },
+  {
+   "id": "8d7d3ef9",
+   "text": "Approve or drop to-do `0dd5d1e1`, which stops a subagent from killing a shared dev server.",
+   "at": 1794215884698,
+   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
+   "name": "Codex Switchboard Integration Setup v4",
+   "why": "you"
+  },
+  {
+   "id": "9d03f498",
+   "text": "Approve or drop to-do `4a877be0`, a time limit on every test run in the engineer and qa role files.",
+   "at": 1794215884161,
+   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
+   "name": "Codex Switchboard Integration Setup v4",
+   "why": "you"
+  },
+  {
+   "id": "6a7283d4",
+   "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
+   "at": 1794214840099,
+   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
+  },
+  {
+   "id": "fe4738f7",
+   "text": "Web Push for the phone app: manifest + service worker + subscribe button in the Tailscale web app, VAPID keys and a send helper the extension can call",
+   "at": 1794214839912,
+   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "before": "6a7283d4",
+   "name": "AWS phone heads-up path"
+  },
+  {
+   "id": "5b5cf8d5",
+   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
+   "at": 1794207923920,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2"
+  },
+  {
+   "id": "2dc6cbb4",
+   "text": "Reload any VS Code window that still shows the old panel.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
+  },
+  {
+   "id": "ed3a63d0",
+   "text": "Reload one VS Code window to pick up the new extension code.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "why": "you"
+  },
+  {
+   "id": "4fd3f17f",
+   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "7035c0ab",
+   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
+   "at": 1794207084031,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  }
+ ],
  "suggested": [
   {
    "id": "7bd3478d",
@@ -744,94 +839,6 @@
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization",
    "why": "you"
-  }
- ],
- "ticked": [
-  {
-   "id": "556a609b",
-   "text": "The caveman A/B before widening its scope (to-do da240ba3).",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later",
-   "at": 1794217590271,
-   "by": "89e03d60-780d-404a-be78-5c13cc4422a9"
-  },
-  {
-   "id": "8d7d3ef9",
-   "text": "Approve or drop to-do `0dd5d1e1`, which stops a subagent from killing a shared dev server.",
-   "at": 1794215884698,
-   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
-   "id": "9d03f498",
-   "text": "Approve or drop to-do `4a877be0`, a time limit on every test run in the engineer and qa role files.",
-   "at": 1794215884161,
-   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
-   "id": "6a7283d4",
-   "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
-   "at": 1794214840099,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
-  },
-  {
-   "id": "fe4738f7",
-   "text": "Web Push for the phone app: manifest + service worker + subscribe button in the Tailscale web app, VAPID keys and a send helper the extension can call",
-   "at": 1794214839912,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "before": "6a7283d4",
-   "name": "AWS phone heads-up path"
-  },
-  {
-   "id": "5b5cf8d5",
-   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
-   "at": 1794207923920,
-   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2"
-  },
-  {
-   "id": "2dc6cbb4",
-   "text": "Reload any VS Code window that still shows the old panel.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
-   "id": "ed3a63d0",
-   "text": "Reload one VS Code window to pick up the new extension code.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2",
-   "why": "you"
-  },
-  {
-   "id": "4fd3f17f",
-   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "you"
-  },
-  {
-   "id": "7035c0ab",
-   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
-   "at": 1794207084031,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
   }
  ]
 }
