@@ -280,7 +280,8 @@
   "c72a4d5e": 1794215388481,
   "9588df5d": 1794215388481,
   "7fae770d": 1794215388481,
-  "9d03f498": 1794215884161
+  "9d03f498": 1794215884161,
+  "8d7d3ef9": 1794215884698
  },
  "suggested": [
   {
@@ -675,14 +676,6 @@
    "why": "you"
   },
   {
-   "id": "8d7d3ef9",
-   "text": "Approve or drop to-do `0dd5d1e1`, which stops a subagent from killing a shared dev server.",
-   "at": 1794214213977,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
    "id": "00188e78",
    "text": "Switchboard to-do, in this order: 1. AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control",
    "at": 1794215383773,
@@ -701,13 +694,22 @@
  ],
  "ticked": [
   {
-   "id": "9d03f498",
-   "text": "Approve or drop to-do `4a877be0`, a time limit on every test run in the engineer and qa role files.",
+   "id": "8d7d3ef9",
+   "text": "Approve or drop to-do `0dd5d1e1`, which stops a subagent from killing a shared dev server.",
    "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
    "name": "Codex Switchboard Integration Setup v4",
    "why": "you",
-   "at": 1794215884161,
+   "at": 1794215884698,
    "by": "89e03d60-780d-404a-be78-5c13cc4422a9"
+  },
+  {
+   "id": "9d03f498",
+   "text": "Approve or drop to-do `4a877be0`, a time limit on every test run in the engineer and qa role files.",
+   "at": 1794215884161,
+   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
+   "name": "Codex Switchboard Integration Setup v4",
+   "why": "you"
   },
   {
    "id": "6a7283d4",
@@ -772,14 +774,6 @@
    "id": "1cc1b2f2",
    "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
    "at": 1794207083314,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "71d7ef16",
-   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
-   "at": 1794207082598,
    "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4"
