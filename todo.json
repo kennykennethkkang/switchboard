@@ -256,7 +256,12 @@
   "77dc8fdb-r": 1794164809704,
   "a3bfbe88": 1794197121845,
   "0d5b8bf5": 1794197121845,
-  "d89dbc20": 1794197121845
+  "d89dbc20": 1794197121845,
+  "414d56b4": 1794198421494,
+  "16f0644b": 1794198421494,
+  "7d647c9a": 1794198421494,
+  "38dd0f19": 1794198421494,
+  "264ef79b": 1794198421494
  },
  "ticked": [
   {
@@ -780,46 +785,6 @@
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "you"
-  },
-  {
-   "id": "414d56b4",
-   "text": "Reload VS Code once the 0.21.5 build is in, then click a question answer and Approve on a real chat. The sample data has no live hub behind it, so neither was c",
-   "at": 1794197226502,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
-   "id": "16f0644b",
-   "text": "Approve or drop to-do `4a877be0`: a time limit on every test run in the engineer and qa role files.",
-   "at": 1794197226502,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
-   "id": "7d647c9a",
-   "text": "Approve or drop to-do `0dd5d1e1`: a shared dev server is never stopped by a subagent.",
-   "at": 1794197226502,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
-   "id": "38dd0f19",
-   "text": "The \"triage-comments\" tool chip still runs off the left edge of the orbit, as it did before the overhaul.",
-   "at": 1794197226502,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "later"
-  },
-  {
-   "id": "264ef79b",
-   "text": "On a phone, the Next dev badge covers the Chats tab. That only happens in development.",
-   "at": 1794197226502,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "later"
   }
  ]
 }
