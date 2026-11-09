@@ -2,42 +2,11 @@
  "version": 1,
  "todo": [
   {
-   "id": "1d1d499f-ok",
-   "text": "Your mic tap: one real tap in VS Code. macOS will ask once to allow mic access, and recording from the real mic has not been tested yet.",
-   "at": 1793526817270,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "you"
-  },
-  {
    "id": "b673a51e",
    "text": "Kit experiment: delegation costs 3x to 4x with no correctness gain on tasks up to about 5 files (vault ecc-vs-switchboard-kit). Try a rules.md line telling the lead to work solo below a size threshold, and A/B it.",
    "at": 1793822518602,
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
    "name": "Check if ECC repo on"
-  },
-  {
-   "id": "1ecbfca1-r-ok",
-   "text": "Turning the keep-alive off: there's no switch yet. That's on the to-do as 8133346b.",
-   "at": 1793818571445,
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2",
-   "why": "later"
-  },
-  {
-   "id": "dfd937e0-r-ok",
-   "text": "Clear shell and start running since other chat is finished. After run is finished put full commit message in for me to push.",
-   "at": 1793818594876,
-   "from": "bea39253-9415-4e12-bc54-bf8938cdece8",
-   "name": "UI UX Site Audit Redesign",
-   "why": "missed"
-  },
-  {
-   "id": "005e5cfd",
-   "text": "MiroFish pilot on Switchboard: once ZEP_API_KEY is in ~/Documents/GitHub/MiroFish/.env (see SETUP-KENNETH.md), run sb-pilot.py with 20 agents, 10 rounds, seeded with the ux/ screenshot descriptions; read it as a rollout story, not a vote.",
-   "at": 1794125532774,
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes"
   },
   {
    "id": "6e1d42fa",
@@ -291,171 +260,71 @@
   "029c83d8": 1794237365205,
   "c074c6d7": 1794237434107,
   "3c7e1b66": 1794237645314,
-  "f87c572f": 1794237645314
+  "f87c572f": 1794237645314,
+  "1ecbfca1-r-ok": 1794237696534,
+  "dfd937e0-r-ok": 1794237696534,
+  "005e5cfd": 1794237696534,
+  "13867d1e": 1794237696534,
+  "3ecc36b7": 1794237696534,
+  "071668ac": 1794237696534,
+  "43c58dd9": 1794237696534,
+  "32b883a8": 1794237696534,
+  "734ed696": 1794237696534,
+  "488c51ea": 1794237696534,
+  "108b44bb": 1794237696534,
+  "dfb17052": 1794237696534,
+  "3ae0e414": 1794237696534,
+  "315a0ac8": 1794237696534,
+  "2e9c37da": 1794237696534,
+  "333783f8": 1794237696534,
+  "6d6ddcb8": 1794237696534,
+  "1ad3ccb0": 1794237696534,
+  "a1c6798c": 1794237696534,
+  "b158578b": 1794237696534,
+  "d9a62357": 1794237696534,
+  "118ce312": 1794237696534,
+  "97fd0981": 1794237696534,
+  "b8f9599a": 1794237696534,
+  "d2136104": 1794237696534,
+  "2173ddca.back": 1794237696534,
+  "1a5a8fd1.back": 1794237696534,
+  "745daf50.back": 1794237696534,
+  "baeb9e5f.back": 1794237696534,
+  "7bd3478d.back": 1794237696534,
+  "c99fc568.back": 1794237696534,
+  "0e849084.back": 1794237696534,
+  "a38d0a25.back": 1794237696534,
+  "440724a4.back": 1794237696534,
+  "ad52b456.back": 1794237696534,
+  "1d1d499f-ok": 1794237696534,
+  "6416d8f9": 1794237696534,
+  "ebaf29ee": 1794237696534,
+  "e20f200e": 1794237696534,
+  "fd0c8d29": 1794237696534,
+  "c37e9bc4": 1794237696534,
+  "97a4adbe": 1794237696534,
+  "1379ee82": 1794237696534,
+  "117d73b3": 1794237696534,
+  "583d0e2a": 1794237696534,
+  "c2c20f3b": 1794237696534,
+  "d9db23eb": 1794237696534,
+  "fc791914": 1794237696534,
+  "0cee494c": 1794237696534,
+  "5492b56f": 1794237696534,
+  "6b629f0f": 1794237696534,
+  "a66fcabf": 1794237696534,
+  "042a12a9": 1794237696534,
+  "029924b4": 1794237696534,
+  "37faed87": 1794237696534,
+  "bfed2782": 1794237696534,
+  "23bdf166": 1794237696534,
+  "a941e2df": 1794237696534,
+  "22def70e": 1794237696534,
+  "70a39291": 1794237696534,
+  "8b85c11c": 1794237696534,
+  "f7034bf5": 1794237696534
  },
- "ticked": [
-  {
-   "id": "2173ddca",
-   "text": "Close VS Code, Claude and Codex. Run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename switc",
-   "at": 1794237108011,
-   "by": "b945f546-538f-467a-9ce7-18197f1f447f",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "1a5a8fd1",
-   "text": "A new top-level `LICENSE`.",
-   "at": 1794236933909,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "745daf50",
-   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
-   "at": 1794236932636,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "baeb9e5f",
-   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
-   "at": 1794236931741,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "7bd3478d",
-   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
-   "at": 1794236926682,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "c99fc568",
-   "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
-   "at": 1794236917088,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "you"
-  },
-  {
-   "id": "0e849084",
-   "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
-   "at": 1794236073782,
-   "by": "e4493897-e467-478a-be18-a607187e2f9f",
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on"
-  },
-  {
-   "id": "a38d0a25",
-   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
-   "at": 1794233558060,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2"
-  },
-  {
-   "id": "440724a4",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
-   "at": 1794233411579,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "ad52b456",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
-   "at": 1794233411110,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  }
- ],
  "suggested": [
-  {
-   "id": "ebaf29ee",
-   "text": "New `accessibility`, `click-path-audit` and `e2e-testing` skills.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "6416d8f9",
-   "text": "First commit: check that the claude-mods box filled. It's the one part only a real window can show.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "13867d1e",
-   "text": "\"Couple of issues to bring\" goes in the next version. It hasn't changed any files, so it isn't in these messages.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "later"
-  },
-  {
-   "id": "3ecc36b7",
-   "text": "Once this is finished please check all changes made so far and give the git message to my mobile device on kennys tailscale or put it in notes for me to copy and commit through switchboard on my phone",
-   "at": 1794085704444,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "missed"
-  },
-  {
-   "id": "071668ac",
-   "text": "Give me a phone call if anything comes up",
-   "at": 1794085704444,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "missed"
-  },
-  {
-   "id": "fd0c8d29",
-   "text": "Sign in to Cloudflare once: type `/mcp` in any chat.",
-   "at": 1794085711184,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "you"
-  },
-  {
-   "id": "e20f200e",
-   "text": "Log out of Instagram in Chrome if you don't want to stay signed in.",
-   "at": 1794085711184,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "you"
-  },
-  {
-   "id": "c37e9bc4",
-   "text": "Try Archive on a card, then Bring back from the Archive list.",
-   "at": 1794107112579,
-   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
-   "name": "Switchboard chat archive controls",
-   "why": "you"
-  },
-  {
-   "id": "97a4adbe",
-   "text": "Restart any Codex chats that are already open, so they pick up the no-prompt setting.",
-   "at": 1794112209535,
-   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
-   "why": "you"
-  },
-  {
-   "id": "43c58dd9",
-   "text": "Continue from /Users/kennykennethkkang/.claude/handoffs/agent-flow/2026-11-08-0332-agent-flow-chat-view-6d99ef26.md: read it first, recreate every open task in it with the task tools before any other",
-   "at": 1794112638679,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
-  },
   {
    "id": "ee375e39",
    "text": "The \"any editor or language\" half of the self-improve item.",
@@ -465,24 +334,8 @@
    "why": "later"
   },
   {
-   "id": "32b883a8",
-   "text": "Please also make it so if user is typing stuff and something happens it has a save what was typed feature.",
-   "at": 1794125585735,
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes",
-   "why": "missed"
-  },
-  {
    "id": "f1ba141b",
    "text": "add this feature also https://www.instagram.com/reel/DfaTZHlh-k0/?dlrf=NTc4MTIwNjQ2YQ==. also lets also make sure there is a creation of a deep research bot that can research anything and researches i",
-   "at": 1794125585735,
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes",
-   "why": "missed"
-  },
-  {
-   "id": "734ed696",
-   "text": "ALso one more thing to include is make sure there are limits to how much is spent and can be spent on 3rd party connected tools that may require money. If those softwares themselves have limits alread",
    "at": 1794125585735,
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
@@ -495,46 +348,6 @@
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
    "why": "missed"
-  },
-  {
-   "id": "1379ee82",
-   "text": "`web/components/switchboard/switchboard.tsx` and `web/lib/hub-demo.ts` stay out of this commit until the Board chat finishes. Unstage them before you commit.",
-   "at": 1794131692535,
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2",
-   "why": "you"
-  },
-  {
-   "id": "117d73b3",
-   "text": "Fix the \"ificSwitchboard adjustments\" note title, and check your New chat draft for missing letters.",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "583d0e2a",
-   "text": "Paste your Perplexity key in Settings, Accounts, API keys, then run Set up. Run `codex mcp login slack` and `codex mcp login cloudflare`, then reload VS Code.",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "c2c20f3b",
-   "text": "Commit the untracked new files too: `web/lib/court-map*`, `web/components/switchboard/board.*`, `web/lib/skins/`, `extension/src/hub/clean-text.ts`, `extension/",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "d9db23eb",
-   "text": "Decide on the 8 untracked `.vsix` files in claude-mods.",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
   },
   {
    "id": "2f08890c",
@@ -553,14 +366,6 @@
    "why": "later"
   },
   {
-   "id": "fc791914",
-   "text": "the new `extension/kit/design-md` entries and `scripts/rename-folder.*`",
-   "at": 1794134131446,
-   "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
-   "name": "Codex Switchboard Integration Setup v3",
-   "why": "you"
-  },
-  {
    "id": "dd0f7384",
    "text": "The Codex transcript tab (to-do 29c4f61f).",
    "at": 1794134131446,
@@ -569,105 +374,9 @@
    "why": "later"
   },
   {
-   "id": "488c51ea",
-   "text": "Subagent engineer (afba261201e8cc784) has been quiet 20 min. Check its last output; if it is waiting or looping, SendMessage it to continue with a narrower next step, or stop it and redo the step your",
-   "at": 1794176132323,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "missed"
-  },
-  {
-   "id": "108b44bb",
-   "text": "Subagent background job \"Start my next dev server on port 3127\": no new output for 51 min (npx next dev -p 3127 > /***). Stop it (TaskStop or KillShell), then rerun it with a timeout if it is still ne",
-   "at": 1794176132323,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "missed"
-  },
-  {
-   "id": "0cee494c",
-   "text": "Open `~/Documents/GitHub/MiroFish/.env` and paste your OpenRouter key after `LLM_API_KEY=`, then save. Tell me \"saved\" and I'll run the MiroFish test.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
-   "id": "5492b56f",
-   "text": "Set a credit limit on your OpenRouter key at openrouter.ai, or Jev and OpenRouter calls will ask once per chat.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
-   "id": "a66fcabf",
-   "text": "Review in the Codex chat: realm C as built, plus the round 2 wait-rope and frozen-pause mocks.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
-   "id": "dfb17052",
-   "text": "The MiroFish usability test, once the key is in.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "later"
-  },
-  {
-   "id": "6b629f0f",
-   "text": "Two small known gaps in bash-approve: `sud''o` with quotes spliced in, and `printenv` of a single named key.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
-   "id": "3ae0e414",
-   "text": "I already added the api key into that .env file and also how come it is not in the vs code explorer area or is it stored somewhere else?",
-   "at": 1794196287516,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
-   "id": "315a0ac8",
-   "text": "ok api key is inside of miro fish already please double check",
-   "at": 1794196287516,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
    "id": "2fbd2f92",
    "text": "If it is not in the folder please pull up the site I need to get the API key and also tell me where to place it. Also make sure future users who set this up don't have such a hard time. Maybe add it s",
    "at": 1794196287516,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
-   "id": "2e9c37da",
-   "text": "Also another issue is that the celestial court does not properly represent all components inside of switchboard. Please make sure that memory and everything related with it is visually shown here also",
-   "at": 1794205298759,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
-   "id": "333783f8",
-   "text": "Fallback: check the MiroFish confusion test agent; when done, send top findings to designer/engineer, qa, then standup.",
-   "at": 1794205298759,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
-   "id": "6d6ddcb8",
-   "text": "<agent-message from=\"a19fcc42cf00bc992\"> Court engineer: my next dev in web/ is on port 3010 (pid 12436). I'll stop it when I finish unless you want it kept up for others. I'm only in board/court file",
-   "at": 1794205298759,
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "missed"
@@ -681,22 +390,6 @@
    "why": "missed"
   },
   {
-   "id": "1ad3ccb0",
-   "text": "Switchboard stopped subagent background job \"Start Next dev server on 3010\": no new output for 30 min (npx next dev -p 3010 > /***). If it is still needed, rerun it with a timeout, or with run_in_back",
-   "at": 1794205298759,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
-   "id": "042a12a9",
-   "text": "Reload VS Code once the 0.21.5 build is in, then click a question answer and Approve on a real chat. Neither could be confirmed against the sample data.",
-   "at": 1794214213977,
-   "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
-   "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
    "id": "00188e78",
    "text": "Switchboard to-do, in this order: 1. AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control",
    "at": 1794215383773,
@@ -705,57 +398,9 @@
    "why": "missed"
   },
   {
-   "id": "a1c6798c",
-   "text": "Looks good please let me know what to do",
-   "at": 1794215383773,
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "name": "AWS phone heads-up path",
-   "why": "missed"
-  },
-  {
-   "id": "029924b4",
-   "text": "Rebuild and reload the extension, then try the button: write a draft, edit it, switch chats, then commit.",
-   "at": 1794217454972,
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization",
-   "why": "you"
-  },
-  {
-   "id": "b158578b",
-   "text": "Build the chosen layout.",
-   "at": 1794217454972,
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization",
-   "why": "later"
-  },
-  {
-   "id": "d9a62357",
-   "text": "Patch `sb-pilot.py` to stop the run before asking for the report.",
-   "at": 1794217454972,
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization",
-   "why": "later"
-  },
-  {
-   "id": "37faed87",
-   "text": "Two small fixes from the after-action review need your OK first: a rule for the engineer role about secret files, and a README line about the demo command.",
-   "at": 1794217454972,
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization",
-   "why": "you"
-  },
-  {
    "id": "665ddabb",
    "text": "Also can you add vercel agent desktop and check if it works better than mcp servers. Please do a full check and test to see which is better",
    "at": 1794221225201,
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
-   "why": "missed"
-  },
-  {
-   "id": "118ce312",
-   "text": "One more thing to please remember to keep in mind when doing fixes and changes or creating any new tools is to list out new tools I have created in read me and give proper credit to others tools. Then",
-   "at": 1794221500285,
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2",
    "why": "missed"
@@ -769,84 +414,12 @@
    "why": "missed"
   },
   {
-   "id": "97fd0981",
-   "text": "Add posthog and composio and what are they for?",
-   "at": 1794233683780,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed"
-  },
-  {
    "id": "b53117ca",
    "text": "These aren't included in the claude picker also no page for codex run where do I do that?",
    "at": 1794234450739,
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed"
-  },
-  {
-   "id": "b8f9599a",
-   "text": "I do not see the pages pulled up",
-   "at": 1794234450739,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed"
-  },
-  {
-   "id": "d2136104",
-   "text": "Finished them and they aren't showing on /mcp",
-   "at": 1794234450739,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed"
-  },
-  {
-   "id": "bfed2782",
-   "text": "Open a new chat in Switchboard.",
-   "at": 1794234455754,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "you"
-  },
-  {
-   "id": "23bdf166",
-   "text": "commit both repos. I only wrote bullets for this chat's work in `claude-mods`; the rest of its changes come from other chats, which Switchboard merges in.",
-   "at": 1794237165270,
-   "from": "3709204e-d2f3-42c7-8a46-2adc3c9c25ae",
-   "name": "Fix temp chats appearing",
-   "why": "you"
-  },
-  {
-   "id": "a941e2df",
-   "text": "Reload the Switchboard window and open the Map.",
-   "at": 1794237365205,
-   "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
-   "name": "Map Component Cleanup",
-   "why": "you"
-  },
-  {
-   "id": "70a39291",
-   "text": "The GitHub plugin couldn't connect at the start of this chat because it had no token, and it's now switched off. Leave it off since `gh` covers it, or set `GITH",
-   "at": 1794237613213,
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "you"
-  },
-  {
-   "id": "8b85c11c",
-   "text": "Slack, Firecrawl, Perplexity and 21st aren't installed. The last three need their keys saved in Sign-ins, and Slack is added the next time you run Set up.",
-   "at": 1794237613213,
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "you"
-  },
-  {
-   "id": "22def70e",
-   "text": "Commit when ready.",
-   "at": 1794237613213,
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "you"
   },
   {
    "id": "44e4175f",
@@ -863,14 +436,7 @@
    "from": "b945f546-538f-467a-9ce7-18197f1f447f",
    "name": "Rename agent-flow to switchboard",
    "why": "missed"
-  },
-  {
-   "id": "f7034bf5",
-   "text": "Quit VS Code with Cmd+Q. The folder moves within 20 seconds and VS Code reopens on `~/Documents/GitHub/switchboard`.",
-   "at": 1794237645314,
-   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
-   "name": "Rename agent-flow to switchboard",
-   "why": "you"
   }
- ]
+ ],
+ "cleared": 27
 }
