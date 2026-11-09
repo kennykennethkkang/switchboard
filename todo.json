@@ -328,7 +328,13 @@
   "70a39291": 1794237696534,
   "8b85c11c": 1794237696534,
   "f7034bf5": 1794237696534,
-  "a3c7d954": 1794237744553
+  "a3c7d954": 1794237744553,
+  "0b6cfec0": 1794239577891,
+  "1e7dacab": 1794239577891,
+  "88785a3c": 1794239577891,
+  "94b34aca": 1794239577891,
+  "f4ab23a6": 1794239577891,
+  "79dfdbc6": 1794239577891
  },
  "suggested": [
   {
@@ -436,60 +442,13 @@
    "why": "later"
   },
   {
-   "id": "1e7dacab",
-   "text": "Reload VS Code once the extension is rebuilt, so the new to-do logic runs.",
-   "at": 1794238042421,
-   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
-   "name": "Auto-complete todo tracking",
-   "why": "you"
-  },
-  {
-   "id": "f4ab23a6",
-   "text": "armasu.app: sign in and check the closet, Social and Settings.",
-   "at": 1794238042421,
-   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
-   "name": "Auto-complete todo tracking",
-   "why": "you"
-  },
-  {
-   "id": "88785a3c",
-   "text": "AWS IAM users: kennykang, Ace-Lavilla and Royce-Li still have no MFA.",
-   "at": 1794238042421,
-   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
-   "name": "Auto-complete todo tracking",
-   "why": "you"
-  },
-  {
-   "id": "94b34aca",
-   "text": "OpenRouter keys: set a credit limit on your key.",
-   "at": 1794238042421,
-   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
-   "name": "Auto-complete todo tracking",
-   "why": "you"
-  },
-  {
-   "id": "0b6cfec0",
-   "text": "Commit both repos.",
-   "at": 1794238042421,
-   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
-   "name": "Auto-complete todo tracking",
-   "why": "you"
-  },
-  {
    "id": "4a336629",
    "text": "The \"Finish up\" section in the web panel will now always be empty. I left it in place, and the demo data still shows sample items there.",
    "at": 1794238042421,
    "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
    "name": "Auto-complete todo tracking",
    "why": "later"
-  },
-  {
-   "id": "79dfdbc6",
-   "text": "After the next Switchboard build and a Reload Window, check both maps; the app you have open still runs the old build.",
-   "at": 1794239348511,
-   "from": "651376ea-09aa-43d9-a8b2-3a6d72c8de3e",
-   "name": "Cleanup map page connections",
-   "why": "you"
   }
- ]
+ ],
+ "cleared": 6
 }
