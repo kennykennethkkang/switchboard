@@ -802,6 +802,22 @@
    "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "name": "AWS phone heads-up path",
    "why": "you"
+  },
+  {
+   "id": "00188e78",
+   "text": "Switchboard to-do, in this order: 1. AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control",
+   "at": 1794215383773,
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "name": "AWS phone heads-up path",
+   "why": "missed"
+  },
+  {
+   "id": "a1c6798c",
+   "text": "Looks good please let me know what to do",
+   "at": 1794215383773,
+   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "name": "AWS phone heads-up path",
+   "why": "missed"
   }
  ]
 }
