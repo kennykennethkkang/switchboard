@@ -61,13 +61,6 @@
    "name": "Tailscale Commit Button Fixes v2"
   },
   {
-   "id": "ad52b456",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
-   "at": 1794137321564,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
    "id": "440724a4",
    "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
    "at": 1794137323685,
@@ -277,7 +270,8 @@
   "e3961128": 1794233408367,
   "af9e39f1": 1794233409101,
   "925b2b40": 1794233409710,
-  "178b1928": 1794233410384
+  "178b1928": 1794233410384,
+  "ad52b456": 1794233411110
  },
  "suggested": [
   {
@@ -778,12 +772,20 @@
  ],
  "ticked": [
   {
+   "id": "ad52b456",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "at": 1794233411110,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
    "id": "178b1928",
    "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
    "at": 1794233410384,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2"
   },
   {
    "id": "925b2b40",
@@ -848,14 +850,6 @@
    "by": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
    "name": "Fix Switchboard plugin access prompt"
-  },
-  {
-   "id": "c1e571de",
-   "text": "Add hub-draft-commit to web/lib/hub-demo.ts so the Write commit message button can be tried on sample data",
-   "at": 1794218982671,
-   "by": "da4605d2-f533-4303-a960-287d006cd833",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
   }
  ]
 }
