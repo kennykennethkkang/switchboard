@@ -129,6 +129,13 @@
    "at": 1794217354635,
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
+  },
+  {
+   "id": "e3961128",
+   "text": "AAR fix plans (approve first): 1) claude-mods/kit/agents/engineer.md, under its rules add: \"Code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only.\" 2) agent-flow README \"Run it locally\": say `pnpm run dev:demo` serves sample data on 3010 (`pnpm dev` sets NEXT_PUBLIC_DEMO=0).",
+   "at": 1794217418707,
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization"
   }
  ],
  "removed": {
