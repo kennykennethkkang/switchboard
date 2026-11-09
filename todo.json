@@ -309,7 +309,8 @@
   "9588df5d": 1794215388481,
   "7fae770d": 1794215388481,
   "9d03f498": 1794215884161,
-  "8d7d3ef9": 1794215884698
+  "8d7d3ef9": 1794215884698,
+  "dc5c0e0f": 1794217454972
  },
  "ticked": [
   {
@@ -398,6 +399,7 @@
    "name": "Tailscale Commit Button Fixes v4"
   }
  ],
+ "cleared": 1,
  "suggested": [
   {
    "id": "7bd3478d",
@@ -805,6 +807,38 @@
    "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "name": "AWS phone heads-up path",
    "why": "missed"
+  },
+  {
+   "id": "029924b4",
+   "text": "Rebuild and reload the extension, then try the button: write a draft, edit it, switch chats, then commit.",
+   "at": 1794217454972,
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization",
+   "why": "you"
+  },
+  {
+   "id": "b158578b",
+   "text": "Build the chosen layout.",
+   "at": 1794217454972,
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization",
+   "why": "later"
+  },
+  {
+   "id": "d9a62357",
+   "text": "Patch `sb-pilot.py` to stop the run before asking for the report.",
+   "at": 1794217454972,
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization",
+   "why": "later"
+  },
+  {
+   "id": "37faed87",
+   "text": "Two small fixes from the after-action review need your OK first: a rule for the engineer role about secret files, and a README line about the demo command.",
+   "at": 1794217454972,
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization",
+   "why": "you"
   }
  ]
 }
