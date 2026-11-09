@@ -275,7 +275,8 @@
   "7035c0ab": 1794207084031,
   "e39c1539": 1794207110753,
   "32ff347d": 1794207110753,
-  "2de7ef70": 1794207110753
+  "2de7ef70": 1794207110753,
+  "068a11df": 1794207340795
  },
  "ticked": [
   {
@@ -720,14 +721,6 @@
    "why": "you"
   },
   {
-   "id": "068a11df",
-   "text": "Is there anything else to do?",
-   "at": 1794197115852,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "missed"
-  },
-  {
    "id": "2dc6cbb4",
    "text": "Reload any VS Code window that still shows the old panel.",
    "at": 1794197121845,
@@ -807,5 +800,6 @@
    "name": "Tailscale Commit Button Fixes v4",
    "why": "later"
   }
- ]
+ ],
+ "cleared": 1
 }
