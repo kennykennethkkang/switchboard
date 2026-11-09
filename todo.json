@@ -278,17 +278,10 @@
   "b40a9840": 1794234739479,
   "0e849084": 1794236073782,
   "116db449": 1794236134513,
-  "c99fc568": 1794236917088
+  "c99fc568": 1794236917088,
+  "7bd3478d": 1794236926682
  },
  "suggested": [
-  {
-   "id": "7bd3478d",
-   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
   {
    "id": "baeb9e5f",
    "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
@@ -763,12 +756,20 @@
  ],
  "ticked": [
   {
+   "id": "7bd3478d",
+   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you",
+   "at": 1794236926682
+  },
+  {
    "id": "c99fc568",
    "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
+   "at": 1794236917088,
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
-   "why": "you",
-   "at": 1794236917088
+   "why": "you"
   },
   {
    "id": "0e849084",
@@ -833,14 +834,6 @@
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
-  },
-  {
-   "id": "5b95f145",
-   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/rules.md, under \"Every role\", add: \"Never send System Events keystroke or key code to another app while Kenneth may be typing: focus moves and the keys land in his window. Read Apple Notes with osascript get plaintext; list ticks under For you.\" Mem",
-   "at": 1794233407680,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
   }
  ]
 }
