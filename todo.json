@@ -101,13 +101,6 @@
    "at": 1794220135885,
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2"
-  },
-  {
-   "id": "af9e39f1",
-   "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
-   "at": 1794220137679,
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2"
   }
  ],
  "removed": {
@@ -295,7 +288,8 @@
   "07a47e6c": 1794233406734,
   "98c31766": 1794233407017,
   "5b95f145": 1794233407680,
-  "e3961128": 1794233408367
+  "e3961128": 1794233408367,
+  "af9e39f1": 1794233409101
  },
  "suggested": [
   {
@@ -796,12 +790,20 @@
  ],
  "ticked": [
   {
+   "id": "af9e39f1",
+   "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2",
+   "at": 1794233409101,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
    "id": "e3961128",
    "text": "AAR fix plans (approve first): 1) claude-mods/kit/agents/engineer.md, under its rules add: \"Code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only.\" 2) agent-flow README \"Run it locally\": say `pnpm run dev:demo` serves sample data on 3010 (`pnpm dev` sets NEXT_PUBLIC_DEMO=0).",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization",
    "at": 1794233408367,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization"
   },
   {
    "id": "5b95f145",
@@ -868,15 +870,6 @@
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring",
    "why": "you"
-  },
-  {
-   "id": "556a609b",
-   "text": "The caveman A/B before widening its scope (to-do da240ba3).",
-   "at": 1794217590271,
-   "by": "89e03d60-780d-404a-be78-5c13cc4422a9",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later"
   }
  ]
 }
