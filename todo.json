@@ -12,8 +12,10 @@
   {
    "id": "6a7283d4",
    "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
-   "at": 1793527531788,
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
+   "at": 1794214288724,
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639",
+   "chat": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "d6bdfb41",
