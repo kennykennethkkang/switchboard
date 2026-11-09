@@ -334,7 +334,8 @@
   "88785a3c": 1794239577891,
   "94b34aca": 1794239577891,
   "f4ab23a6": 1794239577891,
-  "79dfdbc6": 1794239577891
+  "79dfdbc6": 1794239577891,
+  "44e4175f": 1794239653085
  },
  "suggested": [
   {
@@ -434,21 +435,20 @@
    "why": "missed"
   },
   {
-   "id": "44e4175f",
-   "text": "The pronoun fix wasn't in time for 0.21.11 (another chat had already packaged it), so it ships in the next release.",
-   "at": 1794237613213,
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "later"
-  },
-  {
    "id": "4a336629",
    "text": "The \"Finish up\" section in the web panel will now always be empty. I left it in place, and the demo data still shows sample items there.",
    "at": 1794238042421,
    "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
    "name": "Auto-complete todo tracking",
    "why": "later"
+  },
+  {
+   "id": "89c50735",
+   "text": "The map chat may send one more tweak, which goes in the next release.",
+   "at": 1794239653085,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "later"
   }
- ],
- "cleared": 6
+ ]
 }
