@@ -143,6 +143,13 @@
    "at": 1794220135885,
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2"
+  },
+  {
+   "id": "af9e39f1",
+   "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
+   "at": 1794220137679,
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2"
   }
  ],
  "removed": {
