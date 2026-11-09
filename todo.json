@@ -54,13 +54,6 @@
    "name": "Tailscale Commit Button Fixes"
   },
   {
-   "id": "a38d0a25",
-   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
-   "at": 1794131071091,
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2"
-  },
-  {
    "id": "ad7e4488",
    "text": "Switchboard overhaul: build the layout Kenneth picks from the options page (A Inbox first recommended, plus B's live Stuck lane, C's named Cmd+K commands, diff preview in Your OK, project color on Inbox items, a11y labels/focus). Mockups: https://claude.ai/artifact/Htpnb2JAZQtpKpKNCSYkLB",
    "at": 1794217344983,
@@ -265,7 +258,8 @@
   "925b2b40": 1794233409710,
   "178b1928": 1794233410384,
   "ad52b456": 1794233411110,
-  "440724a4": 1794233411579
+  "440724a4": 1794233411579,
+  "a38d0a25": 1794233558060
  },
  "suggested": [
   {
@@ -766,12 +760,20 @@
  ],
  "ticked": [
   {
+   "id": "a38d0a25",
+   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "at": 1794233558060,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
    "id": "440724a4",
    "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
    "at": 1794233411579,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
   },
   {
    "id": "ad52b456",
@@ -836,14 +838,6 @@
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
    "from": "89e03d60-780d-404a-be78-5c13cc4422a9",
    "name": "Fix Site Using Attached PDF v2"
-  },
-  {
-   "id": "3b5da7e1",
-   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/agents/engineer.md and qa.md, add: \"macOS has no timeout. Run suites as perl -e 'alarm 600; exec @ARGV' -- <cmd> (120 for one file); an alarm kill is a fail.\" Two unbounded runs hung ~30 min. Memory: macos-test-timeout.",
-   "at": 1794233078910,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
   }
  ]
 }
