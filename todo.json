@@ -277,90 +277,9 @@
   "cf1bf50c": 1794234739479,
   "b40a9840": 1794234739479,
   "0e849084": 1794236073782,
-  "116db449": 1794236134513
+  "116db449": 1794236134513,
+  "c99fc568": 1794236917088
  },
- "ticked": [
-  {
-   "id": "0e849084",
-   "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
-   "at": 1794236073782,
-   "by": "e4493897-e467-478a-be18-a607187e2f9f",
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on"
-  },
-  {
-   "id": "a38d0a25",
-   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
-   "at": 1794233558060,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2"
-  },
-  {
-   "id": "440724a4",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
-   "at": 1794233411579,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "ad52b456",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
-   "at": 1794233411110,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "178b1928",
-   "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
-   "at": 1794233410384,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2"
-  },
-  {
-   "id": "925b2b40",
-   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses",
-   "at": 1794233409710,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "af9e39f1",
-   "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
-   "at": 1794233409101,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2"
-  },
-  {
-   "id": "e3961128",
-   "text": "AAR fix plans (approve first): 1) claude-mods/kit/agents/engineer.md, under its rules add: \"Code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only.\" 2) agent-flow README \"Run it locally\": say `pnpm run dev:demo` serves sample data on 3010 (`pnpm dev` sets NEXT_PUBLIC_DEMO=0).",
-   "at": 1794233408367,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
-  },
-  {
-   "id": "5b95f145",
-   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/rules.md, under \"Every role\", add: \"Never send System Events keystroke or key code to another app while Kenneth may be typing: focus moves and the keys land in his window. Read Apple Notes with osascript get plaintext; list ticks under For you.\" Mem",
-   "at": 1794233407680,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "98c31766",
-   "text": "Approve kit rule fix (AAR 2026-11-07): in claude-mods/kit/rules.md replace \"Role subagents stop at 60 turns: keep a brief to about 4 items\" with \"Role subagents stop at their maxTurns (engineer 60, qa and designer 40, researcher 25): keep a brief to about 4 items, and run at most about 6 Opus subage",
-   "at": 1794233407017,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes"
-  }
- ],
  "suggested": [
   {
    "id": "7bd3478d",
@@ -834,14 +753,6 @@
    "why": "you"
   },
   {
-   "id": "c99fc568",
-   "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
-   "at": 1794234455754,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "you"
-  },
-  {
    "id": "ad6eba1a",
    "text": "reload the Switchboard windows so the extension picks up the change, then commit.",
    "at": 1794235794135,
@@ -850,5 +761,86 @@
    "why": "you"
   }
  ],
- "cleared": 1
+ "ticked": [
+  {
+   "id": "c99fc568",
+   "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you",
+   "at": 1794236917088
+  },
+  {
+   "id": "0e849084",
+   "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
+   "at": 1794236073782,
+   "by": "e4493897-e467-478a-be18-a607187e2f9f",
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on"
+  },
+  {
+   "id": "a38d0a25",
+   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
+   "at": 1794233558060,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2"
+  },
+  {
+   "id": "440724a4",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
+   "at": 1794233411579,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
+  },
+  {
+   "id": "ad52b456",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
+   "at": 1794233411110,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
+  },
+  {
+   "id": "178b1928",
+   "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
+   "at": 1794233410384,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2"
+  },
+  {
+   "id": "925b2b40",
+   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses",
+   "at": 1794233409710,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "af9e39f1",
+   "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
+   "at": 1794233409101,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2"
+  },
+  {
+   "id": "e3961128",
+   "text": "AAR fix plans (approve first): 1) claude-mods/kit/agents/engineer.md, under its rules add: \"Code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only.\" 2) agent-flow README \"Run it locally\": say `pnpm run dev:demo` serves sample data on 3010 (`pnpm dev` sets NEXT_PUBLIC_DEMO=0).",
+   "at": 1794233408367,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization"
+  },
+  {
+   "id": "5b95f145",
+   "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/rules.md, under \"Every role\", add: \"Never send System Events keystroke or key code to another app while Kenneth may be typing: focus moves and the keys land in his window. Read Apple Notes with osascript get plaintext; list ticks under For you.\" Mem",
+   "at": 1794233407680,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
+  }
+ ]
 }
