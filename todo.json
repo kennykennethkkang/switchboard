@@ -833,6 +833,14 @@
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization",
    "why": "you"
+  },
+  {
+   "id": "665ddabb",
+   "text": "Also can you add vercel agent desktop and check if it works better than mcp servers. Please do a full check and test to see which is better",
+   "at": 1794221225201,
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2",
+   "why": "missed"
   }
  ]
 }
