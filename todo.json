@@ -40,13 +40,6 @@
    "why": "missed"
   },
   {
-   "id": "98c31766",
-   "text": "Approve kit rule fix (AAR 2026-11-07): in claude-mods/kit/rules.md replace \"Role subagents stop at 60 turns: keep a brief to about 4 items\" with \"Role subagents stop at their maxTurns (engineer 60, qa and designer 40, researcher 25): keep a brief to about 4 items, and run at most about 6 Opus subage",
-   "at": 1794125531556,
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes"
-  },
-  {
    "id": "005e5cfd",
    "text": "MiroFish pilot on Switchboard: once ZEP_API_KEY is in ~/Documents/GitHub/MiroFish/.env (see SETUP-KENNETH.md), run sb-pilot.py with 20 agents, 10 rounds, seeded with the ux/ screenshot descriptions; read it as a rollout story, not a vote.",
    "at": 1794125532774,
@@ -313,7 +306,8 @@
   "ec7f192d": 1794221505175,
   "d6bdfb41": 1794222106640,
   "3b5da7e1": 1794233078910,
-  "07a47e6c": 1794233406734
+  "07a47e6c": 1794233406734,
+  "98c31766": 1794233407017
  },
  "suggested": [
   {
@@ -814,12 +808,20 @@
  ],
  "ticked": [
   {
+   "id": "98c31766",
+   "text": "Approve kit rule fix (AAR 2026-11-07): in claude-mods/kit/rules.md replace \"Role subagents stop at 60 turns: keep a brief to about 4 items\" with \"Role subagents stop at their maxTurns (engineer 60, qa and designer 40, researcher 25): keep a brief to about 4 items, and run at most about 6 Opus subage",
+   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "name": "Tailscale Commit Button Fixes",
+   "at": 1794233407017,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
    "id": "07a47e6c",
    "text": "Proposed kit edit (caveman A/B 2026-11-09, vault wiki/caveman-ab.md): caveman narration gave no quality or token gain over 20 runs, and the caveman skill is not installed anywhere, so the role files' Voice line is a no-op. Remove the \"Voice: load the caveman skill...\" paragraph from claude-mods kit/agents/{engineer,qa,ops,designer,growth,researcher,Explore}.md and the \"Caveman is for subagent narration only\" bullet from kit/rules.md.",
-   "from": "89e03d60-780d-404a-be78-5c13cc4422a9",
-   "name": "Fix Site Using Attached PDF v2",
    "at": 1794233406734,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "name": "Fix Site Using Attached PDF v2"
   },
   {
    "id": "3b5da7e1",
@@ -889,13 +891,6 @@
    "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
    "name": "Codex Switchboard Integration Setup v4",
    "why": "you"
-  },
-  {
-   "id": "6a7283d4",
-   "text": "AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control push) and send the 30-min expiry heads-up there too",
-   "at": 1794214840099,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
   }
  ]
 }
