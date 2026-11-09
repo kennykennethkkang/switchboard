@@ -2,15 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "b673a51e",
-   "text": "Kit experiment: delegation costs 3x to 4x with no correctness gain on tasks up to about 5 files (vault ecc-vs-switchboard-kit). Try a rules.md line telling the lead to work solo below a size threshold, and A/B it.",
-   "at": 1794255859245,
-   "chat": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
-   "host": "62903adf5e340f87",
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on"
-  },
-  {
    "id": "6e1d42fa",
    "text": "Deep-research eval round 2: add 10 harder questions (4+ hops, conflicting or recent sources) to claude-mods/kit/skills/deep-research/eval/questions.json, run the standard level vs the researcher prompt on sonnet with two judges, and keep the skill only if it wins on citations.",
    "at": 1794125533920,
@@ -340,7 +331,8 @@
   "44e4175f": 1794239653085,
   "4a336629": 1794242631400,
   "89c50735": 1794244332197,
-  "2e5adc66": 1794256015472
+  "2e5adc66": 1794256015472,
+  "b673a51e": 1794256324677
  },
  "suggested": [
   {
@@ -482,13 +474,21 @@
  ],
  "ticked": [
   {
+   "id": "b673a51e",
+   "text": "Kit experiment: delegation costs 3x to 4x with no correctness gain on tasks up to about 5 files (vault ecc-vs-switchboard-kit). Try a rules.md line telling the lead to work solo below a size threshold, and A/B it.",
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on",
+   "at": 1794256324677,
+   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89"
+  },
+  {
    "id": "2e5adc66",
    "text": "Rebuild bench tasks t8 and t9 (TS event store, Python pagination) into ~/.claude/bench-kit from the 2026-11-03 transcript dbc421a5",
+   "at": 1794256015472,
+   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
    "from": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
    "before": "b673a51e",
-   "name": "Switchboard kit delegation A B",
-   "at": 1794256015472,
-   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89"
+   "name": "Switchboard kit delegation A B"
   }
  ]
 }
