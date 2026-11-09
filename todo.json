@@ -465,6 +465,22 @@
    "from": "b945f546-538f-467a-9ce7-18197f1f447f",
    "name": "Rename agent-flow to switchboard",
    "why": "missed"
+  },
+  {
+   "id": "3bca357b",
+   "text": "Remove kennykang as for ace and royce they do not need mfa for now. Open openrouter for me to set",
+   "at": 1794242625768,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "missed"
+  },
+  {
+   "id": "300d38c8",
+   "text": "Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang",
+   "at": 1794242625768,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "missed"
   }
  ]
 }
