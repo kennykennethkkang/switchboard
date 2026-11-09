@@ -833,7 +833,30 @@
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "you"
+  },
+  {
+   "id": "b53117ca",
+   "text": "These aren't included in the claude picker also no page for codex run where do I do that?",
+   "at": 1794234450739,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "missed"
+  },
+  {
+   "id": "b8f9599a",
+   "text": "I do not see the pages pulled up",
+   "at": 1794234450739,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "missed"
+  },
+  {
+   "id": "d2136104",
+   "text": "Finished them and they aren't showing on /mcp",
+   "at": 1794234450739,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "missed"
   }
- ],
- "cleared": 1
+ ]
 }
