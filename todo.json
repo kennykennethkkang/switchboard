@@ -12,9 +12,11 @@
   {
    "id": "d6bdfb41",
    "text": "Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Slack/Notion/Drive/Figma/Linear). Each needs Kenneth's API key; wire into kit setup mcps list.",
-   "at": 1793667505292,
+   "at": 1794221977241,
    "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt"
+   "name": "Fix Switchboard plugin access prompt",
+   "chat": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "0e849084",
