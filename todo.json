@@ -276,7 +276,12 @@
   "e39c1539": 1794207110753,
   "32ff347d": 1794207110753,
   "2de7ef70": 1794207110753,
-  "068a11df": 1794207340795
+  "068a11df": 1794207340795,
+  "93c7bf64": 1794207458873,
+  "9df55e80": 1794207458873,
+  "d1ea5705": 1794207458873,
+  "d7bc5b3b": 1794207458873,
+  "dd2cf604": 1794207458873
  },
  "ticked": [
   {
@@ -713,14 +718,6 @@
    "why": "missed"
   },
   {
-   "id": "93c7bf64",
-   "text": "Run `claude plugin update` for paid-guard and bash-approve.",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
    "id": "2dc6cbb4",
    "text": "Reload any VS Code window that still shows the old panel.",
    "at": 1794197121845,
@@ -769,37 +766,12 @@
    "why": "missed"
   },
   {
-   "id": "9df55e80",
-   "text": "Rebuild and reload Switchboard. That brings in everything from today: the layout, the cards, the Court, the MiroFish card and the stuck-watcher fix.",
-   "at": 1794207110753,
+   "id": "fa7b295d",
+   "text": "commit both repos. The folder rename still happens on its own once VS Code is closed.",
+   "at": 1794207458873,
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "you"
-  },
-  {
-   "id": "d1ea5705",
-   "text": "When you're ready for the rename, close VS Code and the chats in `agent-flow`.",
-   "at": 1794207110753,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "d7bc5b3b",
-   "text": "Commit both repos, and `sb-pilot.py` in MiroFish if you want to keep it.",
-   "at": 1794207110753,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "dd2cf604",
-   "text": "On a phone, the 90-chat Court still clips at the edges with Fit. This was already on the to-do as the crowded phone view.",
-   "at": 1794207110753,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "later"
   }
- ],
- "cleared": 1
+ ]
 }
