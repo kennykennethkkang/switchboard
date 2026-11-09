@@ -282,9 +282,19 @@
   "7bd3478d": 1794236926682,
   "baeb9e5f": 1794236931741,
   "745daf50": 1794236932636,
-  "1a5a8fd1": 1794236933909
+  "1a5a8fd1": 1794236933909,
+  "2173ddca": 1794237108011
  },
  "ticked": [
+  {
+   "id": "2173ddca",
+   "text": "Close VS Code, Claude and Codex. Run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename switc",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "you",
+   "at": 1794237108011,
+   "by": "b945f546-538f-467a-9ce7-18197f1f447f"
+  },
   {
    "id": "1a5a8fd1",
    "text": "A new top-level `LICENSE`.",
@@ -356,14 +366,6 @@
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "178b1928",
-   "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
-   "at": 1794233410384,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2"
   }
  ],
  "suggested": [
@@ -505,14 +507,6 @@
   {
    "id": "583d0e2a",
    "text": "Paste your Perplexity key in Settings, Accounts, API keys, then run Set up. Run `codex mcp login slack` and `codex mcp login cloudflare`, then reload VS Code.",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "you"
-  },
-  {
-   "id": "2173ddca",
-   "text": "Close VS Code, Claude and Codex. Run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename switc",
    "at": 1794134076971,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
@@ -829,6 +823,22 @@
    "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
    "name": "Map Component Cleanup",
    "why": "later"
+  },
+  {
+   "id": "cdde4a23",
+   "text": "Let the other two chats finish (3709204e is editing `local.ts`, 13b6b943 the map), then quit VS Code with Cmd+Q. The move runs within 20 seconds and VS Code reo",
+   "at": 1794237108011,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
+   "why": "you"
+  },
+  {
+   "id": "bc70e22a",
+   "text": "Commit both repos once it reopens.",
+   "at": 1794237108011,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
+   "why": "you"
   }
  ]
 }
