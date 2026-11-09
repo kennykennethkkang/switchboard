@@ -434,6 +434,54 @@
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later"
+  },
+  {
+   "id": "1e7dacab",
+   "text": "Reload VS Code once the extension is rebuilt, so the new to-do logic runs.",
+   "at": 1794238042421,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "you"
+  },
+  {
+   "id": "f4ab23a6",
+   "text": "armasu.app: sign in and check the closet, Social and Settings.",
+   "at": 1794238042421,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "you"
+  },
+  {
+   "id": "88785a3c",
+   "text": "AWS IAM users: kennykang, Ace-Lavilla and Royce-Li still have no MFA.",
+   "at": 1794238042421,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "you"
+  },
+  {
+   "id": "94b34aca",
+   "text": "OpenRouter keys: set a credit limit on your key.",
+   "at": 1794238042421,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "you"
+  },
+  {
+   "id": "0b6cfec0",
+   "text": "Commit both repos.",
+   "at": 1794238042421,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "you"
+  },
+  {
+   "id": "4a336629",
+   "text": "The \"Finish up\" section in the web panel will now always be empty. I left it in place, and the demo data still shows sample items there.",
+   "at": 1794238042421,
+   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
+   "name": "Auto-complete todo tracking",
+   "why": "later"
   }
  ]
 }
