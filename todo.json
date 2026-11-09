@@ -288,7 +288,8 @@
   "bc70e22a": 1794237165270,
   "cdde4a23": 1794237309749,
   "c64b1a07": 1794237365205,
-  "029c83d8": 1794237365205
+  "029c83d8": 1794237365205,
+  "c074c6d7": 1794237434107
  },
  "ticked": [
   {
@@ -814,19 +815,27 @@
    "why": "you"
   },
   {
-   "id": "c074c6d7",
-   "text": "Once the other chats are done, quit VS Code with Cmd+Q. The move starts within 20 seconds and VS Code reopens on the new folder.",
-   "at": 1794237309749,
-   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
-   "name": "Rename agent-flow to switchboard",
-   "why": "you"
-  },
-  {
    "id": "a941e2df",
    "text": "Reload the Switchboard window and open the Map.",
    "at": 1794237365205,
    "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
    "name": "Map Component Cleanup",
+   "why": "you"
+  },
+  {
+   "id": "3c7e1b66",
+   "text": "Wait for the audit chat to finish before you quit VS Code. Quitting ends that chat in the middle of its edit, and the folder only moves once VS Code is closed.",
+   "at": 1794237434107,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
+   "why": "you"
+  },
+  {
+   "id": "f87c572f",
+   "text": "If you commit before it finishes, those two files will be in the commit but not described in the message below. Its own commit message will cover them once it's",
+   "at": 1794237434107,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
    "why": "you"
   }
  ]
