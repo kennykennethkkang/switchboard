@@ -858,7 +858,14 @@
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2",
    "why": "you"
+  },
+  {
+   "id": "118ce312",
+   "text": "One more thing to please remember to keep in mind when doing fixes and changes or creating any new tools is to list out new tools I have created in read me and give proper credit to others tools. Then",
+   "at": 1794221500285,
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2",
+   "why": "missed"
   }
- ],
- "cleared": 1
+ ]
 }
