@@ -335,7 +335,8 @@
   "94b34aca": 1794239577891,
   "f4ab23a6": 1794239577891,
   "79dfdbc6": 1794239577891,
-  "44e4175f": 1794239653085
+  "44e4175f": 1794239653085,
+  "4a336629": 1794242631400
  },
  "suggested": [
   {
@@ -433,14 +434,6 @@
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed"
-  },
-  {
-   "id": "4a336629",
-   "text": "The \"Finish up\" section in the web panel will now always be empty. I left it in place, and the demo data still shows sample items there.",
-   "at": 1794238042421,
-   "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
-   "name": "Auto-complete todo tracking",
-   "why": "later"
   },
   {
    "id": "89c50735",
