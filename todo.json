@@ -61,13 +61,6 @@
    "name": "Tailscale Commit Button Fixes v2"
   },
   {
-   "id": "440724a4",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
-   "at": 1794137323685,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
    "id": "ad7e4488",
    "text": "Switchboard overhaul: build the layout Kenneth picks from the options page (A Inbox first recommended, plus B's live Stuck lane, C's named Cmd+K commands, diff preview in Your OK, project color on Inbox items, a11y labels/focus). Mockups: https://claude.ai/artifact/Htpnb2JAZQtpKpKNCSYkLB",
    "at": 1794217344983,
@@ -271,7 +264,8 @@
   "af9e39f1": 1794233409101,
   "925b2b40": 1794233409710,
   "178b1928": 1794233410384,
-  "ad52b456": 1794233411110
+  "ad52b456": 1794233411110,
+  "440724a4": 1794233411579
  },
  "suggested": [
   {
@@ -772,12 +766,20 @@
  ],
  "ticked": [
   {
-   "id": "ad52b456",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
+   "id": "440724a4",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3",
-   "at": 1794233411110,
+   "at": 1794233411579,
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
+   "id": "ad52b456",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
+   "at": 1794233411110,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
   },
   {
    "id": "178b1928",
@@ -842,14 +844,6 @@
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "d6bdfb41",
-   "text": "Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Slack/Notion/Drive/Figma/Linear). Each needs Kenneth's API key; wire into kit setup mcps list.",
-   "at": 1794222106640,
-   "by": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt"
   }
  ]
 }
