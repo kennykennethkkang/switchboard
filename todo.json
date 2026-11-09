@@ -122,6 +122,13 @@
    "at": 1794217349958,
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
+  },
+  {
+   "id": "c1e571de",
+   "text": "Add hub-draft-commit to web/lib/hub-demo.ts so the Write commit message button can be tried on sample data",
+   "at": 1794217354635,
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization"
   }
  ],
  "removed": {
