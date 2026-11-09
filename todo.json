@@ -123,13 +123,6 @@
    "name": "Tailscale Commit Button Fixes v3"
   },
   {
-   "id": "71d7ef16",
-   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
-   "at": 1794205237136,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
    "id": "1cc1b2f2",
    "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
    "at": 1794205238407,
@@ -290,91 +283,9 @@
   "0aa9d427": 1794205306312,
   "1b53de53": 1794205306312,
   "621c5d95": 1794205306312,
-  "9e8016f7": 1794205306312
+  "9e8016f7": 1794205306312,
+  "71d7ef16": 1794207082598
  },
- "ticked": [
-  {
-   "id": "a3bfbe88",
-   "text": "Build the wait rope and frozen pause after you approve the mocks.",
-   "at": 1794197121845,
-   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
-   "id": "784b0510",
-   "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
-   "at": 1794125538357,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "ac60400a",
-   "text": "Also tell what was added in what wasn't and why",
-   "at": 1794125487203,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
-  },
-  {
-   "id": "9ab89b5f",
-   "text": "Phone voice for Jarvis: add a browser getUserMedia mic path for the phone over the Tailscale Serve URL (port 3131) and test on iPhone (watch tailscale issue 19147)",
-   "at": 1794125487009,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity"
-  },
-  {
-   "id": "1478322a-ok",
-   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
-   "at": 1794125486813,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "missed"
-  },
-  {
-   "id": "8133346b",
-   "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
-   "at": 1794114467698,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
-  },
-  {
-   "id": "7ffd4fde",
-   "text": "Create instructions on creating mod instructions taylored for your own use.",
-   "at": 1794114467048,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
-  },
-  {
-   "id": "29c4f61f",
-   "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
-   "at": 1794114466352,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
-   "name": "Set up Instagram video tasks v2"
-  },
-  {
-   "id": "e75e0921",
-   "text": "Can you check if mirofish is added in",
-   "at": 1794113771979,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
-  },
-  {
-   "id": "8fbb8fb6",
-   "text": "Proposed (AAR 2026-11-08): crowd-ab author rule. In claude-mods/kit/skills/crowd-ab/SKILL.md, under \"## Inputs\" after the screenshot bullet, add: \"- Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its",
-   "at": 1794113771198,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  }
- ],
  "suggested": [
   {
    "id": "7bd3478d",
@@ -816,5 +727,87 @@
    "why": "you"
   }
  ],
- "cleared": 2
+ "ticked": [
+  {
+   "id": "71d7ef16",
+   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "at": 1794207082598,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0"
+  },
+  {
+   "id": "a3bfbe88",
+   "text": "Build the wait rope and frozen pause after you approve the mocks.",
+   "at": 1794197121845,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "784b0510",
+   "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
+   "at": 1794125538357,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "ac60400a",
+   "text": "Also tell what was added in what wasn't and why",
+   "at": 1794125487203,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "missed"
+  },
+  {
+   "id": "9ab89b5f",
+   "text": "Phone voice for Jarvis: add a browser getUserMedia mic path for the phone over the Tailscale Serve URL (port 3131) and test on iPhone (watch tailscale issue 19147)",
+   "at": 1794125487009,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
+   "name": "Todo Tracking Session Continuity"
+  },
+  {
+   "id": "1478322a-ok",
+   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
+   "at": 1794125486813,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
+   "name": "Fix Switchboard plugin access prompt",
+   "why": "missed"
+  },
+  {
+   "id": "8133346b",
+   "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
+   "at": 1794114467698,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
+  },
+  {
+   "id": "7ffd4fde",
+   "text": "Create instructions on creating mod instructions taylored for your own use.",
+   "at": 1794114467048,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
+  },
+  {
+   "id": "29c4f61f",
+   "text": "Chat view: add the Transcript tab for Codex chats (codex-session-watcher.ts format), same paging and redaction as Claude",
+   "at": 1794114466352,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
+   "name": "Set up Instagram video tasks v2"
+  },
+  {
+   "id": "e75e0921",
+   "text": "Can you check if mirofish is added in",
+   "at": 1794113771979,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "missed"
+  }
+ ]
 }
