@@ -61,13 +61,6 @@
    "name": "Tailscale Commit Button Fixes v2"
   },
   {
-   "id": "925b2b40",
-   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses",
-   "at": 1794132914791,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
    "id": "ad52b456",
    "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
    "at": 1794137321564,
@@ -289,7 +282,8 @@
   "98c31766": 1794233407017,
   "5b95f145": 1794233407680,
   "e3961128": 1794233408367,
-  "af9e39f1": 1794233409101
+  "af9e39f1": 1794233409101,
+  "925b2b40": 1794233409710
  },
  "suggested": [
   {
@@ -790,12 +784,20 @@
  ],
  "ticked": [
   {
+   "id": "925b2b40",
+   "text": "Proposed skill change (AAR 2026-11-08): in claude-mods/kit/skills/crowd-ab/SKILL.md, add: \"Set --goal to the job the new view is for. A glance-at-status goal always crowns a list or dashboard over a visual view; when testing a visual view, run its own goal too and report a glance-only loss as 'loses",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "at": 1794233409710,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
    "id": "af9e39f1",
    "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
    "at": 1794233409101,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2"
   },
   {
    "id": "e3961128",
@@ -860,15 +862,6 @@
    "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "4af72bfe",
-   "text": "Commit both repos (messages below; agent-flow's also covers the earlier 0.21.0 to 0.21.3 work).",
-   "at": 1794217696098,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
    "why": "you"
   }
  ]
