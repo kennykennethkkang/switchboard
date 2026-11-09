@@ -280,17 +280,10 @@
   "116db449": 1794236134513,
   "c99fc568": 1794236917088,
   "7bd3478d": 1794236926682,
-  "baeb9e5f": 1794236931741
+  "baeb9e5f": 1794236931741,
+  "745daf50": 1794236932636
  },
  "suggested": [
-  {
-   "id": "745daf50",
-   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
   {
    "id": "1a5a8fd1",
    "text": "A new top-level `LICENSE`.",
@@ -749,12 +742,20 @@
  ],
  "ticked": [
   {
-   "id": "baeb9e5f",
-   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
+   "id": "745daf50",
+   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you",
-   "at": 1794236931741
+   "at": 1794236932636
+  },
+  {
+   "id": "baeb9e5f",
+   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
+   "at": 1794236931741,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
   },
   {
    "id": "7bd3478d",
@@ -819,14 +820,6 @@
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "af9e39f1",
-   "text": "Approve AAR fix: qa narrow-width check. Target claude-mods/kit/agents/qa.md, in the browser check section add: \"At 380px, report the top y (getBoundingClientRect().top) of the first primary action (Approve, answer) and compare it with the mockup; more than ~100px lower is a finding.\" Why: 2026-11-09 B-led Switchboard rebuild put Approve at y~740 vs ~490 in the mockup; all tests passed and only the design review caught it.",
-   "at": 1794233409101,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2"
   }
  ]
 }
