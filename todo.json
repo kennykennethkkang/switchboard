@@ -279,7 +279,10 @@
   "006b0a7f": 1794233689091,
   "51bb6b40": 1794233689091,
   "9b1fbd4d": 1794233952373,
-  "85843cce": 1794234455754
+  "85843cce": 1794234455754,
+  "2b0f32fc": 1794234739479,
+  "cf1bf50c": 1794234739479,
+  "b40a9840": 1794234739479
  },
  "ticked": [
   {
@@ -786,30 +789,6 @@
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2",
    "why": "missed"
-  },
-  {
-   "id": "2b0f32fc",
-   "text": "Reload each VS Code window (Developer: Reload Window) to get 0.21.9.",
-   "at": 1794221505175,
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
-   "why": "you"
-  },
-  {
-   "id": "cf1bf50c",
-   "text": "Chat cards, the approve bar and the map views still say \"Ready to approve\".",
-   "at": 1794221505175,
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
-   "why": "you"
-  },
-  {
-   "id": "b40a9840",
-   "text": "New-machine setup doesn't install `agent-browser`, `agent-desktop` or the phone-mode mod yet.",
-   "at": 1794221505175,
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
-   "why": "later"
   },
   {
    "id": "a7df2aa6",
