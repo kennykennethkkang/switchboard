@@ -275,7 +275,11 @@
   "5b5cf8d5": 1794207923920,
   "1cea52a0": 1794214220569,
   "fe4738f7": 1794214839912,
-  "6a7283d4": 1794214840099
+  "6a7283d4": 1794214840099,
+  "9f15eb5f": 1794215388481,
+  "c72a4d5e": 1794215388481,
+  "9588df5d": 1794215388481,
+  "7fae770d": 1794215388481
  },
  "ticked": [
   {
@@ -769,38 +773,6 @@
    "at": 1794214213977,
    "from": "f89cf798-7692-45b2-96ab-b1061c8ed6c5",
    "name": "Codex Switchboard Integration Setup v4",
-   "why": "you"
-  },
-  {
-   "id": "9f15eb5f",
-   "text": "Rebuild and restart the phone app (`node app/build.js`), then reload the VS Code windows.",
-   "at": 1794214878401,
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "name": "AWS phone heads-up path",
-   "why": "you"
-  },
-  {
-   "id": "c72a4d5e",
-   "text": "On the iPhone, open the Tailscale https link in Safari, then Share > Add to Home Screen. iOS only allows push from a home-screen app, on iOS 16.4 or later.",
-   "at": 1794214878401,
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "name": "AWS phone heads-up path",
-   "why": "you"
-  },
-  {
-   "id": "9588df5d",
-   "text": "Open Switchboard from the home screen and sign in again. It doesn't share Safari's sign-in.",
-   "at": 1794214878401,
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "name": "AWS phone heads-up path",
-   "why": "you"
-  },
-  {
-   "id": "7fae770d",
-   "text": "Turn on Settings > Chats > Phone alerts and allow notifications.",
-   "at": 1794214878401,
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "name": "AWS phone heads-up path",
    "why": "you"
   },
   {
