@@ -279,17 +279,10 @@
   "0e849084": 1794236073782,
   "116db449": 1794236134513,
   "c99fc568": 1794236917088,
-  "7bd3478d": 1794236926682
+  "7bd3478d": 1794236926682,
+  "baeb9e5f": 1794236931741
  },
  "suggested": [
-  {
-   "id": "baeb9e5f",
-   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
-   "at": 1794080384174,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
   {
    "id": "745daf50",
    "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
@@ -756,12 +749,20 @@
  ],
  "ticked": [
   {
-   "id": "7bd3478d",
-   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "id": "baeb9e5f",
+   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
    "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
    "name": "Using graph engineering knowledge and",
    "why": "you",
-   "at": 1794236926682
+   "at": 1794236931741
+  },
+  {
+   "id": "7bd3478d",
+   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "at": 1794236926682,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
   },
   {
    "id": "c99fc568",
@@ -826,14 +827,6 @@
    "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2"
-  },
-  {
-   "id": "e3961128",
-   "text": "AAR fix plans (approve first): 1) claude-mods/kit/agents/engineer.md, under its rules add: \"Code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only.\" 2) agent-flow README \"Run it locally\": say `pnpm run dev:demo` serves sample data on 3010 (`pnpm dev` sets NEXT_PUBLIC_DEMO=0).",
-   "at": 1794233408367,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
   }
  ]
 }
