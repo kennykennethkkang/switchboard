@@ -281,9 +281,39 @@
   "9df55e80": 1794207458873,
   "d1ea5705": 1794207458873,
   "d7bc5b3b": 1794207458873,
-  "dd2cf604": 1794207458873
+  "dd2cf604": 1794207458873,
+  "4fd3f17f": 1794207540267,
+  "ed3a63d0": 1794207540267,
+  "2dc6cbb4": 1794207540267
  },
  "ticked": [
+  {
+   "id": "2dc6cbb4",
+   "text": "Reload any VS Code window that still shows the old panel.",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677"
+  },
+  {
+   "id": "ed3a63d0",
+   "text": "Reload one VS Code window to pick up the new extension code.",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "why": "you",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677"
+  },
+  {
+   "id": "4fd3f17f",
+   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677"
+  },
   {
    "id": "7035c0ab",
    "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
@@ -341,28 +371,6 @@
    "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
    "name": "Todo Tracking Session Continuity"
-  },
-  {
-   "id": "1478322a-ok",
-   "text": "There is still an issue with switchboard asking for access to use plugins. Please fix it so it doesn't require user access to use plugins and switchboard gives automatic access to it. Using gemini or",
-   "at": 1794125486813,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "2306ad7c-19ba-48f5-acd2-9aff946b6ba0",
-   "name": "Fix Switchboard plugin access prompt",
-   "why": "missed"
-  },
-  {
-   "id": "8133346b",
-   "text": "Switchboard app keeper: add a way to turn the 3131 keep-alive off (today killing the app brings it back in ~6 s; launchctl bootout works until the next window activates). Also consider backoff if the app crash-loops.",
-   "at": 1794114467698,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
-  },
-  {
-   "id": "7ffd4fde",
-   "text": "Create instructions on creating mod instructions taylored for your own use.",
-   "at": 1794114467048,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd"
   }
  ],
  "suggested": [
@@ -455,14 +463,6 @@
    "why": "you"
   },
   {
-   "id": "4fd3f17f",
-   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
-   "at": 1794085711184,
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "you"
-  },
-  {
    "id": "e20f200e",
    "text": "Log out of Instagram in Chrome if you don't want to stay signed in.",
    "at": 1794085711184,
@@ -540,14 +540,6 @@
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
    "why": "missed"
-  },
-  {
-   "id": "ed3a63d0",
-   "text": "Reload one VS Code window to pick up the new extension code.",
-   "at": 1794131692535,
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2",
-   "why": "you"
   },
   {
    "id": "1379ee82",
@@ -718,14 +710,6 @@
    "why": "missed"
   },
   {
-   "id": "2dc6cbb4",
-   "text": "Reload any VS Code window that still shows the old panel.",
-   "at": 1794197121845,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
    "id": "2e9c37da",
    "text": "Also another issue is that the celestial court does not properly represent all components inside of switchboard. Please make sure that memory and everything related with it is visually shown here also",
    "at": 1794205298759,
@@ -772,6 +756,14 @@
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "you"
+  },
+  {
+   "id": "1cea52a0",
+   "text": "the \"Couple of issues to bring v2\" rebuild, which will go out as 0.21.7.",
+   "at": 1794207540267,
+   "from": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "name": "Tailscale Commit Button Fixes v5",
+   "why": "later"
   }
  ]
 }
