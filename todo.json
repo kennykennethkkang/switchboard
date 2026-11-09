@@ -102,13 +102,6 @@
    "name": "Codex Switchboard Integration Setup v2"
   },
   {
-   "id": "5b5cf8d5",
-   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
-   "at": 1794136321609,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2"
-  },
-  {
    "id": "ad52b456",
    "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
    "at": 1794137321564,
@@ -284,95 +277,9 @@
   "dd2cf604": 1794207458873,
   "4fd3f17f": 1794207540267,
   "ed3a63d0": 1794207540267,
-  "2dc6cbb4": 1794207540267
+  "2dc6cbb4": 1794207540267,
+  "5b5cf8d5": 1794207923920
  },
- "ticked": [
-  {
-   "id": "2dc6cbb4",
-   "text": "Reload any VS Code window that still shows the old panel.",
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677"
-  },
-  {
-   "id": "ed3a63d0",
-   "text": "Reload one VS Code window to pick up the new extension code.",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2",
-   "why": "you",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677"
-  },
-  {
-   "id": "4fd3f17f",
-   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring",
-   "why": "you",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677"
-  },
-  {
-   "id": "7035c0ab",
-   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
-   "at": 1794207084031,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "1cc1b2f2",
-   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
-   "at": 1794207083314,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "71d7ef16",
-   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
-   "at": 1794207082598,
-   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
-   "id": "a3bfbe88",
-   "text": "Build the wait rope and frozen pause after you approve the mocks.",
-   "at": 1794197121845,
-   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
-   "id": "784b0510",
-   "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
-   "at": 1794125538357,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "ac60400a",
-   "text": "Also tell what was added in what wasn't and why",
-   "at": 1794125487203,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
-  },
-  {
-   "id": "9ab89b5f",
-   "text": "Phone voice for Jarvis: add a browser getUserMedia mic path for the phone over the Tailscale Serve URL (port 3131) and test on iPhone (watch tailscale issue 19147)",
-   "at": 1794125487009,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "44dbee25-a02d-4409-85ba-a28dc7cda5f4",
-   "name": "Todo Tracking Session Continuity"
-  }
- ],
  "suggested": [
   {
    "id": "7bd3478d",
@@ -764,6 +671,93 @@
    "from": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
    "name": "Tailscale Commit Button Fixes v5",
    "why": "later"
+  }
+ ],
+ "ticked": [
+  {
+   "id": "5b5cf8d5",
+   "text": "Chat git guard everywhere: Set up installs the CLAUDECODE pre-commit/pre-push guard (as in agent-flow/.git/hooks) in every project repo, skipping repos with core.hooksPath, and Switchboard sets a marker env var on Codex chats so the guard covers them too",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "at": 1794207923920,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0"
+  },
+  {
+   "id": "2dc6cbb4",
+   "text": "Reload any VS Code window that still shows the old panel.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
+  },
+  {
+   "id": "ed3a63d0",
+   "text": "Reload one VS Code window to pick up the new extension code.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2",
+   "why": "you"
+  },
+  {
+   "id": "4fd3f17f",
+   "text": "Reload VS Code windows if the Switchboard panel still looks old.",
+   "at": 1794207540267,
+   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
+   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
+   "name": "Couple of issues to bring",
+   "why": "you"
+  },
+  {
+   "id": "7035c0ab",
+   "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
+   "at": 1794207084031,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "1cc1b2f2",
+   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
+   "at": 1794207083314,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "71d7ef16",
+   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
+   "at": 1794207082598,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "a3bfbe88",
+   "text": "Build the wait rope and frozen pause after you approve the mocks.",
+   "at": 1794197121845,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you"
+  },
+  {
+   "id": "784b0510",
+   "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
+   "at": 1794125538357,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
+  },
+  {
+   "id": "ac60400a",
+   "text": "Also tell what was added in what wasn't and why",
+   "at": 1794125487203,
+   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "missed"
   }
  ]
 }
