@@ -286,7 +286,9 @@
   "2173ddca": 1794237108011,
   "ad6eba1a": 1794237165270,
   "bc70e22a": 1794237165270,
-  "cdde4a23": 1794237309749
+  "cdde4a23": 1794237309749,
+  "c64b1a07": 1794237365205,
+  "029c83d8": 1794237365205
  },
  "ticked": [
   {
@@ -804,22 +806,6 @@
    "why": "you"
   },
   {
-   "id": "c64b1a07",
-   "text": "Reload the Switchboard window and open the Map to see it live.",
-   "at": 1794236944096,
-   "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
-   "name": "Map Component Cleanup",
-   "why": "you"
-  },
-  {
-   "id": "029c83d8",
-   "text": "On a phone, the Code list still has no legend chips, so search is the only way to filter there.",
-   "at": 1794236944096,
-   "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
-   "name": "Map Component Cleanup",
-   "why": "later"
-  },
-  {
    "id": "23bdf166",
    "text": "commit both repos. I only wrote bullets for this chat's work in `claude-mods`; the rest of its changes come from other chats, which Switchboard merges in.",
    "at": 1794237165270,
@@ -833,6 +819,14 @@
    "at": 1794237309749,
    "from": "b945f546-538f-467a-9ce7-18197f1f447f",
    "name": "Rename agent-flow to switchboard",
+   "why": "you"
+  },
+  {
+   "id": "a941e2df",
+   "text": "Reload the Switchboard window and open the Map.",
+   "at": 1794237365205,
+   "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
+   "name": "Map Component Cleanup",
    "why": "you"
   }
  ]
