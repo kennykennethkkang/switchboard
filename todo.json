@@ -328,7 +328,8 @@
   "556a609b": 1794217590271,
   "4af72bfe": 1794217696098,
   "fa7b295d": 1794217696098,
-  "c1e571de": 1794218982671
+  "c1e571de": 1794218982671,
+  "99092daf": 1794221233812
  },
  "ticked": [
   {
@@ -841,6 +842,23 @@
    "from": "2557f872-fac4-4016-8555-033e539c4e86",
    "name": "Overhaul Switchboard Organization v2",
    "why": "missed"
+  },
+  {
+   "id": "75a083ac",
+   "text": "Reload the Switchboard windows to see the new layout, then try it at sidebar width and on your phone.",
+   "at": 1794221233812,
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2",
+   "why": "you"
+  },
+  {
+   "id": "ec7f192d",
+   "text": "Chat cards, the approve bar and the map views still say \"Ready to approve\". Only Now and Find say \"Ready for your OK\" so far.",
+   "at": 1794221233812,
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2",
+   "why": "you"
   }
- ]
+ ],
+ "cleared": 1
 }
