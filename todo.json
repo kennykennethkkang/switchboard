@@ -73,6 +73,13 @@
    "at": 1794233949224,
    "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
    "name": "agent-flow-f0"
+  },
+  {
+   "id": "a335ce3c",
+   "text": "AAR memory notes not saved (scheduled AAR had no write access to ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Armasu/memory): write two feedback notes there plus MEMORY.md lines. 1) switchboard-todo-store: each repo's to-do is git ref refs/switchboard/todo (read `git -C <repo> cat-file blob refs/switchboard/todo:todo.json`); claude-mods has none, so kit/AAR to-dos are closed with todo_done project agent-flow; ~/.claude/switchboard/todo/*.json are stale copies. 2) commit-block-other-repo: no Armasu changes = no plain Commit message block, only `Commit message (claude-mods):` style blocks. Full text in vault wiki/aar-armasu.md, 2026-11-09 v3 entry. Also: scheduled AAR runs need write permission to other projects' memory folders.",
+   "at": 1794233952279,
+   "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
+   "name": "agent-flow-f0"
   }
  ],
  "removed": {
