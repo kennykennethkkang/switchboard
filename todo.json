@@ -696,6 +696,30 @@
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3",
    "why": "you"
+  },
+  {
+   "id": "3ae0e414",
+   "text": "I already added the api key into that .env file and also how come it is not in the vs code explorer area or is it stored somewhere else?",
+   "at": 1794196287516,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
+  },
+  {
+   "id": "315a0ac8",
+   "text": "ok api key is inside of miro fish already please double check",
+   "at": 1794196287516,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
+  },
+  {
+   "id": "2fbd2f92",
+   "text": "If it is not in the folder please pull up the site I need to get the API key and also tell me where to place it. Also make sure future users who set this up don't have such a hard time. Maybe add it s",
+   "at": 1794196287516,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
   }
  ]
 }
