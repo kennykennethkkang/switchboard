@@ -877,6 +877,38 @@
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed"
+  },
+  {
+   "id": "fd024ff4",
+   "text": "Make a Firecrawl account and paste its key in Switchboard under Settings, Accounts, API keys.",
+   "at": 1794222127296,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
+  },
+  {
+   "id": "9ccce137",
+   "text": "Run Set up again, then sign in to `posthog` and `composio` with `/mcp` in a chat. For Codex, run `codex mcp login posthog` and `codex mcp login composio`.",
+   "at": 1794222127296,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
+  },
+  {
+   "id": "006b0a7f",
+   "text": "Reload the Switchboard windows and commit.",
+   "at": 1794222127296,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
+  },
+  {
+   "id": "51bb6b40",
+   "text": "Firecrawl isn't covered by paid-guard, so its credit use isn't gated. Add it in `claude-mods/paid-guard` if you want that.",
+   "at": 1794222127296,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
   }
  ]
 }
