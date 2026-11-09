@@ -277,7 +277,8 @@
   "fd024ff4": 1794233689091,
   "9ccce137": 1794233689091,
   "006b0a7f": 1794233689091,
-  "51bb6b40": 1794233689091
+  "51bb6b40": 1794233689091,
+  "9b1fbd4d": 1794233952373
  },
  "ticked": [
   {
@@ -463,14 +464,6 @@
    "text": "Restart any Codex chats that are already open, so they pick up the no-prompt setting.",
    "at": 1794112209535,
    "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
-   "why": "you"
-  },
-  {
-   "id": "9b1fbd4d",
-   "text": "commit claude-mods. Nothing in agent-flow changed.",
-   "at": 1794112236181,
-   "from": "0a9fa6a8-a134-4239-9fd6-258745d9ebe5",
-   "name": "Setup agent-flow project",
    "why": "you"
   },
   {
@@ -841,5 +834,6 @@
    "name": "Switchboard MCP connector setup",
    "why": "you"
   }
- ]
+ ],
+ "cleared": 1
 }
