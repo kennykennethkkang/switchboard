@@ -13,10 +13,10 @@
    "id": "0e849084",
    "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
    "at": 1794235037263,
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on",
    "chat": "e4493897-e467-478a-be18-a607187e2f9f",
-   "host": "62903adf5e340f87"
+   "host": "62903adf5e340f87",
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on"
   },
   {
    "id": "b673a51e",
@@ -846,6 +846,14 @@
    "at": 1794234455754,
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
+   "why": "you"
+  },
+  {
+   "id": "ad6eba1a",
+   "text": "reload the Switchboard windows so the extension picks up the change, then commit.",
+   "at": 1794235794135,
+   "from": "3709204e-d2f3-42c7-8a46-2adc3c9c25ae",
+   "name": "Fix temp chats appearing",
    "why": "you"
   }
  ]
