@@ -123,13 +123,6 @@
    "name": "Tailscale Commit Button Fixes v3"
   },
   {
-   "id": "1cc1b2f2",
-   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
-   "at": 1794205238407,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4"
-  },
-  {
    "id": "7035c0ab",
    "text": "Court gaps needing hub data: an Uploads place (uploads not in HubState) and a Claude realm inside Codex-led chats (HelperAi excludes claude)",
    "at": 1794205239386,
@@ -284,7 +277,8 @@
   "1b53de53": 1794205306312,
   "621c5d95": 1794205306312,
   "9e8016f7": 1794205306312,
-  "71d7ef16": 1794207082598
+  "71d7ef16": 1794207082598,
+  "1cc1b2f2": 1794207083314
  },
  "suggested": [
   {
@@ -729,12 +723,20 @@
  ],
  "ticked": [
   {
-   "id": "71d7ef16",
-   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
+   "id": "1cc1b2f2",
+   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
-   "at": 1794207082598,
+   "at": 1794207083314,
    "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0"
+  },
+  {
+   "id": "71d7ef16",
+   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
+   "at": 1794207082598,
+   "by": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
   },
   {
    "id": "a3bfbe88",
@@ -799,15 +801,6 @@
    "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "from": "657024f1-fbce-4b30-847d-dfb63902e74e",
    "name": "Set up Instagram video tasks v2"
-  },
-  {
-   "id": "e75e0921",
-   "text": "Can you check if mirofish is added in",
-   "at": 1794113771979,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "missed"
   }
  ]
 }
