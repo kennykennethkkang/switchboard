@@ -278,7 +278,8 @@
   "4fd3f17f": 1794207540267,
   "ed3a63d0": 1794207540267,
   "2dc6cbb4": 1794207540267,
-  "5b5cf8d5": 1794207923920
+  "5b5cf8d5": 1794207923920,
+  "1cea52a0": 1794214220569
  },
  "ticked": [
   {
@@ -750,14 +751,6 @@
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "you"
-  },
-  {
-   "id": "1cea52a0",
-   "text": "the \"Couple of issues to bring v2\" rebuild, which will go out as 0.21.7.",
-   "at": 1794207540267,
-   "from": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "name": "Tailscale Commit Button Fixes v5",
-   "why": "later"
   },
   {
    "id": "042a12a9",
