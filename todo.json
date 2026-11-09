@@ -124,13 +124,6 @@
    "name": "Overhaul Switchboard Organization"
   },
   {
-   "id": "c1e571de",
-   "text": "Add hub-draft-commit to web/lib/hub-demo.ts so the Write commit message button can be tried on sample data",
-   "at": 1794217354635,
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
-  },
-  {
    "id": "e3961128",
    "text": "AAR fix plans (approve first): 1) claude-mods/kit/agents/engineer.md, under its rules add: \"Code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only.\" 2) agent-flow README \"Run it locally\": say `pnpm run dev:demo` serves sample data on 3010 (`pnpm dev` sets NEXT_PUBLIC_DEMO=0).",
    "at": 1794217418707,
@@ -320,7 +313,8 @@
   "dc5c0e0f": 1794217454972,
   "556a609b": 1794217590271,
   "4af72bfe": 1794217696098,
-  "fa7b295d": 1794217696098
+  "fa7b295d": 1794217696098,
+  "c1e571de": 1794218982671
  },
  "suggested": [
   {
@@ -741,22 +735,30 @@
  ],
  "ticked": [
   {
+   "id": "c1e571de",
+   "text": "Add hub-draft-commit to web/lib/hub-demo.ts so the Write commit message button can be tried on sample data",
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization",
+   "at": 1794218982671,
+   "by": "da4605d2-f533-4303-a960-287d006cd833"
+  },
+  {
    "id": "fa7b295d",
    "text": "commit both repos. The folder rename still happens on its own once VS Code is closed.",
+   "at": 1794217696098,
+   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
-   "why": "you",
-   "at": 1794217696098,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259"
+   "why": "you"
   },
   {
    "id": "4af72bfe",
    "text": "Commit both repos (messages below; agent-flow's also covers the earlier 0.21.0 to 0.21.3 work).",
+   "at": 1794217696098,
+   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring",
-   "why": "you",
-   "at": 1794217696098,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259"
+   "why": "you"
   },
   {
    "id": "556a609b",
@@ -816,15 +818,6 @@
    "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
-   "id": "ed3a63d0",
-   "text": "Reload one VS Code window to pick up the new extension code.",
-   "at": 1794207540267,
-   "by": "d3709e5e-7033-4a08-af5e-1c5e2537b677",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2",
    "why": "you"
   }
  ]
