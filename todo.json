@@ -457,6 +457,14 @@
    "from": "651376ea-09aa-43d9-a8b2-3a6d72c8de3e",
    "name": "Cleanup map page connections",
    "why": "later"
+  },
+  {
+   "id": "2b2b1ed8",
+   "text": "Wait for all other chats in both armasu and switchboard to be completed then restart",
+   "at": 1794242392447,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
+   "why": "missed"
   }
  ]
 }
