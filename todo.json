@@ -253,9 +253,21 @@
   "54c0e21b": 1794134076971,
   "5e13e5d3": 1794134076971,
   "cbe2d195": 1794134131446,
-  "77dc8fdb-r": 1794164809704
+  "77dc8fdb-r": 1794164809704,
+  "a3bfbe88": 1794197121845,
+  "0d5b8bf5": 1794197121845,
+  "d89dbc20": 1794197121845
  },
  "ticked": [
+  {
+   "id": "a3bfbe88",
+   "text": "Build the wait rope and frozen pause after you approve the mocks.",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3",
+   "why": "you",
+   "at": 1794197121845,
+   "by": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0"
+  },
   {
    "id": "784b0510",
    "text": "MiroFish (666ghj/MiroFish, AGPL): optional \"what would happen\" scenario tool, not a crowd-ab backend. If wanted: 20-agent 10-round pilot to measure cost (needs LLM + Zep keys), then a skill that drives its :5001 backend. Notes in vault wiki/mirofish.md",
@@ -327,14 +339,6 @@
    "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2"
-  },
-  {
-   "id": "86d2ea6b",
-   "text": "Approve kit rule edit (from AAR 2026-11-07): in claude-mods/kit/rules.md under \"Hand any job that spans several files\", add \"End every brief with a tool-call budget (about 25 to 35) and 'send the Report before the budget runs out'.\" Three subagents hit their turn cap this chat without one.",
-   "at": 1794113769691,
-   "by": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
-   "name": "Couple of issues to bring"
   }
  ],
  "suggested": [
@@ -538,14 +542,6 @@
    "why": "you"
   },
   {
-   "id": "0d5b8bf5",
-   "text": "Wait for f426e746 and b0d9a260 to finish, then rebuild 0.21.5 once and commit from the Source Control box.",
-   "at": 1794132037117,
-   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
-   "name": "Couple of issues to bring v2",
-   "why": "you"
-  },
-  {
    "id": "117d73b3",
    "text": "Fix the \"ificSwitchboard adjustments\" note title, and check your New chat draft for missing letters.",
    "at": 1794134076971,
@@ -682,14 +678,6 @@
    "why": "later"
   },
   {
-   "id": "a3bfbe88",
-   "text": "Build the wait rope and frozen pause after you approve the mocks.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
    "id": "6b629f0f",
    "text": "Two small known gaps in bash-approve: `sud''o` with quotes spliced in, and `printenv` of a single named key.",
    "at": 1794176137743,
@@ -784,6 +772,15 @@
    "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
    "name": "Couple of issues to bring v2",
    "why": "missed"
+  },
+  {
+   "id": "2dc6cbb4",
+   "text": "Reload any VS Code window that still shows the old panel.",
+   "at": 1794197121845,
+   "from": "d12463f3-d9bc-49dd-b92f-73f04ae0d7f0",
+   "name": "Couple of issues to bring v2",
+   "why": "you"
   }
- ]
+ ],
+ "cleared": 1
 }
