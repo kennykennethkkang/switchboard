@@ -869,6 +869,14 @@
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later"
+  },
+  {
+   "id": "a3c7d954",
+   "text": "[Cross-session idle notice] \"Audit All Skills Tools Settings\", which you asked to be notified about, is idle now — it finished a turn at 07:20. Its harness reports: «Kenneth, I took that to mean the u",
+   "at": 1794237638498,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
+   "why": "missed"
   }
  ]
 }
