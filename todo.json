@@ -283,17 +283,19 @@
   "baeb9e5f": 1794236931741,
   "745daf50": 1794236932636,
   "1a5a8fd1": 1794236933909,
-  "2173ddca": 1794237108011
+  "2173ddca": 1794237108011,
+  "ad6eba1a": 1794237165270,
+  "bc70e22a": 1794237165270
  },
  "ticked": [
   {
    "id": "2173ddca",
    "text": "Close VS Code, Claude and Codex. Run `bash ~/Documents/GitHub/agent-flow/scripts/rename-folder.sh` as a dry run, then with `--apply`, then `gh repo rename switc",
+   "at": 1794237108011,
+   "by": "b945f546-538f-467a-9ce7-18197f1f447f",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
-   "why": "you",
-   "at": 1794237108011,
-   "by": "b945f546-538f-467a-9ce7-18197f1f447f"
+   "why": "you"
   },
   {
    "id": "1a5a8fd1",
@@ -801,14 +803,6 @@
    "why": "you"
   },
   {
-   "id": "ad6eba1a",
-   "text": "reload the Switchboard windows so the extension picks up the change, then commit.",
-   "at": 1794235794135,
-   "from": "3709204e-d2f3-42c7-8a46-2adc3c9c25ae",
-   "name": "Fix temp chats appearing",
-   "why": "you"
-  },
-  {
    "id": "c64b1a07",
    "text": "Reload the Switchboard window and open the Map to see it live.",
    "at": 1794236944096,
@@ -833,12 +827,13 @@
    "why": "you"
   },
   {
-   "id": "bc70e22a",
-   "text": "Commit both repos once it reopens.",
-   "at": 1794237108011,
-   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
-   "name": "Rename agent-flow to switchboard",
+   "id": "23bdf166",
+   "text": "commit both repos. I only wrote bullets for this chat's work in `claude-mods`; the rest of its changes come from other chats, which Switchboard merges in.",
+   "at": 1794237165270,
+   "from": "3709204e-d2f3-42c7-8a46-2adc3c9c25ae",
+   "name": "Fix temp chats appearing",
    "why": "you"
   }
- ]
+ ],
+ "cleared": 1
 }
