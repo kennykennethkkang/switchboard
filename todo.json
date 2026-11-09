@@ -128,6 +128,13 @@
    "at": 1794205237136,
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4"
+  },
+  {
+   "id": "1cc1b2f2",
+   "text": "Celestial Court at 30+ chats: courtyards overlap at 90 (todo test in web/lib/court-map.test.ts); chain bridges courtyard to courtyard, and stop forced realm plaques covering petition cards",
+   "at": 1794205238407,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
   }
  ],
  "removed": {
