@@ -117,13 +117,6 @@
    "name": "Overhaul Switchboard Organization"
   },
   {
-   "id": "07a47e6c",
-   "text": "Proposed kit edit (caveman A/B 2026-11-09, vault wiki/caveman-ab.md): caveman narration gave no quality or token gain over 20 runs, and the caveman skill is not installed anywhere, so the role files' Voice line is a no-op. Remove the \"Voice: load the caveman skill...\" paragraph from claude-mods kit/agents/{engineer,qa,ops,designer,growth,researcher,Explore}.md and the \"Caveman is for subagent narration only\" bullet from kit/rules.md.",
-   "at": 1794217591950,
-   "from": "89e03d60-780d-404a-be78-5c13cc4422a9",
-   "name": "Fix Site Using Attached PDF v2"
-  },
-  {
    "id": "178b1928",
    "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
    "at": 1794220135885,
@@ -319,7 +312,8 @@
   "75a083ac": 1794221505175,
   "ec7f192d": 1794221505175,
   "d6bdfb41": 1794222106640,
-  "3b5da7e1": 1794233078910
+  "3b5da7e1": 1794233078910,
+  "07a47e6c": 1794233406734
  },
  "suggested": [
   {
@@ -820,12 +814,20 @@
  ],
  "ticked": [
   {
+   "id": "07a47e6c",
+   "text": "Proposed kit edit (caveman A/B 2026-11-09, vault wiki/caveman-ab.md): caveman narration gave no quality or token gain over 20 runs, and the caveman skill is not installed anywhere, so the role files' Voice line is a no-op. Remove the \"Voice: load the caveman skill...\" paragraph from claude-mods kit/agents/{engineer,qa,ops,designer,growth,researcher,Explore}.md and the \"Caveman is for subagent narration only\" bullet from kit/rules.md.",
+   "from": "89e03d60-780d-404a-be78-5c13cc4422a9",
+   "name": "Fix Site Using Attached PDF v2",
+   "at": 1794233406734,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+  },
+  {
    "id": "3b5da7e1",
    "text": "Proposed rule (AAR 2026-11-08): in claude-mods/kit/agents/engineer.md and qa.md, add: \"macOS has no timeout. Run suites as perl -e 'alarm 600; exec @ARGV' -- <cmd> (120 for one file); an alarm kill is a fail.\" Two unbounded runs hung ~30 min. Memory: macos-test-timeout.",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
    "at": 1794233078910,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5"
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2"
   },
   {
    "id": "d6bdfb41",
@@ -894,15 +896,6 @@
    "at": 1794214840099,
    "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "from": "98c038ee-7ffc-4588-b99b-70886cd0e639"
-  },
-  {
-   "id": "fe4738f7",
-   "text": "Web Push for the phone app: manifest + service worker + subscribe button in the Tailscale web app, VAPID keys and a send helper the extension can call",
-   "at": 1794214839912,
-   "by": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "before": "6a7283d4",
-   "name": "AWS phone heads-up path"
   }
  ]
 }
