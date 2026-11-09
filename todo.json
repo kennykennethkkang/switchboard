@@ -285,7 +285,8 @@
   "1a5a8fd1": 1794236933909,
   "2173ddca": 1794237108011,
   "ad6eba1a": 1794237165270,
-  "bc70e22a": 1794237165270
+  "bc70e22a": 1794237165270,
+  "cdde4a23": 1794237309749
  },
  "ticked": [
   {
@@ -819,21 +820,20 @@
    "why": "later"
   },
   {
-   "id": "cdde4a23",
-   "text": "Let the other two chats finish (3709204e is editing `local.ts`, 13b6b943 the map), then quit VS Code with Cmd+Q. The move runs within 20 seconds and VS Code reo",
-   "at": 1794237108011,
-   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
-   "name": "Rename agent-flow to switchboard",
-   "why": "you"
-  },
-  {
    "id": "23bdf166",
    "text": "commit both repos. I only wrote bullets for this chat's work in `claude-mods`; the rest of its changes come from other chats, which Switchboard merges in.",
    "at": 1794237165270,
    "from": "3709204e-d2f3-42c7-8a46-2adc3c9c25ae",
    "name": "Fix temp chats appearing",
    "why": "you"
+  },
+  {
+   "id": "c074c6d7",
+   "text": "Once the other chats are done, quit VS Code with Cmd+Q. The move starts within 20 seconds and VS Code reopens on the new folder.",
+   "at": 1794237309749,
+   "from": "b945f546-538f-467a-9ce7-18197f1f447f",
+   "name": "Rename agent-flow to switchboard",
+   "why": "you"
   }
- ],
- "cleared": 1
+ ]
 }
