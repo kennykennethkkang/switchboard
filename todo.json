@@ -12,9 +12,11 @@
   {
    "id": "0e849084",
    "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
-   "at": 1793822517720,
+   "at": 1794235037263,
    "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on"
+   "name": "Check if ECC repo on",
+   "chat": "e4493897-e467-478a-be18-a607187e2f9f",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "b673a51e",
