@@ -482,6 +482,14 @@
    "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
    "name": "Auto-complete todo tracking",
    "why": "later"
+  },
+  {
+   "id": "79dfdbc6",
+   "text": "After the next Switchboard build and a Reload Window, check both maps; the app you have open still runs the old build.",
+   "at": 1794239348511,
+   "from": "651376ea-09aa-43d9-a8b2-3a6d72c8de3e",
+   "name": "Cleanup map page connections",
+   "why": "you"
   }
  ]
 }
