@@ -42,6 +42,11 @@
    "at": 1794233952279,
    "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
    "name": "agent-flow-f0"
+  },
+  {
+   "id": "8baab3b0",
+   "text": "bash-approve gaps: refuse the root command when quotes are spliced into its name, and printenv of a single named key",
+   "at": 1794237913238
   }
  ],
  "removed": {
