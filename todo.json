@@ -837,6 +837,38 @@
    "from": "b945f546-538f-467a-9ce7-18197f1f447f",
    "name": "Rename agent-flow to switchboard",
    "why": "you"
+  },
+  {
+   "id": "70a39291",
+   "text": "The GitHub plugin couldn't connect at the start of this chat because it had no token, and it's now switched off. Leave it off since `gh` covers it, or set `GITH",
+   "at": 1794237613213,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "you"
+  },
+  {
+   "id": "8b85c11c",
+   "text": "Slack, Firecrawl, Perplexity and 21st aren't installed. The last three need their keys saved in Sign-ins, and Slack is added the next time you run Set up.",
+   "at": 1794237613213,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "you"
+  },
+  {
+   "id": "22def70e",
+   "text": "Commit when ready.",
+   "at": 1794237613213,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "you"
+  },
+  {
+   "id": "44e4175f",
+   "text": "The pronoun fix wasn't in time for 0.21.11 (another chat had already packaged it), so it ships in the next release.",
+   "at": 1794237613213,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "later"
   }
  ]
 }
