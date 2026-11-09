@@ -284,6 +284,88 @@
   "745daf50": 1794236932636,
   "1a5a8fd1": 1794236933909
  },
+ "ticked": [
+  {
+   "id": "1a5a8fd1",
+   "text": "A new top-level `LICENSE`.",
+   "at": 1794236933909,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "745daf50",
+   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
+   "at": 1794236932636,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "baeb9e5f",
+   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
+   "at": 1794236931741,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "7bd3478d",
+   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
+   "at": 1794236926682,
+   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
+   "name": "Using graph engineering knowledge and",
+   "why": "you"
+  },
+  {
+   "id": "c99fc568",
+   "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
+   "at": 1794236917088,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
+  },
+  {
+   "id": "0e849084",
+   "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
+   "at": 1794236073782,
+   "by": "e4493897-e467-478a-be18-a607187e2f9f",
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on"
+  },
+  {
+   "id": "a38d0a25",
+   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
+   "at": 1794233558060,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
+   "name": "Tailscale Commit Button Fixes v2"
+  },
+  {
+   "id": "440724a4",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
+   "at": 1794233411579,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
+  },
+  {
+   "id": "ad52b456",
+   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
+   "at": 1794233411110,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
+   "name": "Tailscale Commit Button Fixes v3"
+  },
+  {
+   "id": "178b1928",
+   "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
+   "at": 1794233410384,
+   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
+   "from": "2557f872-fac4-4016-8555-033e539c4e86",
+   "name": "Overhaul Switchboard Organization v2"
+  }
+ ],
  "suggested": [
   {
    "id": "ebaf29ee",
@@ -731,88 +813,22 @@
    "from": "3709204e-d2f3-42c7-8a46-2adc3c9c25ae",
    "name": "Fix temp chats appearing",
    "why": "you"
-  }
- ],
- "ticked": [
-  {
-   "id": "1a5a8fd1",
-   "text": "A new top-level `LICENSE`.",
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you",
-   "at": 1794236933909
   },
   {
-   "id": "745daf50",
-   "text": "The tracked `kit/switchboard-0.17.13.vsix` is deleted.",
-   "at": 1794236932636,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
+   "id": "c64b1a07",
+   "text": "Reload the Switchboard window and open the Map to see it live.",
+   "at": 1794236944096,
+   "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
+   "name": "Map Component Cleanup",
    "why": "you"
   },
   {
-   "id": "baeb9e5f",
-   "text": "`kit/manifest.json` turns on stitch-build, stitch-design, stitch-utilities and auth0.",
-   "at": 1794236931741,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "7bd3478d",
-   "text": "Leave unstaged: in claude-mods, `.vscode/` and the five `kit/switchboard-0.19.x.vsix` files.",
-   "at": 1794236926682,
-   "from": "efb7a2e6-d8f8-47d5-a885-b6645e4777cb",
-   "name": "Using graph engineering knowledge and",
-   "why": "you"
-  },
-  {
-   "id": "c99fc568",
-   "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
-   "at": 1794236917088,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "you"
-  },
-  {
-   "id": "0e849084",
-   "text": "Kit benchmark: finish round 3 kit and ECC runs for t10 (TS semver) and t11 (vague CSV importer) on Opus, when the usage limit has room. Harness is in the session scratchpad bench/ (run1.sh, redo1.sh, score3.py); see vault wiki ecc-vs-switchboard-kit.",
-   "at": 1794236073782,
-   "by": "e4493897-e467-478a-be18-a607187e2f9f",
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on"
-  },
-  {
-   "id": "a38d0a25",
-   "text": "Proposed fix (claude-mods/usage-meter/hooks/register.ts): the pause prompt lists background shells that already ended, because completion notices absorbed mid-turn (transcript queue-operation, reason absorbed_mid_turn) never fire prompt.submit, so shellsDone() (line ~414, called only at ~814) misses",
-   "at": 1794233558060,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "b0d9a260-e1b2-4c95-9bbf-e029c9feb6d0",
-   "name": "Tailscale Commit Button Fixes v2"
-  },
-  {
-   "id": "440724a4",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 444, replace 'Wait for running subagents to finish, or stop them with TaskStop.' with 'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskSt",
-   "at": 1794233411579,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "ad52b456",
-   "text": "Proposed (aar b0d9a260): claude-mods/usage-meter/hooks/register.ts line 279, when no tasks were recorded write '- none recorded (task tools may be missing in that chat); check Subagent results and Next action' instead of '- none', and list any subagent ids stopped by TaskStop in the last turn as '-",
-   "at": 1794233411110,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3"
-  },
-  {
-   "id": "178b1928",
-   "text": "Approve AAR fix: crowd-ab device mix flag. Target claude-mods/kit/skills/crowd-ab/scripts/crowd-ab.mjs: add `--device phone=55,desktop=35,tablet=10` parsed into the `device` weights at line 23 (default unchanged), with a test in crowd-ab.test.mjs. In claude-mods/kit/skills/crowd-ab/SKILL.md under Run add: \"For a desktop-first product pass --device desktop=80,phone=10,tablet=10; the default is 55% phone.\" Why: 2026-11-09 Switchboard layout test, 56% phone personas moved find-a-feature from A 98.8% (desktop) to A 41% (headline).",
-   "at": 1794233410384,
-   "by": "6db78fc6-7717-4a31-8383-938d1f9872d5",
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2"
+   "id": "029c83d8",
+   "text": "On a phone, the Code list still has no legend chips, so search is the only way to filter there.",
+   "at": 1794236944096,
+   "from": "13b6b943-c13d-4619-a5dd-d53e21fbcfae",
+   "name": "Map Component Cleanup",
+   "why": "later"
   }
  ]
 }
