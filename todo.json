@@ -278,7 +278,8 @@
   "9ccce137": 1794233689091,
   "006b0a7f": 1794233689091,
   "51bb6b40": 1794233689091,
-  "9b1fbd4d": 1794233952373
+  "9b1fbd4d": 1794233952373,
+  "85843cce": 1794234455754
  },
  "ticked": [
   {
@@ -827,14 +828,6 @@
    "why": "missed"
   },
   {
-   "id": "85843cce",
-   "text": "In a chat, type `/mcp`, pick `posthog` and approve it in the browser. Then do the same for `composio`.",
-   "at": 1794233689091,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "you"
-  },
-  {
    "id": "b53117ca",
    "text": "These aren't included in the claude picker also no page for codex run where do I do that?",
    "at": 1794234450739,
@@ -857,6 +850,22 @@
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed"
+  },
+  {
+   "id": "bfed2782",
+   "text": "Open a new chat in Switchboard.",
+   "at": 1794234455754,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
+  },
+  {
+   "id": "c99fc568",
+   "text": "Type `/mcp`, choose `posthog` and approve it in the browser, then do the same for `composio`.",
+   "at": 1794234455754,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "you"
   }
  ]
 }
