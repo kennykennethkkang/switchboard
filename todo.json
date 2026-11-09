@@ -336,7 +336,8 @@
   "f4ab23a6": 1794239577891,
   "79dfdbc6": 1794239577891,
   "44e4175f": 1794239653085,
-  "4a336629": 1794242631400
+  "4a336629": 1794242631400,
+  "89c50735": 1794244332197
  },
  "suggested": [
   {
@@ -436,14 +437,6 @@
    "why": "missed"
   },
   {
-   "id": "89c50735",
-   "text": "The map chat may send one more tweak, which goes in the next release.",
-   "at": 1794239653085,
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "later"
-  },
-  {
    "id": "a56024b2",
    "text": "On the Code map, the footer line slightly overlaps the bottom row of boxes until you scroll.",
    "at": 1794240483186,
@@ -474,6 +467,14 @@
    "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
    "name": "Auto-complete todo tracking",
    "why": "missed"
+  },
+  {
+   "id": "e1c8c72c",
+   "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
+   "at": 1794244332197,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "later"
   }
  ]
 }
