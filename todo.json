@@ -121,6 +121,13 @@
    "at": 1794137323685,
    "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
    "name": "Tailscale Commit Button Fixes v3"
+  },
+  {
+   "id": "71d7ef16",
+   "text": "MiroFish card in Switchboard: run step n/6, elapsed and estimate, report when ready, link to MiroFish graph view on 3100 (Kenneth asked for visuals in Switchboard)",
+   "at": 1794205237136,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4"
   }
  ],
  "removed": {
