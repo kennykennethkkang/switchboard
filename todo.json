@@ -282,7 +282,15 @@
   "16f0644b": 1794198421494,
   "7d647c9a": 1794198421494,
   "38dd0f19": 1794198421494,
-  "264ef79b": 1794198421494
+  "264ef79b": 1794198421494,
+  "ccc47801": 1794205306312,
+  "7528b76b": 1794205306312,
+  "3476b445": 1794205306312,
+  "ea95128a": 1794205306312,
+  "0aa9d427": 1794205306312,
+  "1b53de53": 1794205306312,
+  "621c5d95": 1794205306312,
+  "9e8016f7": 1794205306312
  },
  "ticked": [
   {
@@ -470,14 +478,6 @@
    "at": 1794085711184,
    "from": "06aa1ab0-ff25-4192-bfbc-4aee8687ca10",
    "name": "Couple of issues to bring",
-   "why": "you"
-  },
-  {
-   "id": "621c5d95",
-   "text": "Rebuild and reload Switchboard. Codex chats that are already open keep asking until you restart them.",
-   "at": 1794107112579,
-   "from": "584d11ae-c68e-43b6-a797-e02cadee2a31",
-   "name": "Switchboard chat archive controls",
    "why": "you"
   },
   {
@@ -688,14 +688,6 @@
    "why": "you"
   },
   {
-   "id": "9e8016f7",
-   "text": "Commit both repos once \"Couple of issues to bring v2\" has rebuilt.",
-   "at": 1794176137743,
-   "from": "e450f5ef-7fff-42fd-8205-ba3581f0ff25",
-   "name": "Tailscale Commit Button Fixes v3",
-   "why": "you"
-  },
-  {
    "id": "dfb17052",
    "text": "The MiroFish usability test, once the key is in.",
    "at": 1794176137743,
@@ -736,60 +728,12 @@
    "why": "missed"
   },
   {
-   "id": "ccc47801",
-   "text": "Reload Switchboard so the new key labels and hook script take effect.",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
    "id": "93c7bf64",
    "text": "Run `claude plugin update` for paid-guard and bash-approve.",
    "at": 1794196293297,
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "you"
-  },
-  {
-   "id": "7528b76b",
-   "text": "\"Codex Switchboard Integration Setup v3\"",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "3476b445",
-   "text": "\"Video Review Questions v2\"",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "ea95128a",
-   "text": "\"Tailscale Commit Button Fixes v3\"",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "0aa9d427",
-   "text": "When you're ready for the rename, close VS Code and the chats inside `agent-flow`, then open `~/Documents/GitHub/switchboard`.",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "you"
-  },
-  {
-   "id": "1b53de53",
-   "text": "The MiroFish confusion test, which waits for the Switchboard overhaul to finish.",
-   "at": 1794196293297,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "blocked"
   },
   {
    "id": "068a11df",
@@ -846,6 +790,31 @@
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "missed"
+  },
+  {
+   "id": "e39c1539",
+   "text": "Rebuild and reload Switchboard. That brings in the new layout, the stuck-job fix, and the removal of raw cross-chat message text from approval cards.",
+   "at": 1794205306312,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "you"
+  },
+  {
+   "id": "32ff347d",
+   "text": "Close VS Code and the chats in `agent-flow` when you're ready, so the folder becomes `~/Documents/GitHub/switchboard`.",
+   "at": 1794205306312,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "you"
+  },
+  {
+   "id": "2de7ef70",
+   "text": "Commit both repos. In MiroFish, `sb-pilot.py` is untracked, so commit it there only if you want to keep it.",
+   "at": 1794205306312,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "you"
   }
- ]
+ ],
+ "cleared": 2
 }
