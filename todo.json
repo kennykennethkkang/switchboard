@@ -449,6 +449,14 @@
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later"
+  },
+  {
+   "id": "a56024b2",
+   "text": "On the Code map, the footer line slightly overlaps the bottom row of boxes until you scroll.",
+   "at": 1794240483186,
+   "from": "651376ea-09aa-43d9-a8b2-3a6d72c8de3e",
+   "name": "Cleanup map page connections",
+   "why": "later"
   }
  ]
 }
