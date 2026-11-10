@@ -5,11 +5,11 @@
    "id": "f1ba141b-ok",
    "text": "add this feature also https://www.instagram.com/reel/DfaTZHlh-k0/?dlrf=NTc4MTIwNjQ2YQ==. also lets also make sure there is a creation of a deep research bot that can research anything and researches i",
    "at": 1794318086813,
+   "chat": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "host": "62903adf5e340f87",
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
    "why": "missed",
-   "chat": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "host": "62903adf5e340f87",
    "run": 4,
    "auto": true
   },
@@ -41,6 +41,14 @@
    "id": "a7df2aa6-ok",
    "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
    "at": 1794318086189,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "missed"
+  },
+  {
+   "id": "b53117ca-ok",
+   "text": "These aren't included in the claude picker also no page for codex run where do I do that?",
+   "at": 1794318087104,
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed"
@@ -360,9 +368,11 @@
   "e207ca92": 1794318078365,
   "2fbd2f92": 1794318080871,
   "b9b7da84": 1794318084976,
-  "a7df2aa6": 1794318086189
+  "a7df2aa6": 1794318086189,
+  "b53117ca": 1794318087104
  },
  "seq": 4,
+ "streak": 4,
  "ticked": [
   {
    "id": "2f08890c",
@@ -476,14 +486,6 @@
    "why": "later"
   },
   {
-   "id": "b53117ca",
-   "text": "These aren't included in the claude picker also no page for codex run where do I do that?",
-   "at": 1794234450739,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed"
-  },
-  {
    "id": "300d38c8",
    "text": "Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang",
    "at": 1794242625768,
@@ -530,6 +532,5 @@
    "from": "451fb648-858b-4070-b993-029d7fcd00b8",
    "why": "later"
   }
- ],
- "streak": 4
+ ]
 }
