@@ -34,12 +34,11 @@
   {
    "id": "abf6671a",
    "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
-   "at": 1794336738655,
+   "at": 1794336873123,
    "from": "0419be6e-5137-476b-95bd-41942a3108f3",
-   "chat": "7d91a310-be87-4047-a846-1b59e92a33d4",
-   "host": "62903adf5e340f87",
    "run": 18,
-   "auto": true
+   "auto": true,
+   "stopped": true
   },
   {
    "id": "7246b1e0",
