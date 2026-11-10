@@ -30,17 +30,6 @@
    "stopped": true
   },
   {
-   "id": "55b0229e-ok",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794343548734,
-   "chat": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3",
-   "host": "62903adf5e340f87",
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later",
-   "run": 25,
-   "auto": true
-  },
-  {
    "id": "e14ca1da-ok",
    "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
    "at": 1794343499752,
@@ -448,22 +437,33 @@
   "20b046b5": 1794343514683,
   "ea2f8c40": 1794343518403,
   "77dc7d30-ok": 1794343541187,
-  "a7df2aa6-ok": 1794343565092
+  "a7df2aa6-ok": 1794343565092,
+  "55b0229e-ok": 1794343602370
  },
  "seq": 25,
  "streak": 4,
  "ticked": [
   {
+   "id": "55b0229e-ok",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later",
+   "run": 25,
+   "auto": true,
+   "at": 1794343602370,
+   "by": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3"
+  },
+  {
    "id": "a7df2aa6-ok",
    "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
+   "at": 1794343565092,
+   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed",
    "run": 8,
    "auto": true,
-   "stopped": true,
-   "at": 1794343565092,
-   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87"
+   "stopped": true
   },
   {
    "id": "77dc7d30-ok",
@@ -540,17 +540,6 @@
    "name": "Deep-research eval round 2",
    "why": "later",
    "run": 16,
-   "auto": true
-  },
-  {
-   "id": "e1c8c72c-ok",
-   "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
-   "at": 1794336102972,
-   "by": "5111d5f4-36af-463b-8901-f388f5886fca",
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "later",
-   "run": 15,
    "auto": true
   }
  ]
