@@ -4,9 +4,11 @@
   {
    "id": "6f393e98",
    "text": "Proposed rule (AAR 2026-11-09, Armasu chat 6db78fc6): in claude-mods/kit/rules.md line 67, after \"a block for a repo no open window has is ignored.\" add: \"If this chat's repo has no changes (`git status --short` is empty), leave out the plain block and end with the last named block; never put another repo's message under the plain heading.\" Why: that chat ran in Armasu, changed only claude-mods, and put the claude-mods message under plain `Commit message:`, which would fill Armasu's box.",
-   "at": 1794233949224,
+   "at": 1794311686891,
    "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
-   "name": "agent-flow-f0"
+   "name": "agent-flow-f0",
+   "chat": "a9eae457-c2e7-4460-a5e9-1a744c454118",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "a335ce3c",
