@@ -30,8 +30,12 @@
   {
    "id": "490c3b46",
    "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
-   "at": 1794345706486,
-   "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e"
+   "at": 1794345969779,
+   "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e",
+   "chat": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
+   "host": "62903adf5e340f87",
+   "run": 32,
+   "auto": true
   },
   {
    "id": "5e0932b6",
@@ -403,35 +407,19 @@
   "20b046b5-ok": 1794345889013,
   "ea2f8c40-ok": 1794345955343
  },
- "seq": 31,
+ "seq": 32,
  "streak": 4,
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "ea2f8c40-ok",
    "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
+   "at": 1794345955343,
+   "by": "3f0bc16c-121b-42b9-8f4d-cb231b4e8b3b",
    "from": "10753a2c-1cee-4b3d-b79d-65ec8fed7390",
    "name": "To-do 23: Switchboard AAR rules md bash",
    "why": "missed",
    "run": 31,
-   "auto": true,
-   "at": 1794345955343,
-   "by": "3f0bc16c-121b-42b9-8f4d-cb231b4e8b3b"
+   "auto": true
   },
   {
    "id": "20b046b5-ok",
@@ -530,6 +518,22 @@
    "why": "missed",
    "run": 24,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
   }
  ]
 }
