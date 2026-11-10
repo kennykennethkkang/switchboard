@@ -3,8 +3,8 @@
  "todo": [
   {
    "id": "6e1d42fa",
-   "text": "Deep-research eval round 2: add 10 harder questions (4+ hops, conflicting or recent sources) to claude-mods/kit/skills/deep-research/eval/questions.json, run the standard level vs the researcher prompt on sonnet with two judges, and keep the skill only if it wins on citations.",
-   "at": 1794304738822,
+   "text": "Deep-research eval round 2: the 10 harder questions are in claude-mods/kit/skills/deep-research/eval/questions.json; run them, standard vs the researcher prompt on sonnet, with two judges",
+   "at": 1794305476990,
    "chat": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
    "host": "62903adf5e340f87",
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
