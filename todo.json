@@ -536,6 +536,20 @@
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
    "name": "To-do 4: Instagram reel feature and deep",
    "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
   }
  ]
 }
