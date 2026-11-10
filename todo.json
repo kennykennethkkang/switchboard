@@ -65,6 +65,14 @@
    "at": 1794343499752,
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
    "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3-ok",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794343506119,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -412,7 +420,8 @@
   "a8138064": 1794343173179,
   "77dc7d30": 1794343469270,
   "55b0229e": 1794343494325,
-  "e14ca1da": 1794343499752
+  "e14ca1da": 1794343499752,
+  "7bb98bd3": 1794343506119
  },
  "seq": 24,
  "streak": 4,
@@ -515,14 +524,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
   {
    "id": "fc6b9569",
    "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
