@@ -30,9 +30,13 @@
   {
    "id": "08e0bf2a-ok",
    "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794343511136,
+   "at": 1794344133949,
    "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "why": "later"
+   "why": "later",
+   "chat": "c16f38c8-404b-4818-a33b-c1be5187e64a",
+   "host": "62903adf5e340f87",
+   "run": 28,
+   "auto": true
   },
   {
    "id": "b2b2ae1c-ok",
@@ -418,35 +422,19 @@
   "abf6671a": 1794343760231,
   "fc6b9569-ok": 1794344131984
  },
- "seq": 27,
+ "seq": 28,
  "streak": 4,
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "fc6b9569-ok",
    "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794344131984,
+   "by": "3d202cdd-a44c-4d05-9fed-1b36de1e1755",
    "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
    "name": "To-do 7: Claude island system design",
    "why": "missed",
    "run": 27,
-   "auto": true,
-   "at": 1794344131984,
-   "by": "3d202cdd-a44c-4d05-9fed-1b36de1e1755"
+   "auto": true
   },
   {
    "id": "abf6671a",
@@ -538,6 +526,22 @@
    "by": "818c7301-1cd8-4641-bcdc-e00df1c53271",
    "run": 20,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
   }
  ]
 }
