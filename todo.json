@@ -4,14 +4,13 @@
   {
    "id": "a7df2aa6-ok",
    "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
-   "at": 1794320023236,
+   "at": 1794320156292,
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
    "why": "missed",
-   "chat": "c9f71b00-e9da-4970-b2d7-c026f3719602",
-   "host": "62903adf5e340f87",
    "run": 8,
-   "auto": true
+   "auto": true,
+   "stopped": true
   },
   {
    "id": "b53117ca-ok",
