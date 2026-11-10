@@ -391,35 +391,37 @@
   "20b046b5-ok": 1794345889013,
   "ea2f8c40-ok": 1794345955343,
   "490c3b46": 1794345997136,
-  "5e0932b6": 1794346035429
+  "5e0932b6": 1794346035429,
+  "dcc0d3e4": 1794346358419,
+  "f03c196c": 1794346358419
  },
  "seq": 33,
  "streak": 4,
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
+ "ticked": [
   {
    "id": "f03c196c",
    "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
    "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  }
- ],
- "ticked": [
+   "why": "later",
+   "at": 1794346358419,
+   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503"
+  },
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later",
+   "at": 1794346358419,
+   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503"
+  },
   {
    "id": "5e0932b6",
    "text": "AAR fix plan (chat 1b4609a7), approve to apply: in claude-mods/kit/rules.md line 66 replace \"- If the aar skill is installed, run it on this chat before the standup.\" with \"- Run the aar skill on this chat before the standup (Read kit/skills/aar/SKILL.md if the Skill tool is off). Never skip it; the scheduled Learn run does not replace it.\" Why: chats d0c9b084 and 1b4609a7 both skipped the aar on 2026-11-10, the second with \"I didn't run the after-action review this time\".",
+   "at": 1794346035429,
+   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503",
    "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c",
    "run": 33,
-   "auto": true,
-   "at": 1794346035429,
-   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503"
+   "auto": true
   },
   {
    "id": "490c3b46",
@@ -493,28 +495,6 @@
    "run": 18,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "fc2939be-ok",
-   "text": "The bun-only plugin test suites.",
-   "at": 1794343605049,
-   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later",
-   "run": 13,
-   "auto": true,
-   "stopped": true
-  },
-  {
-   "id": "55b0229e-ok",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794343602370,
-   "by": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3",
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later",
-   "run": 25,
-   "auto": true
   }
  ]
 }
