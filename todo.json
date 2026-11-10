@@ -30,10 +30,14 @@
   {
    "id": "b2b2ae1c-ok",
    "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
-   "at": 1794343513221,
+   "at": 1794344343939,
    "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
    "name": "To-do 20: Smart page tracking and no",
-   "why": "missed"
+   "why": "missed",
+   "chat": "1b4609a7-6297-4362-8701-156db8426f16",
+   "host": "62903adf5e340f87",
+   "run": 29,
+   "auto": true
   },
   {
    "id": "20b046b5-ok",
@@ -412,34 +416,18 @@
   "fc6b9569-ok": 1794344131984,
   "08e0bf2a-ok": 1794344334837
  },
- "seq": 28,
+ "seq": 29,
  "streak": 4,
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "08e0bf2a-ok",
    "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794344334837,
+   "by": "c16f38c8-404b-4818-a33b-c1be5187e64a",
    "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
    "why": "later",
    "run": 28,
-   "auto": true,
-   "at": 1794344334837,
-   "by": "c16f38c8-404b-4818-a33b-c1be5187e64a"
+   "auto": true
   },
   {
    "id": "fc6b9569-ok",
@@ -534,6 +522,22 @@
    "name": "To-do 16: Eval grader citation tuning",
    "run": 21,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
   }
  ]
 }
