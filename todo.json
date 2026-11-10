@@ -340,7 +340,8 @@
   "3bca357b": 1794305476716,
   "2b2b1ed8": 1794305476749,
   "91f6ac67": 1794305476783,
-  "cbf80c17": 1794305476816
+  "cbf80c17": 1794305476816,
+  "665ddabb": 1794305476849
  },
  "ticked": [
   {
@@ -449,14 +450,6 @@
    "at": 1794215383773,
    "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
    "name": "AWS phone heads-up path",
-   "why": "missed"
-  },
-  {
-   "id": "665ddabb",
-   "text": "Also can you add vercel agent desktop and check if it works better than mcp servers. Please do a full check and test to see which is better",
-   "at": 1794221225201,
-   "from": "2557f872-fac4-4016-8555-033e539c4e86",
-   "name": "Overhaul Switchboard Organization v2",
    "why": "missed"
   },
   {
