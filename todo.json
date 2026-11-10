@@ -35,11 +35,11 @@
    "id": "e1c8c72c-ok",
    "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
    "at": 1794334199207,
+   "chat": "5111d5f4-36af-463b-8901-f388f5886fca",
+   "host": "62903adf5e340f87",
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later",
-   "chat": "5111d5f4-36af-463b-8901-f388f5886fca",
-   "host": "62903adf5e340f87",
    "run": 15,
    "auto": true
   },
@@ -69,6 +69,11 @@
    "text": "AAR fix plan (edee7b2a, f5f8e8ad): two chats left work unreleased because the brief listed ended chat 08d8bd98 as holding CHANGELOG.md. In extension/src/hub/brain.ts:128 change `Leave alone, another chat is editing: ${files.join(', ')}` to `Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`, and update the brief test that matches the old text. Needs approval.",
    "at": 1794321036387,
    "from": "997c37c2-e6af-43ed-854c-4db5ed18567a"
+  },
+  {
+   "id": "5eb50396",
+   "text": "Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jumping which makes it hard to use",
+   "at": 1794335436817
   }
  ],
  "removed": {
