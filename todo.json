@@ -2,13 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "e14ca1da-ok",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794343499752,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
    "id": "7bb98bd3-ok",
    "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
    "at": 1794343743072,
@@ -386,18 +379,26 @@
   "5e0932b6": 1794346035429,
   "dcc0d3e4": 1794346358419,
   "f03c196c": 1794346358419,
-  "80f1bfde-ok": 1794346365699
+  "80f1bfde-ok": 1794346365699,
+  "e14ca1da-ok": 1794346366781
  },
  "seq": 33,
  "streak": 4,
  "ticked": [
   {
+   "id": "e14ca1da-ok",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked",
+   "at": 1794346366781
+  },
+  {
    "id": "80f1bfde-ok",
    "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
+   "at": 1794346365699,
    "from": "00411535-d088-4716-bdec-a80217f97b50",
    "name": "Switchboard Adjustment Updates",
-   "why": "blocked",
-   "at": 1794346365699
+   "why": "blocked"
   },
   {
    "id": "f03c196c",
@@ -474,17 +475,6 @@
    "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
    "why": "later",
    "run": 28,
-   "auto": true
-  },
-  {
-   "id": "fc6b9569-ok",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794344131984,
-   "by": "3d202cdd-a44c-4d05-9fed-1b36de1e1755",
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed",
-   "run": 27,
    "auto": true
   }
  ]
