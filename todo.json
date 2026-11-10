@@ -73,6 +73,14 @@
    "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
    "name": "To-do 10: Chrome account mismatch bug",
    "why": "missed"
+  },
+  {
+   "id": "fc6b9569-ok",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794343508954,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -421,7 +429,8 @@
   "77dc7d30": 1794343469270,
   "55b0229e": 1794343494325,
   "e14ca1da": 1794343499752,
-  "7bb98bd3": 1794343506119
+  "7bb98bd3": 1794343506119,
+  "fc6b9569": 1794343508954
  },
  "seq": 24,
  "streak": 4,
@@ -524,14 +533,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
-  },
   {
    "id": "08e0bf2a",
    "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
