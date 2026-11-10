@@ -91,6 +91,12 @@
    "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
    "at": 1794320882732,
    "from": "0419be6e-5137-476b-95bd-41942a3108f3"
+  },
+  {
+   "id": "7246b1e0",
+   "text": "AAR fix plan (edee7b2a, f5f8e8ad): two chats left work unreleased because the brief listed ended chat 08d8bd98 as holding CHANGELOG.md. In extension/src/hub/brain.ts:128 change `Leave alone, another chat is editing: ${files.join(', ')}` to `Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`, and update the brief test that matches the old text. Needs approval.",
+   "at": 1794321036387,
+   "from": "997c37c2-e6af-43ed-854c-4db5ed18567a"
   }
  ],
  "removed": {
