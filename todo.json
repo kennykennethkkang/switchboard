@@ -31,11 +31,11 @@
    "id": "20b046b5-ok",
    "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
    "at": 1794345699580,
+   "chat": "ee43b1e6-af1d-4047-9065-9a635ba24c73",
+   "host": "62903adf5e340f87",
    "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
    "name": "To-do 22: AAR fix plan rules update",
    "why": "missed",
-   "chat": "ee43b1e6-af1d-4047-9065-9a635ba24c73",
-   "host": "62903adf5e340f87",
    "run": 30,
    "auto": true
   },
@@ -46,6 +46,12 @@
    "from": "10753a2c-1cee-4b3d-b79d-65ec8fed7390",
    "name": "To-do 23: Switchboard AAR rules md bash",
    "why": "missed"
+  },
+  {
+   "id": "490c3b46",
+   "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
+   "at": 1794345706486,
+   "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e"
   }
  ],
  "removed": {
