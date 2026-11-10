@@ -341,7 +341,8 @@
   "2b2b1ed8": 1794305476749,
   "91f6ac67": 1794305476783,
   "cbf80c17": 1794305476816,
-  "665ddabb": 1794305476849
+  "665ddabb": 1794305476849,
+  "00188e78": 1794305476885
  },
  "ticked": [
   {
@@ -442,14 +443,6 @@
    "at": 1794205298759,
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
-  },
-  {
-   "id": "00188e78",
-   "text": "Switchboard to-do, in this order: 1. AWS sign-in heads-up on the phone: the extension can only notify VS Code and macOS; find a phone path (Switchboard web push to the Tailscale app, or Remote Control",
-   "at": 1794215383773,
-   "from": "8a48c0d0-9cd2-4d62-85c1-e47190b59259",
-   "name": "AWS phone heads-up path",
    "why": "missed"
   },
   {
