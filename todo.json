@@ -26,16 +26,6 @@
    "run": 26,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "5e0932b6",
-   "text": "AAR fix plan (chat 1b4609a7), approve to apply: in claude-mods/kit/rules.md line 66 replace \"- If the aar skill is installed, run it on this chat before the standup.\" with \"- Run the aar skill on this chat before the standup (Read kit/skills/aar/SKILL.md if the Skill tool is off). Never skip it; the scheduled Learn run does not replace it.\" Why: chats d0c9b084 and 1b4609a7 both skipped the aar on 2026-11-10, the second with \"I didn't run the after-action review this time\".",
-   "at": 1794345999601,
-   "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c",
-   "chat": "79bd8605-e785-4d59-8f45-607ba5fb7503",
-   "host": "62903adf5e340f87",
-   "run": 33,
-   "auto": true
   }
  ],
  "removed": {
@@ -400,11 +390,37 @@
   "b2b2ae1c-ok": 1794345698373,
   "20b046b5-ok": 1794345889013,
   "ea2f8c40-ok": 1794345955343,
-  "490c3b46": 1794345997136
+  "490c3b46": 1794345997136,
+  "5e0932b6": 1794346035429
  },
  "seq": 33,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "5e0932b6",
+   "text": "AAR fix plan (chat 1b4609a7), approve to apply: in claude-mods/kit/rules.md line 66 replace \"- If the aar skill is installed, run it on this chat before the standup.\" with \"- Run the aar skill on this chat before the standup (Read kit/skills/aar/SKILL.md if the Skill tool is off). Never skip it; the scheduled Learn run does not replace it.\" Why: chats d0c9b084 and 1b4609a7 both skipped the aar on 2026-11-10, the second with \"I didn't run the after-action review this time\".",
+   "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c",
+   "run": 33,
+   "auto": true,
+   "at": 1794346035429,
+   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503"
+  },
   {
    "id": "490c3b46",
    "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
@@ -499,34 +515,6 @@
    "why": "later",
    "run": 25,
    "auto": true
-  },
-  {
-   "id": "a7df2aa6-ok",
-   "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
-   "at": 1794343565092,
-   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed",
-   "run": 8,
-   "auto": true,
-   "stopped": true
-  }
- ],
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
   }
  ]
 }
