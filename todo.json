@@ -5,10 +5,10 @@
    "id": "6e1d42fa",
    "text": "Deep-research eval round 2: add 10 harder questions (4+ hops, conflicting or recent sources) to claude-mods/kit/skills/deep-research/eval/questions.json, run the standard level vs the researcher prompt on sonnet with two judges, and keep the skill only if it wins on citations.",
    "at": 1794304738822,
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes",
    "chat": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "host": "62903adf5e340f87"
+   "host": "62903adf5e340f87",
+   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "name": "Tailscale Commit Button Fixes"
   },
   {
    "id": "ad7e4488",
@@ -42,6 +42,16 @@
    "id": "8baab3b0",
    "text": "bash-approve gaps: refuse the root command when quotes are spliced into its name, and printenv of a single named key",
    "at": 1794237913238
+  },
+  {
+   "id": "a2a86cef",
+   "text": "Fix deep-research eval run.mjs: the new arm never got SKILL.md (mkdirSync recursive returns the top dir), so round 1 tested no skill",
+   "at": 1794304793764,
+   "before": "6e1d42fa",
+   "chat": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
+   "host": "62903adf5e340f87",
+   "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
+   "name": "Deep-research eval round 2"
   }
  ],
  "removed": {
