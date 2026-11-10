@@ -10,15 +10,6 @@
    "why": "blocked"
   },
   {
-   "id": "abf6671a",
-   "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
-   "at": 1794336873123,
-   "from": "0419be6e-5137-476b-95bd-41942a3108f3",
-   "run": 18,
-   "auto": true,
-   "stopped": true
-  },
-  {
    "id": "e14ca1da-ok",
    "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
    "at": 1794343499752,
@@ -431,11 +422,22 @@
   "77dc7d30-ok": 1794343541187,
   "a7df2aa6-ok": 1794343565092,
   "55b0229e-ok": 1794343602370,
-  "fc2939be-ok": 1794343605049
+  "fc2939be-ok": 1794343605049,
+  "abf6671a": 1794343760231
  },
  "seq": 26,
  "streak": 4,
  "ticked": [
+  {
+   "id": "abf6671a",
+   "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
+   "from": "0419be6e-5137-476b-95bd-41942a3108f3",
+   "run": 18,
+   "auto": true,
+   "stopped": true,
+   "at": 1794343760231,
+   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87"
+  },
   {
    "id": "fc2939be-ok",
    "text": "The bun-only plugin test suites.",
@@ -524,16 +526,6 @@
    "by": "d0c9b084-ab26-46e6-8ac9-dc21b503d6b3",
    "from": "997c37c2-e6af-43ed-854c-4db5ed18567a",
    "run": 19,
-   "auto": true
-  },
-  {
-   "id": "fd62d42a-ok",
-   "text": "to-do a7dadc73 (AAR write access to other projects' memory folders) is still open; this chat didn't touch it.",
-   "at": 1794336734398,
-   "by": "48b03d63-e202-4439-a07d-2734848186a1",
-   "from": "451fb648-858b-4070-b993-029d7fcd00b8",
-   "why": "later",
-   "run": 17,
    "auto": true
   }
  ]
