@@ -78,6 +78,13 @@
    "at": 1794318265267,
    "from": "451fb648-858b-4070-b993-029d7fcd00b8",
    "why": "later"
+  },
+  {
+   "id": "f135088b",
+   "text": "Release Switchboard 0.21.23 (bump, CHANGELOG, package, install, vsix to claude-mods/kit). The CHANGELOG hold by chat 08d8bd98 is stale, that chat ended. Bullets waiting: \"Links Switchboard opens (hub links, git PR page, the browser app) open in the folder's Chrome pick (Sign-ins, else the * default) instead of Chrome's last used profile.\" and \"Board: Claude realms get their own clay palette, and each AI pavilion shows its realm's landmark.\"",
+   "at": 1794320680964,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug"
   }
  ],
  "removed": {
