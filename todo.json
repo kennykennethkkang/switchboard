@@ -44,9 +44,9 @@
    "id": "7246b1e0",
    "text": "AAR fix plan (edee7b2a, f5f8e8ad): two chats left work unreleased because the brief listed ended chat 08d8bd98 as holding CHANGELOG.md. In extension/src/hub/brain.ts:128 change `Leave alone, another chat is editing: ${files.join(', ')}` to `Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`, and update the brief test that matches the old text. Needs approval.",
    "at": 1794337053699,
-   "from": "997c37c2-e6af-43ed-854c-4db5ed18567a",
    "chat": "d0c9b084-ab26-46e6-8ac9-dc21b503d6b3",
    "host": "62903adf5e340f87",
+   "from": "997c37c2-e6af-43ed-854c-4db5ed18567a",
    "run": 19,
    "auto": true
   },
@@ -61,6 +61,12 @@
    "at": 1794336641934,
    "from": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
    "name": "To-do 16: Eval grader citation tuning"
+  },
+  {
+   "id": "83e57084",
+   "text": "AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" with \"End every brief with a tool-call budget (about 25 to 35, and at least 10 under the role's maxTurns: designer and qa 30 at most)\". Why: two designer briefs said budget about 40 against the 40-turn cap and B stopped mid-work. 2) In the System Events keystroke rule, after \"Never send System Events keystroke or key code to another app while Kenneth may be typing\", add \", and do not type into iPhone Mirroring with computer-use: put a phone link in a QR png opened with open -g in Preview for the Camera\". Why: Mirroring paused while the phone was in use and focus jumped to VS Code mid-typing.",
+   "at": 1794337237779,
+   "from": "4f9a448f-ce28-4dfb-b765-1094067285c4"
   }
  ],
  "removed": {
