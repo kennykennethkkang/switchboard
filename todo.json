@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "e207ca92-ok",
-   "text": "There is an issue when limit reaches switchboard says its no data please keep track and state that usages is up. Also all chats are closing make sure stuff pauses before usage is up so it doesn't just",
-   "at": 1794319393227,
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes",
-   "why": "missed",
-   "chat": "4f34493b-0dd3-4ba0-bfd5-e28545dbff38",
-   "host": "62903adf5e340f87",
-   "run": 5,
-   "auto": true
-  },
-  {
    "id": "2fbd2f92-ok",
    "text": "If it is not in the folder please pull up the site I need to get the API key and also tell me where to place it. Also make sure future users who set this up don't have such a hard time. Maybe add it s",
    "at": 1794318080871,
@@ -442,11 +430,23 @@
   "e1c8c72c": 1794318259034,
   "75089f6c": 1794318262010,
   "fd62d42a": 1794318265267,
-  "f1ba141b-ok": 1794319392377
+  "f1ba141b-ok": 1794319392377,
+  "e207ca92-ok": 1794319548428
  },
  "seq": 5,
  "streak": 4,
  "ticked": [
+  {
+   "id": "e207ca92-ok",
+   "text": "There is an issue when limit reaches switchboard says its no data please keep track and state that usages is up. Also all chats are closing make sure stuff pauses before usage is up so it doesn't just",
+   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "name": "Tailscale Commit Button Fixes",
+   "why": "missed",
+   "run": 5,
+   "auto": true,
+   "at": 1794319548428,
+   "by": "4f34493b-0dd3-4ba0-bfd5-e28545dbff38"
+  },
   {
    "id": "f1ba141b-ok",
    "text": "add this feature also https://www.instagram.com/reel/DfaTZHlh-k0/?dlrf=NTc4MTIwNjQ2YQ==. also lets also make sure there is a creation of a deep research bot that can research anything and researches i",
@@ -526,14 +526,6 @@
    "by": "a9eae457-c2e7-4460-a5e9-1a744c454118",
    "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
    "name": "agent-flow-f0"
-  },
-  {
-   "id": "75e17893",
-   "text": "Inventory gaps left: drop or ship caveman (README credits it, not installed); README line 30 FLAGGED list vs tools.ts FLAGGED; check stitch plugins installed twice; empty ~/.claude/skills/learned dir",
-   "at": 1794311637026,
-   "by": "43fe3f0b-531f-4220-8001-8a4d0672e06f",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
   }
  ]
 }
