@@ -23,14 +23,13 @@
   {
    "id": "fc2939be-ok",
    "text": "The bun-only plugin test suites.",
-   "at": 1794333386311,
+   "at": 1794333506697,
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "later",
-   "chat": "d3629a52-bde4-4720-aeb6-8bb7cdd28d27",
-   "host": "62903adf5e340f87",
    "run": 13,
-   "auto": true
+   "auto": true,
+   "stopped": true
   },
   {
    "id": "dd0f7384-ok",
