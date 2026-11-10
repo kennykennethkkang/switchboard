@@ -28,14 +28,13 @@
   {
    "id": "7bb98bd3-ok",
    "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794343608784,
+   "at": 1794343743072,
    "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
    "name": "To-do 10: Chrome account mismatch bug",
    "why": "missed",
-   "chat": "cbf9bb2d-1f0e-4e3e-b891-7fb0c2306a1f",
-   "host": "62903adf5e340f87",
    "run": 26,
-   "auto": true
+   "auto": true,
+   "stopped": true
   },
   {
    "id": "fc6b9569-ok",
