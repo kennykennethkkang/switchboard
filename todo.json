@@ -58,6 +58,13 @@
    "at": 1794343494325,
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
    "why": "later"
+  },
+  {
+   "id": "e14ca1da-ok",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794343499752,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
   }
  ],
  "removed": {
@@ -404,7 +411,8 @@
   "83e57084": 1794343137629,
   "a8138064": 1794343173179,
   "77dc7d30": 1794343469270,
-  "55b0229e": 1794343494325
+  "55b0229e": 1794343494325,
+  "e14ca1da": 1794343499752
  },
  "seq": 24,
  "streak": 4,
@@ -507,13 +515,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
   {
    "id": "7bb98bd3",
    "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
