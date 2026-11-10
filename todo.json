@@ -60,13 +60,6 @@
    "why": "later"
   },
   {
-   "id": "f135088b",
-   "text": "Release Switchboard 0.21.23 (bump, CHANGELOG, package, install, vsix to claude-mods/kit). The CHANGELOG hold by chat 08d8bd98 is stale, that chat ended. Bullets waiting: \"Links Switchboard opens (hub links, git PR page, the browser app) open in the folder's Chrome pick (Sign-ins, else the * default) instead of Chrome's last used profile.\" and \"Board: Claude realms get their own clay palette, and each AI pavilion shows its realm's landmark.\"",
-   "at": 1794320680964,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug"
-  },
-  {
    "id": "abf6671a",
    "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
    "at": 1794320882732,
@@ -411,7 +404,8 @@
   "b53117ca-ok": 1794320398937,
   "300d38c8-ok": 1794320534453,
   "8ac7feab-ok": 1794321718867,
-  "ee375e39-ok": 1794333382057
+  "ee375e39-ok": 1794333382057,
+  "f135088b": 1794333382342
  },
  "seq": 12,
  "streak": 4,
@@ -464,15 +458,23 @@
  ],
  "ticked": [
   {
+   "id": "f135088b",
+   "text": "Release Switchboard 0.21.23 (bump, CHANGELOG, package, install, vsix to claude-mods/kit). The CHANGELOG hold by chat 08d8bd98 is stale, that chat ended. Bullets waiting: \"Links Switchboard opens (hub links, git PR page, the browser app) open in the folder's Chrome pick (Sign-ins, else the * default) instead of Chrome's last used profile.\" and \"Board: Claude realms get their own clay palette, and each AI pavilion shows its realm's landmark.\"",
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "at": 1794333382342,
+   "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839"
+  },
+  {
    "id": "ee375e39-ok",
    "text": "The \"any editor or language\" half of the self-improve item.",
+   "at": 1794333382057,
+   "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "later",
    "run": 12,
-   "auto": true,
-   "at": 1794333382057,
-   "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839"
+   "auto": true
   },
   {
    "id": "8ac7feab-ok",
@@ -558,14 +560,6 @@
    "by": "1db3d17d-11b2-4092-b231-8f5e45d77030",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
-   "why": "later"
-  },
-  {
-   "id": "c5c53f46",
-   "text": "To-do 0b3f444c: the twice-weekly improve-system run has the same problem. Its permission to write memory notes can never work, so it needs the same copy-back or",
-   "at": 1794316908551,
-   "by": "570604af-1a8f-43d4-852e-9e51a0e6482e",
-   "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
    "why": "later"
   }
  ]
