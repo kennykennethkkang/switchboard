@@ -41,15 +41,6 @@
    "stopped": true
   },
   {
-   "id": "5eb50396",
-   "text": "Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jumping which makes it hard to use",
-   "at": 1794337287288,
-   "chat": "818c7301-1cd8-4641-bcdc-e00df1c53271",
-   "host": "62903adf5e340f87",
-   "run": 20,
-   "auto": true
-  },
-  {
    "id": "948a8482",
    "text": "Deep-research eval round 4 (optional): round 3 checked every citation and the skill still led by only one claim under sonnet. To really separate the skill from the plain researcher prompt, write 20 or more new trap questions (q26 and up, each with a source conflict) and run them with --claims all.",
    "at": 1794336641934,
@@ -401,11 +392,67 @@
   "e1c8c72c-ok": 1794336102972,
   "75089f6c-ok": 1794336640732,
   "fd62d42a-ok": 1794336734398,
-  "7246b1e0": 1794337278398
+  "7246b1e0": 1794337278398,
+  "5eb50396": 1794338085184
  },
  "seq": 20,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
+  },
+  {
+   "id": "08e0bf2a",
+   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794332244536,
+   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "5eb50396",
+   "text": "Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jumping which makes it hard to use",
+   "run": 20,
+   "auto": true,
+   "at": 1794338085184,
+   "by": "818c7301-1cd8-4641-bcdc-e00df1c53271"
+  },
   {
    "id": "7246b1e0",
    "text": "AAR fix plan (edee7b2a, f5f8e8ad): two chats left work unreleased because the brief listed ended chat 08d8bd98 as holding CHANGELOG.md. In extension/src/hub/brain.ts:128 change `Leave alone, another chat is editing: ${files.join(', ')}` to `Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`, and update the brief test that matches the old text. Needs approval.",
@@ -498,64 +545,6 @@
    "why": "missed",
    "run": 10,
    "auto": true
-  },
-  {
-   "id": "b53117ca-ok",
-   "text": "These aren't included in the claude picker also no page for codex run where do I do that?",
-   "at": 1794320398937,
-   "by": "e62c0050-2aec-43bd-9a94-79030fae6c68",
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed",
-   "run": 9,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
-  },
-  {
-   "id": "08e0bf2a",
-   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794332244536,
-   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "why": "later"
   }
  ]
 }
