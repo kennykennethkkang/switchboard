@@ -32,6 +32,14 @@
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "missed"
+  },
+  {
+   "id": "a7df2aa6-ok",
+   "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
+   "at": 1794318086189,
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -347,7 +355,8 @@
   "f1ba141b": 1794318073879,
   "e207ca92": 1794318078365,
   "2fbd2f92": 1794318080871,
-  "b9b7da84": 1794318084976
+  "b9b7da84": 1794318084976,
+  "a7df2aa6": 1794318086189
  },
  "seq": 3,
  "ticked": [
@@ -461,14 +470,6 @@
    "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
    "name": "Codex Switchboard Integration Setup v3",
    "why": "later"
-  },
-  {
-   "id": "a7df2aa6",
-   "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
-   "at": 1794222119540,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed"
   },
   {
    "id": "b53117ca",
