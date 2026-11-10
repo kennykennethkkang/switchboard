@@ -56,6 +56,12 @@
    "text": "AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" with \"End every brief with a tool-call budget (about 25 to 35, and at least 10 under the role's maxTurns: designer and qa 30 at most)\". Why: two designer briefs said budget about 40 against the 40-turn cap and B stopped mid-work. 2) In the System Events keystroke rule, after \"Never send System Events keystroke or key code to another app while Kenneth may be typing\", add \", and do not type into iPhone Mirroring with computer-use: put a phone link in a QR png opened with open -g in Preview for the Camera\". Why: Mirroring paused while the phone was in use and focus jumped to VS Code mid-typing.",
    "at": 1794337237779,
    "from": "4f9a448f-ce28-4dfb-b765-1094067285c4"
+  },
+  {
+   "id": "a8138064",
+   "text": "AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a download piped to a shell,\" with \"a download piped to a shell (curl into python3 -c or node -e counts: curl -o a file, then parse it),\" and replace \"reading .env,\" with \"reading .env (even the word .env in heredoc prose: write \\\"env file\\\"),\". Source: Armasu chat 5ba02468, 2026-11-10.",
+   "at": 1794342392489,
+   "from": "3f765862-8182-43f2-a829-39c30718c6e3"
   }
  ],
  "removed": {
