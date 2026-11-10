@@ -4,10 +4,14 @@
   {
    "id": "2fbd2f92-ok",
    "text": "If it is not in the folder please pull up the site I need to get the API key and also tell me where to place it. Also make sure future users who set this up don't have such a hard time. Maybe add it s",
-   "at": 1794318080871,
+   "at": 1794319558372,
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
+   "why": "missed",
+   "chat": "45bf7d04-fdfc-4273-ae75-cca7337882f7",
+   "host": "62903adf5e340f87",
+   "run": 6,
+   "auto": true
   },
   {
    "id": "b9b7da84-ok",
@@ -433,19 +437,19 @@
   "f1ba141b-ok": 1794319392377,
   "e207ca92-ok": 1794319548428
  },
- "seq": 5,
+ "seq": 6,
  "streak": 4,
  "ticked": [
   {
    "id": "e207ca92-ok",
    "text": "There is an issue when limit reaches switchboard says its no data please keep track and state that usages is up. Also all chats are closing make sure stuff pauses before usage is up so it doesn't just",
+   "at": 1794319548428,
+   "by": "4f34493b-0dd3-4ba0-bfd5-e28545dbff38",
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
    "why": "missed",
    "run": 5,
-   "auto": true,
-   "at": 1794319548428,
-   "by": "4f34493b-0dd3-4ba0-bfd5-e28545dbff38"
+   "auto": true
   },
   {
    "id": "f1ba141b-ok",
