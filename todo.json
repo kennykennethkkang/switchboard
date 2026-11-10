@@ -4,9 +4,11 @@
   {
    "id": "6e1d42fa",
    "text": "Deep-research eval round 2: add 10 harder questions (4+ hops, conflicting or recent sources) to claude-mods/kit/skills/deep-research/eval/questions.json, run the standard level vs the researcher prompt on sonnet with two judges, and keep the skill only if it wins on citations.",
-   "at": 1794125533920,
+   "at": 1794304738822,
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes"
+   "name": "Tailscale Commit Button Fixes",
+   "chat": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "ad7e4488",
