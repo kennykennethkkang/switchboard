@@ -1,18 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "7bb98bd3-ok",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794343743072,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed",
-   "run": 26,
-   "auto": true,
-   "stopped": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -380,17 +368,28 @@
   "dcc0d3e4": 1794346358419,
   "f03c196c": 1794346358419,
   "80f1bfde-ok": 1794346365699,
-  "e14ca1da-ok": 1794346366781
+  "e14ca1da-ok": 1794346366781,
+  "7bb98bd3-ok": 1794346367878
  },
  "seq": 33,
- "streak": 4,
  "ticked": [
+  {
+   "id": "7bb98bd3-ok",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed",
+   "run": 26,
+   "auto": true,
+   "stopped": true,
+   "at": 1794346367878
+  },
   {
    "id": "e14ca1da-ok",
    "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794346366781,
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked",
-   "at": 1794346366781
+   "why": "blocked"
   },
   {
    "id": "80f1bfde-ok",
@@ -465,16 +464,6 @@
    "name": "To-do 20: Smart page tracking and no",
    "why": "missed",
    "run": 29,
-   "auto": true
-  },
-  {
-   "id": "08e0bf2a-ok",
-   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794344334837,
-   "by": "c16f38c8-404b-4818-a33b-c1be5187e64a",
-   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "why": "later",
-   "run": 28,
    "auto": true
   }
  ]
