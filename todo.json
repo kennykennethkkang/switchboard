@@ -42,16 +42,6 @@
    "id": "8baab3b0",
    "text": "bash-approve gaps: refuse the root command when quotes are spliced into its name, and printenv of a single named key",
    "at": 1794237913238
-  },
-  {
-   "id": "a2a86cef",
-   "text": "Fix deep-research eval run.mjs: the new arm never got SKILL.md (mkdirSync recursive returns the top dir), so round 1 tested no skill",
-   "at": 1794304793764,
-   "before": "6e1d42fa",
-   "chat": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "host": "62903adf5e340f87",
-   "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "name": "Deep-research eval round 2"
   }
  ],
  "removed": {
@@ -344,27 +334,9 @@
   "4a336629": 1794242631400,
   "89c50735": 1794244332197,
   "2e5adc66": 1794256015472,
-  "b673a51e": 1794256324677
+  "b673a51e": 1794256324677,
+  "a2a86cef": 1794304954685
  },
- "ticked": [
-  {
-   "id": "b673a51e",
-   "text": "Kit experiment: delegation costs 3x to 4x with no correctness gain on tasks up to about 5 files (vault ecc-vs-switchboard-kit). Try a rules.md line telling the lead to work solo below a size threshold, and A/B it.",
-   "at": 1794256324677,
-   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
-   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
-   "name": "Check if ECC repo on"
-  },
-  {
-   "id": "2e5adc66",
-   "text": "Rebuild bench tasks t8 and t9 (TS event store, Python pagination) into ~/.claude/bench-kit from the 2026-11-03 transcript dbc421a5",
-   "at": 1794256015472,
-   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
-   "from": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
-   "before": "b673a51e",
-   "name": "Switchboard kit delegation A B"
-  }
- ],
  "suggested": [
   {
    "id": "ee375e39",
@@ -517,6 +489,34 @@
    "from": "7edf7c04-4696-43ab-af10-7fa891d6ee82",
    "name": "Fix Switchboard page layout overflow",
    "why": "missed"
+  }
+ ],
+ "ticked": [
+  {
+   "id": "a2a86cef",
+   "text": "Fix deep-research eval run.mjs: the new arm never got SKILL.md (mkdirSync recursive returns the top dir), so round 1 tested no skill",
+   "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
+   "before": "6e1d42fa",
+   "name": "Deep-research eval round 2",
+   "at": 1794304954685,
+   "by": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61"
+  },
+  {
+   "id": "b673a51e",
+   "text": "Kit experiment: delegation costs 3x to 4x with no correctness gain on tasks up to about 5 files (vault ecc-vs-switchboard-kit). Try a rules.md line telling the lead to work solo below a size threshold, and A/B it.",
+   "at": 1794256324677,
+   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
+   "from": "dbc421a5-6fda-4551-950b-8b9ea29615ee",
+   "name": "Check if ECC repo on"
+  },
+  {
+   "id": "2e5adc66",
+   "text": "Rebuild bench tasks t8 and t9 (TS event store, Python pagination) into ~/.claude/bench-kit from the 2026-11-03 transcript dbc421a5",
+   "at": 1794256015472,
+   "by": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
+   "from": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
+   "before": "b673a51e",
+   "name": "Switchboard kit delegation A B"
   }
  ]
 }
