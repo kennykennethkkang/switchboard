@@ -30,8 +30,12 @@
   {
    "id": "5e0932b6",
    "text": "AAR fix plan (chat 1b4609a7), approve to apply: in claude-mods/kit/rules.md line 66 replace \"- If the aar skill is installed, run it on this chat before the standup.\" with \"- Run the aar skill on this chat before the standup (Read kit/skills/aar/SKILL.md if the Skill tool is off). Never skip it; the scheduled Learn run does not replace it.\" Why: chats d0c9b084 and 1b4609a7 both skipped the aar on 2026-11-10, the second with \"I didn't run the after-action review this time\".",
-   "at": 1794345862319,
-   "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c"
+   "at": 1794345999601,
+   "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c",
+   "chat": "79bd8605-e785-4d59-8f45-607ba5fb7503",
+   "host": "62903adf5e340f87",
+   "run": 33,
+   "auto": true
   }
  ],
  "removed": {
@@ -398,33 +402,17 @@
   "ea2f8c40-ok": 1794345955343,
   "490c3b46": 1794345997136
  },
- "seq": 32,
+ "seq": 33,
  "streak": 4,
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "490c3b46",
    "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
+   "at": 1794345997136,
+   "by": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
    "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e",
    "run": 32,
-   "auto": true,
-   "at": 1794345997136,
-   "by": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2"
+   "auto": true
   },
   {
    "id": "ea2f8c40-ok",
@@ -523,6 +511,22 @@
    "run": 8,
    "auto": true,
    "stopped": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
   }
  ]
 }
