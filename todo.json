@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "8ac7feab-ok",
-   "text": "Terminal is still not auto closing when user approves and completes a chat. Please fix it. Also allow for user to open a new github repo and chat directly through switchboard",
-   "at": 1794320548320,
-   "chat": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "host": "62903adf5e340f87",
-   "from": "73fc966b-2bf5-4c0c-b33c-7c141a1e0a37",
-   "name": "Fix terminal auto-close and GitHub",
-   "why": "missed",
-   "run": 11,
-   "auto": true
-  },
-  {
    "id": "80f1bfde-ok",
    "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
    "at": 1794318105299,
@@ -429,11 +417,63 @@
   "2fbd2f92-ok": 1794319689470,
   "b9b7da84-ok": 1794320019121,
   "b53117ca-ok": 1794320398937,
-  "300d38c8-ok": 1794320534453
+  "300d38c8-ok": 1794320534453,
+  "8ac7feab-ok": 1794321718867
  },
  "seq": 11,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
+  }
+ ],
  "ticked": [
+  {
+   "id": "8ac7feab-ok",
+   "text": "Terminal is still not auto closing when user approves and completes a chat. Please fix it. Also allow for user to open a new github repo and chat directly through switchboard",
+   "from": "73fc966b-2bf5-4c0c-b33c-7c141a1e0a37",
+   "name": "Fix terminal auto-close and GitHub",
+   "why": "missed",
+   "run": 11,
+   "auto": true,
+   "at": 1794321718867,
+   "by": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4"
+  },
   {
    "id": "300d38c8-ok",
    "text": "Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang",
@@ -526,56 +566,6 @@
    "name": "To-do 2: Scheduled memory write access fix",
    "run": 3,
    "auto": true
-  },
-  {
-   "id": "a7dadc73",
-   "text": "Scheduled AAR (Learn automatically) runs need write access to other projects' memory folders (~/.claude/projects/*/memory); the 2026-11-09 Armasu run could not save its notes",
-   "at": 1794315703507,
-   "by": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "from": "e117ca05-9986-49fa-8a06-2f6132d2c887",
-   "name": "Fix switchboard memory notes",
-   "run": 2,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
   }
  ]
 }
