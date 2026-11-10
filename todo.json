@@ -10,17 +10,6 @@
    "why": "blocked"
   },
   {
-   "id": "fc2939be-ok",
-   "text": "The bun-only plugin test suites.",
-   "at": 1794333506697,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later",
-   "run": 13,
-   "auto": true,
-   "stopped": true
-  },
-  {
    "id": "abf6671a",
    "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
    "at": 1794336873123,
@@ -438,20 +427,33 @@
   "ea2f8c40": 1794343518403,
   "77dc7d30-ok": 1794343541187,
   "a7df2aa6-ok": 1794343565092,
-  "55b0229e-ok": 1794343602370
+  "55b0229e-ok": 1794343602370,
+  "fc2939be-ok": 1794343605049
  },
  "seq": 25,
  "streak": 4,
  "ticked": [
   {
+   "id": "fc2939be-ok",
+   "text": "The bun-only plugin test suites.",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later",
+   "run": 13,
+   "auto": true,
+   "stopped": true,
+   "at": 1794343605049,
+   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87"
+  },
+  {
    "id": "55b0229e-ok",
    "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794343602370,
+   "by": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3",
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
    "why": "later",
    "run": 25,
-   "auto": true,
-   "at": 1794343602370,
-   "by": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3"
+   "auto": true
   },
   {
    "id": "a7df2aa6-ok",
@@ -529,17 +531,6 @@
    "from": "451fb648-858b-4070-b993-029d7fcd00b8",
    "why": "later",
    "run": 17,
-   "auto": true
-  },
-  {
-   "id": "75089f6c-ok",
-   "text": "to tell the two apart under Sonnet's grading, more questions are needed, or graders that check more than 3 citations per answer.",
-   "at": 1794336640732,
-   "by": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
-   "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "name": "Deep-research eval round 2",
-   "why": "later",
-   "run": 16,
    "auto": true
   }
  ]
