@@ -28,18 +28,6 @@
    "stopped": true
   },
   {
-   "id": "b2b2ae1c-ok",
-   "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
-   "at": 1794344343939,
-   "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
-   "name": "To-do 20: Smart page tracking and no",
-   "why": "missed",
-   "chat": "1b4609a7-6297-4362-8701-156db8426f16",
-   "host": "62903adf5e340f87",
-   "run": 29,
-   "auto": true
-  },
-  {
    "id": "20b046b5-ok",
    "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
    "at": 1794343514683,
@@ -414,11 +402,39 @@
   "fc2939be-ok": 1794343605049,
   "abf6671a": 1794343760231,
   "fc6b9569-ok": 1794344131984,
-  "08e0bf2a-ok": 1794344334837
+  "08e0bf2a-ok": 1794344334837,
+  "b2b2ae1c-ok": 1794345698373
  },
  "seq": 29,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "b2b2ae1c-ok",
+   "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
+   "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
+   "name": "To-do 20: Smart page tracking and no",
+   "why": "missed",
+   "run": 29,
+   "auto": true,
+   "at": 1794345698373,
+   "by": "1b4609a7-6297-4362-8701-156db8426f16"
+  },
   {
    "id": "08e0bf2a-ok",
    "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
@@ -512,32 +528,6 @@
    "from": "4f9a448f-ce28-4dfb-b765-1094067285c4",
    "run": 22,
    "auto": true
-  },
-  {
-   "id": "948a8482",
-   "text": "Deep-research eval round 4 (optional): round 3 checked every citation and the skill still led by only one claim under sonnet. To really separate the skill from the plain researcher prompt, write 20 or more new trap questions (q26 and up, each with a source conflict) and run them with --claims all.",
-   "at": 1794343095956,
-   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "from": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
-   "name": "To-do 16: Eval grader citation tuning",
-   "run": 21,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
   }
  ]
 }
