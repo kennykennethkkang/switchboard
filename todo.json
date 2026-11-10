@@ -4,11 +4,9 @@
   {
    "id": "75e17893",
    "text": "Inventory gaps left: drop or ship caveman (README credits it, not installed); README line 30 FLAGGED list vs tools.ts FLAGGED; check stitch plugins installed twice; empty ~/.claude/skills/learned dir",
-   "at": 1794311275830,
+   "at": 1794311400067,
    "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization",
-   "chat": "eac9fc90-caf1-4ad7-a5c2-4516ee4ec159",
-   "host": "62903adf5e340f87"
+   "name": "Overhaul Switchboard Organization"
   },
   {
    "id": "6f393e98",
