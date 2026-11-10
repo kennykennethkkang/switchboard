@@ -96,6 +96,14 @@
    "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
    "name": "To-do 20: Smart page tracking and no",
    "why": "missed"
+  },
+  {
+   "id": "20b046b5-ok",
+   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
+   "at": 1794343514683,
+   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
+   "name": "To-do 22: AAR fix plan rules update",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -447,7 +455,8 @@
   "7bb98bd3": 1794343506119,
   "fc6b9569": 1794343508954,
   "08e0bf2a": 1794343511136,
-  "b2b2ae1c": 1794343513221
+  "b2b2ae1c": 1794343513221,
+  "20b046b5": 1794343514683
  },
  "seq": 24,
  "streak": 4,
@@ -550,14 +559,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "20b046b5",
-   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
-   "at": 1794343164265,
-   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
-   "name": "To-do 22: AAR fix plan rules update",
-   "why": "missed"
-  },
   {
    "id": "ea2f8c40",
    "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
