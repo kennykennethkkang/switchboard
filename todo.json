@@ -338,7 +338,8 @@
   "a2a86cef": 1794304954685,
   "a56024b2": 1794305476681,
   "3bca357b": 1794305476716,
-  "2b2b1ed8": 1794305476749
+  "2b2b1ed8": 1794305476749,
+  "91f6ac67": 1794305476783
  },
  "ticked": [
   {
@@ -488,14 +489,6 @@
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later"
-  },
-  {
-   "id": "91f6ac67",
-   "text": "Sorry quit after all other chats are finished do it for me",
-   "at": 1794261572805,
-   "from": "86af8da5-285c-4ee4-9cc8-a06de4862d89",
-   "name": "Switchboard kit delegation A B",
-   "why": "missed"
   },
   {
    "id": "cbf80c17",
