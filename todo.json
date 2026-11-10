@@ -34,10 +34,14 @@
   {
    "id": "dd0f7384-ok",
    "text": "The Codex transcript tab (to-do 29c4f61f).",
-   "at": 1794318256829,
+   "at": 1794333701472,
    "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
    "name": "Codex Switchboard Integration Setup v3",
-   "why": "later"
+   "why": "later",
+   "chat": "0f2d4f93-cc16-433a-b118-1f269077b9c6",
+   "host": "62903adf5e340f87",
+   "run": 14,
+   "auto": true
   },
   {
    "id": "e1c8c72c-ok",
@@ -410,7 +414,7 @@
   "ee375e39-ok": 1794333382057,
   "f135088b": 1794333382342
  },
- "seq": 13,
+ "seq": 14,
  "streak": 4,
  "ticked": [
   {
