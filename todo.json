@@ -4,9 +4,13 @@
   {
    "id": "0b3f444c",
    "text": "Learn automatically improve runs still cannot write memory notes: jobArgs('improve') allows ~/.claude/projects/*/memory/** but headless claude refuses writes under ~/.claude. Reuse stageMemory/syncMemory from learn.ts (one stage per project touched) or drop memory from the improve allow list",
-   "at": 1794315729693,
+   "at": 1794315744000,
    "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "name": "To-do 2: Scheduled memory write access fix"
+   "name": "To-do 2: Scheduled memory write access fix",
+   "chat": "570604af-1a8f-43d4-852e-9e51a0e6482e",
+   "host": "62903adf5e340f87",
+   "run": 3,
+   "auto": true
   }
  ],
  "removed": {
@@ -317,7 +321,7 @@
   "3de8acf0": 1794315234257,
   "a7dadc73": 1794315703507
  },
- "seq": 2,
+ "seq": 3,
  "ticked": [
   {
    "id": "a7dadc73",
@@ -524,5 +528,6 @@
    "name": "Switchboard Adjustment Updates",
    "why": "blocked"
   }
- ]
+ ],
+ "streak": 3
 }
