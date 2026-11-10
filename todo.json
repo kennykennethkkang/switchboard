@@ -4,7 +4,9 @@
   {
    "id": "8baab3b0",
    "text": "bash-approve gap: refuse the root command when quotes are spliced into its name (\"pr\"intenv); add a test",
-   "at": 1794305476954
+   "at": 1794311881900,
+   "chat": "05225816-67f6-49cd-8888-2603e9dae808",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "3de8acf0",
