@@ -100,6 +100,14 @@
    "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
    "name": "Codex Switchboard Integration Setup v3",
    "why": "later"
+  },
+  {
+   "id": "e1c8c72c-ok",
+   "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
+   "at": 1794318259034,
+   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
+   "name": "Audit All Skills Tools Settings",
+   "why": "later"
   }
  ],
  "removed": {
@@ -423,7 +431,8 @@
   "80f1bfde": 1794318105299,
   "ee375e39": 1794318240600,
   "fc2939be": 1794318245065,
-  "dd0f7384": 1794318256829
+  "dd0f7384": 1794318256829,
+  "e1c8c72c": 1794318259034
  },
  "seq": 4,
  "streak": 4,
@@ -515,14 +524,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "e1c8c72c",
-   "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
-   "at": 1794244332197,
-   "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
-   "name": "Audit All Skills Tools Settings",
-   "why": "later"
-  },
   {
    "id": "75089f6c",
    "text": "to tell the two apart under Sonnet's grading, more questions are needed, or graders that check more than 3 citations per answer.",
