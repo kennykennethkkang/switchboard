@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "58d13898-ok",
-   "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
-   "at": 1794346434694,
-   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
-   "name": "To-do 32: AAR fix rules md update",
-   "why": "later",
-   "chat": "f42846f5-47f4-4e76-8e15-2fb01c38a37d",
-   "host": "62903adf5e340f87",
-   "run": 35,
-   "auto": true
-  },
-  {
    "id": "85459f6e",
    "text": "Why was renaming blocked please make sure they are not blocked and fix them I want to make sure this folder is renamed to switchboard also",
    "at": 1794346391163
@@ -390,11 +378,23 @@
   "7bb98bd3-ok": 1794346367878,
   "5725fc39": 1794346377802,
   "58d13898": 1794346379075,
-  "5725fc39-ok": 1794346427893
+  "5725fc39-ok": 1794346427893,
+  "58d13898-ok": 1794346458368
  },
  "seq": 35,
  "streak": 34,
  "ticked": [
+  {
+   "id": "58d13898-ok",
+   "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
+   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
+   "name": "To-do 32: AAR fix rules md update",
+   "why": "later",
+   "run": 35,
+   "auto": true,
+   "at": 1794346458368,
+   "by": "f42846f5-47f4-4e76-8e15-2fb01c38a37d"
+  },
   {
    "id": "5725fc39-ok",
    "text": "The copies in `~/.claude` and `extension/kit` won't have the new sentence until the next kit build or setup run.",
@@ -475,17 +475,6 @@
    "name": "To-do 23: Switchboard AAR rules md bash",
    "why": "missed",
    "run": 31,
-   "auto": true
-  },
-  {
-   "id": "20b046b5-ok",
-   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
-   "at": 1794345889013,
-   "by": "ee43b1e6-af1d-4047-9065-9a635ba24c73",
-   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
-   "name": "To-do 22: AAR fix plan rules update",
-   "why": "missed",
-   "run": 30,
    "auto": true
   }
  ]
