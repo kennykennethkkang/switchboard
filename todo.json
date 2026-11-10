@@ -4,10 +4,14 @@
   {
    "id": "a7df2aa6-ok",
    "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
-   "at": 1794318086189,
+   "at": 1794320023236,
    "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
    "name": "Switchboard MCP connector setup",
-   "why": "missed"
+   "why": "missed",
+   "chat": "c9f71b00-e9da-4970-b2d7-c026f3719602",
+   "host": "62903adf5e340f87",
+   "run": 8,
+   "auto": true
   },
   {
    "id": "b53117ca-ok",
@@ -419,43 +423,19 @@
   "2fbd2f92-ok": 1794319689470,
   "b9b7da84-ok": 1794320019121
  },
- "seq": 7,
+ "seq": 8,
  "streak": 4,
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  }
- ],
  "ticked": [
   {
    "id": "b9b7da84-ok",
    "text": "Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design make sure there are no issues with the",
+   "at": 1794320019121,
+   "by": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "missed",
    "run": 7,
-   "auto": true,
-   "at": 1794320019121,
-   "by": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791"
+   "auto": true
   },
   {
    "id": "2fbd2f92-ok",
@@ -542,6 +522,30 @@
    "text": "bash-approve gap: refuse the root command when quotes are spliced into its name (\"pr\"intenv); add a test",
    "at": 1794312008254,
    "by": "05225816-67f6-49cd-8888-2603e9dae808"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
   }
  ]
 }
