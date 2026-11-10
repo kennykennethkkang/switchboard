@@ -8,6 +8,14 @@
    "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
    "name": "To-do 32: AAR fix rules md update",
    "why": "later"
+  },
+  {
+   "id": "58d13898-ok",
+   "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
+   "at": 1794346379075,
+   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
+   "name": "To-do 32: AAR fix rules md update",
+   "why": "later"
   }
  ],
  "removed": {
@@ -379,7 +387,8 @@
   "80f1bfde-ok": 1794346365699,
   "e14ca1da-ok": 1794346366781,
   "7bb98bd3-ok": 1794346367878,
-  "5725fc39": 1794346377802
+  "5725fc39": 1794346377802,
+  "58d13898": 1794346379075
  },
  "seq": 33,
  "ticked": [
@@ -475,16 +484,6 @@
    "why": "missed",
    "run": 29,
    "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "58d13898",
-   "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
-   "at": 1794346368725,
-   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
-   "name": "To-do 32: AAR fix rules md update",
-   "why": "later"
   }
  ]
 }
