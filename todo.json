@@ -108,6 +108,14 @@
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later"
+  },
+  {
+   "id": "75089f6c-ok",
+   "text": "to tell the two apart under Sonnet's grading, more questions are needed, or graders that check more than 3 citations per answer.",
+   "at": 1794318262010,
+   "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
+   "name": "Deep-research eval round 2",
+   "why": "later"
   }
  ],
  "removed": {
@@ -432,7 +440,8 @@
   "ee375e39": 1794318240600,
   "fc2939be": 1794318245065,
   "dd0f7384": 1794318256829,
-  "e1c8c72c": 1794318259034
+  "e1c8c72c": 1794318259034,
+  "75089f6c": 1794318262010
  },
  "seq": 4,
  "streak": 4,
@@ -524,14 +533,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "75089f6c",
-   "text": "to tell the two apart under Sonnet's grading, more questions are needed, or graders that check more than 3 citations per answer.",
-   "at": 1794309694727,
-   "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "name": "Deep-research eval round 2",
-   "why": "later"
-  },
   {
    "id": "fd62d42a",
    "text": "to-do a7dadc73 (AAR write access to other projects' memory folders) is still open; this chat didn't touch it.",
