@@ -16,11 +16,11 @@
    "id": "8ac7feab-ok",
    "text": "Terminal is still not auto closing when user approves and completes a chat. Please fix it. Also allow for user to open a new github repo and chat directly through switchboard",
    "at": 1794320548320,
+   "chat": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "host": "62903adf5e340f87",
    "from": "73fc966b-2bf5-4c0c-b33c-7c141a1e0a37",
    "name": "Fix terminal auto-close and GitHub",
    "why": "missed",
-   "chat": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "host": "62903adf5e340f87",
    "run": 11,
    "auto": true
   },
@@ -541,6 +541,14 @@
    "at": 1794319967429,
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
    "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
   }
  ]
 }
