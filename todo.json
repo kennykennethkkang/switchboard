@@ -43,9 +43,13 @@
   {
    "id": "55b0229e-ok",
    "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794343494325,
+   "at": 1794343548734,
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
+   "why": "later",
+   "chat": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3",
+   "host": "62903adf5e340f87",
+   "run": 25,
+   "auto": true
   },
   {
    "id": "e14ca1da-ok",
@@ -456,19 +460,19 @@
   "ea2f8c40": 1794343518403,
   "77dc7d30-ok": 1794343541187
  },
- "seq": 24,
+ "seq": 25,
  "streak": 4,
  "ticked": [
   {
    "id": "77dc7d30-ok",
    "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794343541187,
+   "by": "47e157d8-ae8f-4a9e-90b5-1ee82be9f450",
    "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
    "name": "To-do 4: Instagram reel feature and deep",
    "why": "missed",
    "run": 24,
-   "auto": true,
-   "at": 1794343541187,
-   "by": "47e157d8-ae8f-4a9e-90b5-1ee82be9f450"
+   "auto": true
   },
   {
    "id": "a8138064",
