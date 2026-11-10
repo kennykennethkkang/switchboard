@@ -34,9 +34,13 @@
   {
    "id": "fd62d42a-ok",
    "text": "to-do a7dadc73 (AAR write access to other projects' memory folders) is still open; this chat didn't touch it.",
-   "at": 1794318265267,
+   "at": 1794336648671,
    "from": "451fb648-858b-4070-b993-029d7fcd00b8",
-   "why": "later"
+   "why": "later",
+   "chat": "48b03d63-e202-4439-a07d-2734848186a1",
+   "host": "62903adf5e340f87",
+   "run": 17,
+   "auto": true
   },
   {
    "id": "abf6671a",
@@ -401,7 +405,7 @@
   "e1c8c72c-ok": 1794336102972,
   "75089f6c-ok": 1794336640732
  },
- "seq": 16,
+ "seq": 17,
  "streak": 4,
  "ticked": [
   {
