@@ -116,6 +116,13 @@
    "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
    "name": "Deep-research eval round 2",
    "why": "later"
+  },
+  {
+   "id": "fd62d42a-ok",
+   "text": "to-do a7dadc73 (AAR write access to other projects' memory folders) is still open; this chat didn't touch it.",
+   "at": 1794318265267,
+   "from": "451fb648-858b-4070-b993-029d7fcd00b8",
+   "why": "later"
   }
  ],
  "removed": {
@@ -441,7 +448,8 @@
   "fc2939be": 1794318245065,
   "dd0f7384": 1794318256829,
   "e1c8c72c": 1794318259034,
-  "75089f6c": 1794318262010
+  "75089f6c": 1794318262010,
+  "fd62d42a": 1794318265267
  },
  "seq": 4,
  "streak": 4,
@@ -530,15 +538,6 @@
    "by": "0b3d0b31-28f4-43c5-b1d3-f81c06568751",
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
-  }
- ],
- "suggested": [
-  {
-   "id": "fd62d42a",
-   "text": "to-do a7dadc73 (AAR write access to other projects' memory folders) is still open; this chat didn't touch it.",
-   "at": 1794316902693,
-   "from": "451fb648-858b-4070-b993-029d7fcd00b8",
-   "why": "later"
   }
  ]
 }
