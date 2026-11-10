@@ -28,18 +28,6 @@
    "stopped": true
   },
   {
-   "id": "fc6b9569-ok",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794343923904,
-   "chat": "3d202cdd-a44c-4d05-9fed-1b36de1e1755",
-   "host": "62903adf5e340f87",
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed",
-   "run": 27,
-   "auto": true
-  },
-  {
    "id": "08e0bf2a-ok",
    "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
    "at": 1794343511136,
@@ -427,11 +415,39 @@
   "a7df2aa6-ok": 1794343565092,
   "55b0229e-ok": 1794343602370,
   "fc2939be-ok": 1794343605049,
-  "abf6671a": 1794343760231
+  "abf6671a": 1794343760231,
+  "fc6b9569-ok": 1794344131984
  },
  "seq": 27,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "fc6b9569-ok",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed",
+   "run": 27,
+   "auto": true,
+   "at": 1794344131984,
+   "by": "3d202cdd-a44c-4d05-9fed-1b36de1e1755"
+  },
   {
    "id": "abf6671a",
    "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
@@ -522,31 +538,6 @@
    "by": "818c7301-1cd8-4641-bcdc-e00df1c53271",
    "run": 20,
    "auto": true
-  },
-  {
-   "id": "7246b1e0",
-   "text": "AAR fix plan (edee7b2a, f5f8e8ad): two chats left work unreleased because the brief listed ended chat 08d8bd98 as holding CHANGELOG.md. In extension/src/hub/brain.ts:128 change `Leave alone, another chat is editing: ${files.join(', ')}` to `Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`, and update the brief test that matches the old text. Needs approval.",
-   "at": 1794337278398,
-   "by": "d0c9b084-ab26-46e6-8ac9-dc21b503d6b3",
-   "from": "997c37c2-e6af-43ed-854c-4db5ed18567a",
-   "run": 19,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
   }
  ]
 }
