@@ -28,16 +28,6 @@
    "stopped": true
   },
   {
-   "id": "490c3b46",
-   "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
-   "at": 1794345969779,
-   "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e",
-   "chat": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
-   "host": "62903adf5e340f87",
-   "run": 32,
-   "auto": true
-  },
-  {
    "id": "5e0932b6",
    "text": "AAR fix plan (chat 1b4609a7), approve to apply: in claude-mods/kit/rules.md line 66 replace \"- If the aar skill is installed, run it on this chat before the standup.\" with \"- Run the aar skill on this chat before the standup (Read kit/skills/aar/SKILL.md if the Skill tool is off). Never skip it; the scheduled Learn run does not replace it.\" Why: chats d0c9b084 and 1b4609a7 both skipped the aar on 2026-11-10, the second with \"I didn't run the after-action review this time\".",
    "at": 1794345862319,
@@ -405,11 +395,37 @@
   "08e0bf2a-ok": 1794344334837,
   "b2b2ae1c-ok": 1794345698373,
   "20b046b5-ok": 1794345889013,
-  "ea2f8c40-ok": 1794345955343
+  "ea2f8c40-ok": 1794345955343,
+  "490c3b46": 1794345997136
  },
  "seq": 32,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "490c3b46",
+   "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
+   "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e",
+   "run": 32,
+   "auto": true,
+   "at": 1794345997136,
+   "by": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2"
+  },
   {
    "id": "ea2f8c40-ok",
    "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
@@ -507,33 +523,6 @@
    "run": 8,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "77dc7d30-ok",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794343541187,
-   "by": "47e157d8-ae8f-4a9e-90b5-1ee82be9f450",
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed",
-   "run": 24,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
   }
  ]
 }
