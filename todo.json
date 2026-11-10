@@ -2,17 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "a7df2aa6-ok",
-   "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
-   "at": 1794320156292,
-   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
-   "name": "Switchboard MCP connector setup",
-   "why": "missed",
-   "run": 8,
-   "auto": true,
-   "stopped": true
-  },
-  {
    "id": "80f1bfde-ok",
    "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
    "at": 1794318105299,
@@ -44,10 +33,10 @@
    "id": "55b0229e-ok",
    "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
    "at": 1794343548734,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later",
    "chat": "fcccb38d-2e55-42b5-9c2e-b2a0ab03e8a3",
    "host": "62903adf5e340f87",
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later",
    "run": 25,
    "auto": true
   },
@@ -458,11 +447,24 @@
   "b2b2ae1c": 1794343513221,
   "20b046b5": 1794343514683,
   "ea2f8c40": 1794343518403,
-  "77dc7d30-ok": 1794343541187
+  "77dc7d30-ok": 1794343541187,
+  "a7df2aa6-ok": 1794343565092
  },
  "seq": 25,
  "streak": 4,
  "ticked": [
+  {
+   "id": "a7df2aa6-ok",
+   "text": "Switchboard to-do, in this order: 1. Add MCP connectors from the PathionAI reel: Perplexity (research), Firecrawl (scrape/brand assets), PostHog (site analytics), Composio (one connector for Gmail/Sla",
+   "from": "e1d01e7e-2598-4489-b88d-1c4d74e6d0e8",
+   "name": "Switchboard MCP connector setup",
+   "why": "missed",
+   "run": 8,
+   "auto": true,
+   "stopped": true,
+   "at": 1794343565092,
+   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87"
+  },
   {
    "id": "77dc7d30-ok",
    "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
@@ -549,17 +551,6 @@
    "name": "Audit All Skills Tools Settings",
    "why": "later",
    "run": 15,
-   "auto": true
-  },
-  {
-   "id": "dd0f7384-ok",
-   "text": "The Codex transcript tab (to-do 29c4f61f).",
-   "at": 1794334184346,
-   "by": "0f2d4f93-cc16-433a-b118-1f269077b9c6",
-   "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
-   "name": "Codex Switchboard Integration Setup v3",
-   "why": "later",
-   "run": 14,
    "auto": true
   }
  ]
