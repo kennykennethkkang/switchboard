@@ -311,6 +311,92 @@
   "0b3f444c": 1794315841695
  },
  "seq": 3,
+ "ticked": [
+  {
+   "id": "0b3f444c",
+   "text": "Learn automatically improve runs still cannot write memory notes: jobArgs('improve') allows ~/.claude/projects/*/memory/** but headless claude refuses writes under ~/.claude. Reuse stageMemory/syncMemory from learn.ts (one stage per project touched) or drop memory from the improve allow list",
+   "at": 1794315841695,
+   "by": "570604af-1a8f-43d4-852e-9e51a0e6482e",
+   "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
+   "name": "To-do 2: Scheduled memory write access fix",
+   "run": 3,
+   "auto": true
+  },
+  {
+   "id": "a7dadc73",
+   "text": "Scheduled AAR (Learn automatically) runs need write access to other projects' memory folders (~/.claude/projects/*/memory); the 2026-11-09 Armasu run could not save its notes",
+   "at": 1794315703507,
+   "by": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
+   "from": "e117ca05-9986-49fa-8a06-2f6132d2c887",
+   "name": "Fix switchboard memory notes",
+   "run": 2,
+   "auto": true
+  },
+  {
+   "id": "3de8acf0",
+   "text": "stitch plugins (stitch-build/design/utilities) fail to load: upstream google-labs-code/stitch-skills dropped marketplace.json, marketplace update refuses. Decide: uninstall the three plus the marketplace, or re-add from wherever it moved.",
+   "at": 1794315234257,
+   "by": "451fb648-858b-4070-b993-029d7fcd00b8",
+   "from": "43fe3f0b-531f-4220-8001-8a4d0672e06f",
+   "name": "Inventory gap cleanup",
+   "run": 1,
+   "auto": true
+  },
+  {
+   "id": "8baab3b0",
+   "text": "bash-approve gap: refuse the root command when quotes are spliced into its name (\"pr\"intenv); add a test",
+   "at": 1794312008254,
+   "by": "05225816-67f6-49cd-8888-2603e9dae808"
+  },
+  {
+   "id": "a335ce3c",
+   "text": "AAR memory notes not saved (scheduled AAR had no write access to ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Armasu/memory): write two feedback notes there plus MEMORY.md lines. 1) switchboard-todo-store: each repo's to-do is git ref refs/switchboard/todo (read `git -C <repo> cat-file blob refs/switchboard/todo:todo.json`); claude-mods has none, so kit/AAR to-dos are closed with todo_done project agent-flow; ~/.claude/switchboard/todo/*.json are stale copies. 2) commit-block-other-repo: no Armasu changes = no plain Commit message block, only `Commit message (claude-mods):` style blocks. Full text in vault wiki/aar-armasu.md, 2026-11-09 v3 entry. Also: scheduled AAR runs need write permission to other projects' memory folders.",
+   "at": 1794311786340,
+   "by": "e117ca05-9986-49fa-8a06-2f6132d2c887",
+   "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
+   "name": "agent-flow-f0"
+  },
+  {
+   "id": "6f393e98",
+   "text": "Proposed rule (AAR 2026-11-09, Armasu chat 6db78fc6): in claude-mods/kit/rules.md line 67, after \"a block for a repo no open window has is ignored.\" add: \"If this chat's repo has no changes (`git status --short` is empty), leave out the plain block and end with the last named block; never put another repo's message under the plain heading.\" Why: that chat ran in Armasu, changed only claude-mods, and put the claude-mods message under plain `Commit message:`, which would fill Armasu's box.",
+   "at": 1794311715517,
+   "by": "a9eae457-c2e7-4460-a5e9-1a744c454118",
+   "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
+   "name": "agent-flow-f0"
+  },
+  {
+   "id": "75e17893",
+   "text": "Inventory gaps left: drop or ship caveman (README credits it, not installed); README line 30 FLAGGED list vs tools.ts FLAGGED; check stitch plugins installed twice; empty ~/.claude/skills/learned dir",
+   "at": 1794311637026,
+   "by": "43fe3f0b-531f-4220-8001-8a4d0672e06f",
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization"
+  },
+  {
+   "id": "ad7e4488",
+   "text": "Switchboard overhaul: build the layout Kenneth picks from the options page (A Inbox first recommended, plus B's live Stuck lane, C's named Cmd+K commands, diff preview in Your OK, project color on Inbox items, a11y labels/focus). Mockups: https://claude.ai/artifact/Htpnb2JAZQtpKpKNCSYkLB",
+   "at": 1794309886084,
+   "by": "0b3d0b31-28f4-43c5-b1d3-f81c06568751",
+   "from": "da4605d2-f533-4303-a960-287d006cd833",
+   "name": "Overhaul Switchboard Organization"
+  },
+  {
+   "id": "6e1d42fa",
+   "text": "Deep-research eval round 2: the 10 harder questions are in claude-mods/kit/skills/deep-research/eval/questions.json; run them, standard vs the researcher prompt on sonnet, with two judges",
+   "at": 1794305708853,
+   "by": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
+   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "name": "Tailscale Commit Button Fixes"
+  },
+  {
+   "id": "a56024b2",
+   "text": "On the Code map, the footer line slightly overlaps the bottom row of boxes until you scroll.",
+   "at": 1794305476681,
+   "from": "651376ea-09aa-43d9-a8b2-3a6d72c8de3e",
+   "name": "Cleanup map page connections",
+   "why": "later"
+  }
+ ],
  "suggested": [
   {
    "id": "ee375e39",
@@ -431,91 +517,12 @@
    "from": "00411535-d088-4716-bdec-a80217f97b50",
    "name": "Switchboard Adjustment Updates",
    "why": "blocked"
-  }
- ],
- "ticked": [
+  },
   {
-   "id": "0b3f444c",
-   "text": "Learn automatically improve runs still cannot write memory notes: jobArgs('improve') allows ~/.claude/projects/*/memory/** but headless claude refuses writes under ~/.claude. Reuse stageMemory/syncMemory from learn.ts (one stage per project touched) or drop memory from the improve allow list",
+   "id": "c5c53f46",
+   "text": "To-do 0b3f444c: the twice-weekly improve-system run has the same problem. Its permission to write memory notes can never work, so it needs the same copy-back or",
+   "at": 1794316901439,
    "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "name": "To-do 2: Scheduled memory write access fix",
-   "run": 3,
-   "auto": true,
-   "at": 1794315841695,
-   "by": "570604af-1a8f-43d4-852e-9e51a0e6482e"
-  },
-  {
-   "id": "a7dadc73",
-   "text": "Scheduled AAR (Learn automatically) runs need write access to other projects' memory folders (~/.claude/projects/*/memory); the 2026-11-09 Armasu run could not save its notes",
-   "at": 1794315703507,
-   "by": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "from": "e117ca05-9986-49fa-8a06-2f6132d2c887",
-   "name": "Fix switchboard memory notes",
-   "run": 2,
-   "auto": true
-  },
-  {
-   "id": "3de8acf0",
-   "text": "stitch plugins (stitch-build/design/utilities) fail to load: upstream google-labs-code/stitch-skills dropped marketplace.json, marketplace update refuses. Decide: uninstall the three plus the marketplace, or re-add from wherever it moved.",
-   "at": 1794315234257,
-   "by": "451fb648-858b-4070-b993-029d7fcd00b8",
-   "from": "43fe3f0b-531f-4220-8001-8a4d0672e06f",
-   "name": "Inventory gap cleanup",
-   "run": 1,
-   "auto": true
-  },
-  {
-   "id": "8baab3b0",
-   "text": "bash-approve gap: refuse the root command when quotes are spliced into its name (\"pr\"intenv); add a test",
-   "at": 1794312008254,
-   "by": "05225816-67f6-49cd-8888-2603e9dae808"
-  },
-  {
-   "id": "a335ce3c",
-   "text": "AAR memory notes not saved (scheduled AAR had no write access to ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Armasu/memory): write two feedback notes there plus MEMORY.md lines. 1) switchboard-todo-store: each repo's to-do is git ref refs/switchboard/todo (read `git -C <repo> cat-file blob refs/switchboard/todo:todo.json`); claude-mods has none, so kit/AAR to-dos are closed with todo_done project agent-flow; ~/.claude/switchboard/todo/*.json are stale copies. 2) commit-block-other-repo: no Armasu changes = no plain Commit message block, only `Commit message (claude-mods):` style blocks. Full text in vault wiki/aar-armasu.md, 2026-11-09 v3 entry. Also: scheduled AAR runs need write permission to other projects' memory folders.",
-   "at": 1794311786340,
-   "by": "e117ca05-9986-49fa-8a06-2f6132d2c887",
-   "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
-   "name": "agent-flow-f0"
-  },
-  {
-   "id": "6f393e98",
-   "text": "Proposed rule (AAR 2026-11-09, Armasu chat 6db78fc6): in claude-mods/kit/rules.md line 67, after \"a block for a repo no open window has is ignored.\" add: \"If this chat's repo has no changes (`git status --short` is empty), leave out the plain block and end with the last named block; never put another repo's message under the plain heading.\" Why: that chat ran in Armasu, changed only claude-mods, and put the claude-mods message under plain `Commit message:`, which would fill Armasu's box.",
-   "at": 1794311715517,
-   "by": "a9eae457-c2e7-4460-a5e9-1a744c454118",
-   "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
-   "name": "agent-flow-f0"
-  },
-  {
-   "id": "75e17893",
-   "text": "Inventory gaps left: drop or ship caveman (README credits it, not installed); README line 30 FLAGGED list vs tools.ts FLAGGED; check stitch plugins installed twice; empty ~/.claude/skills/learned dir",
-   "at": 1794311637026,
-   "by": "43fe3f0b-531f-4220-8001-8a4d0672e06f",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
-  },
-  {
-   "id": "ad7e4488",
-   "text": "Switchboard overhaul: build the layout Kenneth picks from the options page (A Inbox first recommended, plus B's live Stuck lane, C's named Cmd+K commands, diff preview in Your OK, project color on Inbox items, a11y labels/focus). Mockups: https://claude.ai/artifact/Htpnb2JAZQtpKpKNCSYkLB",
-   "at": 1794309886084,
-   "by": "0b3d0b31-28f4-43c5-b1d3-f81c06568751",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
-  },
-  {
-   "id": "6e1d42fa",
-   "text": "Deep-research eval round 2: the 10 harder questions are in claude-mods/kit/skills/deep-research/eval/questions.json; run them, standard vs the researcher prompt on sonnet, with two judges",
-   "at": 1794305708853,
-   "by": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes"
-  },
-  {
-   "id": "a56024b2",
-   "text": "On the Code map, the footer line slightly overlaps the bottom row of boxes until you scroll.",
-   "at": 1794305476681,
-   "from": "651376ea-09aa-43d9-a8b2-3a6d72c8de3e",
-   "name": "Cleanup map page connections",
    "why": "later"
   }
  ]
