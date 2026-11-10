@@ -28,18 +28,6 @@
    "stopped": true
   },
   {
-   "id": "20b046b5-ok",
-   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
-   "at": 1794345699580,
-   "chat": "ee43b1e6-af1d-4047-9065-9a635ba24c73",
-   "host": "62903adf5e340f87",
-   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
-   "name": "To-do 22: AAR fix plan rules update",
-   "why": "missed",
-   "run": 30,
-   "auto": true
-  },
-  {
    "id": "ea2f8c40-ok",
    "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
    "at": 1794343518403,
@@ -419,11 +407,39 @@
   "abf6671a": 1794343760231,
   "fc6b9569-ok": 1794344131984,
   "08e0bf2a-ok": 1794344334837,
-  "b2b2ae1c-ok": 1794345698373
+  "b2b2ae1c-ok": 1794345698373,
+  "20b046b5-ok": 1794345889013
  },
  "seq": 30,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "dcc0d3e4",
+   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  },
+  {
+   "id": "f03c196c",
+   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
+   "at": 1794343969540,
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "20b046b5-ok",
+   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
+   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
+   "name": "To-do 22: AAR fix plan rules update",
+   "why": "missed",
+   "run": 30,
+   "auto": true,
+   "at": 1794345889013,
+   "by": "ee43b1e6-af1d-4047-9065-9a635ba24c73"
+  },
   {
    "id": "b2b2ae1c-ok",
    "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
@@ -519,31 +535,6 @@
    "from": "3f765862-8182-43f2-a829-39c30718c6e3",
    "run": 23,
    "auto": true
-  },
-  {
-   "id": "83e57084",
-   "text": "AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" with \"End every brief with a tool-call budget (about 25 to 35, and at least 10 under the role's maxTurns: designer and qa 30 at most)\". Why: two designer briefs said budget about 40 against the 40-turn cap and B stopped mid-work. 2) In the System Events keystroke rule, after \"Never send System Events keystroke or key code to another app while Kenneth may be typing\", add \", and do not type into iPhone Mirroring with computer-use: put a phone link in a QR png opened with open -g in Preview for the Camera\". Why: Mirroring paused while the phone was in use and focus jumped to VS Code mid-typing.",
-   "at": 1794343137629,
-   "by": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
-   "from": "4f9a448f-ce28-4dfb-b765-1094067285c4",
-   "run": 22,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "dcc0d3e4",
-   "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794343969540,
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
   }
  ]
 }
