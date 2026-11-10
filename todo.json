@@ -41,18 +41,6 @@
    "stopped": true
   },
   {
-   "id": "77dc7d30-ok",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794343475964,
-   "chat": "47e157d8-ae8f-4a9e-90b5-1ee82be9f450",
-   "host": "62903adf5e340f87",
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed",
-   "run": 24,
-   "auto": true
-  },
-  {
    "id": "55b0229e-ok",
    "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
    "at": 1794343494325,
@@ -465,11 +453,23 @@
   "08e0bf2a": 1794343511136,
   "b2b2ae1c": 1794343513221,
   "20b046b5": 1794343514683,
-  "ea2f8c40": 1794343518403
+  "ea2f8c40": 1794343518403,
+  "77dc7d30-ok": 1794343541187
  },
  "seq": 24,
  "streak": 4,
  "ticked": [
+  {
+   "id": "77dc7d30-ok",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed",
+   "run": 24,
+   "auto": true,
+   "at": 1794343541187,
+   "by": "47e157d8-ae8f-4a9e-90b5-1ee82be9f450"
+  },
   {
    "id": "a8138064",
    "text": "AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a download piped to a shell,\" with \"a download piped to a shell (curl into python3 -c or node -e counts: curl -o a file, then parse it),\" and replace \"reading .env,\" with \"reading .env (even the word .env in heredoc prose: write \\\"env file\\\"),\". Source: Armasu chat 5ba02468, 2026-11-10.",
@@ -557,14 +557,6 @@
    "why": "later",
    "run": 14,
    "auto": true
-  },
-  {
-   "id": "f135088b",
-   "text": "Release Switchboard 0.21.23 (bump, CHANGELOG, package, install, vsix to claude-mods/kit). The CHANGELOG hold by chat 08d8bd98 is stale, that chat ended. Bullets waiting: \"Links Switchboard opens (hub links, git PR page, the browser app) open in the folder's Chrome pick (Sign-ins, else the * default) instead of Chrome's last used profile.\" and \"Board: Claude realms get their own clay palette, and each AI pavilion shows its realm's landmark.\"",
-   "at": 1794333382342,
-   "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug"
   }
  ]
 }
