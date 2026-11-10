@@ -43,8 +43,12 @@
   {
    "id": "7246b1e0",
    "text": "AAR fix plan (edee7b2a, f5f8e8ad): two chats left work unreleased because the brief listed ended chat 08d8bd98 as holding CHANGELOG.md. In extension/src/hub/brain.ts:128 change `Leave alone, another chat is editing: ${files.join(', ')}` to `Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`, and update the brief test that matches the old text. Needs approval.",
-   "at": 1794321036387,
-   "from": "997c37c2-e6af-43ed-854c-4db5ed18567a"
+   "at": 1794337053699,
+   "from": "997c37c2-e6af-43ed-854c-4db5ed18567a",
+   "chat": "d0c9b084-ab26-46e6-8ac9-dc21b503d6b3",
+   "host": "62903adf5e340f87",
+   "run": 19,
+   "auto": true
   },
   {
    "id": "5eb50396",
@@ -398,7 +402,7 @@
   "75089f6c-ok": 1794336640732,
   "fd62d42a-ok": 1794336734398
  },
- "seq": 18,
+ "seq": 19,
  "streak": 4,
  "ticked": [
   {
