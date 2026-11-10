@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "2fbd2f92-ok",
-   "text": "If it is not in the folder please pull up the site I need to get the API key and also tell me where to place it. Also make sure future users who set this up don't have such a hard time. Maybe add it s",
-   "at": 1794319558372,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed",
-   "chat": "45bf7d04-fdfc-4273-ae75-cca7337882f7",
-   "host": "62903adf5e340f87",
-   "run": 6,
-   "auto": true
-  },
-  {
    "id": "b9b7da84-ok",
    "text": "Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design make sure there are no issues with the",
    "at": 1794318084976,
@@ -435,11 +423,23 @@
   "75089f6c": 1794318262010,
   "fd62d42a": 1794318265267,
   "f1ba141b-ok": 1794319392377,
-  "e207ca92-ok": 1794319548428
+  "e207ca92-ok": 1794319548428,
+  "2fbd2f92-ok": 1794319689470
  },
  "seq": 6,
  "streak": 4,
  "ticked": [
+  {
+   "id": "2fbd2f92-ok",
+   "text": "If it is not in the folder please pull up the site I need to get the API key and also tell me where to place it. Also make sure future users who set this up don't have such a hard time. Maybe add it s",
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed",
+   "run": 6,
+   "auto": true,
+   "at": 1794319689470,
+   "by": "45bf7d04-fdfc-4273-ae75-cca7337882f7"
+  },
   {
    "id": "e207ca92-ok",
    "text": "There is an issue when limit reaches switchboard says its no data please keep track and state that usages is up. Also all chats are closing make sure stuff pauses before usage is up so it doesn't just",
@@ -520,14 +520,6 @@
    "text": "AAR memory notes not saved (scheduled AAR had no write access to ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Armasu/memory): write two feedback notes there plus MEMORY.md lines. 1) switchboard-todo-store: each repo's to-do is git ref refs/switchboard/todo (read `git -C <repo> cat-file blob refs/switchboard/todo:todo.json`); claude-mods has none, so kit/AAR to-dos are closed with todo_done project agent-flow; ~/.claude/switchboard/todo/*.json are stale copies. 2) commit-block-other-repo: no Armasu changes = no plain Commit message block, only `Commit message (claude-mods):` style blocks. Full text in vault wiki/aar-armasu.md, 2026-11-09 v3 entry. Also: scheduled AAR runs need write permission to other projects' memory folders.",
    "at": 1794311786340,
    "by": "e117ca05-9986-49fa-8a06-2f6132d2c887",
-   "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
-   "name": "agent-flow-f0"
-  },
-  {
-   "id": "6f393e98",
-   "text": "Proposed rule (AAR 2026-11-09, Armasu chat 6db78fc6): in claude-mods/kit/rules.md line 67, after \"a block for a repo no open window has is ignored.\" add: \"If this chat's repo has no changes (`git status --short` is empty), leave out the plain block and end with the last named block; never put another repo's message under the plain heading.\" Why: that chat ran in Armasu, changed only claude-mods, and put the claude-mods message under plain `Commit message:`, which would fill Armasu's box.",
-   "at": 1794311715517,
-   "by": "a9eae457-c2e7-4460-a5e9-1a744c454118",
    "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
    "name": "agent-flow-f0"
   }
