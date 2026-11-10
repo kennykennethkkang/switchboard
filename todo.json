@@ -5,11 +5,11 @@
    "id": "b9b7da84-ok",
    "text": "Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design make sure there are no issues with the",
    "at": 1794319693254,
+   "chat": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "host": "62903adf5e340f87",
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "missed",
-   "chat": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "host": "62903adf5e340f87",
    "run": 7,
    "auto": true
   },
@@ -526,6 +526,16 @@
    "by": "e117ca05-9986-49fa-8a06-2f6132d2c887",
    "from": "bed32ebf-fa98-4562-ad84-82cd730ac54c",
    "name": "agent-flow-f0"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
   }
  ]
 }
