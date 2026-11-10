@@ -387,78 +387,15 @@
  },
  "seq": 23,
  "streak": 4,
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
-  },
-  {
-   "id": "08e0bf2a",
-   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794332244536,
-   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "why": "later"
-  },
-  {
-   "id": "b2b2ae1c",
-   "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
-   "at": 1794341336583,
-   "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
-   "name": "To-do 20: Smart page tracking and no",
-   "why": "missed"
-  },
-  {
-   "id": "20b046b5",
-   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
-   "at": 1794343164265,
-   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
-   "name": "To-do 22: AAR fix plan rules update",
-   "why": "missed"
-  }
- ],
  "ticked": [
   {
    "id": "a8138064",
    "text": "AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a download piped to a shell,\" with \"a download piped to a shell (curl into python3 -c or node -e counts: curl -o a file, then parse it),\" and replace \"reading .env,\" with \"reading .env (even the word .env in heredoc prose: write \\\"env file\\\"),\". Source: Armasu chat 5ba02468, 2026-11-10.",
+   "at": 1794343173179,
+   "by": "10753a2c-1cee-4b3d-b79d-65ec8fed7390",
    "from": "3f765862-8182-43f2-a829-39c30718c6e3",
    "run": 23,
-   "auto": true,
-   "at": 1794343173179,
-   "by": "10753a2c-1cee-4b3d-b79d-65ec8fed7390"
+   "auto": true
   },
   {
    "id": "83e57084",
@@ -546,6 +483,77 @@
    "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
    "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
    "name": "To-do 10: Chrome account mismatch bug"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
+  },
+  {
+   "id": "08e0bf2a",
+   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794332244536,
+   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "why": "later"
+  },
+  {
+   "id": "b2b2ae1c",
+   "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
+   "at": 1794341336583,
+   "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
+   "name": "To-do 20: Smart page tracking and no",
+   "why": "missed"
+  },
+  {
+   "id": "20b046b5",
+   "text": "Switchboard to-do, in this order: 1. AAR fix plan (Armasu chat 1bde592f), approve to apply in claude-mods/kit/rules.md: 1) line 10, replace \"End every brief with a tool-call budget (about 25 to 35)\" w",
+   "at": 1794343164265,
+   "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
+   "name": "To-do 22: AAR fix plan rules update",
+   "why": "missed"
+  },
+  {
+   "id": "ea2f8c40",
+   "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
+   "at": 1794343199013,
+   "from": "10753a2c-1cee-4b3d-b79d-65ec8fed7390",
+   "name": "To-do 23: Switchboard AAR rules md bash",
+   "why": "missed"
   }
  ]
 }
