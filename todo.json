@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "5725fc39-ok",
-   "text": "The copies in `~/.claude` and `extension/kit` won't have the new sentence until the next kit build or setup run.",
-   "at": 1794346390137,
-   "chat": "92a33830-0d0d-4843-9806-d5d88d05a6e6",
-   "host": "62903adf5e340f87",
-   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
-   "name": "To-do 32: AAR fix rules md update",
-   "why": "later",
-   "run": 34,
-   "auto": true
-  },
-  {
    "id": "58d13898-ok",
    "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
    "at": 1794346379075,
@@ -397,11 +385,23 @@
   "e14ca1da-ok": 1794346366781,
   "7bb98bd3-ok": 1794346367878,
   "5725fc39": 1794346377802,
-  "58d13898": 1794346379075
+  "58d13898": 1794346379075,
+  "5725fc39-ok": 1794346427893
  },
  "seq": 34,
  "streak": 34,
  "ticked": [
+  {
+   "id": "5725fc39-ok",
+   "text": "The copies in `~/.claude` and `extension/kit` won't have the new sentence until the next kit build or setup run.",
+   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
+   "name": "To-do 32: AAR fix rules md update",
+   "why": "later",
+   "run": 34,
+   "auto": true,
+   "at": 1794346427893,
+   "by": "92a33830-0d0d-4843-9806-d5d88d05a6e6"
+  },
   {
    "id": "7bb98bd3-ok",
    "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
@@ -482,17 +482,6 @@
    "name": "To-do 22: AAR fix plan rules update",
    "why": "missed",
    "run": 30,
-   "auto": true
-  },
-  {
-   "id": "b2b2ae1c-ok",
-   "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
-   "at": 1794345698373,
-   "by": "1b4609a7-6297-4362-8701-156db8426f16",
-   "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
-   "name": "To-do 20: Smart page tracking and no",
-   "why": "missed",
-   "run": 29,
    "auto": true
   }
  ]
