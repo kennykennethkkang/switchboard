@@ -84,6 +84,14 @@
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "later"
+  },
+  {
+   "id": "fc2939be-ok",
+   "text": "The bun-only plugin test suites.",
+   "at": 1794318245065,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
   }
  ],
  "removed": {
@@ -405,7 +413,8 @@
   "300d38c8": 1794318091878,
   "8ac7feab": 1794318095360,
   "80f1bfde": 1794318105299,
-  "ee375e39": 1794318240600
+  "ee375e39": 1794318240600,
+  "fc2939be": 1794318245065
  },
  "seq": 4,
  "streak": 4,
@@ -497,14 +506,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "fc2939be",
-   "text": "The bun-only plugin test suites.",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later"
-  },
   {
    "id": "dd0f7384",
    "text": "The Codex transcript tab (to-do 29c4f61f).",
