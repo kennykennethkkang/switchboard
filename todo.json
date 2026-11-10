@@ -40,8 +40,8 @@
   },
   {
    "id": "8baab3b0",
-   "text": "bash-approve gaps: refuse the root command when quotes are spliced into its name, and printenv of a single named key",
-   "at": 1794237913238
+   "text": "bash-approve gap: refuse the root command when quotes are spliced into its name (\"pr\"intenv); add a test",
+   "at": 1794305476954
   }
  ],
  "removed": {
