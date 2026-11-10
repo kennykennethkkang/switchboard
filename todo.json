@@ -60,6 +60,14 @@
    "from": "f8b4522e-d5c0-4d58-b0c2-4625168cb460",
    "name": "Auto-complete todo tracking",
    "why": "missed"
+  },
+  {
+   "id": "8ac7feab-ok",
+   "text": "Terminal is still not auto closing when user approves and completes a chat. Please fix it. Also allow for user to open a new github repo and chat directly through switchboard",
+   "at": 1794318095360,
+   "from": "73fc966b-2bf5-4c0c-b33c-7c141a1e0a37",
+   "name": "Fix terminal auto-close and GitHub",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -378,7 +386,8 @@
   "b9b7da84": 1794318084976,
   "a7df2aa6": 1794318086189,
   "b53117ca": 1794318087104,
-  "300d38c8": 1794318091878
+  "300d38c8": 1794318091878,
+  "8ac7feab": 1794318095360
  },
  "seq": 4,
  "streak": 4,
@@ -509,14 +518,6 @@
    "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
    "name": "Deep-research eval round 2",
    "why": "later"
-  },
-  {
-   "id": "8ac7feab",
-   "text": "Terminal is still not auto closing when user approves and completes a chat. Please fix it. Also allow for user to open a new github repo and chat directly through switchboard",
-   "at": 1794311255619,
-   "from": "73fc966b-2bf5-4c0c-b33c-7c141a1e0a37",
-   "name": "Fix terminal auto-close and GitHub",
-   "why": "missed"
   },
   {
    "id": "80f1bfde",
