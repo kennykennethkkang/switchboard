@@ -44,10 +44,10 @@
    "id": "948a8482",
    "text": "Deep-research eval round 4 (optional): round 3 checked every citation and the skill still led by only one claim under sonnet. To really separate the skill from the plain researcher prompt, write 20 or more new trap questions (q26 and up, each with a source conflict) and run them with --claims all.",
    "at": 1794338098918,
-   "from": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
-   "name": "To-do 16: Eval grader citation tuning",
    "chat": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
    "host": "62903adf5e340f87",
+   "from": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
+   "name": "To-do 16: Eval grader citation tuning",
    "run": 21,
    "auto": true
   },
@@ -549,6 +549,14 @@
    "at": 1794332244536,
    "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
    "why": "later"
+  },
+  {
+   "id": "b2b2ae1c",
+   "text": "Switchboard to-do, in this order: 1. Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jump",
+   "at": 1794341336583,
+   "from": "818c7301-1cd8-4641-bcdc-e00df1c53271",
+   "name": "To-do 20: Smart page tracking and no",
+   "why": "missed"
   }
  ]
 }
