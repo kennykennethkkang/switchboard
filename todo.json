@@ -76,6 +76,14 @@
    "from": "00411535-d088-4716-bdec-a80217f97b50",
    "name": "Switchboard Adjustment Updates",
    "why": "blocked"
+  },
+  {
+   "id": "ee375e39-ok",
+   "text": "The \"any editor or language\" half of the self-improve item.",
+   "at": 1794318240600,
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later"
   }
  ],
  "removed": {
@@ -396,7 +404,8 @@
   "b53117ca": 1794318087104,
   "300d38c8": 1794318091878,
   "8ac7feab": 1794318095360,
-  "80f1bfde": 1794318105299
+  "80f1bfde": 1794318105299,
+  "ee375e39": 1794318240600
  },
  "seq": 4,
  "streak": 4,
@@ -488,14 +497,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "ee375e39",
-   "text": "The \"any editor or language\" half of the self-improve item.",
-   "at": 1794112646353,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later"
-  },
   {
    "id": "fc2939be",
    "text": "The bun-only plugin test suites.",
