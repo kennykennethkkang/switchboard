@@ -524,6 +524,13 @@
    "at": 1794316901439,
    "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
    "why": "later"
+  },
+  {
+   "id": "fd62d42a",
+   "text": "to-do a7dadc73 (AAR write access to other projects' memory folders) is still open; this chat didn't touch it.",
+   "at": 1794316902693,
+   "from": "451fb648-858b-4070-b993-029d7fcd00b8",
+   "why": "later"
   }
  ]
 }
