@@ -2,14 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "80f1bfde-ok",
-   "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
-   "at": 1794318105299,
-   "from": "00411535-d088-4716-bdec-a80217f97b50",
-   "name": "Switchboard Adjustment Updates",
-   "why": "blocked"
-  },
-  {
    "id": "e14ca1da-ok",
    "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
    "at": 1794343499752,
@@ -393,26 +385,35 @@
   "490c3b46": 1794345997136,
   "5e0932b6": 1794346035429,
   "dcc0d3e4": 1794346358419,
-  "f03c196c": 1794346358419
+  "f03c196c": 1794346358419,
+  "80f1bfde-ok": 1794346365699
  },
  "seq": 33,
  "streak": 4,
  "ticked": [
   {
+   "id": "80f1bfde-ok",
+   "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
+   "from": "00411535-d088-4716-bdec-a80217f97b50",
+   "name": "Switchboard Adjustment Updates",
+   "why": "blocked",
+   "at": 1794346365699
+  },
+  {
    "id": "f03c196c",
    "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later",
    "at": 1794346358419,
-   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503"
+   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503",
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
   },
   {
    "id": "dcc0d3e4",
    "text": "80f1bfde, folder rename: still waits until no chat is open in any GitHub project.",
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later",
    "at": 1794346358419,
-   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503"
+   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503",
+   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
+   "why": "later"
   },
   {
    "id": "5e0932b6",
@@ -485,16 +486,6 @@
    "why": "missed",
    "run": 27,
    "auto": true
-  },
-  {
-   "id": "abf6671a",
-   "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
-   "at": 1794343760231,
-   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "from": "0419be6e-5137-476b-95bd-41942a3108f3",
-   "run": 18,
-   "auto": true,
-   "stopped": true
   }
  ]
 }
