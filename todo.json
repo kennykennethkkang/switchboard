@@ -104,6 +104,14 @@
    "from": "3034d6cf-0643-41d8-bd46-b6471c40bee0",
    "name": "To-do 22: AAR fix plan rules update",
    "why": "missed"
+  },
+  {
+   "id": "ea2f8c40-ok",
+   "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
+   "at": 1794343518403,
+   "from": "10753a2c-1cee-4b3d-b79d-65ec8fed7390",
+   "name": "To-do 23: Switchboard AAR rules md bash",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -456,7 +464,8 @@
   "fc6b9569": 1794343508954,
   "08e0bf2a": 1794343511136,
   "b2b2ae1c": 1794343513221,
-  "20b046b5": 1794343514683
+  "20b046b5": 1794343514683,
+  "ea2f8c40": 1794343518403
  },
  "seq": 24,
  "streak": 4,
@@ -556,16 +565,6 @@
    "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
    "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
    "name": "To-do 10: Chrome account mismatch bug"
-  }
- ],
- "suggested": [
-  {
-   "id": "ea2f8c40",
-   "text": "Switchboard to-do, in this order: 1. AAR proposal (approve before applying): bash-approve refusals keep costing retries in Armasu and agent-flow. In claude-mods/kit/rules.md line 23 replace \"a downloa",
-   "at": 1794343199013,
-   "from": "10753a2c-1cee-4b3d-b79d-65ec8fed7390",
-   "name": "To-do 23: Switchboard AAR rules md bash",
-   "why": "missed"
   }
  ]
 }
