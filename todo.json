@@ -4,9 +4,11 @@
   {
    "id": "ad7e4488",
    "text": "Switchboard overhaul: build the layout Kenneth picks from the options page (A Inbox first recommended, plus B's live Stuck lane, C's named Cmd+K commands, diff preview in Your OK, project color on Inbox items, a11y labels/focus). Mockups: https://claude.ai/artifact/Htpnb2JAZQtpKpKNCSYkLB",
-   "at": 1794217344983,
+   "at": 1794309700471,
    "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
+   "name": "Overhaul Switchboard Organization",
+   "chat": "0b3d0b31-28f4-43c5-b1d3-f81c06568751",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "75e17893",
