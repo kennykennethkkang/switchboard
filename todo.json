@@ -549,6 +549,14 @@
    "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
    "name": "To-do 10: Chrome account mismatch bug",
    "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
   }
  ]
 }
