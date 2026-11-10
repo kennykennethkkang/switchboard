@@ -24,11 +24,11 @@
    "id": "ee375e39-ok",
    "text": "The \"any editor or language\" half of the self-improve item.",
    "at": 1794321720874,
+   "chat": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
+   "host": "62903adf5e340f87",
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "later",
-   "chat": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
-   "host": "62903adf5e340f87",
    "run": 12,
    "auto": true
   },
@@ -570,6 +570,13 @@
    "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
    "name": "To-do 7: Claude island system design",
    "why": "missed"
+  },
+  {
+   "id": "08e0bf2a",
+   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794332244536,
+   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "why": "later"
   }
  ]
 }
