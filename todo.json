@@ -5,11 +5,11 @@
    "id": "5725fc39-ok",
    "text": "The copies in `~/.claude` and `extension/kit` won't have the new sentence until the next kit build or setup run.",
    "at": 1794346390137,
+   "chat": "92a33830-0d0d-4843-9806-d5d88d05a6e6",
+   "host": "62903adf5e340f87",
    "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
    "name": "To-do 32: AAR fix rules md update",
    "why": "later",
-   "chat": "92a33830-0d0d-4843-9806-d5d88d05a6e6",
-   "host": "62903adf5e340f87",
    "run": 34,
    "auto": true
   },
@@ -20,6 +20,11 @@
    "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
    "name": "To-do 32: AAR fix rules md update",
    "why": "later"
+  },
+  {
+   "id": "85459f6e",
+   "text": "Why was renaming blocked please make sure they are not blocked and fix them I want to make sure this folder is renamed to switchboard also",
+   "at": 1794346391163
   }
  ],
  "removed": {
@@ -395,6 +400,7 @@
   "58d13898": 1794346379075
  },
  "seq": 34,
+ "streak": 34,
  "ticked": [
   {
    "id": "7bb98bd3-ok",
@@ -489,6 +495,5 @@
    "run": 29,
    "auto": true
   }
- ],
- "streak": 34
+ ]
 }
