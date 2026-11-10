@@ -92,6 +92,14 @@
    "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
    "name": "Codex Switchboard Integration Setup v2",
    "why": "later"
+  },
+  {
+   "id": "dd0f7384-ok",
+   "text": "The Codex transcript tab (to-do 29c4f61f).",
+   "at": 1794318256829,
+   "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
+   "name": "Codex Switchboard Integration Setup v3",
+   "why": "later"
   }
  ],
  "removed": {
@@ -414,7 +422,8 @@
   "8ac7feab": 1794318095360,
   "80f1bfde": 1794318105299,
   "ee375e39": 1794318240600,
-  "fc2939be": 1794318245065
+  "fc2939be": 1794318245065,
+  "dd0f7384": 1794318256829
  },
  "seq": 4,
  "streak": 4,
@@ -506,14 +515,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "dd0f7384",
-   "text": "The Codex transcript tab (to-do 29c4f61f).",
-   "at": 1794134131446,
-   "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
-   "name": "Codex Switchboard Integration Setup v3",
-   "why": "later"
-  },
   {
    "id": "e1c8c72c",
    "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
