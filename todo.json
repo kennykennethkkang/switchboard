@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "f1ba141b-ok",
-   "text": "add this feature also https://www.instagram.com/reel/DfaTZHlh-k0/?dlrf=NTc4MTIwNjQ2YQ==. also lets also make sure there is a creation of a deep research bot that can research anything and researches i",
-   "at": 1794318086813,
-   "chat": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "host": "62903adf5e340f87",
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes",
-   "why": "missed",
-   "run": 4,
-   "auto": true
-  },
-  {
    "id": "e207ca92-ok",
    "text": "There is an issue when limit reaches switchboard says its no data please keep track and state that usages is up. Also all chats are closing make sure stuff pauses before usage is up so it doesn't just",
    "at": 1794318078365,
@@ -449,11 +437,23 @@
   "dd0f7384": 1794318256829,
   "e1c8c72c": 1794318259034,
   "75089f6c": 1794318262010,
-  "fd62d42a": 1794318265267
+  "fd62d42a": 1794318265267,
+  "f1ba141b-ok": 1794319392377
  },
  "seq": 4,
  "streak": 4,
  "ticked": [
+  {
+   "id": "f1ba141b-ok",
+   "text": "add this feature also https://www.instagram.com/reel/DfaTZHlh-k0/?dlrf=NTc4MTIwNjQ2YQ==. also lets also make sure there is a creation of a deep research bot that can research anything and researches i",
+   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
+   "name": "Tailscale Commit Button Fixes",
+   "why": "missed",
+   "run": 4,
+   "auto": true,
+   "at": 1794319392377,
+   "by": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d"
+  },
   {
    "id": "2f08890c",
    "text": "Tidying the Board's crowded phone view at Fit.",
@@ -528,14 +528,6 @@
    "text": "Inventory gaps left: drop or ship caveman (README credits it, not installed); README line 30 FLAGGED list vs tools.ts FLAGGED; check stitch plugins installed twice; empty ~/.claude/skills/learned dir",
    "at": 1794311637026,
    "by": "43fe3f0b-531f-4220-8001-8a4d0672e06f",
-   "from": "da4605d2-f533-4303-a960-287d006cd833",
-   "name": "Overhaul Switchboard Organization"
-  },
-  {
-   "id": "ad7e4488",
-   "text": "Switchboard overhaul: build the layout Kenneth picks from the options page (A Inbox first recommended, plus B's live Stuck lane, C's named Cmd+K commands, diff preview in Your OK, project color on Inbox items, a11y labels/focus). Mockups: https://claude.ai/artifact/Htpnb2JAZQtpKpKNCSYkLB",
-   "at": 1794309886084,
-   "by": "0b3d0b31-28f4-43c5-b1d3-f81c06568751",
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
   }
