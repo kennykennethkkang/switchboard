@@ -21,18 +21,6 @@
    "why": "blocked"
   },
   {
-   "id": "ee375e39-ok",
-   "text": "The \"any editor or language\" half of the self-improve item.",
-   "at": 1794321720874,
-   "chat": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839",
-   "host": "62903adf5e340f87",
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later",
-   "run": 12,
-   "auto": true
-  },
-  {
    "id": "fc2939be-ok",
    "text": "The bun-only plugin test suites.",
    "at": 1794318245065,
@@ -422,11 +410,70 @@
   "b9b7da84-ok": 1794320019121,
   "b53117ca-ok": 1794320398937,
   "300d38c8-ok": 1794320534453,
-  "8ac7feab-ok": 1794321718867
+  "8ac7feab-ok": 1794321718867,
+  "ee375e39-ok": 1794333382057
  },
  "seq": 12,
  "streak": 4,
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
+  },
+  {
+   "id": "08e0bf2a",
+   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794332244536,
+   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "ee375e39-ok",
+   "text": "The \"any editor or language\" half of the self-improve item.",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later",
+   "run": 12,
+   "auto": true,
+   "at": 1794333382057,
+   "by": "7f48e6ce-1bd0-47eb-b5fa-1942d837c839"
+  },
   {
    "id": "8ac7feab-ok",
    "text": "Terminal is still not auto closing when user approves and completes a chat. Please fix it. Also allow for user to open a new github repo and chat directly through switchboard",
@@ -519,63 +566,6 @@
    "at": 1794316908551,
    "by": "570604af-1a8f-43d4-852e-9e51a0e6482e",
    "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "why": "later"
-  },
-  {
-   "id": "0b3f444c",
-   "text": "Learn automatically improve runs still cannot write memory notes: jobArgs('improve') allows ~/.claude/projects/*/memory/** but headless claude refuses writes under ~/.claude. Reuse stageMemory/syncMemory from learn.ts (one stage per project touched) or drop memory from the improve allow list",
-   "at": 1794315841695,
-   "by": "570604af-1a8f-43d4-852e-9e51a0e6482e",
-   "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "name": "To-do 2: Scheduled memory write access fix",
-   "run": 3,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
-  },
-  {
-   "id": "08e0bf2a",
-   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794332244536,
-   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
    "why": "later"
   }
  ]
