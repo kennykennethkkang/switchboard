@@ -339,7 +339,8 @@
   "a56024b2": 1794305476681,
   "3bca357b": 1794305476716,
   "2b2b1ed8": 1794305476749,
-  "91f6ac67": 1794305476783
+  "91f6ac67": 1794305476783,
+  "cbf80c17": 1794305476816
  },
  "ticked": [
   {
@@ -489,14 +490,6 @@
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
    "why": "later"
-  },
-  {
-   "id": "cbf80c17",
-   "text": "After all other chats are finished inside of switchboard please fix formatting issues for all pages. Some of the pages habe spill over to other parts of the page and buttons, names, and information is",
-   "at": 1794261603812,
-   "from": "7edf7c04-4696-43ab-af10-7fa891d6ee82",
-   "name": "Fix Switchboard page layout overflow",
-   "why": "missed"
   }
  ]
 }
