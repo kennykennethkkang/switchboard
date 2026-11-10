@@ -68,6 +68,14 @@
    "from": "73fc966b-2bf5-4c0c-b33c-7c141a1e0a37",
    "name": "Fix terminal auto-close and GitHub",
    "why": "missed"
+  },
+  {
+   "id": "80f1bfde-ok",
+   "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
+   "at": 1794318105299,
+   "from": "00411535-d088-4716-bdec-a80217f97b50",
+   "name": "Switchboard Adjustment Updates",
+   "why": "blocked"
   }
  ],
  "removed": {
@@ -387,7 +395,8 @@
   "a7df2aa6": 1794318086189,
   "b53117ca": 1794318087104,
   "300d38c8": 1794318091878,
-  "8ac7feab": 1794318095360
+  "8ac7feab": 1794318095360,
+  "80f1bfde": 1794318105299
  },
  "seq": 4,
  "streak": 4,
@@ -518,14 +527,6 @@
    "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
    "name": "Deep-research eval round 2",
    "why": "later"
-  },
-  {
-   "id": "80f1bfde",
-   "text": "the agent-flow to switchboard folder rename is still waiting for the Armasu chats to finish, and its helper script is running.",
-   "at": 1794311564584,
-   "from": "00411535-d088-4716-bdec-a80217f97b50",
-   "name": "Switchboard Adjustment Updates",
-   "why": "blocked"
   },
   {
    "id": "fd62d42a",
