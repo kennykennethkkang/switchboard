@@ -309,7 +309,8 @@
   "3de8acf0": 1794315234257,
   "a7dadc73": 1794315703507,
   "0b3f444c": 1794315841695,
-  "c5c53f46": 1794316908551
+  "c5c53f46": 1794316908551,
+  "2f08890c": 1794316918931
  },
  "seq": 3,
  "suggested": [
@@ -336,14 +337,6 @@
    "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
    "name": "Tailscale Commit Button Fixes",
    "why": "missed"
-  },
-  {
-   "id": "2f08890c",
-   "text": "Tidying the Board's crowded phone view at Fit.",
-   "at": 1794134076971,
-   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
-   "name": "Codex Switchboard Integration Setup v2",
-   "why": "later"
   },
   {
    "id": "fc2939be",
@@ -443,12 +436,21 @@
  ],
  "ticked": [
   {
+   "id": "2f08890c",
+   "text": "Tidying the Board's crowded phone view at Fit.",
+   "from": "f426e746-e97c-4df7-8e7d-26aa98473a25",
+   "name": "Codex Switchboard Integration Setup v2",
+   "why": "later",
+   "at": 1794316918931,
+   "by": "1db3d17d-11b2-4092-b231-8f5e45d77030"
+  },
+  {
    "id": "c5c53f46",
    "text": "To-do 0b3f444c: the twice-weekly improve-system run has the same problem. Its permission to write memory notes can never work, so it needs the same copy-back or",
-   "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
-   "why": "later",
    "at": 1794316908551,
-   "by": "570604af-1a8f-43d4-852e-9e51a0e6482e"
+   "by": "570604af-1a8f-43d4-852e-9e51a0e6482e",
+   "from": "8a0d622c-7545-4bb4-beee-0dcae60afe32",
+   "why": "later"
   },
   {
    "id": "0b3f444c",
@@ -517,14 +519,6 @@
    "by": "0b3d0b31-28f4-43c5-b1d3-f81c06568751",
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
-  },
-  {
-   "id": "6e1d42fa",
-   "text": "Deep-research eval round 2: the 10 harder questions are in claude-mods/kit/skills/deep-research/eval/questions.json; run them, standard vs the researcher prompt on sonnet, with two judges",
-   "at": 1794305708853,
-   "by": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
-   "from": "904c587d-e264-4480-9e92-4b91b8a808bd",
-   "name": "Tailscale Commit Button Fixes"
   }
  ]
 }
