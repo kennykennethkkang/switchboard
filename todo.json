@@ -54,6 +54,13 @@
    "id": "5eb50396",
    "text": "Smart track which page you are on when inside of plan page so I don't have to manually change. Also make it so if I add to-do items that it doesn't cause page jumping which makes it hard to use",
    "at": 1794335436817
+  },
+  {
+   "id": "948a8482",
+   "text": "Deep-research eval round 4 (optional): round 3 checked every citation and the skill still led by only one claim under sonnet. To really separate the skill from the plain researcher prompt, write 20 or more new trap questions (q26 and up, each with a source conflict) and run them with --claims all.",
+   "at": 1794336641934,
+   "from": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
+   "name": "To-do 16: Eval grader citation tuning"
   }
  ],
  "removed": {
@@ -396,64 +403,17 @@
  },
  "seq": 16,
  "streak": 4,
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
-  },
-  {
-   "id": "08e0bf2a",
-   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794332244536,
-   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "75089f6c-ok",
    "text": "to tell the two apart under Sonnet's grading, more questions are needed, or graders that check more than 3 citations per answer.",
+   "at": 1794336640732,
+   "by": "476d5fca-2380-4f37-adf3-a3ca0f375b36",
    "from": "4c3d7e8a-2c21-4765-84ab-1b5cec3dcc61",
    "name": "Deep-research eval round 2",
    "why": "later",
    "run": 16,
-   "auto": true,
-   "at": 1794336640732,
-   "by": "476d5fca-2380-4f37-adf3-a3ca0f375b36"
+   "auto": true
   },
   {
    "id": "e1c8c72c-ok",
@@ -550,6 +510,53 @@
    "why": "missed",
    "run": 6,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
+  },
+  {
+   "id": "08e0bf2a",
+   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794332244536,
+   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "why": "later"
   }
  ]
 }
