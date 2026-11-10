@@ -19,8 +19,8 @@
   },
   {
    "id": "75e17893",
-   "text": "Fix inventory gaps: install deep-research, crowd-ab, self-improve skills; drop or ship caveman; done-check mod; README line 30 vs tools.ts FLAGGED; stitch plugins installed twice; empty learned/synced skill dirs; stale deep-research skillOverride; add manifest entries for bash-approve, cache-keeper, ecc-agents, pixelfx, humanizer, last30days",
-   "at": 1794217349958,
+   "text": "Inventory gaps left: drop or ship caveman (README credits it, not installed); README line 30 FLAGGED list vs tools.ts FLAGGED; check stitch plugins installed twice; empty ~/.claude/skills/learned dir",
+   "at": 1794305476920,
    "from": "da4605d2-f533-4303-a960-287d006cd833",
    "name": "Overhaul Switchboard Organization"
   },
