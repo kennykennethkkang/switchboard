@@ -34,10 +34,14 @@
   {
    "id": "e1c8c72c-ok",
    "text": "While the closing question is open, the card doesn't show the Verified or Unverified stamp. History is correct; showing it on the card is a design decision for",
-   "at": 1794318259034,
+   "at": 1794334199207,
    "from": "fc34492e-d8bc-415a-b517-cfa2ed2cf828",
    "name": "Audit All Skills Tools Settings",
-   "why": "later"
+   "why": "later",
+   "chat": "5111d5f4-36af-463b-8901-f388f5886fca",
+   "host": "62903adf5e340f87",
+   "run": 15,
+   "auto": true
   },
   {
    "id": "75089f6c-ok",
@@ -403,66 +407,19 @@
   "f135088b": 1794333382342,
   "dd0f7384-ok": 1794334184346
  },
- "seq": 14,
+ "seq": 15,
  "streak": 4,
- "suggested": [
-  {
-   "id": "77dc7d30",
-   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
-   "at": 1794319958909,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "name": "To-do 4: Instagram reel feature and deep",
-   "why": "missed"
-  },
-  {
-   "id": "55b0229e",
-   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "later"
-  },
-  {
-   "id": "e14ca1da",
-   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
-   "at": 1794319967429,
-   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
-   "why": "blocked"
-  },
-  {
-   "id": "7bb98bd3",
-   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
-   "at": 1794320655788,
-   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
-   "name": "To-do 10: Chrome account mismatch bug",
-   "why": "missed"
-  },
-  {
-   "id": "fc6b9569",
-   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794320661189,
-   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
-   "name": "To-do 7: Claude island system design",
-   "why": "missed"
-  },
-  {
-   "id": "08e0bf2a",
-   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
-   "at": 1794332244536,
-   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "dd0f7384-ok",
    "text": "The Codex transcript tab (to-do 29c4f61f).",
+   "at": 1794334184346,
+   "by": "0f2d4f93-cc16-433a-b118-1f269077b9c6",
    "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
    "name": "Codex Switchboard Integration Setup v3",
    "why": "later",
    "run": 14,
-   "auto": true,
-   "at": 1794334184346,
-   "by": "0f2d4f93-cc16-433a-b118-1f269077b9c6"
+   "auto": true
   },
   {
    "id": "f135088b",
@@ -559,6 +516,53 @@
    "why": "missed",
    "run": 4,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "77dc7d30",
+   "text": "sorry but why are you running on opus 4.8 please run on 5.5 since its better unless this chat does not need it",
+   "at": 1794319958909,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "name": "To-do 4: Instagram reel feature and deep",
+   "why": "missed"
+  },
+  {
+   "id": "55b0229e",
+   "text": "Package + install the 0.21.22 VSIX so the island shows in your *running* Switchboard. A 0.21.22 release is already half-assembled by other chats (version bumped",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "later"
+  },
+  {
+   "id": "e14ca1da",
+   "text": "Verify dispatch once on a real board: clicking Research should launch a deep-research chat. Demo mode can't exercise the real dispatch, but it uses the same pro",
+   "at": 1794319967429,
+   "from": "08d8bd98-86e0-46ec-adb0-feb344d1ff9d",
+   "why": "blocked"
+  },
+  {
+   "id": "7bb98bd3",
+   "text": "Switchboard to-do, in this order: 1. Have an issue with items being pulled up on the wrong chrome account when default is kennykennethkkang (id 300d38c8-ok) Do prerequisites first. When you find some",
+   "at": 1794320655788,
+   "from": "edee7b2a-6b82-4a43-9966-c4935f2d40d4",
+   "name": "To-do 10: Chrome account mismatch bug",
+   "why": "missed"
+  },
+  {
+   "id": "fc6b9569",
+   "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
+   "at": 1794320661189,
+   "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
+   "name": "To-do 7: Claude island system design",
+   "why": "missed"
+  },
+  {
+   "id": "08e0bf2a",
+   "text": "if a VS Code window is ever open on the whole `~/Documents/GitHub` folder, a new repo's chat starts in that window instead of the new one. No window is open the",
+   "at": 1794332244536,
+   "from": "b1afd3d6-f58e-44f0-9c9c-3d9dd83473f4",
+   "why": "later"
   }
  ]
 }
