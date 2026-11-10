@@ -4,10 +4,14 @@
   {
    "id": "58d13898-ok",
    "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
-   "at": 1794346379075,
+   "at": 1794346434694,
    "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
    "name": "To-do 32: AAR fix rules md update",
-   "why": "later"
+   "why": "later",
+   "chat": "f42846f5-47f4-4e76-8e15-2fb01c38a37d",
+   "host": "62903adf5e340f87",
+   "run": 35,
+   "auto": true
   },
   {
    "id": "85459f6e",
@@ -388,19 +392,19 @@
   "58d13898": 1794346379075,
   "5725fc39-ok": 1794346427893
  },
- "seq": 34,
+ "seq": 35,
  "streak": 34,
  "ticked": [
   {
    "id": "5725fc39-ok",
    "text": "The copies in `~/.claude` and `extension/kit` won't have the new sentence until the next kit build or setup run.",
+   "at": 1794346427893,
+   "by": "92a33830-0d0d-4843-9806-d5d88d05a6e6",
    "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
    "name": "To-do 32: AAR fix rules md update",
    "why": "later",
    "run": 34,
-   "auto": true,
-   "at": 1794346427893,
-   "by": "92a33830-0d0d-4843-9806-d5d88d05a6e6"
+   "auto": true
   },
   {
    "id": "7bb98bd3-ok",
