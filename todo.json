@@ -24,6 +24,14 @@
    "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
    "name": "Tailscale Commit Button Fixes v4",
    "why": "missed"
+  },
+  {
+   "id": "b9b7da84-ok",
+   "text": "Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design make sure there are no issues with the",
+   "at": 1794318084976,
+   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
+   "name": "Tailscale Commit Button Fixes v4",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -338,7 +346,8 @@
   "2f08890c": 1794316918931,
   "f1ba141b": 1794318073879,
   "e207ca92": 1794318078365,
-  "2fbd2f92": 1794318080871
+  "2fbd2f92": 1794318080871,
+  "b9b7da84": 1794318084976
  },
  "seq": 3,
  "ticked": [
@@ -452,14 +461,6 @@
    "from": "9bf02677-328f-4599-a412-fc77b5c4cd1e",
    "name": "Codex Switchboard Integration Setup v3",
    "why": "later"
-  },
-  {
-   "id": "b9b7da84",
-   "text": "Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design make sure there are no issues with the",
-   "at": 1794205298759,
-   "from": "b4c12308-48ca-4bb5-afe6-5566fe3e50e0",
-   "name": "Tailscale Commit Button Fixes v4",
-   "why": "missed"
   },
   {
    "id": "a7df2aa6",
