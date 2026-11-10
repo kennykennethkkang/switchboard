@@ -30,10 +30,14 @@
   {
    "id": "fc6b9569-ok",
    "text": "Switchboard to-do, in this order: 1. Also another issue I noticed is there are islands for codex, jev, perplexity, and gemini but why not claude. Claude should have its own system also please design m",
-   "at": 1794343508954,
+   "at": 1794343923904,
    "from": "f5f8e8ad-896a-4724-b3a0-ca5946a5f791",
    "name": "To-do 7: Claude island system design",
-   "why": "missed"
+   "why": "missed",
+   "chat": "3d202cdd-a44c-4d05-9fed-1b36de1e1755",
+   "host": "62903adf5e340f87",
+   "run": 27,
+   "auto": true
   },
   {
    "id": "08e0bf2a-ok",
@@ -425,18 +429,18 @@
   "fc2939be-ok": 1794343605049,
   "abf6671a": 1794343760231
  },
- "seq": 26,
+ "seq": 27,
  "streak": 4,
  "ticked": [
   {
    "id": "abf6671a",
    "text": "AAR proposal (approve before applying): zsh glob trap keeps repeating across chats despite memory zsh-quote-grep-include (hit again 2026-11-10 in f5f8e8ad). In claude-mods/kit/rules.md, after line 23 (\"- Bash never prompts (bash-approve)...\"), add: \"- The shell is zsh: single-quote every * inside a flag (`command grep -rn x --include='*.ts' .`); unquoted it aborts with \\\"no matches found\\\". `grep` is ugrep, use `command grep`.\" Then rebuild the kit.",
+   "at": 1794343760231,
+   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
    "from": "0419be6e-5137-476b-95bd-41942a3108f3",
    "run": 18,
    "auto": true,
-   "stopped": true,
-   "at": 1794343760231,
-   "by": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87"
+   "stopped": true
   },
   {
    "id": "fc2939be-ok",
