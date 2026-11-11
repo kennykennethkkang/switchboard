@@ -2,17 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "3652a3ab",
-   "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
-   "at": 1794365938752,
-   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
-   "name": "Self-Improving Switchboard Agents",
-   "chat": "5ec52720-8f6b-4ced-8345-39dc30715d27",
-   "host": "62903adf5e340f87",
-   "run": 37,
-   "auto": true
-  },
-  {
    "id": "34c517e2",
    "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
    "at": 1794365934855,
@@ -393,10 +382,22 @@
   "58d13898": 1794346379075,
   "5725fc39-ok": 1794346427893,
   "58d13898-ok": 1794346458368,
-  "85459f6e": 1794346935635
+  "85459f6e": 1794346935635,
+  "3652a3ab": 1794366181698
  },
  "seq": 37,
+ "streak": 37,
  "ticked": [
+  {
+   "id": "3652a3ab",
+   "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
+   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
+   "name": "Self-Improving Switchboard Agents",
+   "run": 37,
+   "auto": true,
+   "at": 1794366181698,
+   "by": "5ec52720-8f6b-4ced-8345-39dc30715d27"
+  },
   {
    "id": "85459f6e",
    "text": "Why was renaming blocked please make sure they are not blocked and fix them I want to make sure this folder is renamed to switchboard also",
@@ -477,16 +478,6 @@
    "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c",
    "run": 33,
    "auto": true
-  },
-  {
-   "id": "490c3b46",
-   "text": "AAR fix plan (Armasu chat d3d97607), approve to apply in claude-mods/kit/rules.md: after \"and list the step under For you with where you opened it.\" add: \"When several hand steps span sites or Chrome profiles, walk them one at a time: open or bring forward the exact deep URL for that step, name the one click, and move on once it is done; never leave a list of 'the X tab' to find.\"",
-   "at": 1794345997136,
-   "by": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
-   "from": "a07ac0fb-c064-450e-90da-cdbd22a57d8e",
-   "run": 32,
-   "auto": true
   }
- ],
- "streak": 37
+ ]
 }
