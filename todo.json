@@ -4,9 +4,13 @@
   {
    "id": "3652a3ab",
    "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
-   "at": 1794365934035,
+   "at": 1794365938752,
    "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
-   "name": "Self-Improving Switchboard Agents"
+   "name": "Self-Improving Switchboard Agents",
+   "chat": "5ec52720-8f6b-4ced-8345-39dc30715d27",
+   "host": "62903adf5e340f87",
+   "run": 37,
+   "auto": true
   },
   {
    "id": "34c517e2",
@@ -391,7 +395,7 @@
   "58d13898-ok": 1794346458368,
   "85459f6e": 1794346935635
  },
- "seq": 36,
+ "seq": 37,
  "ticked": [
   {
    "id": "85459f6e",
@@ -483,5 +487,6 @@
    "run": 32,
    "auto": true
   }
- ]
+ ],
+ "streak": 37
 }
