@@ -1,18 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "34c517e2",
-   "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
-   "at": 1794366193551,
-   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
-   "name": "Self-Improving Switchboard Agents",
-   "chat": "a926b662-ef75-4433-aaca-db73671a838e",
-   "host": "62903adf5e340f87",
-   "run": 38,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -387,11 +375,21 @@
   "5725fc39-ok": 1794346427893,
   "58d13898-ok": 1794346458368,
   "85459f6e": 1794346935635,
-  "3652a3ab": 1794366181698
+  "3652a3ab": 1794366181698,
+  "34c517e2": 1794366512192
  },
  "seq": 38,
- "streak": 37,
  "ticked": [
+  {
+   "id": "34c517e2",
+   "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
+   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
+   "name": "Self-Improving Switchboard Agents",
+   "run": 38,
+   "auto": true,
+   "at": 1794366512192,
+   "by": "8a5be37e-284a-4476-a0d2-6463cba7f9b9"
+  },
   {
    "id": "3652a3ab",
    "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
@@ -473,15 +471,6 @@
    "by": "79bd8605-e785-4d59-8f45-607ba5fb7503",
    "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
    "why": "later"
-  },
-  {
-   "id": "5e0932b6",
-   "text": "AAR fix plan (chat 1b4609a7), approve to apply: in claude-mods/kit/rules.md line 66 replace \"- If the aar skill is installed, run it on this chat before the standup.\" with \"- Run the aar skill on this chat before the standup (Read kit/skills/aar/SKILL.md if the Skill tool is off). Never skip it; the scheduled Learn run does not replace it.\" Why: chats d0c9b084 and 1b4609a7 both skipped the aar on 2026-11-10, the second with \"I didn't run the after-action review this time\".",
-   "at": 1794346035429,
-   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503",
-   "from": "602b1add-6f50-4bf6-93ba-8a7e6ed93b9c",
-   "run": 33,
-   "auto": true
   }
  ]
 }
