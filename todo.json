@@ -1,6 +1,13 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "0ce5630a",
+   "text": "Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never closed it. Suspects: approvalBlock saw state 'working' at PostToolUse, or the event was handled as a mirror (lowercase -switchboard transcript slug). Log approvalBlock refusals somewhere that survives a reload, and add an approve.test.ts case for the cause.",
+   "at": 1794373662007,
+   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -383,12 +390,12 @@
   {
    "id": "34c517e2",
    "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
+   "at": 1794366512192,
+   "by": "8a5be37e-284a-4476-a0d2-6463cba7f9b9",
    "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
    "name": "Self-Improving Switchboard Agents",
    "run": 38,
-   "auto": true,
-   "at": 1794366512192,
-   "by": "8a5be37e-284a-4476-a0d2-6463cba7f9b9"
+   "auto": true
   },
   {
    "id": "3652a3ab",
