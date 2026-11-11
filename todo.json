@@ -4,8 +4,12 @@
   {
    "id": "0ce5630a",
    "text": "Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never closed it. Suspects: approvalBlock saw state 'working' at PostToolUse, or the event was handled as a mirror (lowercase -switchboard transcript slug). Log approvalBlock refusals somewhere that survives a reload, and add an approve.test.ts case for the cause.",
-   "at": 1794373662007,
-   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd"
+   "at": 1794373662399,
+   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
+   "chat": "f855caa1-c700-4ee2-a002-61708e972bcd",
+   "host": "62903adf5e340f87",
+   "run": 39,
+   "auto": true
   }
  ],
  "removed": {
@@ -385,7 +389,7 @@
   "3652a3ab": 1794366181698,
   "34c517e2": 1794366512192
  },
- "seq": 38,
+ "seq": 39,
  "ticked": [
   {
    "id": "34c517e2",
@@ -479,5 +483,6 @@
    "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
    "why": "later"
   }
- ]
+ ],
+ "streak": 39
 }
