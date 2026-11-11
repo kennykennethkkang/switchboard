@@ -11,6 +11,13 @@
    "name": "Model Benchmarking And Switchboard Settings v2",
    "run": 41,
    "auto": true
+  },
+  {
+   "id": "afd3ecc5",
+   "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
+   "at": 1794428180987,
+   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
+   "name": "To-do 41: Model-bench rescore API stall fix"
   }
  ],
  "removed": {
