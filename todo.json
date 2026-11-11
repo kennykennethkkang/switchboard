@@ -7,6 +7,13 @@
    "at": 1794365934035,
    "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
    "name": "Self-Improving Switchboard Agents"
+  },
+  {
+   "id": "34c517e2",
+   "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
+   "at": 1794365934855,
+   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
+   "name": "Self-Improving Switchboard Agents"
   }
  ],
  "removed": {
