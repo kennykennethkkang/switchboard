@@ -27,8 +27,14 @@ const fresh = (file, ms) => { try { return Date.now() - fs.statSync(file).mtimeM
 
 const BACKOFF_MAX = 5 * 60_000
 
-export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), everyMs = 2000, misses = 3, backoffMs = 5000, log = console.log } = {}) {
-  let down = 0, stopped = false, timer, fails = 0, waitUntil = 0
+export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), everyMs = 2000, misses = 3, backoffMs = 5000, stableMs = 60_000, log = console.log } = {}) {
+  // upSince: when the app this keeper started first answered; fails resets only once it stayed up stableMs.
+  let down = 0, stopped = false, timer, fails = 0, waitUntil = 0, upSince = 0
+  const backoff = why => {
+    const wait = Math.min(BACKOFF_MAX, backoffMs * 2 ** fails++)
+    waitUntil = Date.now() + wait
+    log(`${why}; trying again in ${Math.round(wait / 1000)} s`)
+  }
 
   const start = async (launch, port) => {
     const file = path.join(dir, 'app.log')
@@ -45,13 +51,8 @@ export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), 
     child.once('exit', () => { gone = true })
     for (let i = 0; i < 50 && !gone && !(await answers(port)); i++) await sleep(200)
     // A click's start that took the port first makes this one exit; its pid in app.pid stays.
-    if (gone || !alive(child.pid)) {
-      const wait = Math.min(BACKOFF_MAX, backoffMs * 2 ** fails++)
-      waitUntil = Date.now() + wait
-      log(`the app exited; trying again in ${Math.round(wait / 1000)} s`)
-      return
-    }
-    fails = 0
+    if (gone || !alive(child.pid)) return backoff('the app exited')
+    upSince = Date.now()
     if ((await listeners(port)).includes(child.pid)) fs.writeFileSync(path.join(dir, 'app.pid'), String(child.pid))
     else log(`port ${port} is held, but not by the app it started (${child.pid}); app.pid left as is`)
   }
@@ -63,7 +64,18 @@ export function keep({ dir = path.join(os.homedir(), '.claude', 'switchboard'), 
     if (!Array.isArray(launch?.args) || !fs.existsSync(launch.args[0])) return
     const port = Number(launch.args[launch.args.indexOf('-p') + 1]) || 3131
     // ensureWeb holds app.lock while it stops and starts the app for an update; past a minute it is left over.
-    if ((await answers(port)) || fresh(path.join(dir, 'app.lock'), 60_000)) { down = 0; fails = 0; return }
+    if ((await answers(port)) || fresh(path.join(dir, 'app.lock'), 60_000)) {
+      down = 0
+      // An app someone else started counts as stable.
+      if (!upSince || Date.now() - upSince >= stableMs) fails = 0
+      return
+    }
+    // Ours served a moment, then died: wait like a failed start, not every few seconds.
+    if (upSince) {
+      const short = Date.now() - upSince < stableMs
+      upSince = 0
+      if (short) return backoff('the app stopped soon after starting')
+    }
     if (++down < misses) return
     down = 0
     await start(launch, port)

@@ -5,7 +5,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { AUTH0, accountsNote, applyLink, applyLogin, loginFor, loginUrl, readLinks, readLogins, writeLogins } from '../src/hub/logins'
-import { addAwsProfile, deleteAwsProfile, isStale, parseAwsConfig, removeProfile } from '../src/hub/aws'
+import { addAwsProfile, deleteAwsProfile, parseAwsConfig, removeProfile, renameAwsProfile } from '../src/hub/aws'
 import { commandProblem } from '../src/hub/routes'
 import type { Links, WebApp } from '../src/hub/types'
 
@@ -69,6 +69,16 @@ describe('applyLogin', () => {
     assert.equal(apps[0].active, w.id)
     apps = applyLogin(apps, { type: 'hub-login-rename', app: 'auth0', id: w.id, label: ' Work tenant\n' }) as WebApp[]
     assert.equal(apps[0].logins[1].label, 'Work tenant')
+    apps = applyLogin(apps, { type: 'hub-login-rename', app: 'auth0', id: w.id, label: 'Work tenant', email: ' k@work.com ' }) as WebApp[]
+    assert.equal(apps[0].logins[1].email, 'k@work.com')
+    assert.match(applyLogin(apps, { type: 'hub-login-rename', app: 'auth0', id: w.id, label: 'Work tenant', email: 'nope' }) as string, /email/)
+    // Rename alone keeps the email; an empty one clears it.
+    apps = applyLogin(apps, { type: 'hub-login-rename', app: 'auth0', id: w.id, label: 'Work' }) as WebApp[]
+    assert.equal(apps[0].logins[1].email, 'k@work.com')
+    apps = applyLogin(apps, { type: 'hub-login-rename', app: 'auth0', id: w.id, label: 'Work', email: '' }) as WebApp[]
+    assert.equal(apps[0].logins[1].email, undefined)
+    const withMail = applyLogin(apps, { type: 'hub-login-add', app: 'auth0', label: 'Ops', url: 'https://manage.auth0.com/', email: 'ops@x.io' }, id) as WebApp[]
+    assert.equal(withMail[0].logins[2].email, 'ops@x.io')
     apps = applyLogin(apps, { type: 'hub-login-open', app: 'auth0', id: p.id, chrome: 'Profile 2' }) as WebApp[]
     assert.equal(apps[0].logins[0].chrome, 'Profile 2')
     // Deleting the active one hands active to the next.
@@ -108,18 +118,9 @@ describe('deleting an AWS profile', () => {
     assert.ok(r.text.includes('[default]\nregion = us-west-1\noutput = json\n\n[profile live]'))
   })
 
-  it('refuses the default, the profile the default copies, one another profile sources from, and unknown names', () => {
-    for (const name of ['default', 'live', 'base', 'nope']) assert.ok('problem' in removeProfile(CONFIG, name), name)
-  })
-
-  it('deletes backups and duplicates that match the default; only the last named copy stays', () => {
-    const same = 'region = us-west-1\nlogin_session = s\n'
-    const text = `[default]\n${same}\n[profile live]\n${same}\n[profile yo]\n${same}\n[profile previous-default-20261029-073925]\n${same}`
-    let r = removeProfile(text, 'previous-default-20261029-073925')
-    assert.ok('text' in r)
-    r = removeProfile(r.text, 'yo')
-    assert.ok('text' in r)
-    assert.ok('problem' in removeProfile(r.text, 'live'), 'live is now the only named copy of the default')
+  it('deletes any profile, [default] and its copies too; refuses one another profile sources from, and unknown names', () => {
+    for (const name of ['default', 'live']) assert.ok('text' in removeProfile(CONFIG, name), name)
+    for (const name of ['base', 'nope']) assert.ok('problem' in removeProfile(CONFIG, name), name)
   })
 
   it('writes a timestamped backup next to the config before changing it', () => {
@@ -138,9 +139,46 @@ describe('deleting an AWS profile', () => {
   it('leaves the config and writes no backup when refused', () => {
     const dir = tmp(), file = path.join(dir, 'config')
     fs.writeFileSync(file, CONFIG)
-    assert.match(deleteAwsProfile('default', file, 1) ?? '', /default/)
+    assert.match(deleteAwsProfile('base', file, 1) ?? '', /source_profile/)
     assert.equal(fs.readFileSync(file, 'utf8'), CONFIG)
     assert.deepEqual(fs.readdirSync(dir), ['config'])
+  })
+})
+
+describe('renaming an AWS profile', () => {
+  it('backs the config up, then renames; refuses a taken name and leaves the file', () => {
+    const dir = tmp(), file = path.join(dir, 'config')
+    const text = '[profile Armasu]\nregion = us-west-1\nlogin_session = arn:aws:iam::137809407381:root\n\n[profile live]\nregion = us-west-1\n'
+    fs.writeFileSync(file, text, { mode: 0o600 })
+    assert.match(renameAwsProfile('Armasu', 'live', file, 1) ?? '', /live/)
+    assert.deepEqual(fs.readdirSync(dir), ['config'])
+    assert.equal(renameAwsProfile('Armasu', 'wardrobe', file, Date.UTC(2026, 10, 10, 9, 0, 0)), undefined)
+    assert.equal(fs.readFileSync(path.join(dir, 'config.backup-20261110-090000'), 'utf8'), text)
+    assert.deepEqual(parseAwsConfig(fs.readFileSync(file, 'utf8')).map(s => s.name), ['wardrobe', 'live'])
+    // A second change in the same second gets its own backup instead of failing.
+    assert.equal(renameAwsProfile('wardrobe', 'armasu', file, Date.UTC(2026, 10, 10, 9, 0, 0)), undefined)
+    assert.ok(fs.existsSync(path.join(dir, 'config.backup-20261110-090000-2')))
+    assert.equal(deleteAwsProfile('live', file, Date.UTC(2026, 10, 10, 9, 0, 0)), undefined)
+    assert.ok(fs.existsSync(path.join(dir, 'config.backup-20261110-090000-3')))
+  })
+
+  it('refuses a new name the credentials file already has, reading only its headers', () => {
+    const dir = tmp(), file = path.join(dir, 'config'), creds = path.join(dir, 'credentials')
+    fs.writeFileSync(file, '[profile a]\nregion = us-west-1\n')
+    fs.writeFileSync(creds, '[b]\naws_access_key_id = AKIAEXAMPLE\n')
+    const why = renameAwsProfile('a', 'b', file, 1, creds) ?? ''
+    assert.match(why, /credentials/)
+    assert.ok(!why.includes('AKIA'))
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['config', 'credentials'])
+    assert.equal(renameAwsProfile('a', 'c', file, 1, creds), undefined)
+  })
+
+  it('refuses to rename a profile whose keys live in the credentials file', () => {
+    const dir = tmp(), file = path.join(dir, 'config'), creds = path.join(dir, 'credentials')
+    fs.writeFileSync(file, '[profile work]\nregion = us-west-1\n')
+    fs.writeFileSync(creds, '[work]\naws_access_key_id = AKIAEXAMPLE\n')
+    assert.match(renameAwsProfile('work', 'work2', file, 1, creds) ?? '', /credentials/)
+    assert.equal(fs.readFileSync(file, 'utf8'), '[profile work]\nregion = us-west-1\n')
   })
 })
 
@@ -153,6 +191,9 @@ describe('sign-in command shapes', () => {
       { type: 'hub-login-open', app: 'auth0', id: 'a', chrome: '' },
       { type: 'hub-login-active', app: 'auth0', id: 'a' },
       { type: 'hub-login-rename', app: 'auth0', id: 'a', label: 'x' },
+      { type: 'hub-login-rename', app: 'auth0', id: 'a', label: 'x', email: 'k@x.com' },
+      { type: 'hub-login-add', app: 'auth0', label: 'Work', url: 'https://manage.auth0.com/', email: 'k@x.com' },
+      { type: 'hub-aws-rename', profile: 'Armasu', to: 'wardrobe' },
       { type: 'hub-login-delete', app: 'auth0', id: 'a' },
       { type: 'hub-aws-delete', profile: 'sandbox' },
       { type: 'hub-login-app-delete', app: 'auth0' },
@@ -161,6 +202,8 @@ describe('sign-in command shapes', () => {
     assert.ok(commandProblem({ type: 'hub-login-delete', app: 'auth0' }))
     assert.ok(commandProblem({ type: 'hub-login-add', app: 'auth0', label: 'x', url: 1 }))
     assert.ok(commandProblem({ type: 'hub-aws-delete' }))
+    assert.ok(commandProblem({ type: 'hub-aws-rename', profile: 'a' }))
+    assert.ok(commandProblem({ type: 'hub-aws-default', profile: 'a' }))
   })
 })
 
@@ -172,48 +215,49 @@ describe('project links', () => {
   const P = '/Users/k/Documents/GitHub/app'
   const link = (links: Links, app: string, login: string | null, folder = P) => applyLink(APPS, links, { type: 'hub-login-link', folder, app, login }, [P])
 
-  it('connects with the default, sets a project default, and turns off', () => {
-    let links = link({}, 'auth0', null) as Links
-    assert.deepEqual(links, { [P]: { auth0: null } })
-    links = link(links, 'auth0', 'k') as Links
-    links = link(links, 'vercel', null) as Links
-    assert.deepEqual(links, { [P]: { auth0: 'k', vercel: null } })
+  it('picks a login per project; off and null both mean not used', () => {
+    let links = link({}, 'auth0', 'k') as Links
+    links = link(links, 'vercel', 't') as Links
+    assert.deepEqual(links, { [P]: { auth0: 'k', vercel: 't' } })
     links = link(links, 'auth0', 'off') as Links
-    assert.deepEqual(links, { [P]: { vercel: null } })
-    assert.deepEqual(link(links, 'vercel', 'off'), {})
+    assert.deepEqual(links, { [P]: { vercel: 't' } })
+    assert.deepEqual(link(links, 'vercel', null), {})
   })
 
   it('refuses unknown folders, apps and logins', () => {
-    assert.match(link({}, 'auth0', null, '/etc') as string, /project/)
-    assert.match(link({}, 'nope', null) as string, /app/)
+    assert.match(link({}, 'auth0', 'k', '/etc') as string, /project/)
+    assert.match(link({}, 'nope', 'k') as string, /app/)
     assert.match(link({}, 'auth0', 't') as string, /login/)
   })
 
   it('persists next to the apps and cleans up when a login or app goes', () => {
     const file = path.join(tmp(), 'logins.json')
-    writeLogins(APPS, file, { [P]: { auth0: 'k', vercel: 't' }, '/x': { gone: null } })
+    // A stored null (the old Default pick) reads as not used.
+    fs.writeFileSync(file, JSON.stringify({ apps: APPS, links: { '/old': { auth0: null } } }))
+    assert.deepEqual(readLinks(file), {})
+    writeLogins(APPS, file, { [P]: { auth0: 'k', vercel: 't' }, '/x': { gone: 'k' } })
     assert.deepEqual(readLinks(file), { [P]: { auth0: 'k', vercel: 't' } })
-    // Deleted login falls back to the app default, deleted app drops its key.
+    // A deleted login or app drops the pick.
     let apps = applyLogin(APPS, { type: 'hub-login-delete', app: 'auth0', id: 'k' }) as WebApp[]
     writeLogins(apps, file)
-    assert.deepEqual(readLinks(file), { [P]: { auth0: null, vercel: 't' } })
+    assert.deepEqual(readLinks(file), { [P]: { vercel: 't' } })
     apps = applyLogin(apps, { type: 'hub-login-app-delete', app: 'vercel' }) as WebApp[]
     writeLogins(apps, file)
-    assert.deepEqual(readLinks(file), { [P]: { auth0: null } })
+    assert.deepEqual(readLinks(file), {})
     assert.deepEqual(readLogins(file), apps)
   })
 
-  it('open without an id picks the project default, else the app default', () => {
-    const links: Links = { [P]: { auth0: 'k', vercel: null } }
+  it('open without an id takes the project pick, and nothing without one', () => {
+    const links: Links = { [P]: { auth0: 'k' } }
     assert.equal(loginFor(APPS[0], links, P), 'k')
-    assert.equal(loginFor(APPS[1], links, P), 't')
-    assert.equal(loginFor(APPS[0], links, '/other'), 'w')
-    assert.equal(loginFor(APPS[0], links, undefined), 'w')
+    assert.equal(loginFor(APPS[1], links, P), undefined)
+    assert.equal(loginFor(APPS[0], links, '/other'), undefined)
+    assert.equal(loginFor(APPS[0], links, undefined), undefined)
   })
 
   it('names the linked accounts for a new chat, labels and Chrome profiles only', () => {
     const chrome = [{ dir: 'Profile 4', name: 'Kenneth' }, { dir: 'Default', name: 'Person 1' }]
-    const note = accountsNote(APPS, { [P]: { auth0: 'k', vercel: null } }, P, chrome)
+    const note = accountsNote(APPS, { [P]: { auth0: 'k', vercel: 't' } }, P, chrome)
     assert.equal(note, 'Web accounts for this project: Auth0 uses kenneth@x (Chrome Kenneth); Vercel uses team login (Chrome Person 1).')
     assert.ok(!note?.includes('http'))
     assert.equal(accountsNote(APPS, { [P]: { auth0: 'w' } }, P, []), 'Web accounts for this project: Auth0 uses work (Chrome, last used profile).')
@@ -240,13 +284,9 @@ describe('save order', () => {
     assert.equal(fs.readFileSync(file, 'utf8'), '[default]\nregion = us-west-1\n')
     assert.equal(addAwsProfile('dev', 'us-west-2', 'Default', ['Default'], file), undefined)
     assert.deepEqual(parseAwsConfig(fs.readFileSync(file, 'utf8')).map(s => s.name), ['default', 'dev'])
-    assert.ok(addAwsProfile('dev', 'us-west-2', '', ['Default'], file), 'name taken')
-  })
-
-  it('marks backups of an old default as stale', () => {
-    assert.equal(isStale('previous-default-20261028-150405'), true)
-    assert.equal(isStale('previous'), false)
-    assert.equal(isStale('dev'), false)
+    // Again under the same name: a retry, with the new region.
+    assert.equal(addAwsProfile('dev', 'eu-west-1', '', ['Default'], file), undefined)
+    assert.equal(parseAwsConfig(fs.readFileSync(file, 'utf8')).find(s => s.name === 'dev')?.values.region, 'eu-west-1')
   })
 
   it('takes the link command and open with a folder and no id', () => {

@@ -4,7 +4,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { allowed, codeLogin, macOnly, hostOk, lanNames, macNames, macNamesRead, commandSession, deniedAs, deviceAsks, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
+import { allowed, codeLogin, macOnly, hostOk, lanNames, macNames, macNamesRead, commandSession, deniedAs, deviceAsks, editorOf, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
 import { MAC_ONLY_GIT } from '../../web/lib/hub-types'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
@@ -424,6 +424,13 @@ describe('device approval', () => {
     assert.match(page, /at the Mac/)
     assert.ok(page.indexOf('action="/login"') < page.indexOf('action="/device"'))
     assert.doesNotMatch(page, /<script|\u2014/)
+  })
+  it('both pages name the editor from the window file, else your editor', () => {
+    assert.equal(editorOf([{ port: 1, hubToken: 't', workspace: '/w', pid: 9, editor: 'Gone' }, { port: 2, hubToken: 't', workspace: '/w', editor: 'Cursor' }], p => p !== 9), 'Cursor')
+    assert.equal(editorOf([]), 'your editor')
+    assert.equal(editorOf([{ port: 2, hubToken: 't', workspace: '/w', editor: '<b>' }]), 'b')
+    assert.match(signInPage(undefined, 'Cursor'), /Cursor shows a prompt/)
+    assert.match(waitPage('ab', 'Windsurf'), /prompt Windsurf shows/)
   })
   it('the wait page refreshes itself to its own id, no scripts', () => {
     const id = 'ab'.repeat(16)

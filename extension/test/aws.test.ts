@@ -1,9 +1,9 @@
-/** AWS sign-ins: reading ~/.aws/config, rewriting [default], labels, Chrome profiles and status. */
+/** AWS sign-ins: reading and rewriting ~/.aws/config, identity, Chrome profiles and status. */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import * as path from 'path'
 import * as fs from 'fs'
-import { accountOf, addProfile, AWS_SESSION_MS, awsProfiles, awsStatus, browserEnv, chromeCall, chromeChoice, chromeProfiles, chromeState, dueHeadsUps, HEADS_UP_MS, loginCacheFile, loginError, openChromeScript, rowText, makeDefault, parseAwsConfig, profileFor, trackSessions, validProfileName, validRegion } from '../src/hub/aws'
+import { accountOf, addProfile, AWS_SESSION_MS, awsProfiles, awsStatus, browserEnv, chromeCall, chromeChoice, chromeProfiles, chromeState, dueHeadsUps, HEADS_UP_MS, loginCacheFile, loginError, openChromeScript, rowText, identityOf, moveProfile, browserFor, hasSection, renameLabel, parseAwsConfig, renameProfile, sameLogin, profileFor, trackSessions, validProfileName, validRegion } from '../src/hub/aws'
 
 const ARN = (acct: string) => `arn:aws:iam::${acct}:root`
 const CONFIG = [
@@ -15,9 +15,9 @@ const CONFIG = [
 ].join('\n')
 
 describe('aws config', () => {
-  it('reads profiles with their settings, default first, skipping sso-session blocks', () => {
+  it('reads profiles in file order with their settings, skipping sso-session blocks', () => {
     const s = parseAwsConfig(CONFIG)
-    assert.deepEqual(s.map(x => [x.name, x.isDefault]), [['default', true], ['live', false], ['yo', false], ['sso', false]])
+    assert.deepEqual(s.map(x => x.name), ['default', 'live', 'yo', 'sso'])
     assert.equal(s[2].values.region, 'us-east-1')
   })
 
@@ -28,73 +28,70 @@ describe('aws config', () => {
     assert.equal(accountOf({ region: 'us-west-1' }), undefined)
   })
 
-  it('makes a profile the default and backs up the old default when its account differs', () => {
-    const out = makeDefault(CONFIG, 'yo', Date.UTC(2026, 9, 28, 15, 4, 5))!
-    const s = parseAwsConfig(out)
-    const def = s.find(x => x.isDefault)!
-    assert.equal(def.values.region, 'us-east-1')
-    assert.equal(accountOf(def.values), '457884741882')
-    const backup = s.find(x => x.name.startsWith('previous-default-'))!
-    assert.match(backup.name, /^previous-default-20261028-150405$/)
-    assert.equal(accountOf(backup.values), '137809407381')
-    assert.equal(backup.values.output, 'json')
-    // Everything else is left as it was.
-    assert.ok(out.includes('[sso-session corp]') && out.includes('[profile live]') && out.includes('[profile yo]'))
+  it('finds the profile a fresh sign-in duplicates: same login_session and region, first in the file', () => {
+    assert.equal(sameLogin(CONFIG, 'live'), 'default')
+    // [default] is a profile like any other.
+    assert.equal(sameLogin(CONFIG, 'default'), 'live')
+    assert.equal(sameLogin(CONFIG, 'yo'), undefined)
+    assert.equal(sameLogin(CONFIG, 'sso'), undefined)
+    const two = `${CONFIG}\n[profile again]\nregion = us-west-1\nlogin_session = ${ARN('137809407381')}\n`
+    assert.equal(sameLogin(two, 'again'), 'default')
+    // Another region is a different setup, not a copy.
+    const east = `${CONFIG}\n[profile east]\nregion = us-east-1\nlogin_session = ${ARN('137809407381')}\n`
+    assert.equal(sameLogin(east, 'east'), undefined)
   })
 
-  it('skips the backup only when the old default is the same as the new one, and refuses an unknown profile', () => {
-    const same = '[default]\nregion = us-west-1\n\n[profile twin]\nregion = us-west-1\n'
-    assert.ok(!makeDefault(same, 'twin', 1)!.includes('previous-default'))
-    // Same account, another role: the old role must survive.
-    const roles = '[default]\nrole_arn = arn:aws:iam::111122223333:role/Admin\n\n[profile ro]\nrole_arn = arn:aws:iam::111122223333:role/ReadOnly\n'
-    assert.match(makeDefault(roles, 'ro', 1)!, /\[profile previous-default-[^\]]+\]\nrole_arn = arn:aws:iam::111122223333:role\/Admin/)
-    // No account on either side: still kept.
-    const proc = '[default]\ncredential_process = /usr/local/bin/creds\n\n[profile bare]\nregion = us-east-2\n'
-    assert.match(makeDefault(proc, 'bare', 1)!, /\[profile previous-default-[^\]]+\]\ncredential_process = \/usr\/local\/bin\/creds/)
-    const out = makeDefault(CONFIG, 'live', 1)!
-    assert.ok(out.includes('previous-default'))
-    assert.equal(makeDefault(CONFIG, 'nope', 1), undefined)
-    assert.equal(makeDefault(CONFIG, 'default', 1), undefined)
-  })
-
-  it('points source_profile = default at the backup when the old [default] held keys in config', () => {
-    const text = '[default]\naws_access_key_id = AKIAEXAMPLE\naws_secret_access_key = x\n\n[profile admin]\nrole_arn = arn:aws:iam::444444444444:role/A\nsource_profile = default\n'
-    const s = parseAwsConfig(makeDefault(text, 'admin', Date.UTC(2026, 9, 28, 15, 4, 5))!)
-    assert.equal(s.find(x => x.isDefault)?.values.source_profile, 'previous-default-20261028-150405')
-  })
-
-  it('moves every profile sourcing from a keyed [default] to the backup, not just the new default', () => {
-    const text = '[default]\naws_access_key_id = AKIAEXAMPLE\n\n[profile admin]\nrole_arn = arn:aws:iam::444444444444:role/A\nsource_profile = default\n\n[profile ops]\nrole_arn = arn:aws:iam::555555555555:role/B\nsource_profile = default\n'
-    const s = parseAwsConfig(makeDefault(text, 'admin', Date.UTC(2026, 9, 28, 15, 4, 5))!)
-    for (const n of ['admin', 'ops']) assert.equal(s.find(x => x.name === n)?.values.source_profile, 'previous-default-20261028-150405')
-  })
-
-  it('keeps source_profile = default, since its keys live in credentials [default]', () => {
-    const text = '[default]\naws_account_id = 333333333333\n\n[profile admin]\nrole_arn = arn:aws:iam::444444444444:role/A\nsource_profile = default\n'
-    const s = parseAwsConfig(makeDefault(text, 'admin', Date.UTC(2026, 9, 28, 15, 4, 5))!)
-    assert.equal(s.find(x => x.isDefault)?.values.source_profile, 'default')
-    assert.equal(s.find(x => x.name === 'admin')?.values.source_profile, 'default')
-  })
-
-  it('leaves a comment that heads the next section with that section', () => {
-    const text = '[default]\nregion = us-west-1\n\n[profile a]\nregion = us-east-2\n# the sandbox account\n[profile b]\nregion = eu-west-1\n'
-    const out = makeDefault(text, 'a', 1)!
-    const def = out.slice(out.indexOf('[default]'), out.indexOf('[profile a]'))
-    assert.ok(!def.includes('sandbox'), def)
-    assert.ok(out.includes('# the sandbox account\n[profile b]'))
-  })
-
-  it('adds [default] when there is none', () => {
-    const out = makeDefault('[profile a]\nregion = us-east-2\n', 'a', 1)!
-    assert.equal(parseAwsConfig(out).find(x => x.isDefault)?.values.region, 'us-east-2')
-  })
-
-  it('adds a profile once, with its region', () => {
+  it('adds a profile with its region; a taken name keeps its login and takes the new region', () => {
     const out = addProfile(CONFIG, 'new.one', 'ap-southeast-2')!
     assert.equal(parseAwsConfig(out).find(x => x.name === 'new.one')?.values.region, 'ap-southeast-2')
-    assert.equal(addProfile(CONFIG, 'live', 'us-west-1'), undefined)
+    const again = addProfile(CONFIG, 'yo', 'eu-west-2')!
+    const yo = parseAwsConfig(again).filter(x => x.name === 'yo')
+    assert.equal(yo.length, 1)
+    assert.deepEqual(yo[0].values, { region: 'eu-west-2', login_session: ARN('457884741882') })
+    assert.equal(again.replace('eu-west-2', 'us-east-1'), CONFIG)
+    // No region line yet: one goes under the header.
+    assert.deepEqual(parseAwsConfig(addProfile('[profile a]\noutput = json\n', 'a', 'us-east-2')!)[0].values, { region: 'us-east-2', output: 'json' })
+    assert.equal(addProfile(CONFIG, 'default', 'us-west-1'), undefined)
     assert.equal(addProfile(CONFIG, 'bad name', 'us-west-1'), undefined)
     assert.equal(addProfile(CONFIG, 'ok', 'us-west-1; rm'), undefined)
+  })
+
+  it('renames a profile in place and points source_profile at the new name', () => {
+    const text = `${CONFIG}\n# admin role\n[profile admin]\nrole_arn = arn:aws:iam::1:role/A\nsource_profile = yo\n`
+    const out = renameProfile(text, 'yo', 'wardrobe')!
+    assert.deepEqual(parseAwsConfig(out).map(x => x.name), ['default', 'live', 'wardrobe', 'sso', 'admin'])
+    assert.equal(parseAwsConfig(out).find(x => x.name === 'admin')?.values.source_profile, 'wardrobe')
+    assert.equal(out.replace('[profile wardrobe]', '[profile yo]').replace('source_profile = wardrobe', 'source_profile = yo'), text)
+    assert.equal(parseAwsConfig(renameProfile(CONFIG, 'default', 'main')!)[0].name, 'main')
+    for (const [from, to] of [['nope', 'x'], ['yo', 'live'], ['yo', 'bad name'], ['yo', 'default'], ['yo', 'yo']]) assert.equal(renameProfile(CONFIG, from, to), undefined, `${from} -> ${to}`)
+  })
+
+  it('moves Chrome and project picks to a new name; a pick already on the new name wins', () => {
+    const prefs = { chrome: { yo: 'Profile 2', live: '' }, projects: { '/a': 'yo', '/b': 'live' }, browsers: { '/a': 'Default' } }
+    assert.deepEqual(moveProfile(prefs, 'yo', 'wardrobe'), { chrome: { live: '', wardrobe: 'Profile 2' }, projects: { '/a': 'wardrobe', '/b': 'live' }, browsers: { '/a': 'Default' } })
+    assert.deepEqual(moveProfile(prefs, 'yo', 'live').chrome, { live: '' })
+  })
+
+  it('finds a credentials section by its header alone', () => {
+    const creds = '[default]\naws_access_key_id = AKIA\n\n[ wardrobe ]\naws_secret_access_key = x\n# [ghost]\n'
+    assert.equal(hasSection(creds, 'wardrobe'), true)
+    assert.equal(hasSection(creds, 'default'), true)
+    assert.equal(hasSection(creds, 'ghost'), false)
+    assert.equal(hasSection(creds, 'AKIA'), false)
+  })
+
+  it('moves a hand-typed email kept by profile name; by-account ones stay', () => {
+    assert.deepEqual(renameLabel({ 'profile:yo': 'a@x.com', '111122223333': 'b@x.com' }, 'yo', 'sandbox'), { '111122223333': 'b@x.com', 'profile:sandbox': 'a@x.com' })
+    assert.equal(renameLabel({ '111122223333': 'b@x.com' }, 'yo', 'sandbox'), undefined)
+  })
+
+  it('takes the account name and email from what AWS answered, skipping what it refused', () => {
+    assert.deepEqual(identityOf({ AccountAliases: ['armasu'] }, { ContactInformation: { FullName: 'K Kang' } }, { PrimaryEmail: 'k@x.com' }), { name: 'armasu', email: 'k@x.com' })
+    assert.deepEqual(identityOf({ AccountAliases: [] }, { ContactInformation: { CompanyName: 'Armasu' } }, undefined), { name: 'Armasu' })
+    // The company names the account; the contact's own name is the last resort (a root login reports both).
+    assert.deepEqual(identityOf(undefined, { ContactInformation: { FullName: 'Kenneth Kang', CompanyName: ' Armasu ' } }, { PrimaryEmail: 'not an email' }), { name: 'Armasu' })
+    assert.deepEqual(identityOf(undefined, { ContactInformation: { FullName: ' K ' } }, undefined), { name: 'K' })
+    assert.deepEqual(identityOf(undefined, undefined, undefined), {})
   })
 
   it('takes only safe profile names and real-looking regions', () => {
@@ -125,6 +122,12 @@ describe('aws status and helpers', () => {
     assert.equal(profileFor(projects, '/u/GitHub/Armasu/web'), 'yo')
     assert.equal(profileFor(projects, '/u/GitHub/switchboard'), 'live')
     assert.equal(profileFor(projects, '/u/GitHubX'), undefined)
+    // AWS has no default: a '*' entry is never used for a profile.
+    assert.equal(profileFor({ ...projects, '*': 'live' }, '/u/GitHubX'), undefined)
+    // The browser falls back to '*'; a folder's own pick still wins.
+    assert.equal(browserFor({ ...projects, '*': 'Profile 4' }, '/u/GitHubX'), 'Profile 4')
+    assert.equal(browserFor({ ...projects, '*': 'Profile 4' }, '/u/GitHub/Armasu/web'), 'yo')
+    assert.equal(browserFor(projects, '/u/GitHubX'), undefined)
   })
 
   it('finds Chrome\'s Local State on each OS', () => {
@@ -278,7 +281,7 @@ describe('aws session length', () => {
 })
 
 describe('aws status checks', () => {
-  it('skips old default backups and runs two STS calls at a time', async () => {
+  it('runs two STS calls at a time', async () => {
     const config = `${CONFIG}\n[profile previous-default-20261001-1200]\nregion = us-west-1\n[profile extra]\nregion = us-west-2\n`
     const asked: string[] = []
     let open = 0, peak = 0
@@ -290,9 +293,17 @@ describe('aws status checks', () => {
     }
     const rows = await awsProfiles(1, sts, config)
     assert.deepEqual(rows.map(r => r.name), ['default', 'live', 'yo', 'sso', 'previous-default-20261001-1200', 'extra'])
-    assert.ok(!asked.includes('previous-default-20261001-1200'))
-    assert.equal(asked.length, 5)
+    assert.equal(asked.length, 6)
     assert.equal(peak, 2)
-    assert.equal(rows[4].stale, true)
+  })
+})
+
+describe('pages Switchboard opens', () => {
+  it('go through the folder Chrome pick, not openExternal (last used profile)', () => {
+    for (const f of ['hub-panel.ts', 'actions.ts']) {
+      const src = fs.readFileSync(path.join(__dirname, '../src/hub', f), 'utf8')
+      const raw = src.split('\n').filter(l => l.includes('openExternal(') && !l.includes('if (!c)'))
+      assert.deepEqual(raw, [], f)
+    }
   })
 })

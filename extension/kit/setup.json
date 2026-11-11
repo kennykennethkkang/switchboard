@@ -20,13 +20,16 @@
     "humanizer@humanizer",
     "last30days@last30days-skill"
   ],
-  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper", "ecc-agents", "chat-wait", "phone-mode"],
-  "own": ["aar", "deep-research", "animation-styles", "improve-system", "awwwards", "crowd-ab", "self-improve", "gemini", "phone", "accessibility", "click-path-audit", "e2e-testing", "accessible-motion", "hover-interactions", "page-transitions", "scroll-animations"],
+  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper", "ecc-agents", "chat-wait", "phone-mode", "todo-band", "tab-close", "account-guard"],
+  "own": ["aar", "deep-research", "harden", "animation-styles", "improve-system", "awwwards", "crowd-ab", "self-improve", "gemini", "phone", "accessibility", "click-path-audit", "e2e-testing", "accessible-motion", "hover-interactions", "page-transitions", "scroll-animations", "toolchain"],
   "mcps": [
     { "name": "slack", "url": "https://mcp.slack.com/mcp" },
     { "name": "cloudflare", "url": "https://mcp.cloudflare.com/mcp" },
     { "name": "21st", "url": "https://21st.dev/api/mcp", "keyHeader": "x-api-key" },
-    { "name": "perplexity", "command": ["npx", "-y", "@perplexity-ai/mcp-server"], "keyEnv": "PERPLEXITY_API_KEY" }
+    { "name": "perplexity", "command": ["npx", "-y", "@perplexity-ai/mcp-server"], "keyEnv": "PERPLEXITY_API_KEY" },
+    { "name": "firecrawl", "command": ["npx", "-y", "firecrawl-mcp"], "keyEnv": "FIRECRAWL_API_KEY" },
+    { "name": "posthog", "url": "https://mcp.posthog.com/mcp" },
+    { "name": "composio", "url": "https://connect.composio.dev/mcp" }
   ],
   "skills": [
     { "repo": "emilkowalski/skills", "names": ["animate", "animate-expo", "animation-vocabulary", "apple-design", "ask-sonner", "emil-design-eng", "find-animation-opportunities", "improve-animations", "mobile-native", "pick-ui-library", "prototype", "review-animations", "write-swift"] },
@@ -40,5 +43,9 @@
   "tools": [
     { "uv": "scrapling[ai]", "skill": { "repo": "D4Vinci/Scrapling", "path": "agent-skill", "name": "scrapling-official" }, "mcp": { "name": "scrapling", "command": "scrapling-mcp" } },
     { "uv": "agent-reach", "skill": { "repo": "Panniantong/Agent-Reach", "path": "agent_reach", "name": "agent-reach", "file": "SKILL_en.md" } }
+  ],
+  "npm": [
+    { "pkg": "agent-browser", "then": ["agent-browser", "install"] },
+    { "pkg": "agent-desktop", "os": ["darwin", "win32"] }
   ]
 }

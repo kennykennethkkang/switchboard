@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
+import { editorName } from '@/lib/editor'
 import { gearRows, keywordHit, sweepBadge } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
@@ -107,6 +108,7 @@ function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) 
 }
 
 export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number } | null; start?: Section }) {
+  const ed = editorName(hub)
   const [q, setQ] = useState('')
   const [at, setAt] = useState<Section>(start)
   const c = hub.controls.claude
@@ -144,13 +146,13 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
       control: <Switch label="Stop a chat's dev servers when it ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
     { section: 'Chats', label: 'Show agent browsers', hint: 'Browsers agents drive through Playwright open in a window you can see. Off runs them headless, so nothing lands on your screen. Applies to chats started after the change.',
       control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
-    { section: 'Chats', label: 'Pop-up notices in VS Code', hint: 'Done, question, stuck and AWS sign-in notices pop up in VS Code with a button. Off shows them in the status bar; the Mac notice, the Needs you strip and the phone push still come.',
-      control: <Switch label="Pop-up notices in VS Code" on={sb.toasts === true} onChange={next => own('toasts', next)} /> },
+    { section: 'Chats', label: `Pop-up notices in ${ed}`, hint: `Done, question, stuck and AWS sign-in notices pop up in ${ed} with a button. Off shows them in the status bar; the Mac notice, the Needs you strip and the phone push still come.`,
+      control: <Switch label={`Pop-up notices in ${ed}`} on={sb.toasts === true} onChange={next => own('toasts', next)} /> },
     { section: 'Chats', label: 'Ask before actions (Claude)', hint: 'Claude chats ask before running commands and tools. Off runs them without asking and also trusts project MCP servers. Applies to chats started or resumed after the change. Chats you reach from the Claude app (Remote Control) pick it up the next time Remote Control restarts.',
       control: <Switch label="Ask before actions (Claude)" on={!!sb.askClaude} onChange={next => own('askClaude', next)} /> },
     { section: 'Chats', label: 'Ask before actions (Codex)', hint: 'Codex chats ask before running commands, inside its sandbox. Off runs them without asking or a sandbox. Applies to chats started or resumed after the change.',
       control: <Switch label="Ask before actions (Codex)" on={!!sb.askCodex} onChange={next => own('askCodex', next)} /> },
-    { section: 'Chats', label: 'One window', hint: hub.windowTabs?.mac === false ? 'Needs macOS.' : 'Every VS Code window shows as a tab of one window; Merge all, Split all, Show and Pop out sit above the chat list. Quit and reopen VS Code after changing it. Off puts your old setting back.',
+    { section: 'Chats', label: 'One window', hint: hub.windowTabs?.mac === false ? 'Needs macOS.' : `Every ${ed} window shows as a tab of one window; Merge all, Split all, Show and Pop out sit above the chat list. Quit and reopen ${ed} after changing it. Off puts your old setting back.`,
       control: <Switch label="One window" on={!!sb.oneWindow} onChange={next => own('oneWindow', next)} /> },
     { section: 'Chats', label: 'Keep Switchboard app running', hint: 'Starts this Mac\'s Switchboard page again if it stops, waiting longer each time it keeps crashing. Off leaves it stopped.',
       control: <Switch label="Keep Switchboard app running" on={sb.keepApp !== false} onChange={next => own('keepApp', next)} /> },
@@ -163,7 +165,9 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
     { section: 'Chats', label: 'Phone mode', hint: 'Call me instead of asking in chats: questions, stuck and finished chats, and usage pauses and resumes ring your phone.',
       control: <Switch label="Phone mode" on={sb.phone === true} onChange={next => own('phone', next)} /> },
     { section: 'Chats', label: 'Push to your phone', hint: 'When a chat finishes.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
-    ...(alerts ? [{ section: 'Chats' as const, label: 'Phone alerts', hint: alerts === 'hint'
+    ...(alerts ? [{ section: 'Chats' as const, label: 'Phone alerts', hint: alerts === 'https'
+      ? 'Needs HTTPS: turn on HTTPS Certificates on the DNS page of the Tailscale admin console, then open the https link.'
+      : alerts === 'hint'
       ? 'On iPhone, tap Share then Add to Home Screen, open Switchboard from there and turn this on.'
       : 'AWS sign-in heads-ups on this device, even with the app closed.',
       control: alerts === 'switch' ? <PhoneAlerts /> : null }] : []),
@@ -186,7 +190,7 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
 
     { section: 'Integrations', label: 'Hooks', hint: 'Claude Code reports each chat\'s progress to Switchboard. Off removes the hooks from ~/.claude/settings.json.',
       control: <Switch label="Hooks" on={sb.hooks} onChange={next => own('hooks', next)} /> },
-    { section: 'Integrations', label: 'Status bar button', hint: 'The Switchboard button in VS Code\'s status bar.',
+    { section: 'Integrations', label: 'Status bar button', hint: `The Switchboard button in ${ed}'s status bar.`,
       control: <Switch label="Status bar button" on={sb.statusBar} onChange={next => own('statusBar', next)} /> },
     { section: 'Integrations', label: 'Status line', hint: hub.controls.statusLineReady ? undefined : 'Needs claude-mods/kit/statusline.mjs.',
       control: hub.controls.statusLineReady ? <Switch label="Status line" on={c.statusLine} onChange={next => set('statusLine', next)} /> : <span style={{ color: 'var(--hub-ash)', fontSize: 12 }}>Not set up</span> },

@@ -73,7 +73,7 @@ export const cleanSummary = (s: string) => s.trim().replace(DASH, ', ')
 
 export type Runner = (args: string[]) => Promise<string>
 // A cwd under the OS temp dir, so the run never counts as a chat in any project.
-const realRun: Runner = async args => {
+export const realRun: Runner = async args => {
   const cwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'switchboard-summary-'))
   try {
     return await new Promise((resolve, reject) => execFile(claudeBinary(), args, { cwd, timeout: RUN_MS, maxBuffer: 1 << 20, env: learnEnv() },

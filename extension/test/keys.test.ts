@@ -86,7 +86,7 @@ describe('key status', () => {
   it('shows only the last four and the last test, never the key', () => {
     const f = fakeSecurity(), meta = path.join(tmp(), 'keys.json')
     const s = keyStore({ platform: 'darwin', run: f.run })
-    assert.deepEqual(keyStatus(meta), [{ name: 'GEMINI_API_KEY', saved: false }, { name: 'OPENROUTER_API_KEY', saved: false }, { name: 'PERPLEXITY_API_KEY', saved: false }, { name: 'ZEP_API_KEY', saved: false }])
+    assert.deepEqual(keyStatus(meta), [{ name: 'GEMINI_API_KEY', saved: false }, { name: 'OPENROUTER_API_KEY', saved: false }, { name: 'PERPLEXITY_API_KEY', saved: false }, { name: 'FIRECRAWL_API_KEY', saved: false }, { name: 'ZEP_API_KEY', saved: false }])
     saveKey(s, 'GEMINI_API_KEY', ` ${SECRET}\n`, meta)
     assert.equal(f.items.get('GEMINI_API_KEY'), SECRET)
     assert.ok(!fs.readFileSync(meta, 'utf8').includes(SECRET))

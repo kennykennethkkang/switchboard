@@ -5,9 +5,11 @@ import { Switch } from './gear'
 const ios = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 const standalone = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
 
-/** Web app only: the switch when this browser can take Web Push, the Add to Home Screen hint on an iPhone tab, else nothing. */
-export function phoneAlertsShown(): 'switch' | 'hint' | undefined {
+/** Web app only: the switch when this browser can take Web Push, an https note on plain http, the Add to Home Screen hint on an iPhone tab, else nothing. */
+export function phoneAlertsShown(): 'switch' | 'hint' | 'https' | undefined {
   if (process.env.SWITCHBOARD_STANDALONE !== '1' || typeof window === 'undefined') return undefined
+  // Push needs https; the tailnet may only serve http.
+  if (!window.isSecureContext) return 'https'
   if ('PushManager' in window && 'serviceWorker' in navigator) return 'switch'
   return ios() && !standalone() ? 'hint' : undefined
 }

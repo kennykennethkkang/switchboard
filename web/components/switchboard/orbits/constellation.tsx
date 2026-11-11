@@ -254,7 +254,7 @@ export function Constellation(props: ViewProps) {
         <NodeButtons v={props} roles={teamOf(p)} />
       </div>
       <Reveal on={chat.state === 'needs-you'} className="ov-call"><span data-tone="needs"><b>Needs you</b>{p?.question ?? 'This chat is waiting on you.'}</span></Reveal>
-      <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{'Ready to approve'}</b>{p?.commit ? <CommitText text={p.commit} max={180} /> : 'No commit message.'}</span></Reveal>
+      <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{'Ready for your OK'}</b>{p?.commit ? <CommitText text={p.commit} max={180} /> : 'No commit message.'}</span></Reveal>
       <Legend tools={showTools} almost={almost} />
     </div>
   )

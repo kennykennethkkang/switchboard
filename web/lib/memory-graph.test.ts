@@ -1,7 +1,7 @@
 /** The Memory view's helpers: groups, search, neighbors and the sample graph. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { demoGraph, findNodes, groupOf, healthLine, listNodes, neighbors, relations, GROUPS } from './memory-graph'
+import { demoGraph, dolly, findNodes, framePose, graphCounts, groupOf, healthLine, healthParts, listNodes, neighbors, projectOf, relations, GROUPS } from './memory-graph'
 
 test('groups a memory by its type and everything else by its kind', () => {
   assert.equal(groupOf({ id: 'a', kind: 'memory', label: 'a', type: 'feedback' }), 'feedback')
@@ -83,4 +83,67 @@ test('words the health line in singular or plural, leaving out what is zero', ()
   const h = { dangling: ['a'], orphans: ['a', 'b'], duplicates: [], contradictions: [['a', 'b']] as [string, string][], superseded: [], invalid: ['a'], stale: ['a', 'b'] }
   assert.equal(healthLine(h), '1 note with broken links, 2 unlinked notes, 1 contradiction, 1 invalid note, 2 stale notes')
   assert.equal(healthLine({ ...h, dangling: [], orphans: [], contradictions: [], invalid: [], stale: [], duplicates: ['x', 'y'], superseded: ['s'] }), '2 shared names, 1 superseded note')
+})
+
+// Where p lands on screen, -1..1 each way, seen from pos looking at at (y up).
+function ndc(p: { x: number; y: number; z: number }, pos: { x: number; y: number; z: number }, at: { x: number; y: number; z: number }, fov: number, aspect: number) {
+  const f = [at.x - pos.x, at.y - pos.y, at.z - pos.z], fl = Math.hypot(...f), fw = f.map(v => v / fl)
+  const r = [-fw[2], 0, fw[0]], rl = Math.hypot(...r), rw = r.map(v => v / rl)
+  const u = [rw[1] * fw[2] - rw[2] * fw[1], rw[2] * fw[0] - rw[0] * fw[2], rw[0] * fw[1] - rw[1] * fw[0]]
+  const d = [p.x - pos.x, p.y - pos.y, p.z - pos.z], dot = (a: number[]) => a[0] * d[0] + a[1] * d[1] + a[2] * d[2]
+  const t = Math.tan((fov * Math.PI) / 360)
+  return { x: dot(rw) / (dot(fw) * t * aspect), y: dot(u) / (dot(fw) * t) }
+}
+
+test('frames every point inside the fill share of the view, tight on the widest side', () => {
+  const pts = [{ x: -300, y: 10, z: 40 }, { x: 260, y: -50, z: -80 }, { x: 0, y: 120, z: 0 }, { x: 30, y: -90, z: 150 }]
+  for (const [aspect, cam] of [[1176 / 856, { x: 0, y: 0, z: 1000 }], [390 / 500, { x: 700, y: 0, z: 300 }]] as const) {
+    const pose = framePose(pts, cam, 75, aspect, 0.8)!
+    const max = Math.max(...pts.map(p => { const s = ndc(p, pose.pos, pose.at, 75, aspect); return Math.max(Math.abs(s.x), Math.abs(s.y)) }))
+    assert.ok(max <= 0.8 + 1e-9 && max > 0.6, `max ${max}`)
+  }
+  assert.equal(framePose([], { x: 0, y: 0, z: 1 }, 75, 1), undefined)
+})
+
+test('dolly moves the camera toward its target and back, keeping the direction', () => {
+  const at = { x: 10, y: 0, z: 0 }
+  assert.deepEqual(dolly({ x: 10, y: 0, z: 100 }, at, 0.5), { x: 10, y: 0, z: 50 })
+  assert.deepEqual(dolly({ x: 10, y: 0, z: 100 }, at, 2), { x: 10, y: 0, z: 200 })
+})
+
+test('centres the framed points on screen and fills the share on the binding side', () => {
+  const pts = [{ x: -300, y: 10, z: 40 }, { x: 260, y: -50, z: -80 }, { x: 0, y: 120, z: 300 }, { x: 30, y: -90, z: 150 }, { x: 400, y: 200, z: -200 }]
+  for (const [aspect, cam] of [[1176 / 856, { x: 0, y: 0, z: 1000 }], [390 / 600, { x: 700, y: 0, z: 300 }]] as const) {
+    const pose = framePose(pts, cam, 75, aspect, 0.8)!
+    const s = pts.map(p => ndc(p, pose.pos, pose.at, 75, aspect))
+    const xs = s.map(p => p.x), ys = s.map(p => p.y)
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+    const ex = (Math.max(...xs) - Math.min(...xs)) / 2, ey = (Math.max(...ys) - Math.min(...ys)) / 2
+    assert.ok(Math.abs(cx) < 0.02 && Math.abs(cy) < 0.02, `centre ${cx} ${cy}`)
+    assert.ok(Math.abs(Math.max(ex, ey) - 0.8) < 0.02, `fill ${ex} ${ey}`)
+  }
+})
+
+test('puts superseded notes last in search and the list, the list by project', () => {
+  const g = demoGraph()
+  const proj = projectOf(g)
+  assert.equal(proj.get('m:recall'), 'switchboard')
+  assert.equal(proj.get('m:logo'), 'Armasu')
+  assert.equal(proj.get('rule:global'), undefined)
+  const hits = findNodes([{ id: 'a', kind: 'memory', label: 'ask-old', superseded: true }, { id: 'b', kind: 'memory', label: 'ask-new-longer' }], 'ask', new Set())
+  assert.deepEqual(hits.map(h => h.id), ['b', 'a'])
+  const rows = listNodes(g.nodes.filter(n => n.type === 'project'), '', new Set(), proj)
+  assert.deepEqual(rows.map(n => n.id), ['m:logo', 'm:vision', 'm:recall', 'm:askall'])
+})
+
+test('counts notes and only the links notes make', () => {
+  assert.deepEqual(graphCounts(demoGraph()), { notes: 10, links: 9 })
+})
+
+test('splits the health line into parts holding the node ids to show', () => {
+  const g = demoGraph()
+  const parts = healthParts({ ...g.health, duplicates: ['recall-tool'] }, g.nodes)
+  assert.deepEqual(parts.map(p => p.text), ['1 note with broken links', '1 unlinked note', '1 shared name', '1 contradiction', '1 superseded note'])
+  assert.deepEqual(parts.find(p => p.text === '1 contradiction')!.ids, ['m:nograph', 'm:recall'])
+  assert.deepEqual(parts.find(p => p.text === '1 shared name')!.ids, ['m:recall'])
 })

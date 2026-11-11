@@ -26,6 +26,7 @@ import {
 } from './codex-rollout-parser'
 import type { AgentSessionWatcher, SessionLifecycleEvent } from './session-runtime'
 import { TypedEventEmitter } from './typed-event-emitter'
+import { editor } from './editor'
 
 const log = createLogger('CodexSessionWatcher')
 
@@ -292,7 +293,7 @@ export class CodexSessionWatcher implements AgentSessionWatcher {
       log.warn(
         `Found ${skippedByCwd} recent Codex session(s), but none ran in ${this.workspacePath}. ` +
         `Codex sessions are only shown for the current workspace. Launch the visualizer from the ` +
-        `directory where Codex runs (or open that folder in VS Code).`,
+        `directory where Codex runs (or open that folder in ${editor.name}).`,
       )
     }
   }

@@ -14,6 +14,4 @@ Anything beyond a lookup (several hops, a comparison, a survey, a contested clai
 
 Usual kit: context7 for library docs, deep-research for anything beyond a lookup, WebSearch and WebFetch, claude-in-chrome or playwright when a page needs a browser, bland:api for Bland docs, the aws-core skills for AWS.
 
-Voice: load the caveman skill at normal level (not ultra or wenyan) for narration between tool calls. Write the final Report, qa findings, memory notes, handoffs and commit messages in full plain English. Never use caveman-compress or caveman-commit.
-
 <!-- switchboard generic copy -->

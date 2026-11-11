@@ -38,23 +38,23 @@ export type Server = { pid: number; command: string; port: number; folder: strin
 export type DevProject = { folder: string; project: string; /** projectName(folder), for the project filter; project stays the terminal's key. */ repo: string; command: string; port?: number; link?: string }
 export type GitState = { branch?: string; ahead?: number; behind?: number; changed: number; staged: number; untracked: number }
 export type AwsStatus = 'signed-in' | 'expired' | 'never'
-/** One ~/.aws/config profile. label: from aws-labels.json, by account. chrome: the Chrome profile folder its sign-in opens in ('' = system browser). stale: an old default's backup. */
-export type AwsProfile = { name: string; label?: string; account?: string; region?: string; isDefault: boolean; status: AwsStatus; chrome?: string; checkedAt: number; stale?: boolean; /** Signs in as the account root (aws login): AWS sets the session length, no way to extend it. */ root?: boolean; /** When the aws login session ends at the latest (sign-in + 12 h). */ expiresAt?: number; /** The last check could not tell (timeout, network), so status may be stale. */ unsure?: boolean }
+/** One ~/.aws/config profile; its name is the user's nickname. label: the email set by hand (aws-labels.json, by account). who, email: what AWS said at the last sign-in (aws-identity.json, by account). chrome: the Chrome profile folder its sign-in opens in ('' = system browser). */
+export type AwsProfile = { name: string; label?: string; who?: string; email?: string; account?: string; region?: string; status: AwsStatus; chrome?: string; checkedAt: number; /** Signs in as the account root (aws login): AWS sets the session length, no way to extend it. */ root?: boolean; /** When the aws login session ends at the latest (sign-in + 12 h). */ expiresAt?: number; /** The last check could not tell (timeout, network), so status may be stale. */ unsure?: boolean }
 export type ChromeProfile = { dir: string; name: string; email?: string }
 /** Chrome profiles to sign in with, the AWS profile picked per project folder, and this window's folder. */
 /** A saved web login: only where to sign in and in which Chrome profile, never a password or token. */
-export type WebLogin = { id: string; label: string; url: string; chrome?: string }
+export type WebLogin = { id: string; label: string; url: string; chrome?: string; /** Who it signs in as, typed by the user. */ email?: string; /** A tenant a CLI login added (Auth0): commands run with --tenant <domain>. */ domain?: string; /** A CLI tenant's last check, as for AWS. */ status?: AwsStatus }
 /** A web app with its saved logins (~/.claude/switchboard/logins.json); url is where a new login starts. */
-export type WebApp = { id: string; name: string; url: string; logins: WebLogin[]; active?: string }
-/** Apps a project uses, by project folder then app id; the login id is that project's default, null = the app's own. */
-export type Links = Record<string, Record<string, string | null>>
-export type ApiKeyName = 'GEMINI_API_KEY' | 'OPENROUTER_API_KEY' | 'PERPLEXITY_API_KEY' | 'ZEP_API_KEY'
+export type WebApp = { id: string; name: string; url: string; logins: WebLogin[]; active?: string; /** Sign in runs the app's CLI login (cli-logins.ts), which adds its tenants. */ cli?: boolean }
+/** Apps a project uses, by project folder then app id, then the login it picked. */
+export type Links = Record<string, Record<string, string>>
+export type ApiKeyName = 'GEMINI_API_KEY' | 'OPENROUTER_API_KEY' | 'PERPLEXITY_API_KEY' | 'FIRECRAWL_API_KEY' | 'ZEP_API_KEY'
 /** A saved API key as the UI sees it: never the key, only its last four. checked: the last live test. */
 /** What a .env setup did: names only, never a value. key is the saved key a missing name needs. */
 export type EnvSetup = { folder: string; file: string; filled: string[]; kept: string[]; missing: Array<{ name: string; key?: ApiKeyName }>; at: number }
 export type ApiKey = { name: ApiKeyName; saved: boolean; last4?: string; checked?: { ok: boolean; at: number; reason?: string } }
 /** apps, links, keys: an older extension sends none. */
-export type SignIns = { chrome: ChromeProfile[]; projects: Record<string, string>; window?: string; apps?: WebApp[]; links?: Links; /** Chrome folder per project folder, '' Chrome's last used profile; a login's own pick wins. */ browsers?: Record<string, string>; keys?: ApiKey[]; envSetup?: EnvSetup; /** The last failed sign-in per row (aws:<profile>, login:<app>:<id>), redacted. */ errors?: Record<string, string>; /** Per row: the Chrome pick a sign-in skipped for being deleted, and where it opened instead. */ notes?: Record<string, string> }
+export type SignIns = { chrome: ChromeProfile[]; projects: Record<string, string>; window?: string; apps?: WebApp[]; links?: Links; /** Chrome folder per project folder, '' Chrome's last used profile; a login's own pick wins. */ browsers?: Record<string, string>; keys?: ApiKey[]; envSetup?: EnvSetup; /** The last failed sign-in per row (aws:<profile>, login:<app>:<id>), redacted. */ errors?: Record<string, string>; /** Per row: the Chrome pick a sign-in skipped for being deleted, and where it opened instead. */ notes?: Record<string, string>; /** Web apps with a CLI login running (cli-logins.ts); their Sign in waits for it. */ busy?: string[] }
 /** One Jev run from the usage mod, tied to the chat that ran it when known. */
 export type JevRun = { sessionId?: string; preset?: string; items: number; costUsd: number; seconds: number; at: number }
 /** Set up Jev's jobs for one project, its newest runs (gate: one command each) and what those runs cost. */
@@ -64,6 +64,8 @@ export type MirofishState = { simId: string; step: 'rounds' | 'report' | 'done';
 export type HandoffWait = { sessionId: string; tasks: number; next: string; since: number }
 /** One chat waiting on others (chat-wait mod or a card). auto: an edit clash, reason is the file path; since: epoch ms. */
 export type ChatLink = { from: string; to: string[]; reason: string; auto: boolean; since: number }
+/** Kenneth removed `to` from `from`'s wait at `at`; kept five minutes so the waiting chat can tell it from a link gone missing. */
+export type ChatUnlink = { from: string; to: string; at: number }
 /** skills: a plugin's own skill names. model: a role's frontmatter model (inherit, an alias or a full id). description: plugin.json's or SKILL.md's, cut short. */
 /** asset: a design reference in the project; path is relative to the project folder. */
 /** provider: the tool's own prepaid credit caps it; cap: Switchboard's monthly dollar cap; ask: every call. */
@@ -89,7 +91,7 @@ export type SweepRecord = SweepVerdict & { kind: 'plugin' | 'skill'; path: strin
 export type SweepReview = { verdict: 'APPROVE' | 'CAUTION' | 'REJECT'; why: string; at: number; digest: string }
 export type Connection = { kind: 'mcp' | 'app' | 'project' | 'window' | 'repo'; name: string; status: 'on' | 'off' | 'error'; detail?: string }
 
-/** what: one line, e.g. "1 applied, 2 proposed" or "aar on agent-flow chat 1a2b3c4d". */
+/** what: one line, e.g. "1 applied, 2 proposed" or "aar on switchboard chat 1a2b3c4d". */
 export type LearnRun = { at: number; kind: 'improve' | 'aar'; what: string }
 /** A self-improve run that passed the gate, waiting on Kenneth's Approve. target: path in claude-mods; before, after: held-out pass rates. */
 export type LearnReady = { id: string; target: string; before: number; after: number; diff: string }
@@ -110,6 +112,7 @@ export type HubState = {
   jev: JevRun[]
   waits: HandoffWait[]
   links?: ChatLink[]
+  unlinks?: ChatUnlink[]
   installed: Installed[]
   connections: Connection[]
   rc: { atStartup: boolean; requestedAt?: number }
@@ -166,8 +169,12 @@ export type HubState = {
   devices?: DeviceAsk[]
   /** Every open VS Code window and its color; an older extension sends none. */
   windows?: WindowInfo[]
+  /** The running editor's name (vscode.env.appName, "Visual Studio Code" shortened); an older extension sends none. */
+  editor?: string
   /** The workspace of the window showing the panel; /hub/state leaves it out. */
   thisWindow?: string
+  /** The window focused last, from any window; the browser app's Plan page follows it. */
+  lastWindow?: string
   /** mac: native tabs can work here; live: nativeTabs was on when this window started, so the tab commands do something. */
   windowTabs?: { mac: boolean; live: boolean }
   /** The Git panel's repo: the one holding the chat hub-changes asked for. */
@@ -216,6 +223,8 @@ export type RepoView = {
   /** Every finished chat's message since the last commit, merged, plus a bullet for files none named. last: the newest one's summary; at: when it last grew. */
   pending?: { text: string; last: string; at: number }
   busy?: GitOp | 'harden'; result?: { text: string; ok: boolean; at: number }; at: number
+  /** Write commit message (hub-draft-commit), per repo: busy while Haiku writes, then the text or an error. box: what Source Control got (typed: Kenneth's text kept; missing: no box in this window). */
+  draft?: { busy?: boolean; text?: string; error?: string; box?: 'filled' | 'typed' | 'missing'; at: number }
 }
 export type LaneCommit = { hash: string; author: string; at: number; subject?: string; side?: 'head' | 'base' | 'fork' }
 export type CiRun = { id: number; workflow: string; status: string; conclusion?: string; url: string; sha: string; at: number; jobs: { name: string; status: string; conclusion?: string; step?: string }[] }
@@ -283,12 +292,14 @@ export type JarvisReply = { q: string; at: number; busy?: true; answer?: string;
 /** Why a chat left something: blocked, needs Kenneth (you), out of scope, later, or a request Jev found not covered (missed). */
 export type TodoWhy = 'blocked' | 'you' | 'scope' | 'later' | 'missed'
 /** from: the chat that added it; name: that chat's name when it was added; why: set on what a finished chat left. */
-export type TodoItem = { id: string; text: string; at: number; chat?: string; /** The machine that started chat. */ host?: string; from?: string; before?: string; name?: string; why?: TodoWhy }
+export type TodoItem = { id: string; text: string; at: number; chat?: string; /** The machine that started chat. */ host?: string; from?: string; before?: string; name?: string; why?: TodoWhy; /** To-do N: the run that started it. */ run?: number; /** Started by the autopilot, not Start. */ auto?: true; /** Its chat died before finishing (clearGone); auto-start skips it until Start again. */ stopped?: true }
 /** How a project's lists sync: synced (private repo or opted in), local only (why), or failing (the last error). canSync: a git repo with an origin. remote: the unreadable remote list's commit, which Replace leases on. */
 export type TodoSync = { state: 'synced' | 'local' | 'failing'; why?: string; canSync?: boolean; optIn?: boolean; remote?: string }
 /** A finished item (by: the chat that finished it, none when the user did), kept so the user can put it back. */
-export type TickedItem = Pick<TodoItem, 'id' | 'text' | 'at' | 'from' | 'before' | 'name' | 'why'> & { by?: string }
-export type TodoList = { todo: TodoItem[]; sync?: TodoSync; /** Newest first, at most 10. */ ticked?: TickedItem[]; /** Left by finished chats, waiting for Accept or Dismiss; an older extension sends none. */ suggested?: TodoItem[]; /** How many the last prune cleared (repeats, stale suggestions); their text is gone. */ cleared?: number }
+export type TickedItem = Pick<TodoItem, 'id' | 'text' | 'at' | 'from' | 'before' | 'name' | 'why' | 'run' | 'auto'> & { by?: string }
+export type TodoList = { todo: TodoItem[]; sync?: TodoSync; /** Newest first, at most 10. */ ticked?: TickedItem[]; /** Left by finished chats, waiting for Accept or Dismiss; an older extension sends none. */ suggested?: TodoItem[]; /** How many the last prune cleared (repeats, stale suggestions); their text is gone. */ cleared?: number; pilot?: TodoPilot; /** The last run number. */ seq?: number; /** The first run number of the current chain; none once the queue went empty. */ streak?: number; /** What auto-start runs next (todo.ts upcoming); an older extension sends none. */ plan?: { runs: Array<{ n: number; ids: string[] }>; held: Array<{ id: string; why: 'blocked' | 'you' | 'stopped' }> } }
+/** The project's autopilot: on unset follows the global Auto-start; paused holds new starts, running chats go on. The newest at wins a merge. */
+export type TodoPilot = { on?: boolean; paused?: boolean; at: number }
 /** todo.json on refs/switchboard/todo; removed: tombstones by id (`<id>.back` for a ticked item put back), kept so a merge never brings one back. */
 export type TodoDoc = TodoList & { version: 1; removed: Record<string, number>; /** The last drag in the panel; the newer one wins a merge. */ order?: { ids: string[]; at: number } }
 /** One AskUserQuestion question; options in the terminal's order. */

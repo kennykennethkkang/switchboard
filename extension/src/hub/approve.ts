@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { closeChatTerminal } from './ais'
+import { CHAT_PREFIX } from './terminal-tags'
 import type { ChatProgress, DoneCheck } from './types'
 
 const DONE_CHECK = path.join(os.homedir(), '.claude', 'switchboard', 'done-check')
@@ -19,6 +20,12 @@ export function readDoneCheck(sessionId: string, dir = DONE_CHECK): DoneCheck | 
     const missing = Array.isArray(raw.missing) ? raw.missing.filter((m): m is string => typeof m === 'string').map(m => m.slice(0, 200)).slice(0, 20) : []
     return { verified: raw.verified, ...(missing.length ? { missing } : {}) }
   } catch { return undefined }
+}
+
+/** History's approve fields. Read from the file: a chat approved through the closing question is needs-you, then working, never done. */
+export function approvedFields(sessionId: string, commit?: string, now = Date.now(), dir = DONE_CHECK): { approvedAt: number; commit?: string; doneCheck?: DoneCheck } {
+  const doneCheck = readDoneCheck(sessionId, dir)
+  return { approvedAt: now, ...(commit ? { commit } : {}), ...(doneCheck ? { doneCheck } : {}) }
 }
 
 /** The kit rule's closing question (claude-mods kit/rules.md); any other Approve answer is not this. */
@@ -46,19 +53,25 @@ export function closingApprove(payload: Record<string, unknown>): boolean {
   if (!answers || typeof answers !== 'object' || !Array.isArray(qs)) return false
   return qs.some(q => {
     const { question, options } = (q ?? {}) as { question?: unknown; options?: unknown }
-    if (typeof question !== 'string' || !question.includes(APPROVE_QUESTION) || !Array.isArray(options)) return false
-    const labels = options.map(o => (o as { label?: unknown })?.label)
-    return labels.length === APPROVE_OPTIONS.length && APPROVE_OPTIONS.every((l, i) => labels[i] === l) && String(answers[question] ?? '').trim() === 'Approve'
+    if (!Array.isArray(options)) return false
+    return isClosing(question, options.map(o => (o as { label?: unknown })?.label)) && String(answers[question as string] ?? '').trim() === 'Approve'
   })
 }
+
+const isClosing = (question: unknown, labels: unknown[]) => typeof question === 'string' && question.includes(APPROVE_QUESTION)
+  && labels.length === APPROVE_OPTIONS.length && APPROVE_OPTIONS.every((l, i) => labels[i] === l)
+
+/** Chats that show the done-check stamp: done ones, and ones whose open prompt is the closing question. */
+export const stampedChats = (progress: ChatProgress[]) => progress.filter(p => p.state === 'done'
+  || (p.state === 'needs-you' && p.ask?.kind === 'question' && !p.ask.sub && !!p.ask.questions?.some(q => isClosing(q.question, q.options)))).map(p => p.sessionId)
 
 /** The closing question came back Approve and nothing live is left. The question itself puts the chat in needs-you. */
 export const approvedAnswer = (payload: Record<string, unknown>, chat?: ChatProgress, now = Date.now()) => closingApprove(payload) && !approvalBlock(chat, now)
 
 export { isTempDir } from './temp'
 
-/** By name, for callers without the owner map (terminals.ts): actions.ts names chat terminals `Claude: ...` or `Codex: ...`. */
-export const ourTerminal = (t: { name: string }) => /^(Claude|Codex): /.test(t.name)
+/** By name, for callers without the owner map (terminals.ts): actions.ts names chat terminals `Claude Code: ...` or `Codex: ...`. */
+export const ourTerminal = (t: { name: string }) => CHAT_PREFIX.test(t.name)
 
 type Term = { name: string; processId: Thenable<number | undefined>; dispose(): void }
 /** Disposes the Switchboard terminal of each approved chat process once it exits; how many closed. isOurs: hub-panel passes the owner map. */

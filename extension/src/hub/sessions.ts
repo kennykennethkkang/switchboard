@@ -24,10 +24,13 @@ export function newer(a: string, b: string): boolean {
   return false
 }
 
-export function chatRows(files: Record<string, unknown>[], alive: (pid: number) => boolean, now = Date.now()): ChatRow[] {
+/** started: whether the session has a prompt in its transcript yet. */
+export function chatRows(files: Record<string, unknown>[], alive: (pid: number) => boolean, now = Date.now(), started: (f: { sessionId: string; cwd: string }) => boolean = () => true): ChatRow[] {
   const all = files.flatMap(f => {
     const pid = f.pid, sessionId = str(f.sessionId)
     if (typeof pid !== 'number' || !sessionId) return []
+    // sdk-cli without a bridge is a headless `claude -p` (bench runs); with one but nothing said yet, Remote Control's idle standby.
+    if (f.entrypoint === 'sdk-cli' && (!str(f.bridgeSessionId) || !started({ sessionId, cwd: str(f.cwd) ?? '' }))) return []
     const updatedAt = typeof f.updatedAt === 'number' ? f.updatedAt : undefined
     return [{ pid, sessionId, name: str(f.name), cwd: str(f.cwd) ?? '', status: str(f.status), version: str(f.version), kind: str(f.kind), updatedAt, bridgeId: str(f.bridgeSessionId), live: alive(pid) }]
   })
@@ -98,5 +101,9 @@ export async function readChats(): Promise<ChatRow[]> {
     if (!/^\d+\.json$/.test(n)) continue
     try { files.push(JSON.parse(await fs.promises.readFile(path.join(DIR, n), 'utf8'))) } catch { /* mid-write */ }
   }
-  return chatRows(files, alive)
+  return chatRows(files, alive, Date.now(), hasTranscript)
+}
+
+const hasTranscript = ({ sessionId, cwd }: { sessionId: string; cwd: string }) => {
+  try { return fs.statSync(path.join(os.homedir(), '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'), `${sessionId}.jsonl`)).size > 0 } catch { return false }
 }

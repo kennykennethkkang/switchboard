@@ -122,7 +122,7 @@ describe('transcript aggregation', () => {
     assert.ok(one.edges.some(e => e.to === 'f:src/a.ts' && e.kind === 'touched'))
     assert.equal(await buildFlowMap(proj, {}, [proj], home), one)
     fs.appendFileSync(path.join(dir, 's1.jsonl'), `${tool('Skill', { skill: 'ponytail' })}\n`)
-    fs.utimesSync(path.join(dir, 's1.jsonl'), new Date(), new Date(Date.now() + 5000))
+    fs.utimesSync(path.join(dir, 's1.jsonl'), new Date(), new Date(Date.now() + 6 * 60_000))
     assert.ok((await buildFlowMap(proj, {}, [proj], home)).nodes.some(n => n.id === 'skill:ponytail'))
     await assert.rejects(buildFlowMap('relative/path', {}, [proj], home))
     fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(proj, { recursive: true, force: true })
@@ -233,5 +233,63 @@ describe('qa fixes', () => {
     assert.equal(code.cut, true)
     assert.equal(code.files.size, 0)
     fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('nests folders by full path, with a node for every ancestor', async () => {
+    const root = tmp()
+    put(root, 'a.ts', '')
+    put(root, 'app/page.ts', '')
+    put(root, 'app/api/admin/users/route.ts', '')
+    const map = assemble('p', await scanCode(root), [])
+    const folder = (id: string) => map.nodes.find(n => n.id === id)
+    assert.equal(folder('f:app/api/admin/users/route.ts')?.folder, 'd:app/api/admin/users')
+    assert.equal(folder('f:a.ts')?.folder, 'd:.')
+    assert.equal(folder('d:app')?.folder, undefined)
+    assert.equal(folder('d:app/api')?.folder, 'd:app')
+    assert.equal(folder('d:app/api/admin')?.folder, 'd:app/api')
+    assert.equal(folder('d:app/api/admin/users')?.folder, 'd:app/api/admin')
+    assert.equal(folder('d:.')?.folder, undefined)
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('names a chat by its title record, never a skill load or meta line', () => {
+    const user = (content: string, extra = {}) => JSON.stringify({ type: 'user', ...extra, message: { content } })
+    const w = newWork('s')
+    for (const l of [user('Base directory for this skill: /Users/k/.claude/skills/x', { isMeta: true }), user('<system-reminder>x</system-reminder>'), user('Base directory for this skill: /Users/k/y')]) addLine(w, l, '/p')
+    assert.equal(w.label, undefined)
+    addLine(w, user('Fix the code map so deep folders nest and chat names read like titles instead of prompts'), '/p')
+    assert.equal((w.label as string | undefined)?.length, 60)
+    addLine(w, JSON.stringify({ type: 'ai-title', aiTitle: 'Code map fixes', sessionId: 's' }), '/p')
+    assert.equal(assemble('p', { files: new Map(), folders: new Map(), imports: new Map(), cut: false }, [w]).nodes[0].label, 'Code map fixes')
+    addLine(w, JSON.stringify({ type: 'custom-title', customTitle: 'agent-flow · map v2', sessionId: 's' }), '/p')
+    assert.equal(w.title, 'agent-flow · map v2')
+    const s = { chats: [{ sessionId: 'a', name: 'Base directory for this skill: /Users/k' }], archive: [] } as unknown as Parameters<typeof flowLabels>[0]
+    assert.deepEqual(flowLabels(s), {})
+  })
+
+  it('serves the cache while a running chat keeps writing inside the same 5 minutes', async () => {
+    const home = tmp(), proj = tmp()
+    put(proj, 'a.ts', '')
+    const t = path.join(home, '.claude', 'projects', slugOf(proj), 's.jsonl')
+    put(path.dirname(t), 's.jsonl', '{}\n')
+    const bucket = Math.floor(Date.now() / 300_000) * 300_000
+    fs.utimesSync(t, new Date(), new Date(bucket + 1000))
+    const one = await buildFlowMap(proj, {}, [proj], home)
+    fs.utimesSync(t, new Date(), new Date(bucket + 2000))
+    assert.equal(await buildFlowMap(proj, {}, [proj], home), one)
+    fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(proj, { recursive: true, force: true })
+  })
+
+  it('leaves out a project folder that holds other projects', () => {
+    const state = { projects: [{ path: '/u/GitHub' }, { path: '/u/GitHub/a' }, { path: '/u/GitHub/b' }, { path: '/x' }, { path: '/u/GitHubby' }] } as unknown as Parameters<typeof flowRoots>[0]
+    assert.deepEqual(flowRoots(state), ['/u/GitHub/a', '/u/GitHub/b', '/x', '/u/GitHubby'])
+  })
+
+  it('keeps a parent project that is a git repo itself', () => {
+    const repo = tmp()
+    fs.mkdirSync(path.join(repo, '.git'))
+    const state = { projects: [{ path: repo }, { path: path.join(repo, 'web') }] } as unknown as Parameters<typeof flowRoots>[0]
+    assert.deepEqual(flowRoots(state), [repo, path.join(repo, 'web')])
+    fs.rmSync(repo, { recursive: true, force: true })
   })
 })

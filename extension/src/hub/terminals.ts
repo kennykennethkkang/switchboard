@@ -2,17 +2,15 @@
 import * as vscode from 'vscode'
 import { hub } from './hub-service'
 import { chatTerminal } from './ais'
-import { ANSI, TerminalTags } from './terminal-tags'
+import { ANSI, restoredOurs, TerminalTags } from './terminal-tags'
 import type { ChatRow } from './types'
+import { editor } from '../editor'
 
 const ICON = 'radio-tower'
 export const tags = new TerminalTags<vscode.Terminal>()
 
-// Our icon survives a reload in creationOptions, so restored chat terminals stay ours.
-const ours = (t: vscode.Terminal) => {
-  const icon = (t.creationOptions as vscode.TerminalOptions).iconPath
-  return icon instanceof vscode.ThemeIcon && icon.id === ICON
-}
+// Restored chat terminals stay ours; instanceof ThemeIcon failed for them, so Approve left them open.
+const ours = (t: vscode.Terminal) => restoredOurs((t.creationOptions as vscode.TerminalOptions).iconPath, t.name, ICON)
 
 /** createTerminal for a chat, tagged switchboard. prefix: the AI's name in front of the chat's. */
 export function openChatTerminal(o: vscode.TerminalOptions, prefix: string, sessionId?: string): vscode.Terminal {
@@ -54,6 +52,7 @@ async function renameActive(t: vscode.Terminal | undefined, chats: ChatRow[] = h
 export async function syncTerminals(chats: ChatRow[]): Promise<void> {
   // ponytail: a ps per unbound live chat per refresh; cache misses if it ever shows up.
   await tags.bindLive(chats, pid => chatTerminal(pid, vscode.window.terminals))
+  tags.closeEnded(chats, new Map(hub.get().archive.flatMap(a => a.approvedAt ? [[a.sessionId, a.approvedAt] as const] : [])))
   await renameActive(vscode.window.activeTerminal, chats)
   post()
 }
@@ -63,7 +62,7 @@ export function terminalAction(id: number, act: 'show' | 'close'): string | unde
   const t = tags.find(id)
   if (!t) return 'that terminal is gone'
   if (act === 'show') { t.show(); return undefined }
-  if (tags.ownerOf(t) !== 'switchboard') return 'that terminal is yours; close it in VS Code'
+  if (tags.ownerOf(t) !== 'switchboard') return `that terminal is yours; close it in ${editor.name}`
   t.dispose()
   return undefined
 }

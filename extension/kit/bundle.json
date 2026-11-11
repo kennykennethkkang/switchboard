@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "2026-11-08T21:15:12Z",
+  "rulesVersion": "2026-11-10T21:27:10Z",
   "generic": true,
   "history": {
     "Explore.md": [
@@ -7,7 +7,8 @@
       "24699a382056",
       "61c8141de6af",
       "717dfab6596e",
-      "fc7fa3ca3d31"
+      "fc7fa3ca3d31",
+      "816f83f07288"
     ],
     "designer.md": [
       "df4330c3a43e",
@@ -17,7 +18,8 @@
       "88a01507fd64",
       "5de1b97d0cf7",
       "ffd0c563be7b",
-      "cc74731f66e0"
+      "cc74731f66e0",
+      "b89e4d21fec9"
     ],
     "engineer.md": [
       "f067ddefd984",
@@ -25,21 +27,27 @@
       "6a39eb7a8428",
       "3819b293ec9b",
       "47e0d611aa7e",
-      "a3a7d95275fc"
+      "a3a7d95275fc",
+      "d60e6f8fe280",
+      "714a3380f6ff",
+      "48e0de755291"
     ],
     "growth.md": [
       "8f83534c5908",
       "6e58bbe4e024",
       "f62a5fd41b67",
       "9dfd56abdf33",
-      "e7005aaa8a6c"
+      "e7005aaa8a6c",
+      "d5222fbd985a"
     ],
     "ops.md": [
       "edeaaf2febe5",
       "37dc9bb5ef37",
       "bed25bdac5c0",
       "76cc35b0954a",
-      "4f94a872479e"
+      "4f94a872479e",
+      "5bc596000b3c",
+      "f0eefc63ed0f"
     ],
     "qa.md": [
       "116e389dea0a",
@@ -48,7 +56,10 @@
       "b4d5643bc759",
       "165fe1930f86",
       "a15817f87eee",
-      "4234bd9c76d8"
+      "4234bd9c76d8",
+      "b7348c2fe7a1",
+      "fb2edb935db7",
+      "bfc8543ee018"
     ],
     "researcher.md": [
       "ab8bfc5bda95",
@@ -56,7 +67,8 @@
       "a2c1672db161",
       "2960775433ea",
       "ad81738693bc",
-      "b4339eadf6f2"
+      "b4339eadf6f2",
+      "d090ba6073ba"
     ],
     "engineer-codex.md": [
       "00fb5490c78f"

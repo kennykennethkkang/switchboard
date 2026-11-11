@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { approvalBlock, approvedAnswer, closeApproved, LIVE_SUB_MS, isTempDir, ourTerminal, readDoneCheck } from '../src/hub/approve'
+import { approvalBlock, approvedAnswer, approvedFields, closeApproved, LIVE_SUB_MS, isTempDir, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
 import { HubService } from '../src/hub/hub-service'
 import type { ChatProgress } from '../src/hub/types'
 
@@ -65,6 +65,9 @@ describe('isTempDir', () => {
   it('matches tmp, private tmp, var folders and scratchpads', () => {
     for (const p of ['/tmp/x', '/private/tmp/claude-501/proj/abc/scratchpad', '/var/folders/zz/T/bench', '/private/var/folders/zz/T/bench', path.join(os.tmpdir(), 'run')]) assert.equal(isTempDir(p), true, p)
   })
+  it('matches the temp folder itself (Codex runs in /private/tmp)', () => {
+    for (const p of ['/tmp', '/private/tmp', '/tmp/', os.tmpdir()]) assert.equal(isTempDir(p), true, p)
+  })
   it('leaves real projects alone', () => {
     for (const p of ['/Users/k/Documents/GitHub/agent-flow', '/Users/k/tmpfiles', '/Users/k/tmp', '/Users/k/tmp/myapp', '/Users/k/var/folders/x/']) assert.equal(isTempDir(p), false, p)
   })
@@ -93,6 +96,79 @@ describe('HubService temp filter', () => {
     hub.hook({ ...base, session_id: 's3' })
     assert.deepEqual(got, ['s1'])
   })
+  it('fires onApproved again at the Stop after an in-chat Approve, so the now idle chat closes', () => {
+    const hub = new HubService()
+    const got: { id: string; state?: string }[] = []
+    hub.onApproved(id => got.push({ id, state: hub.get().progress.find(p => p.sessionId === id)?.state }))
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const cwd = '/Users/k/proj'
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'a1', cwd, prompt: 'go' })
+    hub.hook({ hook_event_name: 'PreToolUse', session_id: 'a1', cwd, tool_name: 'AskUserQuestion', tool_input: input })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'a1', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Approve' } } })
+    assert.equal(got.length, 1)
+    assert.equal(got[0].state, 'needs-you')
+    hub.hook({ hook_event_name: 'Stop', session_id: 'a1', cwd, last_assistant_message: 'done' })
+    assert.equal(got.length, 2)
+    assert.ok(got[1].state === 'done' || got[1].state === 'idle', got[1].state)
+    // Only once: a later Stop is an ordinary turn.
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'a1', cwd, prompt: 'more' })
+    hub.hook({ hook_event_name: 'Stop', session_id: 'a1', cwd, last_assistant_message: 'ok' })
+    assert.equal(got.length, 2)
+  })
+  it('closes at the Stop after Approve even when a background job keeps the chat marked working', () => {
+    const hub = new HubService()
+    const got: string[] = []
+    hub.onApproved(id => got.push(id))
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const cwd = '/Users/k/proj'
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'j1', cwd, prompt: 'go' })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'j1', cwd, tool_name: 'Bash', tool_use_id: 't1', tool_input: { command: 'sleep 999', run_in_background: true, description: 'wait' }, tool_response: { backgroundTaskId: 'b1' } })
+    hub.hook({ hook_event_name: 'PreToolUse', session_id: 'j1', cwd, tool_name: 'AskUserQuestion', tool_input: input })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'j1', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Approve' } } })
+    hub.hook({ hook_event_name: 'Stop', session_id: 'j1', cwd, last_assistant_message: 'done' })
+    const p = hub.get().progress.find(x => x.sessionId === 'j1')!
+    assert.equal(p.state, 'working')
+    assert.equal(p.waiting, true)
+    assert.equal(got.length, 2)
+  })
+  it('drops the close when the chat is sent back instead', () => {
+    const hub = new HubService()
+    const got: string[] = []
+    hub.onApproved(id => got.push(id))
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const cwd = '/Users/k/proj'
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'b1', cwd, prompt: 'go' })
+    hub.hook({ hook_event_name: 'PreToolUse', session_id: 'b1', cwd, tool_name: 'AskUserQuestion', tool_input: input })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'b1', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Send back' } } })
+    hub.hook({ hook_event_name: 'Stop', session_id: 'b1', cwd, last_assistant_message: 'done' })
+    assert.deepEqual(got, [])
+  })
+})
+
+describe('approvedFields', () => {
+  it('stamps a chat approved through the closing question, which is never in done', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'done-check-'))
+    fs.writeFileSync(path.join(dir, 'c1.json'), JSON.stringify({ verified: false, missing: ['lint'] }))
+    const hub = new HubService()
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const base = { session_id: 'c1', cwd: '/Users/k/proj', tool_name: 'AskUserQuestion', tool_input: input, tool_use_id: 'q1' }
+    const got: { state?: string; fields: ReturnType<typeof approvedFields> }[] = []
+    hub.onApproved(id => got.push({ state: hub.get().progress.find(p => p.sessionId === id)?.state, fields: approvedFields(id, undefined, 5, dir) }))
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'c1', cwd: '/Users/k/proj', prompt: 'go' })
+    hub.hook({ ...base, hook_event_name: 'PreToolUse' })
+    assert.equal(hub.get().progress.find(p => p.sessionId === 'c1')?.state, 'needs-you')
+    hub.hook({ ...base, hook_event_name: 'PostToolUse', tool_response: { answers: { [Q]: 'Approve' } } })
+    assert.equal(got.length, 1)
+    assert.notEqual(got[0].state, 'done')
+    assert.deepEqual(got[0].fields, { approvedAt: 5, doneCheck: { verified: false, missing: ['lint'] } })
+    assert.deepEqual(approvedFields('c1', 'abc123', 6, dir), { approvedAt: 6, commit: 'abc123', doneCheck: { verified: false, missing: ['lint'] } })
+    assert.deepEqual(approvedFields('none', undefined, 7, dir), { approvedAt: 7 })
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
 })
 
 describe('closeApproved', () => {
@@ -112,6 +188,7 @@ describe('closeApproved', () => {
   it('names Switchboard chat terminals', () => {
     assert.equal(ourTerminal({ name: 'Claude: x' }), true)
     assert.equal(ourTerminal({ name: 'Codex: x' }), true)
+    assert.equal(ourTerminal({ name: 'Claude Code: x' }), true)
     assert.equal(ourTerminal({ name: 'claude' }), false)
   })
 })
@@ -137,5 +214,29 @@ describe('temp chats stay hidden everywhere', () => {
     assert.equal(hub.get().progress.length, 0)
     assert.equal(hub.isHeadless('l'), true)
     assert.equal(hub.isHeadless('other'), false)
+  })
+})
+
+describe('stampedChats', () => {
+  const p = (sessionId: string, state: string, ask?: object) => ({ sessionId, cwd: '/p', state, roles: [], tasks: [], startedAt: 1, at: 1, ...(ask ? { ask } : {}) }) as unknown as ChatProgress
+  const q = (question: string, options = ['Approve', 'Send back']) => ({ id: 't', kind: 'question', tool: 'AskUserQuestion', options: [], questions: [{ question, options }] })
+  it('stamps done chats and chats asking the closing question', () => {
+    assert.deepEqual(stampedChats([
+      p('done', 'done'),
+      p('closing', 'needs-you', q('Approve this chat as finished?')),
+      p('other', 'needs-you', q('Keep Closet?', ['Keep', 'Rename'])),
+      p('lookalike', 'needs-you', q('Approve this chat as finished?', ['Yes', 'No'])),
+      p('perm', 'needs-you', { id: 'x', kind: 'permission', tool: 'Bash', options: ['Yes', 'No'] }),
+      p('bare', 'needs-you'),
+      p('work', 'working', q('Approve this chat as finished?')),
+      p('sub', 'needs-you', { ...q('Approve this chat as finished?'), sub: true }),
+    ]), ['done', 'closing'])
+  })
+  it('drops a stamp as soon as its chat moves to another prompt', () => {
+    const hub = new HubService()
+    hub.set({ progress: [p('a', 'done')], doneChecks: { a: { verified: true } } })
+    assert.deepEqual(hub.get().doneChecks, { a: { verified: true } })
+    hub.set({ progress: [p('a', 'needs-you', { id: 'x', kind: 'permission', tool: 'Bash', options: ['Yes', 'No'] })] })
+    assert.deepEqual(hub.get().doneChecks, {})
   })
 })

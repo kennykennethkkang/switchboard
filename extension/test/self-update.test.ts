@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import * as nfs from 'node:fs'
+import * as nos from 'node:os'
+import * as npath from 'node:path'
 import { diskVersion, gitPuller, newerVersion, newestVsix, onSwitchboard, pendingReload } from '../src/hub/self-update'
 
 test('newerVersion: dotted parts compare as numbers', () => {
@@ -79,7 +82,7 @@ test('startSelfUpdate: installs and reloads only for a production install whose 
     assert.deepEqual(await run(1, row('0.17.10')), ['pull'], 'reloads at most once per version')
     state = new Map()
     answer = undefined
-    assert.deepEqual(await run(1, row('0.17.10')), ['pull', 'reload ready'], 'installed elsewhere: offers a reload, never reloads on its own')
+    assert.deepEqual(await run(1, row('0.17.10')), ['pull', 'workbench.action.reloadWindow'], 'installed elsewhere: reloads too')
     answer = 'Install'
     state = new Map()
     throws = true
@@ -98,7 +101,7 @@ test('startSelfUpdate: installs and reloads only for a production install whose 
   }
 })
 
-test('startSelfUpdate: a version installed elsewhere never reloads by itself, focused or not', async (t) => {
+test('startSelfUpdate: a version installed elsewhere reloads by itself, once', async (t) => {
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path')
   const Module = require('module')
   const id = 'kennykennethkkang.switchboard'
@@ -121,13 +124,85 @@ test('startSelfUpdate: a version installed elsewhere never reloads by itself, fo
     const state = new Map<string, unknown>()
     const ctx = { globalState: { get: (k: string) => state.get(k), update: async (k: string, v: unknown) => { state.set(k, v) } }, extensionMode: 1, extension: { packageJSON: { version: '0.17.10' }, id }, extensionPath: path.join(exts, `${id}-0.17.10`), subscriptions: [] as { dispose(): void }[] }
     await startSelfUpdate(ctx as never, kit, async () => {}, path.join(exts, 'self-update.lock'))
-    assert.deepEqual(calls.splice(0), ['reload ready'], 'focused: offers, does not reload')
-    // Already in the background, so no blur event comes.
-    win.focused = false
+    assert.deepEqual(calls.splice(0), ['workbench.action.reloadWindow'], 'reloads without a click')
     // Five minutes plus up to one of jitter.
     t.mock.timers.tick(6 * 60 * 1000)
     await new Promise(r => setImmediate(r))
-    assert.deepEqual(calls.splice(0), [], 'in the background: still no reload')
+    assert.deepEqual(calls.splice(0), [], 'not again for the same version')
+    for (const s of ctx.subscriptions) s.dispose()
+  } finally {
+    Module._load = orig
+  }
+})
+
+test('startSelfUpdate: a window in use waits to reload until it is idle, rechecking', async (t) => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path')
+  const Module = require('module')
+  const id = 'kennykennethkkang.switchboard'
+  const calls: string[] = []
+  const fake = {
+    ExtensionMode: { Production: 1 },
+    commands: { executeCommand: async (c: string) => { calls.push(c) } },
+    Uri: { file: (p: string) => ({ fsPath: p }) },
+    window: { state: { focused: true }, showInformationMessage: async () => undefined },
+  }
+  const orig = Module._load
+  Module._load = function (req: string, ...a: unknown[]) { return req === 'vscode' ? fake : orig.call(this, req, ...a) }
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  try {
+    const { startSelfUpdate } = await import('../src/hub/self-update')
+    const exts = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-su-')), kit = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-kit-'))
+    fs.writeFileSync(path.join(exts, 'extensions.json'), JSON.stringify([{ identifier: { id }, version: '0.17.11' }]))
+    const state = new Map<string, unknown>()
+    const ctx = { globalState: { get: (k: string) => state.get(k), update: async (k: string, v: unknown) => { state.set(k, v) } }, extensionMode: 1, extension: { packageJSON: { version: '0.17.10' }, id }, extensionPath: path.join(exts, `${id}-0.17.10`), subscriptions: [] as { dispose(): void }[] }
+    let free = false
+    await startSelfUpdate(ctx as never, kit, async () => {}, path.join(exts, 'self-update.lock'), () => free)
+    assert.deepEqual(calls.splice(0), [], 'busy: no reload yet')
+    assert.equal(state.get('selfUpdate.prompted'), undefined, 'and not marked done')
+    t.mock.timers.tick(15_000)
+    await new Promise(r => setImmediate(r))
+    assert.deepEqual(calls.splice(0), [], 'still busy')
+    free = true
+    t.mock.timers.tick(15_000)
+    for (let i = 0; i < 3; i++) await new Promise(r => setImmediate(r))
+    assert.deepEqual(calls.splice(0), ['workbench.action.reloadWindow'], 'idle: reloads')
+    t.mock.timers.tick(6 * 60 * 1000)
+    for (let i = 0; i < 3; i++) await new Promise(r => setImmediate(r))
+    assert.deepEqual(calls.splice(0), [], 'once')
+    for (const s of ctx.subscriptions) s.dispose()
+  } finally {
+    Module._load = orig
+  }
+})
+
+test('startSelfUpdate: Install clicked in a busy window reloads at once', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path')
+  const Module = require('module')
+  const id = 'kennykennethkkang.switchboard'
+  const calls: string[] = []
+  let listing = ''
+  const fake = {
+    ExtensionMode: { Production: 1 },
+    commands: { executeCommand: async (c: string) => {
+      calls.push(c)
+      if (c.endsWith('installExtension')) fs.writeFileSync(listing, JSON.stringify([{ identifier: { id }, version: '0.17.11' }]))
+    } },
+    Uri: { file: (p: string) => ({ fsPath: p }) },
+    window: { state: { focused: true }, showInformationMessage: async () => 'Install' },
+  }
+  const orig = Module._load
+  Module._load = function (req: string, ...a: unknown[]) { return req === 'vscode' ? fake : orig.call(this, req, ...a) }
+  try {
+    const { startSelfUpdate } = await import('../src/hub/self-update')
+    const exts = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-su-')), kit = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-kit-'))
+    listing = path.join(exts, 'extensions.json')
+    fs.writeFileSync(listing, JSON.stringify([{ identifier: { id }, version: '0.17.10' }]))
+    fs.writeFileSync(path.join(kit, 'switchboard-0.17.11.vsix'), '')
+    const state = new Map<string, unknown>()
+    const ctx = { globalState: { get: (k: string) => state.get(k), update: async (k: string, v: unknown) => { state.set(k, v) } }, extensionMode: 1, extension: { packageJSON: { version: '0.17.10' }, id }, extensionPath: path.join(exts, `${id}-0.17.10`), subscriptions: [] as { dispose(): void }[] }
+    await startSelfUpdate(ctx as never, kit, async () => {}, path.join(exts, 'self-update.lock'), () => false)
+    for (let i = 0; i < 3; i++) await new Promise(r => setImmediate(r))
+    assert.deepEqual(calls, ['workbench.extensions.installExtension', 'workbench.action.reloadWindow'])
     for (const s of ctx.subscriptions) s.dispose()
   } finally {
     Module._load = orig
@@ -220,4 +295,25 @@ test('onSwitchboard: a folder at or inside the Switchboard checkout, nothing els
   assert.equal(onSwitchboard([other, repo]), true)
   assert.equal(onSwitchboard([other]), false)
   assert.equal(onSwitchboard([]), false)
+})
+
+test('pendingReload: a version folder VS Code has not registered yet is not a reload', () => {
+  const dir = nfs.mkdtempSync(npath.join(nos.tmpdir(), 'sb-pr-'))
+  try {
+    nfs.mkdirSync(npath.join(dir, 'kennykennethkkang.switchboard-0.2.0'))
+    const row = (version: string) => nfs.writeFileSync(npath.join(dir, 'extensions.json'), JSON.stringify([{ identifier: { id: 'kennykennethkkang.switchboard' }, version }]))
+    row('0.1.0')
+    assert.equal(pendingReload(dir, { version: '0.1.0' }, false), undefined)
+    assert.equal(pendingReload(dir, { version: '0.1.0' }, true), undefined)
+    row('0.2.0')
+    assert.equal(pendingReload(dir, { version: '0.1.0' }, false), '0.2.0')
+    // A stray newer folder from a failed install does not hide the listed update.
+    nfs.mkdirSync(npath.join(dir, 'kennykennethkkang.switchboard-0.3.0'))
+    assert.equal(pendingReload(dir, { version: '0.1.0' }, false), '0.2.0')
+    assert.equal(pendingReload(dir, { version: '0.1.0' }, true), '0.2.0+')
+    nfs.rmSync(npath.join(dir, 'kennykennethkkang.switchboard-0.3.0'), { recursive: true })
+    // No listing at all: the folder decides, as before.
+    nfs.rmSync(npath.join(dir, 'extensions.json'))
+    assert.equal(pendingReload(dir, { version: '0.1.0' }, false), '0.2.0')
+  } finally { nfs.rmSync(dir, { recursive: true, force: true }) }
 })

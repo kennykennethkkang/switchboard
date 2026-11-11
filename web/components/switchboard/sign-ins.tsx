@@ -7,6 +7,7 @@
  */
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { ApiKey, AwsProfile, ChatRow, HubState, WebApp, WebLogin } from '@/lib/hub-types'
+import { editorName } from '@/lib/editor'
 import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import { projectName } from '@/lib/archive'
 import { focusBack } from '@/lib/focus-back'
@@ -23,22 +24,22 @@ const URL_OK = /^https?:\/\/[^\s/@]+(\/\S*)?$/
 const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
 const home = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
-const named = (a: AwsProfile) => (a.label ? `${a.label} (${a.name})` : a.name)
+/** Who a profile signs in as: what AWS said at the last sign-in, else the email typed by hand. */
+const emailOf = (a: AwsProfile) => a.email || a.label
 
-// An older extension sends no stale flag.
-const stale = (p: AwsProfile) => p.stale ?? p.name.startsWith('previous-default-')
-
-/** The profile picked for the deepest project folder holding cwd; the extension's profileFor in aws.ts. */
+/** The pick for the deepest project folder holding cwd; the extension's profileFor in aws.ts. AWS never uses '*'. */
 export function profileFor(projects: Record<string, string>, cwd: string): string | undefined {
   const c = norm(cwd)
-  const hit = Object.keys(projects).filter(k => c === norm(k) || c.startsWith(`${norm(k)}/`)).sort((a, b) => b.length - a.length)[0]
+  const hit = Object.keys(projects).filter(k => k !== '*' && (c === norm(k) || c.startsWith(`${norm(k)}/`))).sort((a, b) => b.length - a.length)[0]
   return hit ? projects[hit] : undefined
 }
+/** The browser for cwd, falling back to the '*' pick; browserFor in aws.ts. */
+const browserFor = (browsers: Record<string, string>, cwd: string) => profileFor(browsers, cwd) ?? browsers['*']
 
 /** This window's project browser, which sign-ins with no Chrome pick of their own use. */
 const projectBrowser = (hub: HubState) => {
   const w = hub.signIns?.window ?? hub.thisWindow
-  return w ? profileFor(hub.signIns?.browsers ?? {}, w) || undefined : undefined
+  return w ? browserFor(hub.signIns?.browsers ?? {}, w) || undefined : undefined
 }
 
 type Tone = 'green' | 'yellow' | 'red' | 'ash'
@@ -58,6 +59,17 @@ function AwsState({ p, failed }: { p: AwsProfile; failed?: string }) {
   if (p.status === 'never') return <Chip tone="ash" text="Not signed in" />
   const left = p.expiresAt ? p.expiresAt - Date.now() : Infinity
   return left < 3_600_000 && left > 0 ? <Chip tone="yellow" text={`Ends in ${timeLeft(left)}`} /> : <Chip tone="green" text="Signed in" />
+}
+
+/** A CLI login for the app is running; its device page waits in Chrome. */
+const waiting = (hub: HubState, app: WebApp) => !!app.cli && !!hub.signIns?.busy?.includes(app.id)
+
+/** A CLI tenant's chip (Auth0), like AwsState: Failed wins over a dead token. */
+function CliState({ l, failed }: { l: WebLogin; failed?: string }) {
+  if (failed && l.status !== 'signed-in') return <Chip tone="red" text="Failed" />
+  if (l.status === 'expired') return <Chip tone="yellow" text="Expired" />
+  if (l.status === 'never') return <Chip tone="ash" text="Not signed in" />
+  return l.status === 'signed-in' ? <Chip tone="green" text="Signed in" /> : failed ? <Chip tone="red" text="Failed" /> : null
 }
 
 /** A sign-in's last failure, as the CLI or Chrome said it. */
@@ -147,13 +159,13 @@ function Confirm({ what, note, onYes, onNo }: { what: string; note: string; onYe
 }
 
 /** A name edited in place: Enter saves, Escape puts it back. */
-function Rename({ value, label, onSave, onDone }: { value: string; label: string; onSave: (v: string) => void; onDone: () => void }) {
+function Rename({ value, label, onSave, onDone, placeholder = 'Display name' }: { value: string; label: string; onSave: (v: string) => void; onDone: () => void; placeholder?: string }) {
   const [v, setV] = useState(value)
   const form = useRef<HTMLFormElement>(null)
   const done = () => { focusBack(form.current); onDone() }
   return (
     <form ref={form} className="si-rename" onSubmit={e => { e.preventDefault(); onSave(v); done() }}>
-      <input autoFocus aria-label={label} value={v} maxLength={80} onChange={e => setV(e.target.value)} placeholder="Display name"
+      <input autoFocus aria-label={label} value={v} maxLength={80} onChange={e => setV(e.target.value)} placeholder={placeholder}
         onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); done() } }} />
       <button type="submit" className="hub-btn">Save</button>
     </form>
@@ -176,16 +188,16 @@ function Uses({ hub, send, folder, here }: { hub: HubState; send: Send; folder: 
   const uses = si?.links?.[folder] ?? {}
   const repo = repoOf(folder)
   const profile = profileFor(si?.projects ?? {}, folder)
-  const p = hub.aws.find(a => a.name === (profile ?? 'default'))
-  const def = hub.aws.find(a => a.isDefault)
+  // Optional, like a web app: no pick means no AWS_PROFILE and no sign-in nag.
+  const p = profile ? hub.aws.find(a => a.name === profile) : undefined
   // The browser picked here, for the profile it was picked for.
   const [pick, setPick] = useState<{ name: string; dir: string }>()
   const chrome = pick && pick.name === p?.name ? pick.dir : p?.chrome ?? ''
   const setChrome = (dir: string) => p && setPick({ name: p.name, dir })
-  const awsOptions: Array<[string, string]> = [['', `Default${def ? `: ${def.label || def.name}` : ''}`], ...hub.aws.filter(a => a.name === profile || (!stale(a) && !(a.isDefault && a.name === 'default'))).map((a): [string, string] => [a.name, named(a)])]
-  const link = (app: string, v: string) => send({ type: 'hub-login-link', folder, app, login: v === 'off' ? 'off' : v || null })
+  const awsOptions: Array<[string, string]> = [['', 'Not used'], ...hub.aws.map((a): [string, string] => [a.name, a.name])]
+  const link = (app: string, v: string) => send({ type: 'hub-login-link', folder, app, login: v })
   // undefined: no project pick; '' Chrome's last used profile.
-  const browser = profileFor(si?.browsers ?? {}, folder)
+  const browser = browserFor(si?.browsers ?? {}, folder)
   const [picks, setPicks] = useState<Record<string, string>>({})
   const browserOptions: Array<[string, string]> = [['unset', 'Each account\'s own pick'], ['', LAST_USED], ...profiles(hub)]
   const awsErr = p ? si?.errors?.[`aws:${p.name}`] : undefined
@@ -206,7 +218,8 @@ function Uses({ hub, send, folder, here }: { hub: HubState; send: Send; folder: 
       <li className="si-row">
         <span className="si-main">
           <span className="si-title"><strong>AWS</strong>{p && <AwsState p={p} failed={awsErr} />}</span>
-          <span className="si-note">{here ? `New terminals get ${profile ? `AWS_PROFILE=${profile}` : 'no AWS_PROFILE, so the default'}.` : `Open ${repo} in VS Code to change.`}</span>
+          <span className="si-note">{!here ? `Open ${repo} in ${editorName(hub)} to change.` : profile ? `New terminals get AWS_PROFILE=${profile}.` : 'Not used here: no AWS_PROFILE.'}</span>
+          {p && emailOf(p) && <span className="si-meta">{emailOf(p)}</span>}
           {here && p && ends(p) && <span className="si-note">{ends(p)}</span>}
           {here && p && <Opens hub={hub} value={chrome} onChange={setChrome} fallback={browser} label={`This project: opens in for ${p.name}`} />}
           {here && <Failed text={awsErr} />}
@@ -215,29 +228,28 @@ function Uses({ hub, send, folder, here }: { hub: HubState; send: Send; folder: 
         <span className="si-acts">
           {here
             ? <Pick label={`AWS profile for ${repo}`} options={awsOptions} value={profile ?? ''} muted={!profile} onChange={v => send({ type: 'hub-aws-window', profile: v || null })} />
-            : <span className="si-meta" style={{ color: 'var(--hub-body)' }}>{profile ?? 'Default'}</span>}
-          {here && p && <button type="button" className={`hub-btn${p.status === 'signed-in' ? '' : ' primary'}`} onClick={() => send({ type: 'hub-aws-login', profile: p.name, chrome })}>{p.status === 'signed-in' ? 'Sign in again' : 'Sign in'}</button>}
+            : <span className="si-meta" style={{ color: 'var(--hub-body)' }}>{profile ?? 'Not used'}</span>}
+          {here && p && <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-aws-login', profile: p.name, chrome })}>{p.status === 'signed-in' ? 'Sign in again' : 'Sign in'}</button>}
         </span>
       </li>
       {(si?.apps ?? []).map(app => {
         const on = app.id in uses
-        const chosen = uses[app.id] ?? null
-        const active = app.logins.find(l => l.id === app.active)
-        const l = app.logins.find(x => x.id === (chosen ?? app.active))
+        const l = app.logins.find(x => x.id === uses[app.id])
         const err = on && l ? si?.errors?.[`login:${app.id}:${l.id}`] : undefined
         return (
           <li key={app.id} className="si-row">
             <span className="si-main">
-              <span className="si-title"><strong>{app.name}</strong>{err && <Chip tone="red" text="Failed" />}</span>
+              <span className="si-title"><strong>{app.name}</strong>{on && l?.domain ? <CliState l={l} failed={err} /> : err && <Chip tone="red" text="Failed" />}</span>
               {(!on || !l) && <span className="si-note">{!on ? 'Not used here' : 'No saved logins yet'}</span>}
+              {on && l && <span className="si-meta">{l.email ? `${l.label} · ${l.email}` : l.label}</span>}
               {on && l && <Opens hub={hub} value={picks[l.id] ?? l.chrome ?? ''} onChange={v => setPicks(x => ({ ...x, [l.id]: v }))} fallback={browser} label={`This project: opens in for ${app.name} ${l.label}`} />}
               <Failed text={err} />
               {on && l && <Note text={si?.notes?.[`login:${app.id}:${l.id}`]} />}
             </span>
             <span className="si-acts">
-              <Pick label={`${app.name} login for ${repo}`} muted={!on} value={on ? chosen ?? '' : 'off'} onChange={v => link(app.id, v)}
-                options={[['off', 'Not used'], ['', `Default${active ? `: ${active.label}` : ''}`], ...app.logins.map((x): [string, string] => [x.id, x.label])]} />
-              {on && l && <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-login-open', app: app.id, id: l.id, folder, ...(picks[l.id] !== undefined ? { chrome: picks[l.id] } : {}) })}>Sign in</button>}
+              <Pick label={`${app.name} login for ${repo}`} muted={!on} value={on ? uses[app.id] : 'off'} onChange={v => link(app.id, v)}
+                options={[['off', 'Not used'], ...app.logins.map((x): [string, string] => [x.id, x.label])]} />
+              {on && l && <button type="button" className="hub-btn" disabled={waiting(hub, app)} onClick={() => send({ type: 'hub-login-open', app: app.id, id: l.id, folder, ...(picks[l.id] !== undefined ? { chrome: picks[l.id] } : {}) })}>Sign in</button>}
             </span>
           </li>
         )
@@ -274,15 +286,15 @@ function Others({ hub, send }: { hub: HubState; send: Send }) {
   const sum = (f: string) => {
     const uses = si?.links?.[f] ?? {}
     const apps = (si?.apps ?? []).filter(a => a.id in uses).map(a => {
-      const id = uses[a.id] ?? a.active
-      return `${a.name}: ${a.logins.find(l => l.id === id)?.label ?? 'default'}`
+      return `${a.name}: ${a.logins.find(l => l.id === uses[a.id])?.label ?? 'none'}`
     })
-    return [`AWS: ${profileFor(si?.projects ?? {}, f) ?? 'default'}`, ...apps].join(', ')
+    const aws = profileFor(si?.projects ?? {}, f)
+    return [...(aws ? [`AWS: ${aws}`] : []), ...apps].join(', ') || 'No accounts'
   }
   return (
     <section aria-labelledby="si-others" className="si-sec">
       <header><h3 id="si-others">Other projects</h3></header>
-      <p className="si-help">Their browser and web logins can change here. Their AWS profile changes from a VS Code window on that project.</p>
+      <p className="si-help">Their browser and web logins can change here. Their AWS profile changes from that project's {editorName(hub)} window.</p>
       {others.map(f => (
         <details key={f} className="hub-fold-list si-other">
           <summary>
@@ -298,7 +310,7 @@ function Others({ hub, send }: { hub: HubState; send: Send }) {
 }
 
 function Profile({ p, hub, send, users, askedAt, onDelete, problem }: { p: AwsProfile; hub: HubState; send: Send; users: ChatRow[]; askedAt?: number; onDelete: () => void; problem: Problem }) {
-  const [renaming, setRenaming] = useState(false)
+  const [editing, setEditing] = useState<'name' | 'email'>()
   const [asking, setAsking] = useState(false)
   const [chrome, setChrome] = useState(p.chrome ?? '')
   const [late, setLate] = useState(false)
@@ -311,39 +323,42 @@ function Profile({ p, hub, send, users, askedAt, onDelete, problem }: { p: AwsPr
   }, [askedAt])
   const why = askedAt && problem && problem.at >= askedAt && problem.text.startsWith('aws-delete failed') && problem.text.includes(p.name)
     ? problem.text.replace(/^aws-delete failed: /, '') : undefined
-  const refused = why ?? (late ? 'Not deleted. VS Code shows why in its notifications.' : undefined)
-  const old = stale(p)
-  const err = old ? undefined : hub.signIns?.errors?.[`aws:${p.name}`]
-  const detail = [p.label ? p.name : '', p.account, p.region].filter(Boolean).join(' · ')
+  const refused = why ?? (late ? `Not deleted. ${editorName(hub)} shows why in its notifications.` : undefined)
+  const err = hub.signIns?.errors?.[`aws:${p.name}`]
+  // The profile name is the nickname; who it signs in as comes from AWS at sign-in, or by hand.
+  const email = emailOf(p)
+  const detail = [p.who, p.account, p.region].filter(Boolean).join(' · ')
   const items: Item[] = [
-    ...(!old && !p.isDefault ? [{ label: 'Make default', hint: '[default] takes this profile\'s settings; the old default is kept as a backup', run: () => send({ type: 'hub-aws-default', profile: p.name }) }] : []),
-    ...(!old ? [{ label: 'Rename', run: () => setRenaming(true) }] : []),
-    ...(!p.isDefault ? [{ label: 'Delete', danger: true, run: () => setAsking(true) }] : []),
+    { label: 'Rename', hint: 'Renames the profile in ~/.aws/config; projects that use it follow', run: () => setEditing('name') },
+    { label: p.label ? 'Edit email' : 'Set email', hint: p.email ? `AWS gives ${p.email}, which wins; this shows only when AWS gives none` : `Shown for every profile in account ${p.account ?? p.name} until AWS gives one`, run: () => setEditing('email') },
+    { label: 'Delete', danger: true, run: () => setAsking(true) },
   ]
   return (
     <li className="si-row">
       <span className="si-main">
         <span className="si-title">
-          {renaming
-            ? <Rename value={p.label ?? ''} label={`Name for ${p.name}`} onSave={label => send({ type: 'hub-aws-label', profile: p.name, label })} onDone={() => setRenaming(false)} />
-            : <strong title={p.label || p.name}>{p.label || p.name}</strong>}
-          {p.isDefault && <span className="hub-chip" style={{ color: 'var(--hub-blue)', background: 'var(--hub-blue-soft)' }}>Default</span>}
+          {editing === 'name'
+            ? <Rename value={p.name} label={`New name for ${p.name}`} onSave={to => { if (to.trim() && to.trim() !== p.name) send({ type: 'hub-aws-rename', profile: p.name, to: to.trim() }) }} onDone={() => setEditing(undefined)} />
+            : <strong title={p.name}>{p.name}</strong>}
           {p.root && <span className="hub-chip ver" title="Signs in as the account root">Root</span>}
-          {!old && <AwsState p={p} failed={err} />}
+          <AwsState p={p} failed={err} />
         </span>
+        {editing === 'email'
+          ? <Rename value={p.label ?? ''} label={`Email for ${p.name}`} placeholder={p.email ?? 'name@example.com'} onSave={label => send({ type: 'hub-aws-label', profile: p.name, label })} onDone={() => setEditing(undefined)} />
+          : <span title={email} className={email ? 'si-who' : 'si-note'}>{email ?? 'No email yet'}</span>}
         {detail && <span title={detail} className="si-meta">{detail}</span>}
-        {!old && ends(p) && <span className="si-note">{ends(p)}</span>}
+        {ends(p) && <span className="si-note">{ends(p)}</span>}
         {users.length > 0 && <span className="si-note">Used by {users.map(c => c.name || projectName(c)).join(', ')}</span>}
-        {!old && <Opens hub={hub} value={chrome} onChange={setChrome} fallback={projectBrowser(hub)} label={`Browser for signing in to ${p.name}`} />}
+        <Opens hub={hub} value={chrome} onChange={setChrome} fallback={projectBrowser(hub)} label={`Browser for signing in to ${p.name}`} />
         <Failed text={err} />
-        {!old && <Note text={hub.signIns?.notes?.[`aws:${p.name}`]} />}
+        <Note text={hub.signIns?.notes?.[`aws:${p.name}`]} />
         {refused && <span role="alert" className="si-err">{refused}</span>}
       </span>
       <span className="si-acts">
-        {!old && <button type="button" className={`hub-btn${p.status === 'signed-in' ? '' : ' primary'}`} onClick={() => send({ type: 'hub-aws-login', profile: p.name, chrome })}>
+        <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-aws-login', profile: p.name, chrome })}>
           {p.status === 'never' ? 'Sign in' : 'Sign in again'}
-        </button>}
-        <More name={named(p)} items={items} />
+        </button>
+        <More name={p.name} items={items} />
       </span>
       {asking && <Confirm what={p.name} note="~/.aws/config is backed up first." onYes={() => { setAsking(false); onDelete() }} onNo={() => setAsking(false)} />}
     </li>
@@ -355,7 +370,6 @@ function Aws({ hub, send, problem }: { hub: HubState; send: Send; problem: Probl
   const [region, setRegion] = useState('us-west-1')
   const [chrome, setChrome] = useState('')
   const [asked, setAsked] = useState<Record<string, number>>({})
-  const [askAll, setAskAll] = useState(false)
   const projects = hub.signIns?.projects ?? {}
   const bad = (name && !NAME.test(name)) || (region && !REGION.test(region))
   const taken = hub.aws.some(a => a.name === name)
@@ -367,9 +381,8 @@ function Aws({ hub, send, problem }: { hub: HubState; send: Send; problem: Probl
   }
   const item = (p: AwsProfile) => <Profile key={`${p.name}:${p.chrome ?? ''}`} p={p} hub={hub} send={send} problem={problem}
     askedAt={asked[p.name]} onDelete={() => del([p.name])}
-    users={live.filter(c => (profileFor(projects, c.cwd) ?? 'default') === p.name)} />
-  const old = hub.aws.filter(stale)
-  const current = hub.aws.filter(p => !stale(p))
+    users={live.filter(c => profileFor(projects, c.cwd) === p.name)} />
+  const current = hub.aws
   return (
     <section aria-labelledby="si-aws" className="si-sec">
       <header>
@@ -383,28 +396,14 @@ function Aws({ hub, send, problem }: { hub: HubState; send: Send; problem: Probl
       {current.length
         ? <ul role="list" className="si-list">{current.map(item)}</ul>
         : <p className="si-empty">No profiles in ~/.aws/config yet. Add one and Switchboard signs you in.</p>}
-      {old.length > 0 && (
-        <details className="hub-fold-list">
-          <summary><b aria-hidden>›</b><span style={{ flex: 1, minWidth: 0, color: 'var(--hub-ink)' }}>Backups of old defaults</span><span style={{ font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-mute)' }}>{old.length}</span></summary>
-          <div style={{ marginLeft: 22, display: 'grid' }}>
-            <div className="si-row" style={{ borderTop: 0, paddingTop: 0 }}>
-              <p className="si-note" style={{ margin: 0 }}>Kept when another profile became the default.</p>
-              <span className="si-acts">{!askAll && <button type="button" className="hub-btn" onClick={() => setAskAll(true)}>Delete all backups</button>}</span>
-              {askAll && <Confirm what={plural(old.length, 'backup')} note="~/.aws/config is backed up first." onYes={() => { setAskAll(false); del(old.map(p => p.name)) }} onNo={() => setAskAll(false)} />}
-            </div>
-            <ul role="list" className="si-list">{old.map(item)}</ul>
-          </div>
-        </details>
-      )}
       <Add title="Add profile" open={!hub.aws.length || undefined}>
-        <form className="si-form" onSubmit={e => { e.preventDefault(); if (name && !bad && !taken) { send({ type: 'hub-aws-add', profile: name, region, chrome }); setName('') } }}>
+        <form className="si-form" onSubmit={e => { e.preventDefault(); if (name && !bad) { send({ type: 'hub-aws-add', profile: name, region, chrome }); setName('') } }}>
           <input aria-label="New profile name" placeholder="Profile name" value={name} maxLength={64} onChange={e => setName(e.target.value.trim())} style={{ flex: '2 1 140px' }} />
           <input aria-label="Region" placeholder="us-west-1" value={region} onChange={e => setRegion(e.target.value.trim())} style={{ flex: '1 1 100px' }} />
-          <button type="submit" className="hub-btn primary" disabled={!name || !!bad || taken}>Add and sign in</button>
+          <button type="submit" className="hub-btn primary" disabled={!name || !!bad}>{taken ? 'Sign in again' : 'Add and sign in'}</button>
           <span className="si-wide"><Opens hub={hub} value={chrome} onChange={setChrome} fallback={projectBrowser(hub)} label="Browser for the new profile's sign-in" /></span>
-          {(bad || taken) && <span role="alert" className="si-err si-wide">
-            {taken ? `${name} already exists.` : 'Names use letters, digits and . _ @ + - (up to 64). Regions look like us-west-1.'}
-          </span>}
+          {bad && <span role="alert" className="si-err si-wide">Names use letters, digits and . _ @ + - (up to 64). Regions look like us-west-1.</span>}
+          {taken && !bad && <span className="si-note si-wide">{name} is already saved: this keeps its sign-in setup, sets the region to {region} and signs in again.</span>}
         </form>
       </Add>
     </section>
@@ -412,34 +411,37 @@ function Aws({ hub, send, problem }: { hub: HubState; send: Send; problem: Probl
 }
 
 function Login({ app, l, hub, send }: { app: WebApp; l: WebLogin; hub: HubState; send: Send }) {
-  const [renaming, setRenaming] = useState(false)
+  const [editing, setEditing] = useState<'name' | 'email'>()
   const [asking, setAsking] = useState(false)
   const [chrome, setChrome] = useState(l.chrome ?? '')
   const ids = { app: app.id, id: l.id }
-  const active = app.active === l.id
   const err = hub.signIns?.errors?.[`login:${app.id}:${l.id}`]
   const items: Item[] = [
-    ...(!active ? [{ label: 'Make default', hint: `Projects that use ${app.name} without a pick get this login`, run: () => send({ type: 'hub-login-active', ...ids }) }] : []),
-    { label: 'Rename', run: () => setRenaming(true) },
+    { label: 'Rename', run: () => setEditing('name') },
+    { label: l.email ? 'Edit email' : 'Set email', run: () => setEditing('email') },
     { label: 'Delete', danger: true, run: () => setAsking(true) },
   ]
   return (
     <li className="si-row">
       <span className="si-main">
         <span className="si-title">
-          {renaming
-            ? <Rename value={l.label} label={`Name for ${l.label}`} onSave={label => send({ type: 'hub-login-rename', ...ids, label })} onDone={() => setRenaming(false)} />
+          {editing === 'name'
+            ? <Rename value={l.label} label={`Name for ${l.label}`} onSave={label => send({ type: 'hub-login-rename', ...ids, label })} onDone={() => setEditing(undefined)} />
             : <strong title={l.label}>{l.label}</strong>}
-          {active && <span className="hub-chip" style={{ color: 'var(--hub-blue)', background: 'var(--hub-blue-soft)' }}>Default</span>}
-          {err && <Chip tone="red" text="Failed" />}
+          {l.domain ? <CliState l={l} failed={err} /> : err && <Chip tone="red" text="Failed" />}
         </span>
-        <span title={l.url} className="si-meta">{l.url}</span>
+        {editing === 'email'
+          ? <Rename value={l.email ?? ''} label={`Email for ${l.label}`} placeholder="name@example.com" onSave={email => send({ type: 'hub-login-rename', ...ids, label: l.label, email: email.trim() })} onDone={() => setEditing(undefined)} />
+          : l.email && <span title={l.email} className="si-who">{l.email}</span>}
+        <span title={l.domain ?? l.url} className="si-meta">{l.domain ?? l.url}</span>
         <Opens hub={hub} value={chrome} onChange={setChrome} fallback={projectBrowser(hub)} label={`Browser for ${l.label}`} />
         <Failed text={err} />
         <Note text={hub.signIns?.notes?.[`login:${app.id}:${l.id}`]} />
       </span>
       <span className="si-acts">
-        <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-login-open', ...ids, chrome })}>Sign in</button>
+        {waiting(hub, app)
+          ? <button type="button" className="hub-btn" disabled>Waiting for Chrome</button>
+          : <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-login-open', ...ids, chrome })}>{l.domain && l.status === 'signed-in' ? 'Sign in again' : 'Sign in'}</button>}
         <More name={`${app.name} ${l.label}`} items={items} />
       </span>
       {asking && <Confirm what={l.label} note="Only the saved entry goes." onYes={() => { setAsking(false); send({ type: 'hub-login-delete', ...ids }) }} onNo={() => setAsking(false)} />}
@@ -450,26 +452,34 @@ function Login({ app, l, hub, send }: { app: WebApp; l: WebLogin; hub: HubState;
 /** One web app: its saved logins and a folded form for another. */
 function App({ app, hub, send }: { app: WebApp; hub: HubState; send: Send }) {
   const [label, setLabel] = useState('')
+  const [email, setEmail] = useState('')
   const [url, setUrl] = useState(app.url)
   const [chrome, setChrome] = useState('')
   const [asking, setAsking] = useState(false)
+  const [newChrome, setNewChrome] = useState('')
   const bad = !!url && !URL_OK.test(url)
   const n = app.logins.length
   return (
     <div role="group" aria-label={app.name} className="si-app">
       <header>
         <h4 title={app.name}>{app.name}<small>{n}</small></h4>
-        <More name={app.name} items={[{ label: 'Delete app', danger: true, run: () => setAsking(true) }]} />
+        <span className="si-acts">
+          {app.cli && <button type="button" className="hub-btn" disabled={waiting(hub, app)} onClick={() => send({ type: 'hub-login-open', app: app.id, chrome: newChrome })}>{waiting(hub, app) ? 'Waiting for Chrome' : n ? 'Add tenants' : 'Sign in'}</button>}
+          <More name={app.name} items={[{ label: 'Delete app', danger: true, run: () => setAsking(true) }]} />
+        </span>
       </header>
+      {app.cli && <p className="si-help" style={{ margin: '0 0 8px' }}>Sign in runs {app.id} login in the Chrome profile shown; signing in adds your tenants here, each with its own status.</p>}
+      {app.cli && !n && <span className="si-wide"><Opens hub={hub} value={newChrome} onChange={setNewChrome} fallback={projectBrowser(hub)} label={`Browser for signing in to ${app.name}`} /></span>}
       {asking && <div className="si-row" style={{ borderTop: 0, paddingTop: 0 }}>
         <Confirm what={app.name} note={n ? `Its ${plural(n, 'saved login')} ${n === 1 ? 'goes' : 'go'} too.` : ''} onYes={() => { setAsking(false); send({ type: 'hub-login-app-delete', app: app.id }) }} onNo={() => setAsking(false)} />
       </div>}
       {n
         ? <ul role="list" className="si-list">{app.logins.map(l => <Login key={`${l.id}:${l.chrome ?? ''}`} app={app} l={l} hub={hub} send={send} />)}</ul>
-        : <p className="si-empty">No saved logins yet. Add one for each account you use.</p>}
+        : <p className="si-empty">{app.cli ? 'No tenants yet. Sign in and they show up here.' : 'No saved logins yet. Add one for each account you use.'}</p>}
       <Add title={`Add ${app.name} login`}>
-        <form className="si-form" onSubmit={e => { e.preventDefault(); if (label.trim() && url && !bad) { send({ type: 'hub-login-add', app: app.id, label, url, chrome }); setLabel('') } }}>
+        <form className="si-form" onSubmit={e => { e.preventDefault(); if (label.trim() && url && !bad) { send({ type: 'hub-login-add', app: app.id, label, url, chrome, ...(email.trim() ? { email: email.trim() } : {}) }); setLabel(''); setEmail('') } }}>
           <input aria-label={`New ${app.name} login name`} placeholder="Name, like Work tenant" value={label} maxLength={80} onChange={e => setLabel(e.target.value)} style={{ flex: '1 1 140px' }} />
+          <input aria-label={`Email for the new ${app.name} login`} type="email" placeholder="Email (optional)" value={email} maxLength={120} onChange={e => setEmail(e.target.value)} style={{ flex: '1 1 160px' }} />
           <input aria-label={`${app.name} login URL`} placeholder={app.url} value={url} onChange={e => setUrl(e.target.value.trim())} style={{ flex: '2 1 200px' }} />
           <button type="submit" className="hub-btn" disabled={!label.trim() || !url || bad}>Add login</button>
           <span className="si-wide"><Opens hub={hub} value={chrome} onChange={setChrome} fallback={projectBrowser(hub)} label={`Browser for the new ${app.name} login`} /></span>
@@ -489,7 +499,7 @@ function Apps({ hub, send }: { hub: HubState; send: Send }) {
   return (
     <section aria-labelledby="si-apps" className="si-sec">
       <header><h3 id="si-apps">Web apps</h3></header>
-      <p className="si-help">Saved logins per app, like a work and a personal tenant. Each project picks one; Default covers projects that do not.</p>
+      <p className="si-help">Saved logins per app, like a work and a personal tenant. Each project picks the one it uses, or none.</p>
       {!apps
         ? <p className="si-empty">Update the Switchboard extension to save web logins.</p>
         : <>
@@ -512,6 +522,7 @@ const KEY_ROWS: Record<ApiKey['name'], { label: string; url: string; usedBy?: st
   GEMINI_API_KEY: { label: 'Gemini', url: 'https://aistudio.google.com/apikey' },
   OPENROUTER_API_KEY: { label: 'OpenRouter', url: 'https://openrouter.ai/keys', usedBy: 'Jev and MiroFish' },
   PERPLEXITY_API_KEY: { label: 'Perplexity', url: 'https://www.perplexity.ai/account/api/keys' },
+  FIRECRAWL_API_KEY: { label: 'Firecrawl', url: 'https://www.firecrawl.dev/app/api-keys' },
   ZEP_API_KEY: { label: 'Zep', url: 'https://app.getzep.com/', usedBy: 'MiroFish' },
 }
 // Zep keys are JWT-like and longer.

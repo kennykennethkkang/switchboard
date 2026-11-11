@@ -13,7 +13,9 @@ import { serveStatic } from './static'
 import { portTaken } from './port'
 import { pushRoute } from './push'
 import { openCmd } from './open'
-import { codeLogin, deniedAs, deviceAsks, forwardedIp, lanFor, lanGate, lanNames, lanSetCookie, liveToken, macNames, macNamesRead, phoneSecret, proxyHub, signInPage, tellWindows, uaSummary, waitPage, windows, type Lan } from './hub-proxy'
+import { startHeadless } from './headless'
+import { hub } from '../../extension/src/hub/hub-service'
+import { codeLogin, deniedAs, deviceAsks, editorLive, forwardedIp, lanFor, lanGate, lanNames, lanSetCookie, liveToken, macNames, macNamesRead, phoneSecret, proxyHub, signInPage, tellWindows, uaSummary, waitPage, windows, withSelf, type Lan } from './hub-proxy'
 import { phoneServeArgs, readMacNames, tailscaleBin } from '../../extension/src/hub/lan'
 
 interface ServerOptions {
@@ -37,6 +39,9 @@ export async function startServer(options: ServerOptions) {
   }
 
   const relay = await createRelay({ workspace, verbose: options.verbose })
+  // With no editor window the hub routes go to the relay's own hook server.
+  const hubList = relay.hookPort ? withSelf(windows, { port: relay.hookPort, hubToken: hub.token, workspace, mtimeMs: 0, pid: process.pid }) : windows
+  const stopHeadless = relay.hookPort ? startHeadless(workspace, async () => editorLive(await windows())) : () => {}
 
   const secret = options.lan ? phoneSecret(path.join(os.homedir(), '.claude', 'switchboard', 'phone.secret')) : ''
 
@@ -122,7 +127,7 @@ export async function startServer(options: ServerOptions) {
     // The hub, through a VS Code window's hook server
     if (req.url?.startsWith('/hub/')) {
       // A client dropping mid-body rejects here; uncaught, that exits the app.
-      proxyHub(req, res, port, workspace, lan).catch(() => { if (!res.headersSent) res.writeHead(400); res.end() })
+      proxyHub(req, res, port, workspace, lan, hubList).catch(() => { if (!res.headersSent) res.writeHead(400); res.end() })
       return
     }
 
@@ -201,6 +206,7 @@ export async function startServer(options: ServerOptions) {
     try { if (options.lan && fs.readFileSync(LAN_FILE, 'utf8') === lanMark) fs.unlinkSync(LAN_FILE) } catch { /* gone */ }
     try { if (serving) execFileSync(tailscaleBin()!, phoneServeArgs(port, false, serving === 'https'), { timeout: 5000, stdio: 'ignore' }) } catch { /* tailscale gone */ }
     server.close()
+    stopHeadless()
     relay.dispose()
     process.exit(0)
   }

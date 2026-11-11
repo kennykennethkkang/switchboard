@@ -1,4 +1,4 @@
-// Phone mode: with Switchboard's Phone toggle on, AskUserQuestion is denied and the chat calls the user instead.
+// Phone mode: with Switchboard's Phone toggle on, AskUserQuestion is denied and the chat calls the user instead (not the closing Approve question).
 // The hub mirrors the toggle into ~/.claude/switchboard/limits.json as phone: true.
 import type { EngineInterface, Register } from 'claude-code'
 
@@ -17,6 +17,10 @@ async function phoneOn($: EngineInterface): Promise<boolean> {
   return cache.on
 }
 
+// The kit's closing question goes through: Switchboard approves from its answer and rings the phone for it once.
+const closing = (input: { questions?: unknown }) => Array.isArray(input.questions)
+  && input.questions.some(q => String((q as Question)?.question ?? '').includes('Approve this chat as finished'))
+
 const sh = (s: string) => `"${s.replace(/["\\$`]/g, '\\$&')}"`
 
 /** The deny text: push pictures, one call per question with the options by name, carry on with the answer. */
@@ -28,8 +32,8 @@ export function denial(input: { questions?: unknown }): string {
     return `${CALL} ${sh(`${String(q.question ?? '')}${names.length ? ` Options: ${names.join(', ')}.` : ''}`)} "CONTEXT"`
   })
   return [
-    'Phone mode is on: the user is away from the keyboard, so call him instead of asking here.',
-    `1. Pictures first${pictures ? ' (this question has previews)' : ''}: push any screenshots or previews to his phone with SendUserFile (status proactive) or PushNotification, plus the comparison page link if there is one. Then the question should say "look at A and B on your phone".`,
+    'Phone mode is on: the user is away from the keyboard, so call them instead of asking here.',
+    `1. Pictures first${pictures ? ' (this question has previews)' : ''}: push any screenshots or previews to their phone with SendUserFile (status proactive) or PushNotification, plus the comparison page link if there is one. Then the question should say "look at A and B on your phone".`,
     '2. Run one call per question, saying the options by name, with one or two sentences of CONTEXT:',
     ...lines.map(l => `   ${l}`),
     '3. Read the ANSWER line and carry on with it. Do not re-ask in chat.',
@@ -39,7 +43,7 @@ export function denial(input: { questions?: unknown }): string {
 
 export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
-    if (String(e.tool) !== 'AskUserQuestion' || !(await phoneOn($))) return next(e)
+    if (String(e.tool) !== 'AskUserQuestion' || closing(e as { questions?: unknown }) || !(await phoneOn($))) return next(e)
     return { deny: denial(e as { questions?: unknown }) }
   })
 }

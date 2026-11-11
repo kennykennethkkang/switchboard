@@ -19,6 +19,8 @@ export type SetupKit = {
   own?: string[]
   /** Python tools: uv installs them, then their skill and stdio MCP go to Claude and Codex. */
   tools?: Tool[]
+  /** Global npm CLIs, bin named like the package; then: run once after a fresh install; os: only there. */
+  npm?: { pkg: string; then?: string[]; os?: NodeJS.Platform[] }[]
 }
 /** path: the folder holding the skill folders (default skills); file: the one to use as SKILL.md. */
 export type SkillRepo = { repo: string; names: string[]; path?: string; file?: string }
@@ -35,11 +37,12 @@ const ASK = '~/.claude/switchboard/ask/ask-server.mjs'
 
 /** One step for kit/setup-run.mjs: say a line, or copy then run, only when ifExists is there; key: store the key and add that server; skills: clone the repo and copy those in;
  * own: copy those bundled skills from the folder, where missing or an older copy of ours. needs: skipped with a note when one of these commands is missing.
+ * unless: skipped when this command answers --version. then: run after run succeeds.
  * wait: seconds after which a still running command counts as done. ~/ is the home folder. */
-export type SetupStep = { label?: string; say?: string; needs?: string[]; wait?: number; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo; own?: { from: string; names: string[] } }
+export type SetupStep = { label?: string; say?: string; needs?: string[]; unless?: string; then?: string[]; wait?: number; ifExists?: string; copy?: { from: string; to: string }; run?: string[]; quiet?: true; key?: { name: string; url: string; header: string }; skills?: SkillRepo; own?: { from: string; names: string[] } }
 
-const KEY_LABEL: Record<ApiKey['name'], string> = { GEMINI_API_KEY: 'Gemini', OPENROUTER_API_KEY: 'OpenRouter (Jev, MiroFish)', PERPLEXITY_API_KEY: 'Perplexity', ZEP_API_KEY: 'Zep (MiroFish)' }
-const KEY_URL: Partial<Record<ApiKey['name'], string>> = { OPENROUTER_API_KEY: 'https://openrouter.ai/keys', ZEP_API_KEY: 'https://app.getzep.com' }
+const KEY_LABEL: Record<ApiKey['name'], string> = { GEMINI_API_KEY: 'Gemini', OPENROUTER_API_KEY: 'OpenRouter (Jev, MiroFish)', PERPLEXITY_API_KEY: 'Perplexity', FIRECRAWL_API_KEY: 'Firecrawl', ZEP_API_KEY: 'Zep (MiroFish)' }
+const KEY_URL: Partial<Record<ApiKey['name'], string>> = { OPENROUTER_API_KEY: 'https://openrouter.ai/keys', FIRECRAWL_API_KEY: 'https://www.firecrawl.dev/app/api-keys', ZEP_API_KEY: 'https://app.getzep.com' }
 const paste = (n: ApiKey['name']) => `${KEY_URL[n] ? `Get one at ${KEY_URL[n]} and paste` : 'Paste'} it in Switchboard: Settings, Accounts, API keys.`
 const keyLine = (k: ApiKey) => `${KEY_LABEL[k.name]} key: ${!k.saved ? `missing. ${paste(k.name)}` : `saved (ends ${k.last4})${k.checked ? (k.checked.ok ? ', works' : `, failed its test (${k.checked.reason ?? 'no reason'})`) : ''}.`}`
 
@@ -114,8 +117,13 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
     if (!o.mcps.includes(t.mcp.name)) out.push({ label: t.mcp.name, needs: ['uv'], run: ['claude', 'mcp', 'add', '--scope', 'user', t.mcp.name, '--', bin] })
     if (!cx.mcps.includes(t.mcp.name)) out.push({ label: `${t.mcp.name} (Codex)`, needs: ['uv', 'codex'], run: ['codex', 'mcp', 'add', t.mcp.name, '--', bin] })
   }
-  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: 'Set up done. Sign in to Slack and Cloudflare with /mcp in a chat, then run /reload-plugins in chats that were already open.' },
-    { say: `In Codex, sign in with ${kit.mcps.filter(m => m.url && !m.keyHeader).map(m => `codex mcp login ${m.name}`).join(' and ')}.` })
+  for (const n of kit.npm ?? []) {
+    if (n.os && !n.os.includes(platform)) continue
+    out.push({ label: n.pkg, needs: ['npm'], unless: n.pkg, run: ['npm', 'install', '-g', n.pkg], ...(n.then ? { then: n.then } : {}) })
+  }
+  const oauth = kit.mcps.filter(m => m.url && !m.keyHeader).map(m => m.name)
+  out.push({ say: '' }, ...(o.keys ?? []).map(k => ({ say: keyLine(k) })), { say: `Set up done. Sign in to ${oauth.join(', ')} with /mcp in a chat, then run /reload-plugins in chats that were already open.` },
+    { say: `In Codex, sign in with ${oauth.map(n => `codex mcp login ${n}`).join(', ')}.` })
   return out
 }
 

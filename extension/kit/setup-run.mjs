@@ -202,6 +202,7 @@ async function main(planFile, dry) {
     if (s.ifExists && !existsSync(expand(s.ifExists))) continue
     const gone = (s.needs ?? []).find(c => !dry && !(has[c] ??= run(c, ['--version'], true)))
     if (gone) { if (!said.has(gone)) { said.add(gone); console.log(`${gone} is not installed, so its steps are skipped (${s.label} and on).`) } continue }
+    if (s.unless && !dry && run(s.unless, ['--version'], true)) { console.log(`${s.label}: already installed`); continue }
     if (s.key) {
       const key = keyFor(s.key)
       if (!key) console.log(`${s.label}: no key in the env, skipped.`)
@@ -229,6 +230,7 @@ async function main(planFile, dry) {
     console.log(`> ${s.quiet ? s.label : [s.run[0], ...args].join(' ')}`)
     if (dry) continue
     if (run(s.run[0], args, s.quiet, s.wait)) {
+      if (s.then && !run(s.then[0], s.then.slice(1).map(a => expand(a)))) failed.push(`${s.label} (${s.then.join(' ')})`)
       if (s.quiet) console.log(`Added ${s.label}`)
       if (s.run[0] === 'claude' && s.run[1] === 'plugin' && s.run[2] === 'install') await sweepPlugin(s.run[3])
     } else failed.push(s.label)

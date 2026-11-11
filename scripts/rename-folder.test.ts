@@ -28,7 +28,7 @@ function fakeHome() {
   put(path.join(claude, 'jev-presets', 'agent-flow-route.json'), '{}')
   put(path.join(home, '.codex', 'config.toml'), `[projects."${src}"]\ntrust_level = "trusted"\n\n[projects."${src}/web"]\ntrust_level = "trusted"\n`)
   const lsof = path.join(home, 'lsof-stub')
-  put(lsof, '#!/bin/sh\n[ -n "$BUSY" ] && printf "p1\\ncCode Helper\\nn%s\\n" "$BUSY"\nexit 0\n')
+  put(lsof, '#!/bin/sh\n[ -n "$BUSY" ] && printf "p1\\nc%s\\nn%s\\n" "${CMD:-Code Helper}" "$BUSY"\nexit 0\n')
   fs.chmodSync(lsof, 0o755)
   return { home, src, dst, claude, sb, lsof }
 }
@@ -55,6 +55,16 @@ test('refuses while VS Code has a cwd inside the folder', () => {
   const r = run(h, ['--apply'], { BUSY: path.join(h.src, 'web') })
   assert.equal(r.status, 1)
   assert.match(r.stdout, /refuses until/)
+  assert.ok(fs.existsSync(h.src))
+  fs.rmSync(h.home, { recursive: true, force: true })
+})
+
+// the native claude binary shows up in lsof under its version, not "claude"
+test('refuses while a Claude chat named by its version runs inside', () => {
+  const h = fakeHome()
+  const r = run(h, ['--apply'], { BUSY: h.src, CMD: '2.1.321' })
+  assert.equal(r.status, 1)
+  assert.match(r.stdout, /2\.1\.321 in/)
   assert.ok(fs.existsSync(h.src))
   fs.rmSync(h.home, { recursive: true, force: true })
 })

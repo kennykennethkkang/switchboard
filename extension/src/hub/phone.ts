@@ -4,6 +4,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { withLock } from '../fs-utils'
+import { APPROVE_QUESTION } from './approve'
 import { doneText, otherText } from './progress'
 import type { Ask, AskQuestion, ChatProgress, Choice } from './types'
 
@@ -42,10 +43,13 @@ export function ring(c: Call): Promise<Placed | undefined> {
   return next
 }
 
-/** A chat turned done or needs-you (notify.ts dedupes repeats). A hub ask rings on its own through phoneAsk. */
+// phone-mode (claude-mods) denies every AskUserQuestion but the closing one and has the chat call instead.
+const chatCalls = (a: Ask | undefined) => a?.tool === 'AskUserQuestion' && !a.questions?.some(q => q.question.includes(APPROVE_QUESTION))
+
+/** A chat turned done or needs-you (notify.ts dedupes repeats). A hub ask rings on its own through phoneAsk; a chat's own call covers its AskUserQuestion. */
 export function phoneChange(p: ChatProgress, title: string): void {
   if (p.state === 'done') void ring({ key: `done\n${p.sessionId}\n${doneText(p)}`, text: `${title} is done. ${doneText(p)}`, say: true })
-  else if (p.state === 'needs-you' && p.ask?.via !== 'hub') void ring({ key: `need\n${p.sessionId}\n${p.question ?? ''}`, text: `${title} needs you: ${p.question ?? 'it is waiting on you'}`, say: true })
+  else if (p.state === 'needs-you' && p.ask?.via !== 'hub' && !chatCalls(p.ask)) void ring({ key: `need\n${p.sessionId}\n${p.question ?? ''}`, text: `${title} needs you: ${p.question ?? 'it is waiting on you'}`, say: true })
 }
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

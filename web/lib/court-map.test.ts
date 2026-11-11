@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PLACES, buildCourt, chatOf, courtEvents, fitCourt, forcedSpot, freeSpot, lod, movedFrom, PLATE, realmPlaque, type Box, type Court, type CourtNode } from './court-map'
+import { PLACES, buildCourt, courtSummary, chatOf, courtEvents, fitCourt, forcedSpot, freeSpot, lod, movedFrom, PLATE, realmPlaque, type Box, type Court, type CourtNode } from './court-map'
 import { emptyHub } from './hub-demo'
 import type { ChatProgress, ChatRow, Helper, HubState, RoleStep } from './hub-types'
 
@@ -85,7 +85,9 @@ test('council at the origin; Claude and Codex always get pavilions, Hermes when 
   const c = buildCourt(hub({}))
   const council = c.nodes.find(n => n.kind === 'council')!
   assert.equal(council.x + council.w / 2, 0); assert.equal(council.y + council.h / 2, 0)
-  assert.deepEqual(c.nodes.filter(n => n.kind === 'pavilion').map(n => n.ai), ['claude', 'codex'])
+  assert.deepEqual(c.nodes.filter(n => n.kind === 'pavilion').map(n => n.ai), ['claude', 'codex', 'research'])
+  const research = c.nodes.find(n => n.id === 'ai:research')!
+  assert.deepEqual([research.kind, research.label], ['pavilion', 'Research'])
   const c2 = buildCourt(hub({ ais: [{ id: 'hermes', name: 'Hermes', installed: true, chats: 0 }] }))
   assert.ok(c2.nodes.some(n => n.id === 'ai:hermes'))
   assert.ok(c2.nodes.some(n => n.kind === 'garden') && c2.nodes.some(n => n.kind === 'armory'))
@@ -124,9 +126,13 @@ test('a chat that needs you gets a petition from its lead desk to the council', 
   assert.equal(c.petition!.deskId, lead.id)
   const path = c.petition!.path, council = c.nodes.find(n => n.kind === 'council')!
   assert.deepEqual(path[0], [lead.x + lead.w / 2, lead.y + lead.h / 2].map(Math.round))
-  assert.deepEqual(path.at(-1), [council.x + council.w / 2, council.y + council.h / 2])
-  // Every leg of the path runs along a link.
-  for (let i = 1; i < path.length; i++) assert.ok(c.links.some(l => l.points.some(p => p[0] === path[i][0] && p[1] === path[i][1])))
+  // The walk stops at the council's rim, so its callout leaves the Council label clear.
+  const [ex, ey] = path.at(-1)!, [px, py] = path.at(-2)!
+  assert.ok(!(ex > council.x && ex < council.x + council.w && ey > council.y && ey < council.y + council.h), 'stops outside the council')
+  assert.ok(Math.abs((ex - px) * (0 - py) - (ey - py) * (0 - px)) < 1e3 * Math.hypot(px, py), 'on the road to the council')
+  assert.ok(Math.hypot(ex, ey) < Math.hypot(council.w, council.h), 'right at the rim')
+  // Every leg but the last runs along a link.
+  for (let i = 1; i < path.length - 1; i++) assert.ok(c.links.some(l => l.points.some(p => p[0] === path[i][0] && p[1] === path[i][1])))
 })
 
 test('lod: plates when a courtyard is big on screen, one card at mid zoom, dots when tiny', () => {
@@ -267,7 +273,7 @@ test('realms: a Claude lead\'s Codex desks and Jev calls dock on its courtyard a
   const eng = c.nodes.find(n => n.id === 'desk:a:engineer-codex')!
   assert.deepEqual([eng.parent, eng.ai, eng.role], ['realm:a:codex', 'codex', 'engineer'])
   const cl = c.nodes.find(n => n.id === 'realm:a:claude')!
-  assert.deepEqual([cl.parent, cl.ai, cl.label, cl.sub, cl.state, cl.runs], ['yard:a', 'claude', 'CLAUDE REALM', 'from Claude · a', 'done', 1])
+  assert.deepEqual([cl.parent, cl.ai, cl.label, cl.sub, cl.state, cl.runs], ['yard:a', 'claude', 'CLAUDE REALM', 'a', 'done', 1])
   assert.equal(c.nodes.find(n => n.id === 'desk:a:qa')!.parent, 'realm:a:claude')
   assert.deepEqual(c.nodes.filter(n => n.parent === 'yard:a' && n.kind === 'desk').map(n => n.role), ['lead'])
   assert.ok(inside(eng.x + eng.w / 2, eng.y + eng.h / 2, codex))
@@ -383,12 +389,12 @@ for (const n of [1, 6, 13, 30, 90]) test(`realm plaques stay clear of every isla
   }
 })
 
-test('Fit frames every node and every realm plaque inside the stage', () => {
-  const h = many(13), c = buildCourt(h), by = new Map(c.nodes.map(x => [x.id, x]))
-  for (const [w, ht] of [[1440, 846], [1280, 800]]) {
+test('Fit frames every island inside the stage and fills it on one axis', () => {
+  const c = buildCourt(many(13))
+  for (const [w, ht] of [[1440, 846], [1280, 800], [968, 740]]) {
     const f = fitCourt(c, w, ht), sx = (x: number) => x * f.zoom + f.x, sy = (y: number) => y * f.zoom + f.y
-    const boxes = [...c.nodes, ...c.nodes.filter(r => r.kind === 'realm').map(r => realmPlaque(r, by.get(r.parent!)!, f.zoom))]
-    for (const b of boxes) assert.ok(sx(b.x) >= 0 && sx(b.x + b.w) <= w && sy(b.y) >= 0 && sy(b.y + b.h) <= ht, `box out of the ${w} stage`)
+    for (const b of c.nodes) assert.ok(sx(b.x) >= 0 && sx(b.x + b.w) <= w && sy(b.y) >= 0 && sy(b.y + b.h) <= ht, `${b.id} out of the ${w} stage`)
+    assert.ok(Math.max(c.bounds.w * f.zoom / w, c.bounds.h * f.zoom / ht) > 0.85, `court fills the ${w} stage`)
   }
 })
 
@@ -412,6 +418,7 @@ for (const n of [1, 30, 90]) test(`realm plaques never land on each other or the
       const free = freeSpot(spots, w, ph2, boxes(), isles, r.id, stage), got = free ? { at: free, w } : forcedSpot(spots, w, ph2, [cx, mid], boxes(), isles, r.id, stage)
       if (!got) continue
       const box: Box = [got.at[0], got.at[1], got.w, ph2]
+      assert.ok(box[0] >= stage[0] && box[1] >= stage[1] && box[0] + box[2] <= stage[0] + stage[2] && box[1] + box[3] <= stage[1] + stage[3], `${r.id} plaque off the ${W}x${H} stage`)
       for (const t of taken) assert.ok(!overlap({ x: box[0], y: box[1], w: box[2], h: box[3] }, { x: t.r[0], y: t.r[1], w: t.r[2], h: t.r[3] }), `${r.id} plaque on ${t.id} at ${W}x${H}`)
       taken.push({ id: r.id, r: box }); shown++
     }
@@ -440,4 +447,54 @@ test('with uploads the demo court stays compact: a crowded shelf never flings a 
   assert.ok(c.nodes.some(n => n.kind === 'uploads'))
   assert.ok(c.bounds.w < 8000 && c.bounds.h < 8000, `bounds ${c.bounds.w}x${c.bounds.h}`)
   checkLayout(c)
+})
+
+test('a done chat with a request not covered carries missed on its yard and lead; a covered one does not', () => {
+  const c = buildCourt(hub({ chats: [chat('a'), chat('b')], progress: [
+    prog({ sessionId: 'a', state: 'done', asked: ['x', 'y'], covered: [0.1, 0.9] }),
+    prog({ sessionId: 'b', state: 'done', asked: ['x'], covered: [0.9] }),
+  ] }))
+  const get = (id: string) => c.nodes.find(n => n.id === id)!
+  assert.equal(get('yard:a').missed, 1)
+  assert.equal(get('desk:a:lead').missed, 1)
+  assert.equal(get('yard:b').missed, undefined)
+  assert.equal(get('desk:b:lead').state, 'done')
+})
+
+test('yards with realms sit near their window: no bridge runs far across the sky', () => {
+  const chats = ['a', 'b', 'c', 'd'].map(id => ({ ...chat(id), cwd: '/w/a' }))
+  const progress = chats.map(c => prog({ sessionId: c.sessionId, roles: [{ id: `${c.sessionId}-r`, role: 'engineer', state: 'active', startedAt: NOW }] }))
+  const c = buildCourt(hub({ chats, progress, windows: [{ workspace: '/w/a', name: 'Ay', color: 'violet' }] }), { w: 1600, h: 900 })
+  assert.equal(c.nodes.filter(n => n.kind === 'realm').length, 4)
+  for (const l of c.links.filter(l => l.from === 'win:/w/a')) {
+    const [[x0, y0], [x1, y1]] = l.points
+    assert.ok(Math.hypot(x1 - x0, y1 - y0) < 900, `${l.to} bridge is ${Math.round(Math.hypot(x1 - x0, y1 - y0))}px`)
+  }
+  checkLayout(c)
+})
+
+test('a tall stage squeezes the ring sideways instead of stretching it', () => {
+  const h = many(6)
+  assert.ok(buildCourt(h, { w: 390, h: 844 }).bounds.w < buildCourt(h).bounds.w * 0.9)
+})
+
+test('treasury counts only keys that can fail: unset keys and backup profiles stay out', () => {
+  const h = hub({
+    signIns: { chrome: [], projects: {}, keys: [{ name: 'GEMINI_API_KEY', saved: true }, { name: 'PERPLEXITY_API_KEY', saved: false }] },
+    aws: [{ name: 'default', status: 'signed-in', checkedAt: 1 }, { name: 'previous-default-1', status: 'expired', checkedAt: 1 }, { name: 'scratch', status: 'never', checkedAt: 1 }],
+  })
+  const t = buildCourt(h).nodes.find(n => n.kind === 'treasury')!
+  assert.deepEqual([t.task, t.warn], ['2/2 ok', 0])
+})
+
+test('Fit on a phone fills the stage instead of shrinking to fit 220px plaques', () => {
+  const h = many(13)
+  h.progress = h.progress.map((p, i) => i % 3 ? p : { ...p, helpers: [{ ai: 'jev', label: 'ask', state: 'done', since: NOW, last: NOW, count: 1 }] })
+  const c = buildCourt(h, { w: 390, h: 622 }), f = fitCourt(c, 390, 622)
+  assert.ok(Math.max(c.bounds.w * f.zoom / 390, c.bounds.h * f.zoom / 622) > 0.85)
+})
+
+test('council summary counts only AIs that have chats, pluralized', () => {
+  const h = hub({ chats: [chat('a')], progress: [prog({ sessionId: 'a', roles: [] })] })
+  assert.equal(courtSummary(buildCourt(h)), '1 AI · 1 chat · 1 agent')
 })

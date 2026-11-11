@@ -15,17 +15,19 @@ import { AIS, chatTerminal, cliPath, codexPaste, codexReady, shareKitWithHermes 
 import { quickAsk, withBrief } from './brain'
 import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
-import { awsBinary, browserEnv, chromeCall, chromeChoice, loginError, rowText, profileFor, readPrefs, readSessions, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
+import { CLI_APPS, cliBinary, cliBusy, deviceUrl, endCli, startCli } from './cli-logins'
+import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
 import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
 import { titleFor } from './title'
-import { moveTodoChat } from './todo'
+import { heldLabel, moveTodoChat, projectOf, todoEnv, type RunLabel } from './todo'
 import { trustFolder, trustedWindowRoots } from './trust'
 import { openChatTerminal, tags } from './terminals'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
 import { FLAGGED, chatSettings, cleanProfile, defaultProfile, handoffSettings, nameNote, saveProfile, savedProfile, startProfile, toolsNote } from './tools'
+import { editor } from '../editor'
 
 // A window opened by `code` from inside a chat inherits Claude's child marker, and a chat started
 // under it saves no transcript (no --resume, no handoff). Chat terminals drop it; null unsets.
@@ -33,7 +35,7 @@ import { FLAGGED, chatSettings, cleanProfile, defaultProfile, handoffSettings, n
 const OWN_CHAT = { CLAUDE_CODE_CHILD_SESSION: null, SWITCHBOARD_CHAT: '1' }
 /** A chat terminal's env: no child marker, and the AWS profile picked for its folder (Sign-ins). */
 const chatEnv = (cwd: string): Record<string, string | null> => {
-  const p = profileFor(hub.get().signIns.projects, cwd), b = profileFor(hub.get().signIns.browsers ?? {}, cwd)
+  const p = profileFor(hub.get().signIns.projects, cwd), b = browserFor(hub.get().signIns.browsers ?? {}, cwd)
   return { ...OWN_CHAT, ...(p && validProfileName(p) ? { AWS_PROFILE: p } : {}), ...browserEnv(chromeChoice(undefined, b, knownChrome()).dir, writeOpenChrome()) }
 }
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
@@ -63,6 +65,9 @@ const rowName = (first: string) => first.replace(/\s+/g, ' ').trim().slice(0, 60
 const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | undefined) => {
   if (name) codexStarts.push({ key: Math.random().toString(36).slice(2), cwd, name, at: Date.now(), terminal })
 }
+
+// A resumed or handed-off to-do chat keeps its todo-band; a handoff opens before moveTodoChat, so the old id holds it.
+const heldEnv = (cwd: string, chats: string[]) => { const f = projectOf(cwd); return todoEnv(heldLabel(hub.get().todos?.[f]?.todo, f, chats)) }
 
 /** Ties started Codex terminals to their sessions; hub-panel.ts calls it with each fresh chat list. */
 export function bindCodexTerminals(chats: ChatRow[], now = Date.now()): void {
@@ -102,14 +107,17 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
  * with no goal). Remote Control gets the same title: its name outranks --name. Answers why it could not start.
  * id: the Claude chat's session id, when the caller tracks it (a To-do item).
  * noRemote: Remote Control stays off even when it is on at startup, so a To-do run stays in VS Code.
+ * todo: a To-do run's label (runLabel): the chat is named `To-do N: <title>` and gets it as SWITCHBOARD_TODO.
  */
-export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, ai: AiId = 'claude', tools?: ChatProfile, id?: string, noRemote = false): Promise<string | undefined> {
+export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, ai: AiId = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel): Promise<string | undefined> {
   const project = hub.get().projects.find(p => p.path === folder)
   if (!project) return `${folder} is not in the project list yet; open Switchboard once and try again`
   const goal = text?.trim()
   const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(folder) : []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
-  const title = goal ? await titleFor(goal, quickAsk) : project.name
+  const named = goal ? await titleFor(goal, quickAsk) : project.name
+  // Prefix, not suffix: a handoff's version number has to stay at the end (projects.ts CHAIN).
+  const title = todo ? `To-do ${todo.n}: ${named}` : named
   const profile = startProfile(inv, tools)
   // Codex has no hook to read the brief from, so it rides in front of the first message.
   const first = withPointer(ai === 'claude' ? '' : withBrief(hub.get(), folder, text), rulesState.ready[ai], rulesState.kit)
@@ -132,12 +140,12 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, profileFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
   trustHere(folder)
-  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: chatEnv(folder) }, AIS[ai].name, sessionId)
+  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: { ...chatEnv(folder), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
   t.show(true)
   t.sendText(typed(command))
   return undefined
@@ -231,7 +239,7 @@ export async function openDiff(sessionId: string, file: string): Promise<string 
   type GitApi = { toGitUri(uri: vscode.Uri, ref: string): vscode.Uri; openRepository?(root: vscode.Uri): Promise<unknown> }
   const ext = vscode.extensions.getExtension<{ getAPI(v: 1): GitApi }>('vscode.git')
   const api = (ext?.isActive ? ext.exports : await ext?.activate())?.getAPI(1)
-  if (!api) { if (f.status !== 'deleted') await vscode.window.showTextDocument(right, { preview: true }); return api ? undefined : 'VS Code\'s Git extension is off' }
+  if (!api) { if (f.status !== 'deleted') await vscode.window.showTextDocument(right, { preview: true }); return api ? undefined : `${editor.name}'s Git extension is off` }
   await api.openRepository?.(vscode.Uri.file(c.cwd))
   const left = api.toGitUri(right, 'HEAD')
   if (f.status === 'deleted') await vscode.window.showTextDocument(left, { preview: true })
@@ -262,7 +270,7 @@ export function focusChat(sessionId: string): boolean {
 /** claim runs once the terminal is known, before any key goes out, so a refused answer leaves the prompt showing; false: a second tap got there first. */
 export async function answerInTerminal(pid: number, keys: string[], claim: () => boolean): Promise<string | undefined> {
   const t = await chatTerminal(pid, vscode.window.terminals)
-  if (!t) return 'that chat runs outside this VS Code window, so answer it in its terminal'
+  if (!t) return `that chat runs outside this ${editor.name} window, so answer it in its terminal`
   if (!claim()) return 'that prompt is already answered or gone'
   for (const [i, k] of keys.entries()) {
     if (i) await new Promise(r => setTimeout(r, 300))
@@ -293,7 +301,7 @@ export async function resumeChat(sessionId: string, ai: AiId, prompt?: string, f
     return undefined
   }
   trustHere(cwd)
-  const t = openChatTerminal({ name, cwd, env: chatEnv(cwd) }, AIS[ai].name, sessionId)
+  const t = openChatTerminal({ name, cwd, env: { ...chatEnv(cwd), ...heldEnv(cwd, [sessionId]) } }, AIS[ai].name, sessionId)
   t.show(true)
   t.sendText(typed(AIS[ai].resumeCommand(sessionId, myName()) + (prompt ? ` ${shellQuote(prompt, SHELL)}` : '')))
   return undefined
@@ -365,7 +373,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
   if (!codex) trustHere(h.cwd)
   const t = codex
     ? await codexTerminal(`Codex: ${fresh}`, h.cwd, [withBrief(hub.get(), h.cwd, text)])
-    : openChatTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: chatEnv(h.cwd) }, 'Claude', freshId)
+    : openChatTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: { ...chatEnv(h.cwd), ...heldEnv(h.cwd, [h.sessionId]) } }, 'Claude', freshId)
   if (typeof t === 'string') {
     void vscode.window.showWarningMessage(`Switchboard: ${t}.`)
     return false
@@ -459,7 +467,7 @@ function goneNote(gone: string[], dir: string): string | undefined {
  * Python's webbrowser runs BROWSER, a fixed script; the Chrome folder rides in the env. The own pick is kept per
  * profile, a deleted one dropped. done: called when it ends, signed in or not.
  */
-export function awsLogin(profile: string, chrome: string | undefined, done: () => void, project?: string): string | undefined {
+export function awsLogin(profile: string, chrome: string | undefined, done: () => void, project?: string, added = false): string | undefined {
   if (!validProfileName(profile)) return 'Not a profile name'
   const prefs = readPrefs()
   const own = chrome ?? prefs.chrome[profile] ?? ''
@@ -481,14 +489,72 @@ export function awsLogin(profile: string, chrome: string | undefined, done: () =
   child.on('close', code => {
     clearTimeout(timer)
     if (code === 0) {
-      writeSessions({ ...readSessions(), [profile]: { at: Date.now() } })
-      void vscode.window.showInformationMessage(`Switchboard: signed in to AWS as ${profile}.`)
+      // A just-added profile that signed in as a user already there folds into that one; a re-sign-in only refreshes.
+      let kept = profile
+      // A throw here (config backup, prefs write) must not skip done(); the sign-in itself worked.
+      try {
+        const twin = added ? sameLogin(readAwsConfig(), profile) : undefined
+        if (twin && !deleteAwsProfile(profile)) kept = twin
+        if (kept !== profile) writePrefs(moveProfile(readPrefs(), profile, kept))
+        const { [profile]: _gone, ...sessions } = readSessions()
+        writeSessions({ ...(kept === profile ? readSessions() : sessions), [kept]: { at: Date.now() } })
+      } catch (err) { signInNote(key, `Signed in, but Switchboard could not update its own files: ${(err as Error).message}`) }
+      void vscode.window.showInformationMessage(kept === profile ? `Switchboard: signed in to AWS as ${profile}.` : `Switchboard: signed in to AWS as ${kept}; ${profile} was the same login, so it was folded into ${kept}.`)
+      // The row's name and email follow whoever just signed in.
+      void refreshIdentity(kept).catch(() => undefined).finally(done)
+      return
     } else {
       const why = code === null ? `No sign-in within ${LOGIN_MS / 60_000} minutes, so aws login was stopped.` : loginError(out) || `aws login exited with code ${code}.`
       signInError(key, why)
       void vscode.window.showWarningMessage(`Switchboard: aws login --profile ${profile} did not finish: ${why.split('\n').pop()}`)
     }
     done()
+  })
+  return undefined
+}
+
+/** A device sign-in page in the picked Chrome profile, behind the front window (the BROWSER script's -g). */
+function openDevice(url: string, dir: string, key: string): void {
+  const script = writeOpenChrome()
+  const fail = (err: Error | null) => { if (err) signInError(key, `Could not open Chrome: ${err.message}`) }
+  if (script) { execFile(script, [url], { timeout: 10_000, env: { ...process.env, SWITCHBOARD_CHROME_DIR: dir } }, fail); return }
+  const c = knownChrome().length ? chromeCall(url, dir) : undefined
+  if (!c) { void vscode.env.openExternal(vscode.Uri.parse(url)); return }
+  execFile(c.cmd, c.args, { timeout: 10_000, windowsHide: true }, fail)
+}
+
+/**
+ * A CLI web app's login (CLI_APPS, Auth0 now) with no stdin: its device page opens in Chrome as awsLogin picks
+ * (own, project, last used). key: the row for notes and errors. done: called when it ends, signed in or not.
+ */
+export function cliLogin(app: string, own: string | undefined, project: string | undefined, key: string, done: () => void): string | undefined {
+  const c = CLI_APPS[app]
+  if (!c) return 'that app has no CLI sign-in'
+  if (!startCli(app)) { signInNote(key, 'Sign-in already open in Chrome; approve it there or wait for it to time out.'); return undefined }
+  const busy = () => hub.set({ signIns: { ...hub.get().signIns, busy: cliBusy() } })
+  busy()
+  let ended = false
+  const finish = () => { if (ended) return; ended = true; endCli(app); busy(); done() }
+  const { dir, gone } = chromeChoice(own, project, knownChrome())
+  signInError(key)
+  signInNote(key, goneNote(gone, dir))
+  const script = writeOpenChrome()
+  let child: ReturnType<typeof spawn>
+  try { child = spawn(cliBinary(c), c.login, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...browserEnv(dir, script) }, windowsHide: true }) } catch (err) { finish(); return `${c.login[0]} could not start: ${(err as Error).message}` }
+  let out = '', opened = false
+  const keep = (b: Buffer) => {
+    out = (out + b.toString()).slice(-8000)
+    const url = opened ? undefined : deviceUrl(out)
+    if (url) { opened = true; openDevice(url, dir, key) }
+  }
+  child.stdout?.on('data', keep); child.stderr?.on('data', keep)
+  // The kill fires close, which frees the slot.
+  const timer = setTimeout(() => child.kill(), LOGIN_MS)
+  child.on('error', err => { clearTimeout(timer); signInError(key, `${c.login[0]} could not start: ${err.message}`); finish() })
+  child.on('close', code => {
+    clearTimeout(timer)
+    if (code !== 0) signInError(key, code === null ? `No sign-in within ${LOGIN_MS / 60_000} minutes, so the login was stopped.` : loginError(out) || `login exited with code ${code}.`)
+    finish()
   })
   return undefined
 }

@@ -8,11 +8,12 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRe
 import { Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './flow-map.css'
-import { KIND_NAME, NODE_H, NODE_W, cardOf, demoFlowMap, foldView, layoutView, loadFlowMap, neighbours, sidesOf, when, type FlowKind, type FlowMap, type Mode, type ViewEdge, type ViewNode } from '@/lib/flow-map'
+import { KIND_NAME, NODE_H, NODE_W, PAD, boxH, READ, boxText, cardOf, openView, demoFlowMap, foldView, layoutView, loadFlowMap, neighbours, quietEdges, sidesOf, startProject, toggleOpen, when, withTree, type FlowKind, type FlowMap, type ViewEdge, type ViewNode } from '@/lib/flow-map'
 
 const NARROW = '(max-width: 600px)'
-// Room for the lane titles, the zoom buttons and the legend.
-const FIT = { padding: { top: '48px', right: '72px', bottom: '104px', left: '32px' }, maxZoom: 1 } as const
+const SAVED = 'fm-project'
+// Room for the lane titles and the zoom buttons.
+const FIT = { padding: { top: `${PAD.top}px`, right: `${PAD.right}px`, bottom: `${PAD.bottom}px`, left: `${PAD.left}px` }, maxZoom: 1 } as const
 const ORDER: FlowKind[] = ['folder', 'file', 'chat', 'skill', 'plugin', 'mod', 'role']
 const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 
@@ -24,7 +25,7 @@ type Data = { n: ViewNode; d: number }
 const Box = memo(function Box({ data }: NodeProps<Node<Data>>) {
   const { n, d } = data
   const act = useContext(Act)
-  const meta = n.kind === 'folder' ? `${n.files} file${n.files === 1 ? '' : 's'}${n.open ? ', open' : ''}` : n.kind === 'chat' ? when(n.at) : KIND_NAME[n.kind]
+  const { name, meta } = boxText(n)
   return (
     <button type="button" className="fm-node" data-kind={n.kind} data-hit={n.hit || undefined} title={n.label} style={{ animationDelay: `${d}ms` }}
       onClick={() => act.pick(n.id)} onDoubleClick={() => { if (n.kind === 'folder') act.toggle(n.id) }}
@@ -32,14 +33,14 @@ const Box = memo(function Box({ data }: NodeProps<Node<Data>>) {
       <Handle type="target" id="tl" position={Position.Left} isConnectable={false} />
       <Handle type="source" id="sl" position={Position.Left} isConnectable={false} />
       <i aria-hidden />
-      <span><b>{n.kind === 'file' ? base(n.label) : n.label}</b><small>{meta}</small></span>
+      <span><b>{name}</b><small>{meta}</small></span>
       <Handle type="target" id="tr" position={Position.Right} isConnectable={false} />
       <Handle type="source" id="sr" position={Position.Right} isConnectable={false} />
     </button>
   )
 })
-const Lane = memo(function Lane({ data }: NodeProps<Node<{ name: string; count: number }>>) {
-  return <div className="fm-lane">{data.name}<b>{data.count}</b></div>
+const Lane = memo(function Lane({ data }: NodeProps<Node<{ name: string; count: number; total?: number }>>) {
+  return <div className="fm-lane">{data.name}<b>{data.count}{data.total && data.total > data.count ? ` of ${data.total}` : ''}</b></div>
 })
 const TYPES = { box: Box, lane: Lane }
 
@@ -69,32 +70,35 @@ function focusCss(id: string | undefined, idx: Map<string, number>, near: Map<st
   return rules.join('')
 }
 
-function Canvas({ nodes, edges, picked, onPick, onToggle, still, docked }: { nodes: ViewNode[]; edges: ViewEdge[]; picked?: string; onPick: (id?: string) => void; onToggle: (id: string) => void; still: boolean; docked: boolean }) {
+type Reveal = { id: string; at: number }
+function Canvas({ nodes, edges, picked, onPick, onToggle, still, fitKey, reveal, folders }: { nodes: ViewNode[]; edges: ViewEdge[]; picked?: string; onPick: (id?: string) => void; onToggle: (id: string) => void; still: boolean; fitKey: string; reveal?: Reveal; folders: number }) {
   const wrap = useRef<HTMLDivElement>(null)
   const style = useRef<HTMLStyleElement>(null)
   const [aspect] = useState(() => (typeof window === 'undefined' ? 1.6 : Math.max(0.6, Math.min(2.4, window.innerWidth / Math.max(1, window.innerHeight - 64)))))
-  const lay = useMemo(() => layoutView(nodes, edges, aspect), [nodes, edges, aspect])
+  const [maxW] = useState(() => (typeof window === 'undefined' ? Infinity : (window.innerWidth - PAD.left - PAD.right) / READ))
+  const lay = useMemo(() => layoutView(nodes, edges, aspect, maxW), [nodes, edges, aspect, maxW])
   const idx = useMemo(() => new Map(nodes.map((n, i) => [n.id, i])), [nodes])
-  const near = useMemo(() => neighbours(edges), [edges])
+  const near = useMemo(() => neighbours(edges, nodes), [edges, nodes])
+  const quiet = useMemo(() => quietEdges(nodes, edges), [nodes, edges])
   const rf = useReactFlow()
 
   const flowNodes = useMemo(() => {
     const lane = (x: number) => Math.max(0, lay.lanes.findLastIndex(l => l.x <= x))
-    const out: Node[] = lay.lanes.map((l, i) => ({ id: `lane:${i}`, type: 'lane', position: { x: l.x, y: -40 }, data: { name: l.name, count: l.count }, selectable: false, focusable: false, className: 'fm-lane-n' }))
+    const out: Node[] = lay.lanes.map((l, i) => ({ id: `lane:${i}`, type: 'lane', position: { x: l.x, y: -40 }, data: { name: l.name, count: l.count, ...(l.name === 'Folders' ? { total: folders } : {}) }, selectable: false, focusable: false, className: 'fm-lane-n' }))
     nodes.forEach((n, i) => {
       const p = lay.at.get(n.id) ?? { x: 0, y: 0 }
       // Entry stagger: by lane, then down the column, capped so a big map is in within ~0.5 s.
       const d = lane(p.x) * 70 + Math.min(Math.round(p.y / (NODE_H + 10)), 16) * 14
-      out.push({ id: n.id, type: 'box', position: p, data: { n, d }, width: NODE_W, height: NODE_H, className: `n${i}`, focusable: false })
+      out.push({ id: n.id, type: 'box', position: p, data: { n, d }, width: NODE_W, height: boxH(n.kind), className: `n${i}`, focusable: false })
     })
     return out
-  }, [nodes, lay])
+  }, [nodes, lay, folders])
   const flowEdges: Edge[] = useMemo(() => edges.map(e => {
     const s = sidesOf(lay.at.get(e.from), lay.at.get(e.to))
     // Same column: a bezier between two right handles collapses into the node border, so bracket out to the side.
     const bend = s.from === s.to ? { type: 'smoothstep', pathOptions: { offset: 22, borderRadius: 10 } } : {}
-    return { id: `${e.from}>${e.to}>${e.kind}`, source: e.from, target: e.to, sourceHandle: `s${s.from}`, targetHandle: `t${s.to}`, ...bend, className: `fm-edge ${e.kind} s${idx.get(e.from)} t${idx.get(e.to)}`, markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 }, ...(e.n > 1 ? { label: String(e.n) } : {}) }
-  }), [edges, lay, idx])
+    return { id: `${e.from}>${e.to}>${e.kind}`, source: e.from, target: e.to, sourceHandle: `s${s.from}`, targetHandle: `t${s.to}`, ...bend, className: `fm-edge ${e.kind}${quiet.has(e) ? ' quiet' : ''} s${idx.get(e.from)} t${idx.get(e.to)}`, markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 }, ...(e.n > 1 ? { label: String(e.n) } : {}) }
+  }), [edges, lay, idx, quiet])
 
   const hovered = useRef<string>(undefined)
   const pickedRef = useRef(picked)
@@ -116,8 +120,52 @@ function Canvas({ nodes, edges, picked, onPick, onToggle, still, docked }: { nod
     const t = setTimeout(() => w.removeAttribute('data-enter'), 1100)
     return () => clearTimeout(t)
   }, [lay, still])
-  // Refit when the card docks or leaves too, or the map sits under it.
-  useEffect(() => { const t = setTimeout(() => void rf.fitView({ ...FIT, duration: still ? 0 : 420 }), 20); return () => clearTimeout(t) }, [lay, rf, still, docked])
+  // Fit on first draw and when the search changes; opening or folding a folder keeps the view where it is.
+  const fitted = useRef<string>(undefined)
+  useEffect(() => {
+    if (fitted.current === fitKey) return
+    const t = setTimeout(() => {
+      fitted.current = fitKey
+      const w = wrap.current, v = w && openView(lay, w.clientWidth, w.clientHeight), duration = still ? 0 : 420
+      if (!v || v === 'fit') void rf.fitView({ ...FIT, duration })
+      else void rf.setViewport(v, { duration })
+    }, 20)
+    return () => clearTimeout(t)
+  }, [lay, rf, still, fitKey])
+  // Pan a box on screen when it is off it: a just opened folder (and room for what it shows), a search pick, or a pick the docked card now covers.
+  const show = (id: string, below: number) => {
+    const p = lay.at.get(id), w = wrap.current
+    if (!p || !w) return
+    const { x, y, zoom } = rf.getViewport(), sx = p.x * zoom + x, sy = p.y * zoom + y
+    if (sx >= 0 && sy >= PAD.top && sx + NODE_W * zoom <= w.clientWidth && sy + NODE_H * below * zoom <= w.clientHeight) return
+    // move only as far as it takes, 24px clear of the edge
+    const m = 24, bw = NODE_W * zoom, bh = NODE_H * below * zoom
+    const dx = sx < m ? m - sx : sx + bw > w.clientWidth - m ? w.clientWidth - m - bw - sx : 0
+    const dy = sy < PAD.top ? PAD.top - sy : sy + bh > w.clientHeight - m ? Math.max(PAD.top - sy, w.clientHeight - m - bh - sy) : 0
+    void rf.setViewport({ x: x + dx, y: y + dy, zoom }, { duration: still ? 0 : 320 })
+  }
+  useEffect(() => { if (reveal) show(reveal.id, 3) }, [reveal, lay]) // eslint-disable-line react-hooks/exhaustive-deps
+  // after the grid gives the card its column, so the canvas width is the new one
+  useEffect(() => {
+    if (!picked) return
+    const t = setTimeout(() => show(picked, 1), 40)
+    return () => clearTimeout(t)
+  }, [picked]) // eslint-disable-line react-hooks/exhaustive-deps
+  // + / = zoom in, - out, 0 fits; not while typing in the search box or the project picker.
+  useEffect(() => {
+    const d = wrap.current?.closest('dialog')
+    if (!d) return
+    const key = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest?.('input, select')) return
+      if (e.key === '+' || e.key === '=') void rf.zoomIn() // no animation: a second press would cut the first short
+      else if (e.key === '-') void rf.zoomOut()
+      else if (e.key === '0') void rf.fitView({ ...FIT, duration: still ? 0 : 420 })
+      else return
+      e.preventDefault()
+    }
+    d.addEventListener('keydown', key)
+    return () => d.removeEventListener('keydown', key)
+  }, [rf, still])
 
   return (
     <Act.Provider value={acts}>
@@ -125,20 +173,25 @@ function Canvas({ nodes, edges, picked, onPick, onToggle, still, docked }: { nod
         <style ref={style} />
         <ReactFlow nodes={flowNodes} edges={flowEdges} nodeTypes={TYPES} onPaneClick={() => onPick(undefined)}
           onNodeMouseEnter={(_, n) => { if (!n.id.startsWith('lane:')) acts.hover(n.id) }} onNodeMouseLeave={() => acts.hover(undefined)}
-          nodesDraggable={false} nodesConnectable={false} zoomOnDoubleClick={false} nodesFocusable={false} edgesFocusable={false} elementsSelectable={false} onlyRenderVisibleElements
-          minZoom={0.04} maxZoom={2} attributionPosition="top-right" fitView fitViewOptions={FIT}>
-          <Controls showInteractive={false} />
+          nodesDraggable={false} nodesConnectable={false} zoomOnDoubleClick={false} nodesFocusable={false} edgesFocusable={false} elementsSelectable={false} onlyRenderVisibleElements panOnScroll
+          minZoom={0.04} maxZoom={2} attributionPosition="top-right">
+          <Controls showInteractive={false} fitViewOptions={FIT} />
         </ReactFlow>
       </div>
     </Act.Provider>
   )
 }
 
-export function FlowMapView({ isDemo, cwds, cwd: first, onClose }: { isDemo: boolean; cwds: string[]; cwd?: string; onClose: () => void }) {
-  const [cwd, setCwd] = useState(first ?? cwds[0])
-  const [map, setMap] = useState<FlowMap>()
+/** here: this window's project; cwd: the picked chat's. Both follow the hub until a project is picked in the map. */
+export function FlowMapView({ isDemo, cwds, here, cwd: chatCwd, onClose }: { isDemo: boolean; cwds: string[]; here?: string; cwd?: string; onClose: () => void }) {
+  const [chosen, setChosen] = useState<string>()
+  const [saved] = useState(() => { try { return localStorage.getItem(SAVED) ?? undefined } catch { return undefined } })
+  const cwd = chosen ?? startProject(cwds, here, saved, chatCwd)
+  const pickProject = (c: string) => { setChosen(c); try { localStorage.setItem(SAVED, c) } catch { /* private window */ } }
+  const [raw, setMap] = useState<FlowMap>()
+  const map = useMemo(() => raw && withTree(raw), [raw])
+  const [reveal, setReveal] = useState<Reveal>()
   const [problem, setProblem] = useState<string>()
-  const [mode, setMode] = useState<Mode>('both')
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<string>()
@@ -146,7 +199,6 @@ export function FlowMapView({ isDemo, cwds, cwd: first, onClose }: { isDemo: boo
   const narrow = useMedia(NARROW)
   const still = useMedia('(prefers-reduced-motion: reduce)')
   const dlg = useRef<HTMLDialogElement>(null)
-  const findRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let stop = false
@@ -160,46 +212,54 @@ export function FlowMapView({ isDemo, cwds, cwd: first, onClose }: { isDemo: boo
   const [was] = useState(() => (typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null))
   useEffect(() => {
     const d = dlg.current
-    if (d && !d.open) { d.showModal(); findRef.current?.focus() }
+    if (d && !d.open) { d.showModal(); d.focus() } // the dialog, not the search box, so + - 0 work at once
     return () => { d?.close(); was?.focus?.() }
   }, [was])
 
-  const view = useMemo(() => (map ? foldView(map, mode, open, q, hide) : { nodes: [], edges: [] }), [map, mode, open, q, hide])
+  const view = useMemo(() => (map ? foldView(map, open, q, hide) : { nodes: [], edges: [] }), [map, open, q, hide])
   const card = map && picked ? cardOf(map, picked) : undefined
-  const toggle = useCallback((id: string) => setOpen(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }), [])
+  const toggle = useCallback((id: string) => { setOpen(s => toggleOpen(s, id)); setReveal({ id, at: Date.now() }) }, [])
   const flip = (k: FlowKind) => setHide(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
-  const kinds = useMemo(() => { const c = new Map<FlowKind, number>(); for (const n of map?.nodes ?? []) if (n.kind !== 'file') c.set(n.kind, (c.get(n.kind) ?? 0) + 1); return ORDER.filter(k => c.has(k) && (mode === 'both' || (mode === 'code') === (k === 'folder'))).map(k => [k, c.get(k)!] as const) }, [map, mode])
+  const kinds = useMemo(() => { const c = new Map<FlowKind, number>(); for (const n of map?.nodes ?? []) if (n.kind !== 'file') c.set(n.kind, (c.get(n.kind) ?? 0) + 1); return ORDER.filter(k => c.has(k)).map(k => [k, c.get(k)!] as const) }, [map])
   const chats = map?.nodes.filter(n => n.kind === 'chat').length ?? 0
   const folders = map?.nodes.filter(n => n.kind === 'folder').length ?? 0
 
   return (
-    <dialog ref={dlg} className="fm" aria-label="Flow map" data-picked={card ? '' : undefined} onCancel={e => { e.preventDefault(); if (picked) setPicked(undefined); else onClose() }}>
+    <dialog ref={dlg} className="fm" aria-label="Flow map" tabIndex={-1} data-picked={card ? '' : undefined}
+      // Esc on keydown: Chrome only lets a dialog cancel be stopped once per user activation. Card first, then the view.
+      onCancel={e => { e.preventDefault(); if (picked) setPicked(undefined); else onClose() }}
+      onKeyDown={e => {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        // in the search box Esc clears it, then leaves it; the map stays open
+        const t = e.target as HTMLElement
+        if (t instanceof HTMLInputElement && t.type === 'search') { if (q) setQ(''); else { t.blur(); dlg.current?.focus() } return }
+        if (picked) setPicked(undefined); else onClose()
+      }}>
       <header className="fm-bar">
         <div className="fm-title">
           <h2>Flow map</h2>
           {cwds.length > 1 && !isDemo
-            ? <select aria-label="Project" value={cwd} onChange={e => setCwd(e.target.value)}>{cwds.map(c => <option key={c} value={c}>{base(c)}</option>)}</select>
+            ? <select aria-label="Project" value={cwd} onChange={e => pickProject(e.target.value)}>{cwds.map(c => <option key={c} value={c}>{base(c)}</option>)}</select>
             : <p>{map?.project ?? (cwd ? base(cwd) : '')}</p>}
-        </div>
-        <div className="fm-mode" role="group" aria-label="Show">
-          {(['code', 'work', 'both'] as Mode[]).map(m => <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>{m === 'code' ? 'Code' : m === 'work' ? 'Work' : 'Both'}</button>)}
         </div>
         <label className="fm-find">
           <svg aria-hidden width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM11 11l3.5 3.5" /></svg>
-          <input ref={findRef} type="search" placeholder="Find a folder, chat or skill" aria-label="Find" value={q} onChange={e => setQ(e.target.value)} />
+          <input type="search" placeholder="Find a folder, chat or skill" aria-label="Find" value={q} onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { const hit = view.nodes.find(n => n.hit); if (hit) { setPicked(hit.id); setReveal({ id: hit.id, at: Date.now() }) } } }} />
         </label>
-        <button type="button" className="hub-btn icon" aria-label="Close Flow map" onClick={onClose}>
-          <svg aria-hidden width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
-        </button>
       </header>
 
       <main className="fm-main">
         {problem ? <p className="fm-note">{problem}</p>
           : !map ? <p className="fm-note">Reading the code and the chats...</p>
-          : !view.nodes.length ? <p className="fm-note">{q ? `Nothing matches "${q}".` : mode === 'work' ? 'No chats have worked here yet.' : 'No code files found.'}</p>
+          : !view.nodes.length ? <p className="fm-note">{q ? `Nothing matches "${q}".` : hide.size ? 'Everything is hidden. Turn a kind back on below.' : 'No code files or chats found.'}</p>
           : narrow ? <List nodes={view.nodes} picked={picked} onPick={setPicked} onToggle={toggle} />
-          : <ReactFlowProvider><Canvas nodes={view.nodes} edges={view.edges} picked={picked} onPick={setPicked} onToggle={toggle} still={still} docked={!!card} /></ReactFlowProvider>}
-        {map && !narrow && kinds.length > 0 && <div className="fm-legend">
+          : <ReactFlowProvider><Canvas nodes={view.nodes} edges={view.edges} picked={picked} onPick={setPicked} onToggle={toggle} still={still} fitKey={`${cwd}\n${q.trim()}`} reveal={reveal} folders={folders} /></ReactFlowProvider>}
+      </main>
+
+      {map && <footer className="fm-under">
+        {kinds.length > 0 && <div className="fm-legend">
           <ul aria-label="Show or hide">{kinds.map(([k, c]) => <li key={k}><button type="button" data-kind={k} aria-pressed={!hide.has(k)} onClick={() => flip(k)}><i aria-hidden />{k === 'role' ? 'Roles' : `${KIND_NAME[k]}s`}<b>{c}</b></button></li>)}</ul>
           <ul aria-label="Lines" className="fm-key">
             <li><svg aria-hidden width="22" height="8"><path d="M1 4h20" className="import" /></svg>Imports</li>
@@ -207,8 +267,8 @@ export function FlowMapView({ isDemo, cwds, cwd: first, onClose }: { isDemo: boo
             <li><svg aria-hidden width="22" height="8"><path d="M1 4h20" className="used" /></svg>Used</li>
           </ul>
         </div>}
-        {map && <p className="fm-foot">{folders} folder{folders === 1 ? '' : 's'}, {chats} chat{chats === 1 ? '' : 's'}{map.cut ? ', stopped at 1500 files' : ''}. Hover to trace links, click for details, double-click a folder for its files.</p>}
-      </main>
+        <p className="fm-foot">{folders} folder{folders === 1 ? '' : 's'}, {chats} chat{chats === 1 ? '' : 's'}{map.cut ? ', stopped at 1500 files' : ''}. Hover or click a box to trace its lines, click for details, double-click a folder to open it.</p>
+      </footer>}
 
       {card && picked && (
         <aside className="fm-card" aria-label={card.title}>
@@ -219,7 +279,7 @@ export function FlowMapView({ isDemo, cwds, cwd: first, onClose }: { isDemo: boo
             </button>
           </div>
           <p>{card.about}</p>
-          {picked.startsWith('d:') && <button type="button" className="hub-btn" onClick={() => toggle(picked)}>{open.has(picked) ? 'Fold its files back in' : 'Show its files'}</button>}
+          {picked.startsWith('d:') && <button type="button" className="hub-btn" onClick={() => toggle(picked)}>{open.has(picked) ? 'Fold it' : 'Open it'}</button>}
           {card.uses.length > 0 && <><h4>{picked.startsWith('chat:') ? 'It used' : 'It uses'}</h4><ul>{card.uses.map(u => <li key={u}>{u}</li>)}</ul></>}
           {card.usedBy.length > 0 && <><h4>Used by</h4><ul>{card.usedBy.map(u => <li key={u}>{u}</li>)}</ul></>}
           {card.history.length > 0 && <><h4>{picked.startsWith('chat:') ? 'What it changed' : picked.startsWith('d:') || picked.startsWith('f:') ? 'Built or changed by' : 'Chats that used it'}</h4>
@@ -242,8 +302,8 @@ function List({ nodes, picked, onPick, onToggle }: { nodes: ViewNode[]; picked?:
             <h4>{KIND_NAME[k]}s <b>{of.length}</b></h4>
             <ul>{of.map(n => (
               <li key={n.id}>
-                <button type="button" data-kind={n.kind} aria-pressed={n.id === picked} onClick={() => onPick(n.id)}><i aria-hidden /><span>{n.label}</span>{n.kind === 'folder' && <small>{n.files}</small>}</button>
-                {n.kind === 'folder' && <button type="button" className="fm-open" aria-label={n.open ? `Fold ${n.label}` : `Show files in ${n.label}`} onClick={() => onToggle(n.id)}>{n.open ? 'Fold' : 'Files'}</button>}
+                <button type="button" data-kind={n.kind} aria-pressed={n.id === picked} onClick={() => onPick(n.id)}><i aria-hidden /><span>{n.label}</span>{n.kind === 'folder' && <small>{(n.files ?? 0) + (n.subs ?? 0)}</small>}</button>
+                {n.kind === 'folder' && <button type="button" className="fm-open" aria-label={n.open ? `Fold ${n.label}` : `Open ${n.label}`} onClick={() => onToggle(n.id)}>{n.open ? 'Fold' : 'Open'}</button>}
               </li>
             ))}</ul>
           </section>

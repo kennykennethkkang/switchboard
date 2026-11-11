@@ -448,6 +448,7 @@ describe('chatTranscript for a Codex rollout', () => {
     ])
     const t = (await chatTranscript(id, undefined, { home }))!
     assert.equal(t.transcript, undefined)
+    assert.equal(t.codex, true)
     assert.deepEqual(t.messages.slice(0, 2), [{ role: 'you', text: 'fix the bug' }, { role: 'claude', text: 'On it [removed]' }])
     assert.deepEqual(t.messages.slice(2).map(m => m.role), ['tool', 'tool', 'tool'])
     assert.match(t.messages[2].text, /^exec_command .*ls -la/)

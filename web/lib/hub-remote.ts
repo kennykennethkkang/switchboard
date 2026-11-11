@@ -11,7 +11,7 @@ const HEADERS = { 'X-Switchboard': '1', 'Content-Type': 'application/json' }
 export const downReason = (status: number | undefined) =>
   status === 401 || status === 403 ? 'This device is signed out. Scan the QR code or type the code from the Switchboard panel again.'
   : status === undefined ? 'Cannot reach the Mac. Check Wi-Fi or Tailscale.'
-  : 'No VS Code window with Switchboard is open on the Mac.'
+  : 'No editor window with Switchboard is open on the Mac.'
 
 // The proxy answers 304 when the state has not changed since this ETag; no-store keeps the browser cache out of it.
 let last: { etag: string; hub: HubState } | undefined

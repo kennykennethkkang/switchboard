@@ -112,7 +112,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string } }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
   | { type: 'hub-star'; sessionId: string; ai: AiId; on: boolean }
@@ -125,20 +125,21 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-terminal'; id: number; act: 'show' | 'close' }
   | { type: 'hub-keep'; onFull?: 'compact' | 'fresh'; freshBranch?: boolean }
   | { type: 'hub-aws-login'; profile: string; chrome?: string }
-  | { type: 'hub-aws-default'; profile: string }
+  | { type: 'hub-aws-rename'; profile: string; to: string }
   | { type: 'hub-aws-label'; profile: string; label: string }
   | { type: 'hub-aws-add'; profile: string; region: string; chrome?: string }
   | { type: 'hub-aws-window'; profile: string | null }
   | { type: 'hub-aws-check' }
   | { type: 'hub-aws-delete'; profile: string }
   | { type: 'hub-login-app-add'; name: string; url: string }
-  | { type: 'hub-login-add'; app: string; label: string; url: string; chrome?: string }
+  | { type: 'hub-login-add'; app: string; label: string; url: string; chrome?: string; email?: string }
   | { type: 'hub-login-open'; app: string; id?: string; chrome?: string; folder?: string }
-  /** login: a login id, null for the app's default, 'off' to drop the app from the project. */
+  /** login: a login id; 'off' or null drops the app from the project. */
   | { type: 'hub-login-link'; folder: string; app: string; login: string | null }
   | { type: 'hub-browser'; folder: string; chrome: string | null }
   | { type: 'hub-login-active'; app: string; id: string }
-  | { type: 'hub-login-rename'; app: string; id: string; label: string }
+  /** email: '' clears it, none keeps it. */
+  | { type: 'hub-login-rename'; app: string; id: string; label: string; email?: string }
   | { type: 'hub-login-delete'; app: string; id: string }
   | { type: 'hub-login-app-delete'; app: string }
   | { type: 'hub-key-save'; name: ApiKeyName; value: string }
@@ -183,6 +184,8 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
   | { type: 'hub-harden'; sessionId: string }
+  /** One message for every uncommitted change in the chat's repo, into Source Control and RepoView.draft. */
+  | { type: 'hub-draft-commit'; sessionId: string }
   | { type: 'hub-todo-add'; path: string; text: string }
   | { type: 'hub-todo-edit'; path: string; id: string; text: string }
   | { type: 'hub-todo-remove'; path: string; id: string }
@@ -195,6 +198,7 @@ export type WebviewToExtensionMessage =
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
   | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
+  | { type: 'hub-todo-pilot'; path: string; on?: boolean; paused?: boolean }
   | { type: 'hub-todo-replace'; path: string; remote: string }
 
 // ─── Transcript Types (from Claude Code JSONL files) ─────────────────────────

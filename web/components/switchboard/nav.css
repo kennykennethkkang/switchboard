@@ -1,0 +1,89 @@
+/* Shell: rail on the left, page column beside it. */
+.hub-shell { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-height: 100vh; }
+.hub-col { display: flex; flex-direction: column; min-width: 0; min-height: 100vh; }
+.hub-page { flex: 1; min-width: 0; padding: 20px; display: grid; gap: 12px; align-content: start; }
+.hub-page-title { margin: 0; font: 600 20px/1.2 var(--hub-sans); color: var(--hub-ink); }
+.hub-top-acts { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.hub-top .hub-top-find { display: none; }
+.nav-brand { padding: 6px 10px 2px; }
+
+.nav {
+  position: sticky; top: 0; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
+  padding: 12px 10px; background: var(--hub-canvas); border-right: 1px solid var(--hub-hair); overflow-y: auto;
+}
+.nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.nav-find, .nav-item {
+  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; box-sizing: border-box;
+  font: 500 14px/1 var(--hub-sans); color: var(--hub-body); text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.nav-find { width: 100%; border: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-mute); font-weight: 400; }
+.nav-find kbd { margin-left: auto; font: 400 11px/1 var(--hub-mono); color: var(--hub-ash); padding: 3px 5px; border: 1px solid var(--hub-hair); border-radius: 4px; }
+.nav-item[aria-current='page'] { background: var(--hub-elev); color: var(--hub-ink); }
+.nav-n { margin-left: auto; font: 500 12px/1 var(--hub-mono); color: var(--hub-ash); font-variant-numeric: tabular-nums; }
+.nav-n[data-hot] { min-width: 18px; padding: 3px 5px; box-sizing: border-box; text-align: center; border-radius: 99px; background: var(--hub-red); color: #fff; }
+.nav-find:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) {
+  .nav-item:hover { background: var(--hub-elev); color: var(--hub-ink); }
+  .nav-find:hover { border-color: var(--hub-hair-strong); color: var(--hub-body); }
+}
+
+/* Chats: list column and the picked chat. */
+.hub-chats { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; margin: -20px; }
+.hub-chats > .hub-rail { padding: 16px; background: var(--hub-canvas); min-height: 100%; box-sizing: border-box; }
+.hub-chats > .hub-chat-main { min-width: 0; display: grid; align-content: start; }
+.hub-chats .hub-chat-git { padding: 0 20px 20px; display: grid; gap: 12px; }
+.hub-ship-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hub-ship-head h2 { margin: 0; font: 600 13px/1 var(--hub-sans); color: var(--hub-mute); }
+
+/* The status bar's popover opens upward. */
+.sb .hub-pop { top: auto; bottom: calc(100% + 8px); }
+/* Phone stays in the narrow bar: the sidebar has no other way to it. */
+@media (max-width: 760px) { .sb .sb-slot:has(> .sb-phone) { display: inline-flex; } }
+
+/* Map: the open view's dialog makes room for the mode bar along the top. */
+/* Bar height grows by the notch inset on phones. */
+.hub-shell[data-map] dialog:is(.board, .fm, .mem)[open] { --map-top: calc(44px + env(safe-area-inset-top)); inset: var(--map-top) 0 0 0; height: calc(100dvh - var(--map-top)); }
+.map-bar {
+  position: fixed; top: 0; left: 0; right: 0; height: calc(44px + env(safe-area-inset-top)); z-index: 50; box-sizing: border-box;
+  display: flex; align-items: center; gap: 12px; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  background: var(--hub-canvas); border-bottom: 1px solid var(--hub-hair); color: var(--hub-body); font: 400 13px/1 var(--hub-sans);
+}
+.map-back { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px 0 6px; border: 0; border-radius: 6px; background: none; color: var(--hub-body); font: 500 13px/1 var(--hub-sans); cursor: pointer; }
+.map-modes { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--hub-hair); border-radius: 8px; background: var(--hub-surface); }
+.map-modes button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--hub-mute); font: 500 13px/1 var(--hub-sans); cursor: pointer; transition: background-color 160ms ease, color 160ms ease; }
+.map-modes button[aria-pressed='true'] { background: var(--hub-elev); color: var(--hub-ink); }
+.map-bar button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) { .map-back:hover, .map-modes button:hover { background: var(--hub-elev); color: var(--hub-ink); } }
+/* Touch: 44px targets; the bar keeps its 44px, so the buttons fill it. */
+@media (pointer: coarse) { .map-back, .map-modes button { min-height: 44px; } .map-modes { padding: 0; border-color: transparent; } }
+
+/* Narrow: the rail turns into a fixed tab bar along the bottom, icon over label. */
+@media (max-width: 760px) {
+  .hub-shell { --nav-h: 52px; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr; }
+  .nav {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 6; height: auto; flex-direction: row; align-items: stretch; gap: 0;
+    padding: 2px 4px env(safe-area-inset-bottom); border-right: 0; border-top: 1px solid var(--hub-hair); overflow: hidden;
+  }
+  .nav ul { display: flex; flex: 1; gap: 0; }
+  .nav li { flex: 1 1 0; min-width: 0; }
+  .nav-item {
+    position: relative; flex-direction: column; justify-content: center; gap: 3px; height: 48px; padding: 0 2px;
+    font-size: 11px; overflow: hidden;
+  }
+  .nav-item > span:not(.nav-n) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* right-anchored so a 3 digit count stays inside the tab */
+  .nav-n { position: absolute; top: 3px; right: max(2px, calc(50% - 22px)); margin: 0; font-size: 10px; }
+  .nav-n[data-hot] { min-width: 16px; padding: 2px 4px; }
+  .hub-col { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+  .nav .nav-brand, .nav .nav-find { display: none; }
+  .hub-top .hub-top-find { display: inline-flex; }
+  .hub-page .hub-filter { flex-wrap: nowrap !important; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .hub-page .hub-filter::-webkit-scrollbar { display: none; }
+  .hub-page .hub-filter > * { flex: none; white-space: nowrap; }
+  .hub-col { min-height: 0; }
+  .hub-page { padding: 16px; }
+  .hub-chats { grid-template-columns: minmax(0, 1fr); margin: -16px; }
+}
+@media (pointer: coarse) { .nav-find, .nav-item { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .nav-find, .nav-item, .map-modes button { transition: none; } }

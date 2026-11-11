@@ -28,10 +28,12 @@
  * Anything outside /hub answers undefined and stays with the hook handler.
  */
 import { askBrain, askContext, brief } from './brain'
+import { touch } from './idle'
 import type { HubService } from './hub-service'
 import type { WebviewToExtensionMessage } from '../protocol'
 import type { GitOp, SettingKey, SwitchboardKey } from './types'
 import { isAi } from './ais'
+import { isRepoAsk } from './projects'
 import { isKeyName } from './keys'
 import { ROLE_MODELS } from './roles'
 import { questionAsk } from './progress'
@@ -96,7 +98,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-pause': { action: oneOf('resume', 'cancel') },
   'hub-hand-to': { sessionId: str },
   'hub-ai-login': { ai: isAi },
-  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile) },
+  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk) },
   'hub-pick-tools': { text: str, path: opt(str) },
   'hub-chat-tools': { sessionId: str, tools: profile },
   'hub-star': { sessionId: str, ai: isAi, on: bool },
@@ -109,19 +111,19 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-terminal': { id: num, act: oneOf('show', 'close') },
   'hub-keep': { onFull: opt(oneOf('compact', 'fresh')), freshBranch: opt(bool) },
   'hub-aws-login': { profile: str, chrome: opt(str) },
-  'hub-aws-default': { profile: str },
+  'hub-aws-rename': { profile: str, to: str },
   'hub-aws-label': { profile: str, label: str },
   'hub-aws-add': { profile: str, region: str, chrome: opt(str) },
   'hub-aws-window': { profile: any(str, oneOf(null)) },
   'hub-aws-check': {},
   'hub-aws-delete': { profile: str },
   'hub-login-app-add': { name: str, url: str },
-  'hub-login-add': { app: str, label: str, url: str, chrome: opt(str) },
+  'hub-login-add': { app: str, label: str, url: str, chrome: opt(str), email: opt(str) },
   'hub-login-open': { app: str, id: opt(str), chrome: opt(str), folder: opt(str) },
   'hub-login-link': { folder: str, app: str, login: any(str, oneOf(null)) },
   'hub-browser': { folder: str, chrome: any(str, oneOf(null)) },
   'hub-login-active': { app: str, id: str },
-  'hub-login-rename': { app: str, id: str, label: str },
+  'hub-login-rename': { app: str, id: str, label: str, email: opt(str) },
   'hub-login-delete': { app: str, id: str },
   'hub-login-app-delete': { app: str },
   'hub-key-save': { name: isKeyName, value: v => typeof v === 'string' && v.length <= 512 },
@@ -158,6 +160,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-unlink': { from: str, to: str },
   'hub-git': { sessionId: str, op: oneOf(...GIT_OPS), files: opt(paths), summary: opt(str), description: opt(str), branch: opt(str), stash: opt(bool), confirmed: opt(bool) },
   'hub-harden': { sessionId: str },
+  'hub-draft-commit': { sessionId: str },
   'hub-todo-add': { path: str, text: todoText },
   'hub-todo-edit': { path: str, id: str, text: todoText },
   'hub-todo-remove': { path: str, id: str },
@@ -167,6 +170,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-todo-move': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 500 && v.every(x => typeof x === 'string') },
   'hub-todo-run': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(x => typeof x === 'string'), to: opt(str) },
   'hub-todo-sync': { path: str, on: bool },
+  'hub-todo-pilot': { path: str, on: opt(bool), paused: opt(bool) },
   'hub-todo-replace': { path: str, remote: v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v) },
 }
 
@@ -306,6 +310,7 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
 
   if (method === 'POST' && u.pathname === '/hub/command') {
     if (!hub.isToken(sent)) return { status: 403, body: '' }
+    touch()
     if (!hub.runner) return { status: 503, body: '' }
     let c: unknown
     try { c = JSON.parse(body) } catch { return { status: 400, body: '' } }

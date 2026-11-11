@@ -58,7 +58,7 @@ if (( ! APPLY )); then say "Dry run. Pass --apply to make these changes."; fi
 
 busy=$("$LSOF" -nP -d cwd -Fcn 2>/dev/null | awk -v src="$SRC" '
   /^c/ { cmd = substr($0, 2) }
-  /^n/ { p = substr($0, 2); if ((p == src || index(p, src "/") == 1) && cmd ~ /Code|Electron|claude|codex/) print cmd " in " p }
+  /^n/ { p = substr($0, 2); if ((p == src || index(p, src "/") == 1) && (cmd ~ /Code|Electron|claude|codex/ || cmd ~ /^[0-9]+\.[0-9]+\.[0-9]+$/)) print cmd " in " p }
 ' || true)
 if [[ -n "$busy" ]]; then
   say "These still run inside $SRC; --apply refuses until they are closed:"

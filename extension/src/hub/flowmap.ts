@@ -1,8 +1,8 @@
 /**
  * Flow map: how a project is built. Code is folders and files linked by their imports (a regex scan, capped);
  * work is the chats that ran in the project and the skills, plugins, mods, roles and files each one used.
- * Built on demand (the panel's flowmap-get, GET /hub/flowmap), cached per project until HEAD, the git index
- * or a transcript changes, or 5 minutes pass.
+ * Built on demand (the panel's flowmap-get, GET /hub/flowmap), cached per project until HEAD or the git index
+ * changes, or the newest transcript moves into a new 5-minute window.
  */
 import * as fs from 'fs'
 import * as os from 'os'
@@ -40,8 +40,19 @@ export const KIT_MODS: string[] = (() => {
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
 const posix = (p: string) => p.split(path.sep).join('/')
-/** Folder id for a file: its folder, cut to 3 levels so a deep tree stays readable. */
-export const folderOf = (rel: string) => { const d = path.posix.dirname(rel); return d === '.' ? '.' : d.split('/').slice(0, 3).join('/') }
+/** Folder id for a file: its full folder path, '.' at the root. */
+export const folderOf = (rel: string) => path.posix.dirname(rel)
+/** A folder's parent folder, undefined at the top. */
+const parentOf = (d: string) => { const p = path.posix.dirname(d); return d === '.' || p === '.' ? undefined : p }
+const LABEL_MAX = 60
+// skill loads, slash commands, system reminders
+const NOT_A_NAME = ['Base directory for this skill', '<', 'Caveat:']
+/** A chat name from a prompt or title: first words on one line, undefined for skill loads and meta text. */
+export function chatName(text: string): string | undefined {
+  const t = text.trim()
+  if (!t || NOT_A_NAME.some(p => t.startsWith(p))) return undefined
+  return redact(handoffName(t) ?? t.replace(/\s+/g, ' ')).slice(0, LABEL_MAX)
+}
 
 /** The import specifiers in one file's source. */
 export function parseImports(src: string, ext: string): string[] {
@@ -139,9 +150,9 @@ export async function scanCode(root: string, cap = FILE_MAX, dirCap = DIR_MAX): 
     }
   }
   const folders = new Map<string, string | undefined>()
-  for (const f of found) {
-    const d = folderOf(f)
-    if (folders.has(d)) continue
+  const ancestors = new Set<string>()
+  for (const f of found) for (let d: string | undefined = folderOf(f); d && !ancestors.has(d); d = parentOf(d)) ancestors.add(d)
+  for (const d of ancestors) {
     const md = readmes.get(d)
     const line = md ? readmeLine(await fs.promises.readFile(path.join(root, md), 'utf8').catch(() => '')) : undefined
     const idx = [...files.keys()].find(x => path.posix.dirname(x) === d && /^(index\.[mc]?[jt]sx?|__init__\.py)$/.test(path.posix.basename(x)))
@@ -151,7 +162,7 @@ export async function scanCode(root: string, cap = FILE_MAX, dirCap = DIR_MAX): 
 }
 
 /** What one chat did: tallies by name, files by path relative to cwd (with the last time each was written). */
-export type ChatWork = { sessionId: string; label?: string; first?: number; last?: number; skills: Map<string, number>; plugins: Map<string, number>; mods: Map<string, number>; roles: Map<string, number>; files: Map<string, number> }
+export type ChatWork = { sessionId: string; label?: string; title?: string; custom?: boolean; first?: number; last?: number; skills: Map<string, number>; plugins: Map<string, number>; mods: Map<string, number>; roles: Map<string, number>; files: Map<string, number> }
 export const newWork = (sessionId: string): ChatWork => ({ sessionId, skills: new Map(), plugins: new Map(), mods: new Map(), roles: new Map(), files: new Map() })
 const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1)
 
@@ -176,15 +187,19 @@ export function handoffName(text: string): string | undefined {
 /** Folds one transcript line into w. Cheap lines (no tool use, hook or first prompt) skip JSON.parse. root: what file paths are relative to, when the chat ran in a subfolder. */
 export function addLine(w: ChatWork, line: string, cwd: string, mods = KIT_MODS, root = cwd): void {
   const wantsLabel = !w.label && line.includes('"type":"user"')
-  if (!wantsLabel && !line.includes('"tool_use"') && !line.includes('"attachment"')) return
-  let o: { type?: string; timestamp?: string; message?: { content?: unknown }; attachment?: { type?: string; command?: unknown } }
+  const isTitle = line.includes('"type":"ai-title"') || line.includes('"type":"custom-title"')
+  if (!wantsLabel && !isTitle && !line.includes('"tool_use"') && !line.includes('"attachment"')) return
+  let o: { type?: string; timestamp?: string; isMeta?: boolean; aiTitle?: unknown; customTitle?: unknown; message?: { content?: unknown }; attachment?: { type?: string; command?: unknown } }
   try { o = JSON.parse(line) } catch { return }
+  // a rename beats Claude's own title, which beats the first prompt
+  if (o.type === 'custom-title' && typeof o.customTitle === 'string') { w.title = chatName(o.customTitle) ?? w.title; w.custom = true; return }
+  if (o.type === 'ai-title' && typeof o.aiTitle === 'string') { if (!w.custom) w.title = chatName(o.aiTitle) ?? w.title; return }
   const t = o.timestamp ? Date.parse(o.timestamp) : NaN
   if (Number.isFinite(t)) { w.first = Math.min(w.first ?? t, t); w.last = Math.max(w.last ?? t, t) }
-  if (o.type === 'user' && !w.label) {
+  if (o.type === 'user' && !w.label && o.isMeta !== true) {
     const c = o.message?.content
     const text = typeof c === 'string' ? c : Array.isArray(c) ? (c.find(b => b?.type === 'text')?.text ?? '') : ''
-    if (typeof text === 'string' && text.trim() && !text.trimStart().startsWith('<') && !text.startsWith('Caveat:')) w.label = redact(handoffName(text) ?? text.replace(/\s+/g, ' ').trim()).slice(0, 80)
+    if (typeof text === 'string') w.label = chatName(text)
   }
   const cmd = o.attachment?.type?.startsWith('hook') && typeof o.attachment.command === 'string' ? o.attachment.command : ''
   if (cmd) for (const m of mods) if (cmd.includes(`/${m}/`)) bump(w.mods, m)
@@ -229,9 +244,9 @@ export async function readWork(cwd: string, home = os.homedir(), max = CHATS_MAX
     await readInto(w, path.join(dir, n), at, cwd)
     const agents = path.join(dir, w.sessionId, 'subagents')
     for (const s of (await fs.promises.readdir(agents).catch(() => [] as string[])).filter(x => x.endsWith('.jsonl'))) {
-      const label = w.label
+      const { label, title, custom } = w
       await readInto(w, path.join(agents, s), at, cwd)
-      w.label = label
+      Object.assign(w, { label, title, custom })
       try { const meta = JSON.parse(await fs.promises.readFile(path.join(agents, s.replace(/\.jsonl$/, '.meta.json')), 'utf8')) as { agentType?: unknown }; if (typeof meta.agentType === 'string' && !w.roles.has(meta.agentType)) w.roles.set(meta.agentType, 1) } catch { /* no meta */ }
     }
     out.push(w)
@@ -242,13 +257,13 @@ export async function readWork(cwd: string, home = os.homedir(), max = CHATS_MAX
 /** Code and work as one node and edge list. labels: chat names the hub already knows, by session id. */
 export function assemble(project: string, code: Code, work: ChatWork[], labels: Record<string, string> = {}): FlowMap {
   const nodes: FlowNode[] = [], edges: FlowEdge[] = []
-  for (const [id, about] of code.folders) nodes.push({ id: `d:${id}`, kind: 'folder', label: id === '.' ? project : id, ...(about ? { about } : {}) })
+  for (const [id, about] of code.folders) { const up = parentOf(id); nodes.push({ id: `d:${id}`, kind: 'folder', label: id === '.' ? project : id, ...(up ? { folder: `d:${up}` } : {}), ...(about ? { about } : {}) }) }
   for (const [f, about] of code.files) nodes.push({ id: `f:${f}`, kind: 'file', label: f, folder: `d:${folderOf(f)}`, ...(about ? { about } : {}) })
   for (const [k, n] of code.imports) { const [a, b] = k.split('\n'); edges.push({ from: `f:${a}`, to: `f:${b}`, kind: 'import', n }) }
   const tools = new Map<string, FlowNode>()
   for (const w of work) {
     const id = `chat:${w.sessionId}`
-    nodes.push({ id, kind: 'chat', label: labels[w.sessionId] || w.label || w.sessionId.slice(0, 8), ...(w.first ? { first: w.first } : {}), ...(w.last ? { at: w.last } : {}) })
+    nodes.push({ id, kind: 'chat', label: labels[w.sessionId] || w.title || w.label || w.sessionId.slice(0, 8), ...(w.first ? { first: w.first } : {}), ...(w.last ? { at: w.last } : {}) })
     const use = (kind: FlowKind, m: Map<string, number>) => {
       for (const [name, n] of m) {
         const to = `${kind}:${name}`
@@ -276,7 +291,8 @@ async function keyOf(cwd: string, subs: string[], home: string): Promise<string>
     const names = (await fs.promises.readdir(dir).catch(() => [] as string[])).filter(n => n.endsWith('.jsonl'))
     for (const n of names) newest = Math.max(newest, (await fs.promises.stat(path.join(dir, n)).catch(() => undefined))?.mtimeMs ?? 0)
   }
-  return `${head.trim()}|${index}|${newest}|${subs.length}`
+  // a running chat writes every few seconds; bucket by TTL so reopening the map stays a cache hit
+  return `${head.trim()}|${index}|${Math.floor(newest / TTL)}|${subs.length}`
 }
 
 /** The map for cwd, from cache while nothing it reads has changed. cwd must be one of roots or inside one, after symlinks; anything else throws. Transcripts are found by cwd as given, the way Claude Code names their folder, plus those of chats folders inside cwd. */
@@ -299,10 +315,13 @@ export async function buildFlowMap(cwd: string, labels: Record<string, string> =
 }
 
 /** Chat names the hub already shows, by session id: live chats over archived ones. */
-export const flowLabels = (s: HubState): Record<string, string> => Object.fromEntries([...(s.archive ?? []), ...s.chats].flatMap(c => (c.name ? [[c.sessionId, c.name]] : [])))
+export const flowLabels = (s: HubState): Record<string, string> => Object.fromEntries([...(s.archive ?? []), ...s.chats].flatMap(c => { const n = c.name && chatName(c.name); return n ? [[c.sessionId, n]] : [] }))
 
-/** Folders a map may be built for: registered projects only, so a chat that ran in ~ cannot map the home folder. */
-export const flowRoots = (s: HubState): string[] => s.projects.map(p => p.path)
+/** Folders a map may be built for: registered projects only, so a chat that ran in ~ cannot map the home folder. A folder holding other projects (~/Documents/GitHub) is left out unless it is a git repo itself. */
+export const flowRoots = (s: HubState): string[] => {
+  const all = s.projects.map(p => p.path)
+  return all.filter(r => fs.existsSync(path.join(r, '.git')) || !all.some(o => o.startsWith(r.replace(/\/+$/, '') + '/')))
+}
 
 /** Live and archived chats' folders, only for finding a project's subfolder chats. */
 export const flowChatDirs = (s: HubState): string[] => [...new Set([...s.chats.map(c => c.cwd), ...(s.archive ?? []).map(a => a.cwd)])]

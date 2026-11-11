@@ -95,3 +95,16 @@ export function withLock<T>(lock: string, fn: () => T, waitMs = 100): T {
   while (!release && Date.now() < until) { Atomics.wait(nap, 0, 0, 10); release = tryLock(lock, 2_000) }
   try { return fn() } finally { release?.() }
 }
+
+/** Write JSON via temp file + rename so a crash mid-write can't truncate the file. */
+export function writeJsonAtomic(target: string, value: unknown): void {
+  // Write through a symlink (dotfiles) and keep the mode, or rename replaces both; a new file is owner-only
+  let filePath = target
+  let mode = 0o600
+  try { filePath = fs.realpathSync(target); mode = fs.statSync(filePath).mode & 0o777 } catch { /* new file */ }
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  const tmpPath = `${filePath}.${process.pid}.tmp`
+  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2) + '\n', { mode })
+  fs.chmodSync(tmpPath, mode)
+  fs.renameSync(tmpPath, filePath)
+}

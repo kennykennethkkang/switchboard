@@ -147,6 +147,10 @@ test('routes: tool commands checked, a profile must be two maps of booleans', as
   const tools = { plugins: { 'a@b': true }, skills: {} }
   assert.equal(commandProblem({ type: 'hub-new-chat', path: '/p', remote: false, tools }), undefined)
   assert.equal(commandProblem({ type: 'hub-new-chat', path: '/p', remote: false }), undefined)
+  assert.equal(commandProblem({ type: 'hub-new-chat', path: '', remote: false, repo: { create: 'new-app', private: true } }), undefined)
+  assert.equal(commandProblem({ type: 'hub-new-chat', path: '', remote: false, repo: { clone: 'o/r' } }), undefined)
+  assert.ok(commandProblem({ type: 'hub-new-chat', path: '', remote: false, repo: { create: '..', private: true } }))
+  assert.ok(commandProblem({ type: 'hub-new-chat', path: '', remote: false, repo: { clone: 'rm -rf' } }))
   assert.equal(commandProblem({ type: 'hub-pick-tools', text: 'x' }), undefined)
   assert.equal(commandProblem({ type: 'hub-pick-tools', text: '', path: '/p' }), undefined)
   assert.equal(commandProblem({ type: 'hub-chat-tools', sessionId: 'x', tools }), undefined)

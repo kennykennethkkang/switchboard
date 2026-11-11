@@ -1,5 +1,178 @@
 # Changelog
 
+## 0.21.36
+
+- Auth0: a sign-in adopts a hand-added login whose dashboard url names the tenant, so one tenant never shows twice
+
+## 0.21.35
+
+- Auth0: Sign in runs `auth0 login` (device login, page opens in the picked Chrome profile behind the front window); its tenants become saved Auth0 logins with a domain and a Signed in, Expired or Not signed in chip, checked on the AWS cadence. Hand-added logins and emails stay; tenants the CLI drops show Not signed in. The CLI part is one table entry per app, so other apps keep opening their URL
+- Auth0: a tenant whose check gets no answer keeps its last status (none for a new one) instead of reading Signed in; one auth0 login runs at a time, and Sign in reads Waiting for Chrome until it ends
+
+## 0.21.34
+
+- AWS account name prefers the account alias, then the company name, then the contact name
+- account-guard 0.1.3: also checks commands run inside bash -c, sh -c, zsh -c and eval strings
+
+## 0.21.33
+
+- Accounts: no default anywhere. Make default and the Default chip are gone, any AWS profile can be deleted, and a project picks a specific web login or Not used (old Default picks read as Not used)
+- AWS: adding a name that already exists signs in again under it with the new region, so a failed sign-in can be retried; Rename renames the profile in ~/.aws/config (backed up first) and moves its project, Chrome and session picks
+- AWS: after a sign-in the account name and email come from AWS (alias or contact name, primary email) when it answers; rows show the profile name, then the email, then account name and id; Set email covers accounts AWS gives none for
+- Web logins: an optional email, set when adding or from the row menu, shown under the login name
+- AWS: no hidden '*' profile for folders without a pick (the browser '*' fallback stays); an email AWS returns wins over a typed one; Rename refuses a name ~/.aws/credentials already has and moves a typed email kept by name; config backups made in the same second no longer collide
+
+## 0.21.32
+
+- Projects: a folder opened under another case (switchboard vs Switchboard) lists once
+- Accounts: AWS is optional per project like a web app (Not used until picked); profile rows lead with the profile name and show the account name beside it; Rename is now Name account
+- AWS: signing in again as the same user overwrites instead of stacking copies; a new profile that turns out to be the same login folds into the existing one, and Make default keeps no backup of the same login
+
+## 0.21.31
+
+- Set up installs the new tab-close mod: when a chat or role subagent ends its turn, its agent-browser sessions are closed, and an open Playwright browser, Chrome MCP tab, Scrapling session or Firecrawl browser holds the stop once until the agent closes it
+- New chats: when no window has the chat's project open, Switchboard opens one and starts the chat there, instead of in the window you clicked from (not for a folder a move is closing)
+
+## 0.21.30
+
+- Folder moves: a window closes itself when ~/.claude/close-window-for-move names its folder, so the agent-flow to switchboard move only waits for chats in that folder instead of quitting VS Code once every project is quiet
+
+## 0.21.29
+
+- Plan page: the To-do project follows the VS Code window used last, in the browser and phone app too; a hand pick holds until another window gets focus
+- To-do: after an add, the box stays under the finger through every update that grows the page above it (new row, chain chips, Running row), and lets go once you scroll or click
+
+## 0.21.28
+
+- New repo: a window open on a parent folder (all of ~/Documents/GitHub) no longer takes the new repo's chat; it waits for the repo's own window, also when the click came from that parent window
+
+## 0.21.27
+
+- Brief: the files another chat holds now read "was editing at chat start (check it is still in ListAgents before waiting on it)", so a chat no longer waits on a holder that already ended
+
+## 0.21.26
+
+- Closing question: while a chat asks "Approve this chat as finished?", Needs you and the chat view show its done-check stamp under the question (green Verified, or red Unverified with what is missing), same as the done cards
+
+## 0.21.25
+
+- Chat view: a Codex chat's Transcript tab labels its replies Codex instead of Claude, and keeps the label after Load earlier
+
+## 0.21.24
+
+- Any VS Code family editor: Switchboard names the editor it runs in (Cursor, Windsurf, Antigravity, VSCodium, Insiders) in its notices, buttons and sign-in pages, finds pending reloads in that editor's extensions folder, and the stuck check knows each editor's helper process
+- Without an editor: the browser app serves chats, projects and to-do from its own hub when no editor window is open, starts New chat in tmux or a background Terminal window, and gets hook events from chats in any folder; it hands back to the editor once a window opens
+- toolchain skill: reads a repo's manifests (JS/TS, Python, Go, Rust, Swift, Java/Kotlin, Ruby, PHP, .NET, C/C++, Dart/Flutter) and prints its test, lint, typecheck and build commands with the matching ecc-agents reviewer; engineer, qa and the lead use it when a repo's CLAUDE.md names no checks
+
+## 0.21.23
+
+- Approve closes the chat's terminal even when the last turn runs past a minute (done-check hold, aar, standup) or a background job is still tracked: every window closes a Switchboard terminal once its approved chat has exited
+- New repo button beside New chat: name the repo, pick Private or Public, say what the chat should do; gh makes the repo, it opens in its own VS Code window and the chat starts there
+- Links open in the folder's Chrome profile: hub links, git PR pages and the browser app use the folder's Chrome pick (Sign-ins, else the default) instead of Chrome's last used profile
+- Board: Claude realms use their own clay palette, and each AI pavilion stands its landmark (Claude spark, Codex monolith, Jev balance, Gemini spires)
+
+## 0.21.22
+
+- Learn automatically: scheduled improve runs save memory notes too; they write a staged copy of the Switchboard project's memory that is copied back, the same way the aar does
+- Research island on the board: click it, type any question, and it starts a Claude chat that runs the deep-research skill on it (always present, like the Jev and Gemini islands)
+- harden skill: a /harden skill that runs BLA (bla-agents) to harden a build against AI reverse-engineering before a release; the Ship card's Harden build check already runs it on a throwaway copy
+
+## 0.21.21
+
+- Learn automatically: scheduled aar runs save memory notes again; they edit a copy in ~/.cache/switchboard/learn and Switchboard copies new and changed notes back to the project (headless claude refuses writes under ~/.claude)
+
+## 0.21.20
+
+- To-do redesign: an Autopilot bar on top says what is running, what starts next and why, with a To-do 1, 2, 3 chain; then Only you can do these, For your OK (Approve, Dismiss, Approve all), Running, a numbered Queue with Next and Start now, and the add box
+- Auto-run next and Pause per project: Pause holds new starts while running chats finish; a project you never set follows Settings, Auto-start chats
+- Auto-start no longer waits for other chats in the project, only for a running to-do chat, and starts the next item when that one is done
+- Chats started from the to-do are named "To-do N: ..." and keep it through handoffs; the new todo-band mod shows To-do N, auto, the item and who left it above the prompt, also after a resume or handoff
+- Blocked items, items behind your own step and items whose chat stopped show as held, never as Next; a stopped one waits for Start again
+- Plan page: an Autopilot card with one lane per project (done, running, next, queued, paused)
+
+## 0.21.19
+
+- Approve closes chat terminals again after a window reload, including ones named "Claude Code: ..."
+- New chat: the Project list has New GitHub repo (private unless you pick Public) and Clone from GitHub; Start makes or clones it in ~/Documents/GitHub and opens the chat there, and a failure also goes to your phone
+
+## 0.21.18
+
+- A chat approved through its closing question now exits and its terminal closes at the end of that turn; before, the answer arrived mid-turn and the chat stayed open
+- Approving a chat clears the requests Jev had marked as missed for it from Suggested, so the Plan page stops listing work that was already accepted as done
+- Now: each Your OK row folds open the chat's changes with their diffs above Approve, Needs you rows carry their project's color, and every Jump or Open chat button names its chat for screen readers
+
+## 0.21.17
+
+- Layout: chat names show in full (the cache warm chip moved to the meta line), project headers wrap on a phone, the tab bar drops the brand so Settings and 3-digit badges fit, orbit labels hold their side and Done has its own corner, Find keeps the version chip, Ship keeps file names, and Code map opens fitted to a narrow width, and on a phone the chat menu keeps a 16px gutter, the orbit turns square, Jarvis and terminal rows no longer push the page sideways and Memory filter chips wrap
+
+## 0.21.16
+
+- Map, Code: big repos open as a folder tree (top level first, open one level at a time), search finds any file and opens its folders, file hits show their folder, dense import lines rest until hover, the legend sits below the map, keys work on open and Esc clears search first; opens on this window's project
+- Map, Code data: full folder paths, chat names from Claude's titles instead of raw prompts, the map is cached per 5 minutes, and folders that only hold other projects are skipped
+- Map, Agents: Fit frames the court beside an open card and fills a phone, labels stay on stage, counts use chats and say done, Treasury ignores old backup profiles and unset keys, empty pavilions say No chats yet
+- Map, Memory: project tags always show, rows and cards name their project, superseded notes are marked and sorted last, health counts filter the list, the graph centres on screen; fake broken links from code spans and archived bench or temp chats are gone
+- Headless `claude -p` runs (bench runs) and Remote Control's unused standby session no longer show as chats
+
+## 0.21.15
+
+- Chrome pages open in a default profile (`*` in the browser picks) for folders without a pick of their own, instead of Chrome's last used one
+- Chat waits: a wait ends as removed only when you unlink it; links survive a window reload, follow a handoff to the next chat, and a chat at its usage limit still counts as working
+- A waiting chat that gets a failure or question asks you with a question card, and repeated waits no longer show as a stuck loop
+- A new chat started while its project's window reloads opens in that window
+- An update registered after its folder appears, or a stray folder from a failed install, no longer leaves a window on the old version
+- Keep awake only trusts its own caffeinate, so a reused pid never shows it on or stops another app's
+- History keeps the Verified or Unverified stamp when a chat is approved through the closing question
+- The git guard stays on its process markers alone, as in 0.21.12
+
+## 0.21.14
+
+- Code map: the footer hint sits on its own backdrop so it no longer runs over the bottom row
+
+## 0.21.13
+
+- Code map: a big map grows downward to fit the screen width at a readable zoom, scrolls with the wheel, and keeps its changed-by and import lines visible at rest
+
+## 0.21.12
+
+- Maps: Code map hides chat-to-tool lines on big maps until a node is hovered, shows each tool's chat count and opens at a readable zoom; Agents board yards with subagent realms sit next to their window instead of far out
+- To-do keeps no hand steps: For you lines stay on the chat card, chats open the page for them, and old Finish up rows are cleared
+- The done-check ticks any open item or tray line a chat's work covered, also when the chat ends without Done
+- System notices pasted into a turn (idle notices, stopped jobs, quiet subagents) no longer land in the tray
+- Usage pause: Resume holds across a window reload and in every other window; auto start, the open-tasks nudge, handoffs and the stuck auto-fix wait while chats are paused, and auto start comes back once the limit resets
+- done-check lets a paused chat stop, and cache-keeper sends no pings while paused
+- Updates reload a window only after 2 idle minutes (no typing, no Commit or Push running, no open question); Install clicked in a window still reloads it at once
+- Open questions survive a reload: they are kept on disk and the ask tool posts again to the same project's window
+- Keep Switchboard app running off now holds on every window load; the keeper waits longer each time the app crashes soon after starting
+- Ask before actions brings back Bash prompts too; phone mode places one call per question, and the closing Approve question works with phone mode on
+- Bundled rules and mod hints read gender neutral
+
+## 0.21.11
+
+- Learn finds the clone as switchboard or agent-flow, so it keeps running after the folder rename
+
+## 0.21.10
+
+- Map cleanup: Agents is the board's name (Celestial Court stays as a subtitle), Back is the one exit in every mode, Esc closes a card first, and + - 0 zoom and fit in Agents, Code and Memory
+- Code drops its Code/Work/Both switch for the legend chips, Enter in search opens the first match and an open folder lights its files, and the phone list gets the same chips; Memory fills the screen on open and Rules reads CLAUDE.md files
+- Agents strip: Commit lands on the git card and Usage shows both windows in its tip
+- A finished update reloads every window by itself, no Reload ready click; terminal chats keep running
+- Chats in the temp folder itself (Codex runs in /private/tmp) stay out of the lists, and temp folders leave Connections
+
+## 0.21.9
+
+- New layout: a labelled rail of pages (Now, Chats, Plan, Ship, Settings, Map), a status bar with usage, Keep awake and Call me, and Cmd+K Find; on a phone or narrow sidebar the pages sit in a bottom tab bar
+- Now page: Needs you, Working and Done today side by side; the project filter has an All projects chip and filters the whole page
+- Needs you reads as one list: one heading, "Ready for your OK" with Approve first, answer choices in one row
+- Map is one view with an Agents, Code and Memory switch and a Back button
+- Write commit message on Ship fills the repo's Source Control box from every changed file; secret files are named, never sent
+- "Ready for your OK" everywhere a finished chat waits on you; the ship chip leads with Push so a narrow status bar keeps it
+- Set up installs agent-browser and agent-desktop (skipped when already installed); rules pick the cheapest tool first, CLI before MCP
+
+## 0.21.8
+
+- Phone alerts: the phone web app can be added to the home screen and turn on Phone alerts in Settings, Chats; the AWS sign-in heads-up now reaches the phone as a push, about 30 minutes before the session ends
+- Pushes only go to Apple, Google, Mozilla and Microsoft push services, and only a signed-in phone or the Mac can subscribe
+
 ## 0.21.7
 
 - Git guard: Switchboard installs a pre-commit and pre-push guard in every project repo it lists, refusing commits and pushes from Claude and Codex chats; the Commit and Push buttons, the phone and your own terminals still work

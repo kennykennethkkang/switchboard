@@ -13,7 +13,7 @@ import * as path from 'path'
 import { pipeline } from 'stream'
 import * as zlib from 'zlib'
 
-type Win = { port: number; hubToken: string; workspace: string; mtimeMs: number; pid?: number }
+type Win = { port: number; hubToken: string; workspace: string; mtimeMs: number; pid?: number; editor?: string }
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
 const MAX_BODY = 64 * 1024
 // Same cap as extension/src/hub/uploads.ts; the window checks it again.
@@ -34,6 +34,14 @@ const real = (p: string) => { try { return fs.realpathSync(p) } catch { return p
 
 const usable = (f: Partial<Win>, alive: (pid: number) => boolean): f is Win =>
   typeof f.port === 'number' && typeof f.hubToken === 'string' && typeof f.workspace === 'string' && (typeof f.pid !== 'number' || alive(f.pid))
+
+/** No editor window live: the app's own hook server stands in, so the page still gets state and new chats. */
+export const editorLive = (files: Partial<Win>[]) => files.some(f => usable(f, pidAlive))
+
+export const withSelf = (list: typeof windows, self: Win) => async (): Promise<Partial<Win>[]> => {
+  const files = await list()
+  return editorLive(files) ? files : [...files, self]
+}
 
 /** The live window holding the command's folder (deepest, then newest), else the one holding the app's folder, else the newest.
  * A closed window can leave its file behind. */
@@ -248,21 +256,32 @@ button{font:600 15px/1 inherit;padding:12px;border:0;border-radius:8px;backgroun
 button.alt{background:transparent;color:var(--blue);border:1px solid var(--line)}
 </style></head><body><main>`
 
+/** The editor a live window says it runs in (Cursor, VS Code...); an older extension writes none. */
+export function editorOf(files: Partial<Win>[], alive: (pid: number) => boolean = pidAlive): string {
+  const name = files.find(f => usable(f, alive) && typeof f.editor === 'string')?.editor?.replace(/[<>&"]/g, '').trim()
+  return name || 'your editor'
+}
+
+// Sync: the two pages below render on a rare sign-in, so one small directory read is fine.
+const editorNow = (): string => {
+  try { return editorOf(fs.readdirSync(DIR).filter(n => n.endsWith('.json')).map(n => { try { return JSON.parse(fs.readFileSync(path.join(DIR, n), 'utf8')) } catch { return {} } })) } catch { return 'your editor' }
+}
+
 /** The sign-in page for a typed address. Self-contained: the device has no cookie, so nothing else would load. */
-export function signInPage(note?: string): string {
+export function signInPage(note?: string, editor = editorNow()): string {
   return `${pageHead('Switchboard sign-in')}<h1>Switchboard</h1>${note ? `<p class="note" role="alert">${note}</p>` : ''}
 <form action="/login" method="post"><p>Enter the code shown in Switchboard's Phone menu on your Mac.</p>
 <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" aria-label="Code" required>
 <button type="submit">Sign in with the code</button></form>
-<form action="/device" method="post"><p>Or, when someone is at the Mac, ask it: VS Code shows a prompt there to click Allow.</p>
+<form action="/device" method="post"><p>Or, when someone is at the Mac, ask it: ${editor} shows a prompt there to click Allow.</p>
 <button type="submit" class="alt">Ask the Mac to let me in</button></form></main></body></html>`
 }
 
 /** Shown while the Mac decides; reloads itself every 2 s, no script needed. */
-export function waitPage(id: string): string {
+export function waitPage(id: string, editor = editorNow()): string {
   const safe = id.replace(/[^0-9a-f]/g, '')
   return `${pageHead('Waiting for the Mac', `<meta http-equiv="refresh" content="2;url=/device/wait?id=${safe}">`)}<h1>Waiting for your Mac</h1>
-<p role="status">Click Allow in the prompt VS Code shows on your Mac. This page goes on by itself.</p>
+<p role="status">Click Allow in the prompt ${editor} shows on your Mac. This page goes on by itself.</p>
 <p><a href="/">Cancel and use the code instead</a></p></main></body></html>`
 }
 

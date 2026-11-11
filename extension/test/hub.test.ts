@@ -329,7 +329,7 @@ describe('hub state and command routes', () => {
     assert.equal(post({ type: 'hub-aws-add', profile: 'a' }).status, 400)
     assert.equal(post({ type: 'hub-aws-window', profile: null }).status, 204)
     assert.equal(post({ type: 'hub-aws-login', profile: 'live', chrome: 'Default' }).status, 204)
-    assert.equal(post({ type: 'hub-aws-default', profile: 'live' }).status, 204)
+    assert.equal(post({ type: 'hub-aws-rename', profile: 'live', to: 'main' }).status, 204)
     assert.equal(post({ type: 'hub-aws-label', profile: 'live', label: 'Me' }).status, 204)
     assert.equal(post({ type: 'hub-aws-add', profile: 'a', region: 'us-west-1' }).status, 204)
     assert.equal(post({ type: 'hub-aws-check' }).status, 204)
@@ -949,6 +949,34 @@ describe('usage limit pause', () => {
     assert.ok(!late.retryIds().includes('u'), 'past the reset: a close is a close')
   })
 
+  it('a resume sticks across a window reload', () => {
+    const { h, dir, feed } = setup()
+    feed(99)
+    h.endPause(true, now + 1)
+    const again = new HubService()
+    again.keepRetries(path.join(dir, 'retries-x.json'))
+    again.ingest({ token: again.token, kind: 'live', sessionId: 'a', cwd: '/u/w', limits: [{ kind: 'five_hour', percentUsed: 99, resetsAt: new Date(reset).toISOString() }] }, now + 2)
+    assert.equal(again.get().pause, undefined)
+    const file = JSON.parse(fs.readFileSync(path.join(dir, 'limits.json'), 'utf8'))
+    assert.equal(file.pauseOff, reset + 60_000)
+    assert.equal(file.paused, undefined)
+  })
+
+  it('a resume in one window holds in another that loaded the pause', () => {
+    const { h, dir, feed } = setup()
+    feed(99)
+    const b = new HubService()
+    b.keepRetries(path.join(dir, 'retries-y.json'))
+    assert.equal(b.get().pause?.resumeAt, reset + 60_000)
+    h.endPause(true, now + 1)
+    b.ingest({ token: b.token, kind: 'live', sessionId: 'z', cwd: '/u/z', limits: [{ kind: 'five_hour', percentUsed: 99.5, resetsAt: new Date(reset).toISOString() }] }, now + 2 * 60_000)
+    assert.equal(b.get().pause, undefined)
+    const file = JSON.parse(fs.readFileSync(path.join(dir, 'limits.json'), 'utf8'))
+    assert.equal(file.pauseOff, reset + 60_000)
+    assert.equal(file.paused, undefined)
+    assert.equal(file.pause, undefined)
+  })
+
   it('off, or after Cancel, does not pause again until the reset', () => {
     const off = setup(null)
     off.feed(100)
@@ -997,14 +1025,26 @@ describe('chat links', () => {
     assert.equal(post({ kind: 'link', to: ['b'] }), false)
   })
 
-  it('drops a link once the waiting chat or every target is gone', () => {
+  it('keeps a link to an ended target so its outcome stays readable, drops it once the waiting chat is gone', () => {
     const { h, post } = setup()
     post({ kind: 'link', from: 'a', to: ['b', 'c'], reason: 'r', auto: false, since: now })
     post({ kind: 'link', from: 'c', to: ['b'], reason: 'r', auto: false, since: now })
     const rows = h.get().chats
     h.set({ chats: rows.map(c => (c.sessionId === 'b' ? { ...c, live: false } : c)) }, now + 1)
-    assert.deepEqual(h.get().links?.map(l => l.from), ['a'])
+    assert.deepEqual(h.get().links?.map(l => l.from), ['a', 'c'])
     h.set({ chats: rows.map(c => (c.sessionId === 'a' ? { ...c, live: false } : c)) }, now + 2)
+    assert.deepEqual(h.get().links?.map(l => l.from), ['c'])
+    // No row yet, as just after a reload: kept.
+    h.set({ chats: [] }, now + 3)
+    assert.deepEqual(h.get().links?.map(l => l.from), ['c'])
+  })
+
+  it('drops a link whose waiter has no row and no live entry after two minutes', () => {
+    const { h, post } = setup()
+    post({ kind: 'link', from: 'z', to: ['b'], reason: 'r', auto: false, since: now })
+    h.set({}, now + MIN)
+    assert.deepEqual(h.get().links?.map(l => l.from), ['z'])
+    h.set({}, now + 3 * MIN)
     assert.deepEqual(h.get().links, [])
   })
 
@@ -1022,6 +1062,37 @@ describe('chat links', () => {
     assert.equal(h.get().links?.length, 1)
     h.set({}, now + 21 * MIN)
     assert.deepEqual(h.get().links, [])
+  })
+
+  it('Kenneth\'s unlink leaves a tombstone for five minutes; link-end does not; a new link clears it', () => {
+    const { h, post } = setup()
+    h.link({ from: 'a', to: ['b', 'c'], reason: 'r', auto: false, since: now }, now)
+    h.unlink('a', ['b'], now)
+    assert.deepEqual(h.get().unlinks, [{ from: 'a', to: 'b', at: now }])
+    post({ kind: 'link-end', from: 'a', to: ['c'] }, now)
+    assert.deepEqual(h.get().unlinks?.map(u => u.to), ['b'])
+    h.set({}, now + 5 * MIN)
+    assert.deepEqual(h.get().unlinks, [])
+    h.unlink('a', ['b'], now + 6 * MIN)
+    h.link({ from: 'a', to: ['b'], reason: 'r', auto: false, since: now }, now + 6 * MIN)
+    assert.deepEqual(h.get().unlinks, [])
+  })
+
+  it('keeps links and unlinks across a window reload', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'links-'))
+    try {
+      const file = path.join(dir, 'retries-x.json')
+      const h = new HubService()
+      h.keepRetries(file)
+      h.link({ from: 'a', to: ['b', 'c'], reason: 'r', auto: false, since: Date.now() - 60 * MIN })
+      h.unlink('a', ['c'])
+      const again = new HubService()
+      again.keepRetries(file)
+      // Rows come back after the reload; the link holds meanwhile, however old.
+      again.set({ chats: [] })
+      assert.deepEqual(again.get().links?.map(l => l.to), [['b']])
+      assert.deepEqual(again.get().unlinks?.map(u => u.to), ['c'])
+    } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   })
 
   it('a card link and unlink, as Kenneth made them', () => {

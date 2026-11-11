@@ -87,6 +87,7 @@ describe('brain brief', () => {
     const text = brief(state(live, { plan, servers }), '/w/Armasu', 'me', NOW)
     assert.match(text, /Shop/)
     assert.match(text, /app\/shop\.ts/)
+    assert.match(text, /was editing at chat start \(check it is still in ListAgents before waiting on it\): app\/shop\.ts/)
     assert.match(text, /22 Ship it/)
     assert.match(text, /localhost:3000/)
   })

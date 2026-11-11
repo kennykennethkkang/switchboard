@@ -46,6 +46,16 @@ export function devHome(wins: Win[], folder: string, self: number): Win | undefi
   return home && home.pid !== self ? home : undefined
 }
 
+/** No window is or holds the folder, so a chat for it needs its own window. Not the folder a move is closing. */
+export function needsWindow(wins: Win[], folder: string, moving = readMoving()): boolean {
+  return !!folder && path.resolve(folder) !== moving && !wins.some(w => inside(w.workspace, folder))
+}
+
+// close-for-move.ts's flag: that folder's window was closed on purpose.
+function readMoving(): string | undefined {
+  try { return path.resolve(fs.readFileSync(path.join(os.homedir(), '.claude', 'close-window-for-move'), 'utf8').trim()) } catch { return undefined }
+}
+
 export type Tailnet = { dns: string; https: boolean; served: Set<number> }
 
 /** One row per folder with a dev command; running when a dev server's cwd is inside (never the app on 3131). */
@@ -69,6 +79,15 @@ export function readDev(folder: string): { command: string } | undefined {
     const command = devCommand(JSON.parse(fs.readFileSync(path.join(folder, 'package.json'), 'utf8')), fs.readdirSync(folder))
     return command ? { command } : undefined
   } catch { return undefined }
+}
+
+// Shared by every window, so the browser app's Plan page can follow the window Kenneth used last.
+const FOCUSED = 'focused.json'
+export function writeFocused(workspace: string, dir = DIR): void {
+  try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, FOCUSED), JSON.stringify({ workspace, at: Date.now() })) } catch { /* the next focus writes it */ }
+}
+export function readFocused(dir = DIR): string | undefined {
+  try { const v = JSON.parse(fs.readFileSync(path.join(dir, FOCUSED), 'utf8')); return typeof v?.workspace === 'string' ? v.workspace : undefined } catch { return undefined }
 }
 
 /** Every live window's discovery file. */
@@ -121,6 +140,45 @@ export async function postCommand(w: Win, command: { type: string }, ms = 2000):
   } catch (err) { return (err as Error).name === 'TimeoutError' }
 }
 
+// A reloading window drops its file (dispose) and its host pid, so for a few seconds no window holds its folder.
+// It leaves <pid>.reloading naming its workspace; a chat for that folder waits for it instead of opening elsewhere.
+const RELOAD_MS = 20_000
+
+/** Call right before reloadWindow. */
+export function markReloading(dir = DIR, pid = process.pid): void {
+  const w = readWindows(dir).find(x => x.pid === pid)
+  if (w) try { fs.writeFileSync(path.join(dir, `${pid}.reloading`), w.workspace) } catch { /* then it just opens here */ }
+}
+
+function reloading(dir: string): string[] {
+  const out: string[] = []
+  for (const n of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+    if (!n.endsWith('.reloading')) continue
+    const f = path.join(dir, n)
+    try {
+      if (Date.now() - fs.statSync(f).mtimeMs > RELOAD_MS) fs.rmSync(f, { force: true })
+      else out.push(fs.readFileSync(f, 'utf8'))
+    } catch { /* gone meanwhile */ }
+  }
+  return out
+}
+
+/** Runs the command in the window that holds the folder (devHome), waiting up to 20s for one that is mid-reload.
+ * False when this window holds it, none does, or it never took it. */
+export async function sendHome(folder: string, command: { type: string }, self = process.pid, dir = DIR, every = 500, waitMs = 0): Promise<boolean> {
+  // waitMs: a window just asked to open the folder; wait that long for it to list itself.
+  // A window on a parent folder (all of ~/Documents/GitHub) would take it first, so only the folder's own window counts then.
+  const until = Date.now() + waitMs
+  for (;;) {
+    const wins = readWindows(dir).filter(w => !waitMs || path.resolve(w.workspace) === path.resolve(folder))
+    const home = devHome(wins, folder, self)
+    if (home && await postCommand(home, command)) return true
+    if (!home && wins.some(w => inside(w.workspace, folder))) return false
+    if (!reloading(dir).some(ws => inside(ws, folder)) && Date.now() >= until) return false
+    await new Promise(r => setTimeout(r, every))
+  }
+}
+
 /** This Mac's tailnet name, whether it can serve https, and what it serves; null without tailscale or when it is down. */
 export async function tailnet(): Promise<Tailnet | null> {
   const bin = tailscaleBin()
@@ -143,9 +201,13 @@ const AWAKE_FILE = path.join(DIR, 'awake.pid')
 // -w on the VS Code app (the extension host's parent), not the host: an extension update restarts the host.
 export const awakeArgs = (owner = process.ppid) => ['-dis', '-w', String(owner)]
 
-export async function awakePid(): Promise<number | undefined> {
-  const pid = Number(await fs.promises.readFile(AWAKE_FILE, 'utf8').catch(() => ''))
-  return pid > 0 && (await run('ps', ['-p', String(pid), '-o', 'comm='])).trim().endsWith('caffeinate') ? pid : undefined
+/** Our caffeinate's pid; a stale file (VS Code quit, pid reused, say by Claude Code's `caffeinate -i -t 300`) is deleted. */
+export async function awakePid(file = AWAKE_FILE): Promise<number | undefined> {
+  const pid = Number(await fs.promises.readFile(file, 'utf8').catch(() => ''))
+  if (!(pid > 0)) return undefined
+  if (/(^|\/)caffeinate -dis -w \d+$/.test((await run('ps', ['-p', String(pid), '-o', 'args='])).trim())) return pid
+  fs.rmSync(file, { force: true })
+  return undefined
 }
 
 // One toggle at a time in this window, so a double click cannot start two caffeinates.

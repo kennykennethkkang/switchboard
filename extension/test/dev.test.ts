@@ -4,7 +4,7 @@ import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
 import * as http from 'http'
-import { awakeArgs, devCommand, devHome, devLink, devRows, knownDev, offArgs, postCommand, postWindow, serveArgs, servedPorts } from '../src/hub/dev'
+import { awakeArgs, awakePid, devCommand, devHome, devLink, devRows, knownDev, needsWindow, offArgs, markReloading, postCommand, postWindow, readWindows, sendHome, serveArgs, servedPorts } from '../src/hub/dev'
 import { HubService } from '../src/hub/hub-service'
 import { handleHub } from '../src/hub/routes'
 
@@ -54,6 +54,18 @@ describe('dev button', () => {
     assert.equal(devHome(wins, '/r/QR-Test-2', 1)?.pid, 3)
   })
 
+  it('a chat whose project has no window gets its own, unless a move is closing that folder', () => {
+    const wins = [
+      { pid: 1, port: 9001, hubToken: 'a', workspace: '/r/Armasu' },
+      { pid: 2, port: 9002, hubToken: 'b', workspace: '/r/switchboard' },
+    ]
+    assert.equal(needsWindow(wins, '/r/agent-flow', ''), true)
+    assert.equal(needsWindow(wins, '/r/switchboard/web', ''), false)
+    assert.equal(needsWindow(wins, '/r/Armasu', ''), false)
+    assert.equal(needsWindow(wins, '/r/agent-flow', '/r/agent-flow'), false)
+    assert.equal(needsWindow(wins, '', ''), false)
+  })
+
   it('lists folders with a dev script, running when a server cwd is inside, linked when served', () => {
     const read = (f: string) => f === '/r/QR-Test' ? { command: 'npm run dev' } : f === '/r/Web' ? { command: 'pnpm run dev' } : undefined
     const servers = [
@@ -93,6 +105,24 @@ describe('keep awake', () => {
     assert.deepEqual(awakeArgs(4242), ['-dis', '-w', '4242'])
     // The extension host is a child of the VS Code app process.
     assert.deepEqual(awakeArgs(), ['-dis', '-w', String(process.ppid)])
+  })
+
+  it('takes the pid file only for our caffeinate, so a reused pid is never shown on or killed', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-awake-')), file = path.join(dir, 'awake.pid')
+    const { spawn } = await import('child_process')
+    // Claude Code runs this form all the time.
+    const theirs = spawn('caffeinate', ['-i', '-t', '30'], { stdio: 'ignore' })
+    const ours = spawn('caffeinate', awakeArgs(process.pid), { stdio: 'ignore' })
+    try {
+      fs.writeFileSync(file, String(theirs.pid))
+      assert.equal(await awakePid(file), undefined)
+      assert.ok(!fs.existsSync(file), 'stale file removed')
+      fs.writeFileSync(file, String(ours.pid))
+      assert.equal(await awakePid(file), ours.pid)
+    } finally {
+      theirs.kill(); ours.kill()
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -170,5 +200,53 @@ describe('window posts', () => {
     await new Promise(r => setTimeout(r, 20))
     process.off('uncaughtException', onUncaught)
     assert.deepEqual(uncaught, [])
+  })
+})
+
+describe('sendHome', () => {
+  it('waits for a window that is mid-reload instead of opening the chat here', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-win-'))
+    const seen: string[] = []
+    const server = http.createServer((req, res) => { seen.push(req.url ?? ''); req.resume(); req.on('end', () => res.writeHead(200).end()) })
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+    const port = (server.address() as { port: number }).port
+    const file = (pid: number) => path.join(dir, `abc-${pid}.json`)
+    const write = (pid: number) => fs.writeFileSync(file(pid), JSON.stringify({ pid, port, hubToken: 't', workspace: '/r/Armasu' }))
+    try {
+      // Before the reload: a live window holds the folder.
+      write(process.pid)
+      markReloading(dir, process.pid)
+      // Reloading: dispose removed the file and the old host pid is gone, so nothing is listed and nothing is refused.
+      fs.rmSync(file(process.pid))
+      assert.deepEqual(readWindows(dir), [])
+      // The window comes back a moment later.
+      setTimeout(() => write(process.pid), 300)
+      assert.equal(await sendHome('/r/Armasu/web', { type: 'hub-new-chat' }, 0, dir, 50), true)
+      assert.equal(seen.length, 1)
+      // No reload marker for the folder: falls back here at once.
+      assert.equal(await sendHome('/r/Other', { type: 'hub-new-chat' }, 0, dir, 50), false)
+      // This window holds it: stays here even while another one reloads.
+      assert.equal(await sendHome('/r/Armasu', { type: 'hub-new-chat' }, process.pid, dir, 50), false)
+      // A window just asked to open a new repo: waits for it to list itself, then hands over.
+      const mine = (pid: number) => path.join(dir, `new-${pid}.json`)
+      setTimeout(() => fs.writeFileSync(mine(process.pid), JSON.stringify({ pid: process.pid, port, hubToken: 't', workspace: '/r/my-app' })), 300)
+      assert.equal(await sendHome('/r/my-app', { type: 'hub-new-chat' }, 0, dir, 50, 5000), true)
+      // It never shows up: gives up after waitMs.
+      assert.equal(await sendHome('/r/never', { type: 'hub-new-chat' }, 0, dir, 50, 200), false)
+      // A window on the parent folder does not take a new repo's chat; the repo's own window does.
+      fs.writeFileSync(path.join(dir, 'root-1.json'), JSON.stringify({ pid: process.ppid, port, hubToken: 'root', workspace: '/r' }))
+      seen.length = 0
+      setTimeout(() => fs.writeFileSync(mine(process.pid), JSON.stringify({ pid: process.pid, port, hubToken: 't', workspace: '/r/fresh' })), 300)
+      assert.equal(await sendHome('/r/fresh', { type: 'hub-new-chat' }, 0, dir, 50, 5000), true)
+      assert.deepEqual(seen.map(u => u.includes('token=t')), [true])
+      // Same when this window is the parent one: it waits for the new window instead of keeping the chat.
+      fs.rmSync(mine(process.pid))
+      setTimeout(() => fs.writeFileSync(mine(process.pid), JSON.stringify({ pid: process.pid, port, hubToken: 't', workspace: '/r/fresh' })), 300)
+      assert.equal(await sendHome('/r/fresh', { type: 'hub-new-chat' }, process.ppid, dir, 50, 5000), true)
+    } finally {
+      server.closeAllConnections()
+      await new Promise(r => server.close(r))
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

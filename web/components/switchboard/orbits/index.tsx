@@ -3,6 +3,7 @@
 // Same props as Orbit; the pick lives in localStorage like the tool-calls switch.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useDismiss } from '../use-popover'
+import { fitMenu } from '../chat-menu'
 import type { ChatProgress } from '@/lib/hub-types'
 import { VIEW_KEY, parseView, type View } from '@/lib/orbit-views'
 import { Orbit } from '../orbit'
@@ -95,6 +96,7 @@ function MoreViews({ view, onPick }: { view: View; onPick: (v: View) => void }) 
   const close = () => { setOpen(false); btn.current?.focus() }
   useDismiss(open, wrap, () => setOpen(false))
   useEffect(() => {
+    if (open) fitMenu(wrap.current)
     if (open) (wrap.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? wrap.current?.querySelector<HTMLElement>('[role="menuitemradio"]'))?.focus()
   }, [open])
   const at = (MORE as readonly string[]).includes(view) ? view : undefined

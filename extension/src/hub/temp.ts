@@ -3,8 +3,9 @@ import * as os from 'os'
 import * as path from 'path'
 
 // Anchored, so a folder merely named tmp (~/tmp/app) stays a project. Claude scratchpads live under /private/tmp.
-const TEMP = /^(\/private)?\/(tmp|var\/folders)\//
+const TEMP = /^(\/private)?\/(tmp|var\/folders)(\/|$)/
 const realTmp = () => { try { return fs.realpathSync(os.tmpdir()) } catch { return os.tmpdir() } }
-const TMPDIRS = [...new Set([os.tmpdir(), realTmp()])]
+// the bench harness lives here so /tmp reaping cannot eat it; its runs are still throwaway
+const TMPDIRS = [...new Set([os.tmpdir(), realTmp(), path.join(os.homedir(), '.claude', 'bench-kit')])]
 /** A chat running in a temp folder: scratchpads, bench runs, headless `claude -p`. Every view reads the hub, which drops these. */
-export const isTempDir = (cwd: string) => TEMP.test(cwd) || TMPDIRS.some(d => cwd.startsWith(d + path.sep))
+export const isTempDir = (cwd: string) => TEMP.test(cwd) || TMPDIRS.some(d => cwd === d || cwd.startsWith(d + path.sep))

@@ -1,5 +1,5 @@
 /**
- * Per-project to-do list of future work: Kenneth's items and what chats add with todo_add. What finished chats left waits in suggested for Accept or Dismiss; Kenneth's own hand steps (why 'you') show as Finish up until ticked. A repo keeps it as todo.json in a commit on refs/switchboard/todo,
+ * Per-project to-do list of future work: Kenneth's items and what chats add with todo_add. What finished chats left waits in suggested for Accept or Dismiss. Hand steps (why 'you') never stay: the chat opens the page for them, and prune drops any an older device wrote. A repo keeps it as todo.json in a commit on refs/switchboard/todo,
  * synced through origin by fetch, merge and a plain push; branches, the index, the working tree and HEAD
  * are never touched. A folder with no git keeps them in ~/.claude/switchboard/todo/<sha>.json, unsynced.
  */
@@ -16,7 +16,7 @@ import { foldPathCase } from '../fs-utils'
 import { createLogger } from '../logger'
 import { hub } from './hub-service'
 import { quickAsk } from './brain'
-import type { ChatProgress, TickedItem, TodoDoc, TodoItem, TodoSync, TodoWhy } from './types'
+import type { ChatProgress, TickedItem, TodoDoc, TodoItem, TodoPilot, TodoSync, TodoWhy } from './types'
 
 export const TODO_REF = 'refs/switchboard/todo'
 const REMOTE_REF = 'refs/switchboard/todo-remote'
@@ -67,7 +67,7 @@ export function parseDoc(raw: string): TodoDoc {
     if (!okId(o.id) || typeof o.text !== 'string' || typeof o.at !== 'number') return []
     const more = Object.fromEntries(extras.flatMap(k => (typeof o[k] === 'string' ? [[k, (o[k] as string).slice(0, 64)]] : [])))
     if (more.why && !WHYS.has(more.why)) delete more.why
-    return [{ id: o.id, text: clean(o.text), at: o.at, ...more } as T]
+    return [{ id: o.id, text: clean(o.text), at: o.at, ...more, ...(count(o.run) ? { run: o.run } : {}), ...(o.auto === true ? { auto: true } : {}), ...(o.stopped === true ? { stopped: true } : {}) } as T]
   })
   const removed = Object.fromEntries(Object.entries((j?.removed ?? {}) as object).filter(([id, at]) => okKey(id) && typeof at === 'number'))
   // Older docs keep finished chats' items in left; they are to-do items now, and an older device may still write them.
@@ -76,9 +76,14 @@ export function parseDoc(raw: string): TodoDoc {
   const left = rows<TodoItem>(j?.left, ['from']).filter(l => !ids.has(l.id) && !Object.hasOwn(removed, l.id))
   const o = (j?.order ?? {}) as { ids?: unknown; at?: unknown }
   const order = Array.isArray(o.ids) && typeof o.at === 'number' ? { ids: o.ids.filter(okId).slice(0, 500) as string[], at: o.at } : undefined
-  const out = withTicked({ version: 1, todo: [...todo, ...left], removed, ...(order ? { order } : {}) }, rows<TickedItem>(j?.ticked, ['by', 'from', 'before', 'name', 'why']))
+  const p = (j?.pilot ?? {}) as Record<string, unknown>
+  const pilot = typeof p.at === 'number' ? { ...(typeof p.on === 'boolean' ? { on: p.on } : {}), ...(p.paused === true ? { paused: true } : {}), at: p.at } : undefined
+  const runs = { ...(pilot ? { pilot } : {}), ...(count(j?.seq) ? { seq: j.seq } : {}), ...(count(j?.streak) ? { streak: j.streak } : {}) }
+  const out = withTicked({ version: 1, todo: [...todo, ...left], removed, ...(order ? { order } : {}), ...runs }, rows<TickedItem>(j?.ticked, ['by', 'from', 'before', 'name', 'why']))
   return withSuggested(out, rows<TodoItem>(j?.suggested, ['from', 'name', 'why']))
 }
+
+const count = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0
 
 /** d with ticked set to xs, newest first and capped; no field when empty. */
 function withTicked(d: TodoDoc, xs: TickedItem[]): TodoDoc {
@@ -102,8 +107,8 @@ export function mergeDocs(a: TodoDoc, b: TodoDoc, now = Date.now()): TodoDoc {
   for (const [id, at] of [...Object.entries(a.removed), ...Object.entries(b.removed)]) if (now - at < TOMBSTONE_MS) removed.set(id, Math.max(at, removed.get(id) ?? 0))
   const pick = <T extends { id: string; at: number }>(xs: T[], ys: T[]) => {
     const m = new Map<string, T>()
-    // An older device's newer copy has no name or why; keep the ones this side knows.
-    for (const x of [...xs, ...ys]) { const o = m.get(x.id) as TodoItem | undefined; if (!o || x.at > o.at) m.set(x.id, o ? { ...(o.name ? { name: o.name } : {}), ...(o.why ? { why: o.why } : {}), ...x } : x) }
+    // An older device's newer copy has no name, why or run; keep the ones this side knows.
+    for (const x of [...xs, ...ys]) { const o = m.get(x.id) as TodoItem | undefined; if (!o || x.at > o.at) m.set(x.id, o ? { ...(o.name ? { name: o.name } : {}), ...(o.why ? { why: o.why } : {}), ...(o.run ? { run: o.run } : {}), ...(o.auto ? { auto: o.auto } : {}), ...(o.stopped && !(x as { chat?: string }).chat ? { stopped: o.stopped } : {}), ...x } : x) }
     return [...m.values()].filter(x => !removed.has(x.id))
   }
   // Ticked ids are tombstoned as items, so only the put-back tombstone drops one.
@@ -114,7 +119,12 @@ export function mergeDocs(a: TodoDoc, b: TodoDoc, now = Date.now()): TodoDoc {
   }
   const order = [a.order, b.order].reduce<TodoDoc['order']>((m, o) => (o && (!m || o.at > m.at) ? o : m), undefined)
   const todo = order ? byOrder(pick(a.todo, b.todo), order.ids) : pick(a.todo, b.todo)
-  const out = withTicked({ version: 1, todo, removed: Object.fromEntries(removed), ...(order ? { order } : {}) }, [...ticked.values()])
+  const pilot = [a.pilot, b.pilot].reduce<TodoDoc['pilot']>((m, p) => (p && (!m || p.at > m.at) ? p : m), undefined)
+  // The higher seq knows the latest claim; on a tie an ended chain (no streak) wins.
+  const [hi, lo] = (a.seq ?? 0) >= (b.seq ?? 0) ? [a, b] : [b, a]
+  const streak = hi.seq === lo.seq && lo.streak === undefined ? undefined : hi.streak
+  const runs = { ...(pilot ? { pilot } : {}), ...(hi.seq ? { seq: hi.seq } : {}), ...(streak ? { streak } : {}) }
+  const out = withTicked({ version: 1, todo, removed: Object.fromEntries(removed), ...(order ? { order } : {}), ...runs }, [...ticked.values()])
   return withSuggested(out, pick(a.suggested ?? [], b.suggested ?? []))
 }
 
@@ -150,8 +160,33 @@ export function editTodo(d: TodoDoc, id: string, text: string, now = Date.now())
 }
 export function removeItem(d: TodoDoc, id: string, now = Date.now()): TodoDoc {
   if (!okId(id)) return d
-  return { ...d, todo: d.todo.filter(x => x.id !== id), removed: { ...d.removed, [id]: now } }
+  const out = { ...d, todo: d.todo.filter(x => x.id !== id), removed: { ...d.removed, [id]: now } }
+  // The queue went empty: the next claim starts a new chain.
+  if (!out.todo.some(x => x.why !== 'you')) delete out.streak
+  return out
 }
+
+/** hub-todo-pilot: the fields given change, the rest stay; at stamps it for the merge. */
+export function setPilot(d: TodoDoc, set: { on?: boolean; paused?: boolean }, now = Date.now()): TodoDoc {
+  const { at: _a, ...was } = d.pilot ?? { at: 0 }
+  const p = { ...was, ...(set.on !== undefined ? { on: set.on } : {}), ...(set.paused !== undefined ? { paused: set.paused } : {}) }
+  if (!p.paused) delete p.paused
+  return { ...d, pilot: { ...p, at: now } }
+}
+
+/** SWITCHBOARD_TODO for a chat started on items: run number, autopilot or Start, the item the run is for, who left it, project, item count. */
+export type RunLabel = { n: number; auto: boolean; text: string; from: string; project: string; total: number }
+export function runLabel(items: TodoItem[], folder: string): RunLabel | undefined {
+  const r = items.find(t => t.run), t = items.find(x => !items.some(y => y.id === x.before)) ?? items[0]
+  return r?.run ? { n: r.run, auto: !!r.auto, text: t.text, from: t.name ?? 'you', project: path.basename(folder), total: items.length } : undefined
+}
+/** The run label of the items any of chats holds (a resume, or a handoff by old or new id), in run order. */
+export function heldLabel(todo: TodoItem[] | undefined, folder: string, chats: string[]): RunLabel | undefined {
+  const all = todo ?? []
+  return runLabel(runOrder(all, all.filter(t => !!t.chat && chats.includes(t.chat)).map(t => t.id)), folder)
+}
+/** A chat terminal's SWITCHBOARD_TODO, none when it is not a to-do chat. */
+export const todoEnv = (label?: RunLabel): Record<string, string> => (label ? { SWITCHBOARD_TODO: JSON.stringify(label) } : {})
 /** Done: off the list (or the tray) and into the finished archive; by is the chat that did it, none for the user. */
 export function finishItem(d: TodoDoc, id: string, by?: string, now = Date.now()): TodoDoc {
   const t = d.todo.find(x => x.id === id)
@@ -161,7 +196,7 @@ export function finishItem(d: TodoDoc, id: string, by?: string, now = Date.now()
 /** The finished row keeps name and why, so Put back brings a hand step back as one. */
 const tickRow = ({ chat: _c, host: _h, at: _a, ...t }: TodoItem, by: string | undefined, now: number): TickedItem => ({ ...t, at: now, ...(by ? { by } : {}) })
 export function startTodo(d: TodoDoc, id: string, chat: string | undefined, now = Date.now()): TodoDoc {
-  return { ...d, todo: d.todo.map(x => { if (x.id !== id) return x; const { chat: _c, host: _h, ...rest } = x; return { ...rest, at: now, ...(chat ? { chat, host: hostId() } : {}) } }) }
+  return { ...d, todo: d.todo.map(x => { if (x.id !== id) return x; const { chat: _c, host: _h, stopped: _s, ...rest } = x; return { ...rest, at: now, ...(chat ? { chat, host: hostId() } : {}) } }) }
 }
 
 /** A handoff: the item follows its chat to the fresh one. */
@@ -172,10 +207,11 @@ export function moveChat(d: TodoDoc, from: string, to: string, now = Date.now())
 
 // A chat started from an item takes a while to show in the chat list.
 export const START_GRACE_MS = 2 * 60_000
-/** Items this machine started whose chat is no longer live here go back to not started. */
+/** Items this machine started whose chat is no longer live here go back to not started, marked stopped: only Start again runs them. */
 export function clearGone(d: TodoDoc, live: Set<string>, now = Date.now()): TodoDoc {
-  const gone = d.todo.filter(x => x.chat && x.host === hostId() && !live.has(x.chat) && now - x.at > START_GRACE_MS)
-  return gone.reduce((out, x) => startTodo(out, x.id, undefined, now), d)
+  const gone = new Set(d.todo.filter(x => x.chat && x.host === hostId() && !live.has(x.chat) && now - x.at > START_GRACE_MS).map(x => x.id))
+  const out = [...gone].reduce((o, id) => startTodo(o, id, undefined, now), d)
+  return gone.size ? { ...out, todo: out.todo.map(x => (gone.has(x.id) ? { ...x, stopped: true as const } : x)) } : d
 }
 
 /** The ids of known items an answer names, each as a whole word. */
@@ -191,10 +227,8 @@ export function finishPrompt(left: TodoItem[], p: ChatProgress): string {
     + 'Which open items are now done? Answer with their ids only, comma separated, or "none".'
 }
 
-/** A chat's standup Left items, cleaned, once each. Its open tasks stay on its card: the to-do is for later work. */
+/** A chat's standup Left items, cleaned, once each. Its open tasks stay on its card, and For you stays there too: the to-do is for later work. */
 const leftTexts = (p: ChatProgress) => [...new Set((p.report?.left ?? []).map(clean).filter(Boolean))]
-/** Its For you lines: the user's own steps, so no guess and no later filter. */
-const youTexts = (p: ChatProgress) => [...new Set((p.report?.you ?? []).map(clean).filter(Boolean))]
 
 const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 /** Whether a Left line and an item say the same thing: one holds the other, or most of the shorter one's longer words are in both. */
@@ -220,7 +254,7 @@ export function whyLeft(text: string): TodoWhy {
   // Keyword guess; swap in a quick model call if these read wrong too often.
   if (/out of scope|not in scope|unrelated|separate (task|chat|pr)|beyond (this|the) (task|brief)/.test(t)) return 'scope'
   if (/\bblocked\b|\bblocker|waiting (on|for)|waits (on|for)|can'?not|can't|no access|missing (key|token|access|credentials)/.test(t)) return 'blocked'
-  if (/\bkenneth\b|\byou\b|\byour\b|decide|decision|approve|confirm|sign ?in|log ?in|manual(ly)?\b/.test(t)) return 'you'
+  // No 'you' guess: For you lines are the hand steps, and a word guess dropped real work ("add retries to your handler").
   return 'later'
 }
 
@@ -240,27 +274,16 @@ function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why:
   return prune(add.length ? withSuggested(d, [...had, ...add]) : d, now)
 }
 
-// A For you step this old is stale: the chat that left it is long over.
-const YOU_MS = 3 * 24 * 60 * 60_000
-// Hand steps that repeat across chats; one per verb and object is enough.
-const HAND = /^(?:optional |first |then )?(reload|restart|reconnect|reinstall|rebuild|commit|push)\b/
-const FILLER = new Set(['the', 'a', 'an', 'your', 'this', 'now', 'optional', 'first'])
-/** A For you step's verb and object, from its first clause: "Reload VS Code so ..." and "Reload VS Code. That ..." match; "Commit in X" keeps X. */
-const kind = (t: string) => {
-  if (!HAND.test(words(t))) return words(t)
-  const head = t.replace(/^\s*(?:optional|first|then)\b[\s:,]*/i, '').split(/[.,:;!?](?:\s|$)|\s(?:so|once|then)\s/i)[0]
-  return words(head).split(' ').filter(w => !FILLER.has(w)).join(' ')
-}
 /** Whole-word match on normalized text, so an open "CI" never matches "Decide pricing". */
 const sameWork = (a: string, b: string) => { const x = words(a), y = words(b); return !!x && !!y && (` ${x} `.includes(` ${y} `) || ` ${y} `.includes(` ${x} `) || overlap(x, y, 2)) }
 // Oldest first, then smallest id: every machine keeps the same one of two duplicates.
 const byAge = <T extends { id: string; at: number }>(xs: T[]) => [...xs].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 
 /**
- * The list without junk. Suggestions: wrapped blocks or nudges (workText), a pointer at an open item's id, a repeat of an
- * open item or an older suggestion, a For you step past YOU_MS or with a newer one of the same kind. Open items: only an
- * exact repeat that a chat added and nobody accepted (no -ok id); accepted and typed items stay. Order free: the same
- * set prunes the same on every machine. Drops are tombstoned, so sync keeps them gone. d itself when nothing goes.
+ * The list without junk. A For you hand step, open (accepted) or suggested. Suggestions: wrapped blocks or nudges (workText),
+ * a pointer at an open item's id, a repeat of an open item or an older suggestion. Open items: an exact repeat that a chat
+ * added and nobody accepted (no -ok id); accepted and typed items stay. Order free: the same set prunes the same on every
+ * machine. Drops are tombstoned, so sync keeps them gone. d itself when nothing goes.
  */
 export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
   const open = new Set(d.todo.map(t => t.id))
@@ -269,28 +292,25 @@ export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
   const seen = new Set<string>()
   for (const t of byAge(d.todo)) {
     const w = words(t.text)
-    if (seen.has(w) && t.from && !t.chat && !t.id.endsWith('-ok')) out = removeItem(out, t.id, now)
+    if (handStep(t) || (seen.has(w) && t.from && !t.chat && !t.id.endsWith('-ok'))) out = removeItem(out, t.id, now)
     else seen.add(w)
   }
-  const sorted = byAge(d.suggested ?? [])
-  const newest = new Map<string, TodoItem>()
-  for (const s of sorted) if (s.why === 'you') newest.set(kind(s.text), s)
   const kept: TodoItem[] = []
-  for (const s of sorted) {
-    const you = s.why === 'you' && (now - s.at > YOU_MS || newest.get(kind(s.text)) !== s)
-    if (you || !workText(s.text, s.why === 'missed') || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
+  for (const s of byAge(d.suggested ?? [])) {
+    if (handStep(s) || !workText(s.text, s.why === 'missed') || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
     else kept.push(s)
   }
   const n = d.todo.length + (d.suggested?.length ?? 0) - out.todo.length - (out.suggested?.length ?? 0)
   return n ? { ...out, cleared: n } : out
 }
-// For you first, so a Left line that holds one never stands in for it.
-const addLeft = (d: TodoDoc, p: ChatProgress, texts: string[], now: number) => suggest(suggest(d, p, youTexts(p), now, () => 'you', youId), p, texts, now, whyLeft)
+const addLeft = (d: TodoDoc, p: ChatProgress, texts: string[], now: number) => suggest(d, p, texts, now, whyLeft)
+// For you lines used to land as suggestions under this id; only those go, not a Left line once guessed as 'you'.
 const youId = (chat: string, text: string) => leftId(chat, `you\n${text}`)
+const handStep = (t: TodoItem) => t.why === 'you' && !!t.from && t.id.replace(/-ok$/, '') === youId(t.from, t.text)
 
 const missedId = (chat: string, text: string) => leftId(chat, `missed\n${text}`)
-// Talk to the chat, not work: call me, carry on from a handoff, how is it going.
-const CHATTY = /^(please )?(give me a (phone )?call|call me|phone me|ring me|text me)\b|^(please )?(continue|carry on|pick up|resume) (from|with) |^(so )?(what s|what is|how s|how is|how are|where are|where s|are you|is it) (the )?(status|progress|it going|things going|going|we at|you at|done|finished|up to)\b/
+// Talk to the chat, not work: call me, carry on from a handoff, how is it going, a system notice pasted into a turn.
+const CHATTY = /^(cross session idle notice|switchboard stopped|subagent .* (has been quiet|no new output)|agent message from|developer reload window|(please )?(complete|do|finish) (what s|what is|everything) (left|remaining))\b|^(please )?(give me a (phone )?call|call me|phone me|ring me|text me)\b|^(please )?(continue|carry on|pick up|resume) (from|with) |^(so )?(what s|what is|how s|how is|how are|where are|where s|are you|is it) (the )?(status|progress|it going|things going|going|we at|you at|done|finished|up to)\b/
 const chatty = (t: string) => CHATTY.test(t.toLowerCase().replace(/[^a-z0-9/]+/g, ' ').trim())
 /** Kenneth's requests Jev found the Done list does not cover, as suggestions; one Jev now scores covered goes. */
 export function addMissed(d: TodoDoc, p: ChatProgress, now = Date.now()): TodoDoc {
@@ -299,6 +319,17 @@ export function addMissed(d: TodoDoc, p: ChatProgress, now = Date.now()): TodoDo
   const gone = (d.suggested ?? []).filter(x => x.from === p.sessionId && x.why === 'missed' && covered.has(x.text) && x.id === missedId(p.sessionId, x.text))
   const out = gone.reduce((o, x) => dismissSuggestion(o, x.id, now), d)
   return suggest(out, p, [...new Set(missed(p).map(clean).filter(t => t && !chatty(t)))], now, () => 'missed', missedId)
+}
+
+/** Kenneth approved the chat as finished, so the requests Jev scored as missed were covered after all. */
+export function approvedMissed(d: TodoDoc, sessionId: string, now = Date.now()): TodoDoc {
+  return (d.suggested ?? []).filter(x => x.from === sessionId && x.why === 'missed').reduce((o, x) => dismissSuggestion(o, x.id, now), d)
+}
+
+/** hub-panel.ts calls this on Approve; no write when the chat left no missed rows. */
+export async function chatApproved(sessionId: string, cwd: string): Promise<void> {
+  const folder = projectOf(cwd)
+  if (hub.get().todos?.[folder]?.suggested?.some(x => x.from === sessionId && x.why === 'missed')) await changeTodo(folder, d => approvedMissed(d, sessionId))
 }
 
 /** Accept: into the to-do keeping where it came from and why; the suggestion stays tombstoned. The new id comes from the old one, so two devices accepting it make one item. */
@@ -336,12 +367,12 @@ const leftId = (chat: string, text: string) => crypto.createHash('sha1').update(
  */
 export function afterFinish(d: TodoDoc, p: ChatProgress, doneIds: string[], now = Date.now(), add?: string[]): TodoDoc {
   const texts = leftTexts(p)
-  const fresh = new Set([...texts.map(t => leftId(p.sessionId, t)), ...youTexts(p).map(t => youId(p.sessionId, t))])
+  const fresh = new Set(texts.map(t => leftId(p.sessionId, t)))
   // Only the model's guesses can be put back; the user's Done and the chat's own items cannot.
   let out = doneIds.reduce((o, id) => finishItem(o, id, p.sessionId, now), d)
   // Older docs hold auto added Left items in todo; those and the suggestions both follow the chat's latest Left.
   for (const l of out.todo) if (l.from === p.sessionId && !l.chat && l.id === leftId(p.sessionId, l.text) && !fresh.has(l.id)) out = removeItem(out, l.id, now)
-  for (const l of out.suggested ?? []) if (l.from === p.sessionId && (l.id === leftId(p.sessionId, l.text) || l.id === youId(p.sessionId, l.text)) && !fresh.has(l.id)) out = dismissSuggestion(out, l.id, now)
+  for (const l of out.suggested ?? []) if (l.from === p.sessionId && l.id === leftId(p.sessionId, l.text) && !fresh.has(l.id)) out = dismissSuggestion(out, l.id, now)
   for (const t of out.todo.filter(x => x.chat === p.sessionId)) out = texts.some(l => mentions(l, t.text)) ? startTodo(out, t.id, undefined, now) : removeItem(out, t.id, now)
   return addLeft(out, p, add ?? texts, now)
 }
@@ -361,23 +392,53 @@ export function runOrder(todo: TodoItem[], ids: string[]): TodoItem[] {
 
 /**
  * Auto-start: the items one fresh chat should run in this window's project, or none. folder: the project this window
- * owns (none: a mirror). busy: a live chat runs in it. limited: a usage limit is used up or a retry waits. tried: items
+ * owns (none: a mirror). busy: held for another reason. live: live chat ids; one holding an item here keeps it busy,
+ * other chats in the project do not. pilot: the project's switch over the global on; paused starts nothing, running
+ * chats go on. limited: a usage limit is used up or a retry waits. tried: items
  * auto-started before, never again (a chat that keeps failing to start would loop). resumed: when a chat in it was last
  * resumed after a usage limit. A claim or a resume still in its grace counts as busy: that chat is not live yet.
  * failedAt: the last auto claim origin did not confirm (offline, rejected); nothing for SYNC_MS after it.
  */
-export function autoStartPlan(s: { on: boolean; folder?: string; todo: TodoItem[]; busy: boolean; limited: boolean; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): { folder: string; items: TodoItem[] } | undefined {
-  if (!s.on || !s.folder || s.busy || s.limited) return undefined
+export function autoStartPlan(s: { on: boolean; pilot?: TodoPilot; folder?: string; todo: TodoItem[]; busy: boolean; live?: Set<string>; limited: boolean; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): { folder: string; items: TodoItem[] } | undefined {
+  if (!(s.pilot?.on ?? s.on) || s.pilot?.paused || !s.folder || s.busy || s.limited) return undefined
+  if (s.live && s.todo.some(x => x.chat && s.live!.has(x.chat))) return undefined
   if (s.resumed !== undefined && s.now - s.resumed <= START_GRACE_MS) return undefined
   if (s.failedAt !== undefined && s.now - s.failedAt < SYNC_MS) return undefined
   if (s.todo.some(x => x.chat && s.now - x.at <= START_GRACE_MS)) return undefined
-  // A hand step or a blocked item is not a chat's to start, nor anything waiting on one.
-  const ready = (t: TodoItem) => !t.chat && t.why !== 'you' && t.why !== 'blocked' && !s.tried.has(t.id)
-  for (const t of s.todo.filter(ready)) {
-    const items = runOrder(s.todo, [t.id])
-    if (items.every(ready)) return { folder: s.folder, items }
+  const items = nextRun(s.todo, t => startable(t) && !s.tried.has(t.id))
+  return items && { folder: s.folder, items }
+}
+
+// A hand step, a blocked item, one in a chat or one whose chat died is not for auto-start, nor anything waiting on one.
+const startable = (t: TodoItem) => !t.chat && !t.stopped && t.why !== 'you' && t.why !== 'blocked'
+/** The first item, in list order, that starts with its prerequisites all ready; those items in run order. */
+function nextRun(todo: TodoItem[], ready: (t: TodoItem) => boolean): TodoItem[] | undefined {
+  for (const t of todo.filter(ready)) {
+    const items = runOrder(todo, [t.id])
+    if (items.every(ready)) return items
   }
   return undefined
+}
+
+export type TodoPlan = { runs: Array<{ n: number; ids: string[] }>; held: Array<{ id: string; why: 'blocked' | 'you' | 'stopped' }> }
+/**
+ * What auto-start will run, in order, each run one chat with one number after seq; held: what it never starts and why
+ * (its own or a prerequisite's). Items in a live chat are running and in neither.
+ */
+export function upcoming(all: TodoItem[], seq = 0, live = new Set<string>()): TodoPlan {
+  // A live chat's items leave the list when it is done, so nothing waits on them.
+  const todo = all.filter(t => !(t.chat && live.has(t.chat)))
+  const runs: TodoPlan['runs'] = [], taken = new Set<string>()
+  for (let items; (items = nextRun(todo, t => startable(t) && !taken.has(t.id)));) {
+    for (const t of items) taken.add(t.id)
+    runs.push({ n: seq + runs.length + 1, ids: items.map(t => t.id) })
+  }
+  const why = (t: TodoItem) => (t.why === 'blocked' ? 'blocked' : t.why === 'you' ? 'you' : t.chat || t.stopped ? 'stopped' : undefined)
+  const held = todo.filter(t => !taken.has(t.id)).map(t => {
+    const chain = runOrder(todo, [t.id]).map(why)
+    return { id: t.id, why: chain.find(w => w === 'blocked') ?? chain.find(w => w === 'you') ?? 'stopped' as const }
+  })
+  return { runs, held }
 }
 
 /**
@@ -388,7 +449,9 @@ export function autoStartPlan(s: { on: boolean; folder?: string; todo: TodoItem[
 export function claimItems(d: TodoDoc, ids: string[], chat: string, live: Set<string>, now = Date.now(), manual = false): TodoDoc {
   const taken = (t: TodoItem | undefined) => !t || (!!t.chat && ((t.host !== hostId() && !manual) || live.has(t.chat) || now - t.at <= START_GRACE_MS))
   if (ids.some(id => taken(d.todo.find(t => t.id === id)))) return d
-  return ids.reduce((out, id) => startTodo(out, id, chat, now), d)
+  const n = (d.seq ?? 0) + 1, out = ids.reduce((o, id) => startTodo(o, id, chat, now), d)
+  const todo = out.todo.map(t => { if (!ids.includes(t.id)) return t; const { auto: _a, ...rest } = t; return { ...rest, run: n, ...(manual ? {} : { auto: true as const }) } })
+  return { ...out, todo, seq: n, streak: d.streak ?? n }
 }
 
 /**
@@ -460,7 +523,7 @@ export function toolStep(d: TodoDoc, c: TodoCall, now = Date.now(), id = ID()): 
   const dup = d.todo.find(t => repeats(t.text, text))
   if (dup) return { doc: d, said: `Already on the list as ${dup.id}: ${dup.text}` }
   const to = c.before ? findItem(d, c.before) : undefined
-  const more: Partial<TodoItem> = { ...(to ? { before: to.id } : {}), ...(to?.chat ? { chat: to.chat, host: to.host } : {}), ...(c.session ? { from: c.session.slice(0, 64) } : {}), ...(c.session && chatName(c.session) ? { name: chatName(c.session) } : {}) }
+  const more: Partial<TodoItem> = { ...(to ? { before: to.id } : {}), ...(to?.chat ? { chat: to.chat, host: to.host } : {}), ...(to?.run && to.chat && to.chat === c.session ? { run: to.run, ...(to.auto ? { auto: true as const } : {}) } : {}), ...(c.session ? { from: c.session.slice(0, 64) } : {}), ...(c.session && chatName(c.session) ? { name: chatName(c.session) } : {}) }
   return { doc: addTodo(d, text, now, id, more), said: `Added ${id}: ${text}${to ? ` (needed first for ${to.id})` : ''}` }
 }
 
@@ -713,18 +776,36 @@ export async function laterOnly(p: ChatProgress, ask: (prompt: string, ms: numbe
 const turns = new Map<string, number>()
 const nextTurn = (id: string) => { const n = (turns.get(id) ?? 0) + 1; turns.set(id, n); return n }
 
-/** A chat reached Done: one quick model call ticks the open items its work covers, wherever they came from, another keeps only later work from its Left, then afterFinish. */
-export async function todoFinished(s: TodoStore, p: ChatProgress, ask: (prompt: string, ms: number) => Promise<string>): Promise<TodoDoc> {
+type Ask = (prompt: string, ms: number) => Promise<string>
+/**
+ * The ids of open items and tray lines, from any chat, that this chat's work covers: a chat often finishes one while
+ * on another. Not asked about: items in progress on a chat, or what its own Left still lists. withAsked: what it was
+ * asked counts as evidence too (a chat at Done).
+ */
+async function coveredIds(d: TodoDoc, p: ChatProgress, ask: Ask, withAsked: boolean): Promise<string[]> {
+  const left = leftTexts(p)
+  // Its own missed lines are its asks, which the evidence repeats; Jev's score in addMissed judges those.
+  const open = [...d.todo.filter(l => !l.chat), ...(d.suggested ?? []).filter(l => !(l.why === 'missed' && l.from === p.sessionId))].filter(l => !left.some(t => mentions(t, l.text)))
+  const q = withAsked ? p : { ...p, asked: [] }
+  if (!open.length || !(q.report?.done.length || q.asked?.length)) return []
+  return parseDoneIds(await ask(finishPrompt(open, q), 60_000).catch(() => ''), open.map(l => l.id))
+}
+
+/** A chat reached Done: one quick model call ticks the open items and tray lines its work covers, another keeps only later work from its Left, then afterFinish. */
+export async function todoFinished(s: TodoStore, p: ChatProgress, ask: Ask): Promise<TodoDoc> {
   const turn = nextTurn(p.sessionId)
-  const left = [...leftTexts(p), ...youTexts(p)]
   const was = await readDoc(s)
-  // Finish up steps from any chat too, so "I reloaded it" anywhere ticks one.
-  const older = [...was.todo.filter(l => !l.chat), ...(was.suggested ?? []).filter(l => l.why === 'you')].filter(l => !left.some(t => mentions(t, l.text)))
-  const said = !!(p.report?.done.length || p.asked?.length)
-  const [answer, later] = await Promise.all([older.length && said ? ask(finishPrompt(older, p), 60_000).catch(() => '') : '', laterOnly(p, ask)])
+  const [done, later] = await Promise.all([coveredIds(was, p, ask, true), laterOnly(p, ask)])
   if (turns.get(p.sessionId) !== turn) return readDoc(s)
-  const done = parseDoneIds(answer, older.map(l => l.id))
   return updateDoc(s, d => afterFinish(d, p, done, Date.now(), later))
+}
+
+/** A chat ended without Done: what its Done list covers is ticked all the same, then afterEnd. */
+export async function todoEnded(s: TodoStore, p: ChatProgress, ask: Ask): Promise<TodoDoc> {
+  if (p.state === 'done') return readDoc(s)
+  // ponytail: a report seen at an earlier Done was judged then; a newer standup after it is skipped too, add a report time if that matters.
+  const [done, later] = await Promise.all([p.finishedAt ? [] : coveredIds(await readDoc(s), p, ask, false), laterOnly(p, ask)])
+  return updateDoc(s, d => afterEnd(done.reduce((o, id) => finishItem(o, id, p.sessionId), d), p, Date.now(), later))
 }
 
 /** Kenneth wrote to a chat past Done: what its Left put on the list is that chat's work again, until its next Done says what is still left. */
@@ -744,7 +825,8 @@ const storeOf = (folder: string) => { let s = stores.get(folder); if (!s) stores
 const show = (folder: string, d?: TodoDoc) => {
   const was = hub.get().todos?.[folder]
   const src = d ?? was
-  hub.set({ todos: { ...hub.get().todos, [folder]: { todo: src?.todo ?? [], ticked: src?.ticked, suggested: src?.suggested, cleared: src?.cleared, sync: syncState.get(folder) } } })
+  hub.set({ todos: { ...hub.get().todos, [folder]: { todo: src?.todo ?? [], ticked: src?.ticked, suggested: src?.suggested, cleared: src?.cleared, pilot: src?.pilot, seq: src?.seq, streak: src?.streak, sync: syncState.get(folder),
+    plan: upcoming(src?.todo ?? [], src?.seq, new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId))) } } })
 }
 
 /** Syncs when the repo may (syncMode) and keeps how it went for the panel. */
@@ -824,8 +906,9 @@ export async function chatFinished(p: ChatProgress): Promise<void> {
 /** claude-runtime.ts calls this when a chat this window owns ends without Done (hub.onEnded). */
 export async function chatEnded(p: ChatProgress): Promise<void> {
   if (p.state === 'done') return
-  const later = await laterOnly(p, quickAsk)
-  await changeTodo(projectOf(p.cwd), d => afterEnd(d, p, Date.now(), later))
+  const folder = projectOf(p.cwd), s = await storeOf(folder)
+  show(folder, await todoEnded(s, p, quickAsk))
+  laterSync(folder, s)
 }
 
 /** claude-runtime.ts calls this once Jev scored a Done chat's requests. */

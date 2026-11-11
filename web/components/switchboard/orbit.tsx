@@ -43,11 +43,12 @@ export function describe(c: OrbitChat): string {
 type Scene = {
   v: Map<string, number>; seen: Set<string>; moving: boolean; glide: boolean; snap: boolean; dt: number
   spin: number; ring: Map<string, RoleOn>; sats: Map<string, string>; badge: Map<string, number>
-  sub?: { text: string; prev?: string; at: number }; q?: string
+  sub?: { text: string; y: number; prev?: string; prevY?: number; at: number }; q?: string
+  pick: Map<string, { i: number; at: number }>
   /** Where each role's bubble is this frame, for its node button. */
   hits: Map<string, Hit>
 }
-export const newScene = (): Scene => ({ v: new Map(), seen: new Set(), moving: false, glide: false, snap: true, dt: 0, spin: 0, ring: new Map(), sats: new Map(), badge: new Map(), hits: new Map() })
+export const newScene = (): Scene => ({ v: new Map(), seen: new Set(), moving: false, glide: false, snap: true, dt: 0, spin: 0, ring: new Map(), sats: new Map(), badge: new Map(), hits: new Map(), pick: new Map() })
 
 const KEYS = ['canvas', 'card', 'elev', 'hair', 'ink', 'body', 'mute', 'ash', 'blue', 'red', 'green', 'yellow', 'violet', 'teal'] as const
 type Pal = Record<(typeof KEYS)[number], string> & { sans: string; mono: string }
@@ -204,13 +205,16 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   let lx = 16
   for (const [l, col] of legend) {
     const lw = ctx.measureText(l).width + 26
-    if (lx > 16 && lx + lw - 15 > w - 8) { rows.push([]); lx = 16 }
+    // the bottom-right corner is kept for Done
+    if (lx > 16 && lx + lw - 15 > w - 84) { rows.push([]); lx = 16 }
     rows[rows.length - 1].push([l, col, lx]); lx += lw
   }
   // Under ~420px a role name no longer fits its bubble.
   const narrow = w < 420
+  // a small bubble on a wide stage cuts the name too, so it hangs under like narrow
+  const under = narrow || Math.min(w, h) * 0.07 < 24
   // Narrow, the names hang under the bubbles, so the bottom one needs room above the legend.
-  const lift = (rows.length - 1) * 16 + (narrow ? 20 : 0)
+  const lift = (rows.length - 1) * 16 + (under ? 20 : 0)
   const m = Math.min(w, h - lift), live = c.state === 'working', finished = c.state === 'done', needs = c.state === 'needs-you'
   const dim = tw('dim', c.state === 'idle' ? 0.45 : 1, TW.color)
   const fin = almostDone(c.progress) ? C.teal : C.green
@@ -221,7 +225,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   const cx = snap(w * 0.5), cy = snap((h - lift) * 0.5), R = m * 0.32, rr = m * 0.07, lr = m * 0.11, sr = Math.max(7, rr * 0.34)
   // The orbit: round 1.5px dots, 7px apart.
   ctx.setLineDash([0, 7]); ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.strokeStyle = rgba(C.ash, 0.6 * dim); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([])
-  const lead = { x: cx, y: cy }, you = { x: snap(cx - R * 1.55), y: snap(cy - R * 0.62) }, done = { x: snap(cx + R * 1.55), y: snap(cy + R * 0.66) }
+  const lead = { x: cx, y: cy }, you = { x: snap(cx - R * 1.55), y: snap(cy - R * 0.62) }, done = { x: snap(w - 44), y: snap(h - 18) }
 
   // The ring turns slowly while the chat works; once it stops, it settles back on its resting slots.
   const roles = ringRoles(c.progress), slot = TAU / roles.length
@@ -252,12 +256,6 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     })
   }
   const active = roles.filter(r => r.state === 'active').map(r => r.role)
-  // Done takes the first slot clear of every role's bubble and label, and glides when the ring turns.
-  {
-    const ys = [0.66, 0.98, 0.34].map(k => cy + R * k), cap = h - 40 - (rows.length - 1) * 16
-    const clear = (y: number) => [...pos.values()].every(p => Math.abs(p.x - done.x) > rr + 40 || y < p.y - rr - 14 || y > p.y + rr + 40)
-    done.y = snap(tw('doneY', Math.min(cap, ys.find(clear) ?? ys[0]), TW.move))
-  }
 
   edge(you, lead, C.ash, 0.7 * dim, [], -0.08)
   if (!still) spark(you, lead, (t * 0.3) % 1, C.blue, -0.08, 2, wWork)
@@ -267,7 +265,12 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     seed += 0.37
     if (!still && p.wA > 0.01) for (let k = 0; k < 2; k++) spark(lead, p, (t * 0.42 + k / 2 + seed) % 1, C.blue, 0.1, 2.5, p.wA * p.on)
   }
-  edge(lead, done, twc('de', finished ? fin : C.ash), lerp(0.3 * dim, 0.7, wFin), finished ? [] : [3, 5], -0.06)
+  // Done sits in the corner, so its line bows around any role in the way, and is left out when none clears.
+  const doneBend = [-0.06, 0.22, -0.28].find(b => {
+    for (let u = 0.15; u < 0.95; u += 0.05) { const q = curve(lead, done, b, u); if ([...pos.values()].some(p => Math.hypot(q.x - p.x, q.y - p.y) < rr + 4)) return false }
+    return true
+  })
+  if (doneBend !== undefined) edge(lead, done, twc('de', finished ? fin : C.ash), lerp(0.3 * dim, 0.7, wFin), finished ? [] : [3, 5], doneBend)
 
   // Tool calls: the newest few, out from whoever made them. A role not on the ring draws from the lead.
   if (showTools) {
@@ -343,6 +346,36 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
   if (qText) S.q = qText
   ctx.font = `500 12px ${C.sans}`
   const qShown = S.q ? fit(S.q, w * 0.55) : '', qBox = qText ? pillBox(cx, cy - lr - 30, qShown, { size: 12, mono: false }) : undefined
+  const subFull = live ? (active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning') : needs ? 'waiting on you' : finished ? 'ready to approve' : c.wait ?? `idle ${c.ago}`
+  type Box = { l: number; pw: number; top: number; ph: number }
+  const overlap = (a: Box, b: Box) => a.l < b.l + b.pw && b.l < a.l + a.pw && a.top < b.top + b.ph && b.top < a.top + a.ph
+  const touches = (b: Box, o: { x: number; y: number; r: number }) => Math.hypot(Math.max(b.l - o.x, 0, o.x - b.l - b.pw), Math.max(b.top - o.y, 0, o.y - b.top - b.ph)) < o.r
+  // Lead's line when too wide for its bubble hangs under it, or over it when a role sits there.
+  // With no room either side it drops the role and says just working; the role's own arc shows which.
+  ctx.font = `400 ${Math.max(11, lr * 0.13)}px ${C.mono}`
+  const subAt_ = (s: string, y: number): Box => { const sw = ctx.measureText(s).width; return { l: cx - sw / 2 - 4, pw: sw + 8, top: y - 9, ph: 18 } }
+  // each role's bubble with its glow, and the check or count badge on its upper right
+  const subClear = (s: string, y: number) => [...pos.values()].every(p => !touches(subAt_(s, y), { x: p.x, y: p.y, r: rr + 6 }) && !touches(subAt_(s, y), { x: p.x + rr * 0.72, y: p.y - rr * 0.72, r: 12 }))
+  // A placement sticks until it is blocked, and a new one holds 1.5s, so a turning ring does not flip it back and forth.
+  const stick = (k: string, n: number, ok: (i: number) => boolean, fallback: number) => {
+    const was = S.pick.get(k)
+    if (was && was.i < n && (now - was.at < 1500 || ok(was.i))) return was
+    let i = 0
+    while (i < n && !ok(i)) i++
+    // nowhere free: stay put rather than jump onto something else
+    if (i === n) i = was && was.i < n ? was.i : fallback
+    if (was?.i !== i) S.pick.set(k, { i, at: was && !S.snap ? now : -1e9 })
+    return S.pick.get(k)!
+  }
+  const subTry = (live && active.length ? [subFull, 'working'] : [subFull]).flatMap(s => [[s, cy + lr + 18], [s, cy - lr - 18]] as Array<[string, number]>)
+  const subOk = (i: number) => !(qBox && i % 2) && subClear(...subTry[i])
+  const subPick = stick('sub', subTry.length, subOk, subTry.length - 2).i
+  // Boxed in on both sides it fades out; Lead's color and arc still say working.
+  const [sub, subY] = ctx.measureText(subFull).width <= lr * 1.7 ? [subFull, 0] : stick('subShow', 2, i => (i === 0) === subOk(subPick), 0).i === 0 ? subTry[subPick] : ['', subTry[subPick][1]]
+  const subIn = ctx.measureText(sub).width <= lr * 1.7, subBox = subIn || !sub ? undefined : subAt_(sub, subY)
+  const commit = c.progress?.commit ? 'commit message ready' : 'no commit message'
+  ctx.font = `400 11px ${C.mono}`
+  const commitBox = wFin > 0.01 ? { l: w - 12 - ctx.measureText(commit).width, pw: ctx.measureText(commit).width, top: done.y - 32, ph: 16 } : undefined
 
   S.hits.clear()
   for (const p of pos.values()) {
@@ -356,10 +389,11 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
       const model = c.models?.[r.role]
       // An unused role reads quieter in mute, not in a faded ink that fails contrast.
       const ink = mix(C.ink, C.mute, wU)
-      if (narrow) {
+      if (under) {
         // Too small for the name: the model goes in the bubble and the name under it.
         // Only when it fits whole; a cut model name spills over a small bubble.
-        if (model) { ctx.font = `400 10px ${C.mono}`; if (ctx.measureText(model).width <= rr * 1.6) text(model, p.x, p.y, { size: 10, color: C.mute, mono: true, weight: 400, alpha: dim }) }
+        // and not under a done check, a count badge or the working arc
+        if (model && wD * (1 - wA) < 0.01 && wA < 0.01 && r.running.length < 2) { ctx.font = `400 10px ${C.mono}`; if (ctx.measureText(model).width <= rr * 1.6) text(model, p.x, p.y, { size: 10, color: C.mute, mono: true, weight: 400, alpha: dim }) }
       } else {
         // Shrinks to fit the bubble, down to 9px, before it cuts the name.
         // The fitted size is kept per name and bubble size, so a frame does not re-measure it.
@@ -381,14 +415,23 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
       const kb = tw(`kb:${r.role}`, r.running.length > 1 ? 1 : 0, TW.enter, 0)
       if (kb > 0.01 && S.badge.has(r.role)) pop(bx, by, 0.7 + 0.3 * kb, kb, () => pill(bx + 4, by, `×${S.badge.get(r.role)}`, C.blue, 1, { size: 10, fg: C.ink }))
       else if (kb === 0) S.badge.delete(r.role)
-      if (narrow || model) {
-        ctx.font = narrow ? `500 11px ${C.sans}` : `400 11px ${C.mono}`
-        const label = narrow ? r.role : fit(model!, rr * 2.4), half = ctx.measureText(label).width / 2 + 8
-        let ly = p.y + rr + 11 + p.band * Math.max(0, Math.sin(p.a))
-        if (qBox && p.x + half > qBox.l && p.x - half < qBox.l + qBox.pw && ly + 14 > qBox.top && ly - 14 < qBox.top + qBox.ph) ly = p.y - rr - 11 - p.band * Math.max(0, -Math.sin(p.a))
-        // never onto the legend, even with a satellite row below
-        ly = Math.min(ly, h - 34 - (rows.length - 1) * 16)
-        text(label, p.x, tw(`ly:${r.role}`, ly, TW.move), narrow ? { size: 11, color: ink, alpha: dim } : { size: 11, color: C.mute, mono: true, weight: 400, alpha: dim })
+      if (under || model) {
+        ctx.font = under ? `500 11px ${C.sans}` : `400 11px ${C.mono}`
+        const label = under ? r.role : fit(model!, rr * 2.4), half = ctx.measureText(label).width / 2 + 8
+        // Below the bubble, else above, else beside it: clear of Lead and its ring, the other roles,
+        // the question, Lead's line, the commit note, the wait pills along the top and the legend.
+        const floor = h - 34 - (rows.length - 1) * 16
+        const rings = [{ x: cx, y: cy, r: lr + 14 }, ...[...pos.values()].filter(o => o !== p).map(o => ({ x: o.x, y: o.y, r: rr + 3 }))]
+        const free = ([x, y]: number[]) => {
+          const b = { l: x - half, pw: half * 2, top: y - 8, ph: 16 }
+          return y <= floor && b.top >= 26 && b.l >= 0 && b.l + b.pw <= w && ![qBox, subBox, commitBox].some(o => o && overlap(o, b)) && !rings.some(o => touches(b, o))
+        }
+        const spots = [[p.x, p.y + rr + 11 + p.band * Math.max(0, Math.sin(p.a))], [p.x, p.y - rr - 11 - p.band * Math.max(0, -Math.sin(p.a))], [p.x + rr + 4 + half, p.y], [p.x - rr - 4 - half, p.y]]
+        // A label that changes side fades in at the new spot instead of gliding across its own bubble.
+        const pk = stick(`l:${r.role}`, spots.length, i => free(spots[i]), 0), la = Math.min(1, (now - pk.at) / 220)
+        if (la < 1) S.moving = true
+        const [lx, ly] = free(spots[pk.i]) || pk.i ? spots[pk.i] : [p.x, Math.min(spots[0][1], floor)]
+        text(label, lx, ly, under ? { size: 11, color: ink, alpha: dim * la } : { size: 11, color: C.mute, mono: true, weight: 400, alpha: dim * la })
       }
     })
   }
@@ -405,29 +448,29 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     arc(cx, cy, lr + 7, -Math.PI / 2, fill, rgba(fill > 0.85 ? C.yellow : C.blue, 0.9 * dim), 2)
   }
   text('Lead', cx, cy - lr * 0.16, { size: Math.max(12, lr * 0.25), weight: 600, alpha: dim })
-  // The line under Lead crossfades when it changes.
-  const sub = live ? (active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning') : needs ? 'waiting on you' : finished ? 'ready to approve' : c.wait ?? `idle ${c.ago}`
-  if (S.snap || !S.sub) S.sub = { text: sub, at: -1e9 }
-  else if (S.sub.text !== sub) S.sub = { text: sub, prev: S.sub.text, at: now }
+  // The line under Lead crossfades when its words or its side change, so it never slides across Lead.
+  if (S.snap || !S.sub) S.sub = { text: sub, y: subY, at: -1e9 }
+  else if (S.sub.text !== sub || S.sub.y !== subY) S.sub = { text: sub, y: subY, prev: S.sub.text, prevY: S.sub.y, at: now }
   const fade = Math.min(1, (now - S.sub.at) / 180)
   if (fade < 1) S.moving = true
   // A line too wide for the bubble sits just under it instead of spilling over the ring.
-  const subAt = (s: string, a: number) => {
+  const subAt = (s: string, a: number, sy: number) => {
+    if (!s) return
     const size = Math.max(11, lr * 0.13)
     ctx.font = `400 ${size}px ${C.mono}`
-    const w = ctx.measureText(s).width, inside = w <= lr * 1.7, y = inside ? cy + lr * 0.26 : cy + lr + 18
+    const w = ctx.measureText(s).width, inside = w <= lr * 1.7, y = inside ? cy + lr * 0.26 : sy
     // Outside the bubble it crosses the ring and links, so it gets a canvas-colored backing.
     if (!inside) { ctx.beginPath(); ctx.roundRect(cx - w / 2 - 4, y - size * 0.75, w + 8, size * 1.5, 4); ctx.fillStyle = rgba(C.canvas, a); ctx.fill() }
     text(s, cx, y, { size, color: C.mute, mono: true, weight: 400, alpha: dim * a })
   }
-  if (S.sub.prev && fade < 1) subAt(S.sub.prev, 1 - fade)
-  subAt(S.sub.text, fade)
+  if (S.sub.prev && fade < 1) subAt(S.sub.prev, 1 - fade, S.sub.prevY ?? S.sub.y)
+  subAt(S.sub.text, fade, S.sub.y)
   // The question slides down into place and fades; it fades back out once answered.
   const qOn = tw('q', qText ? 1 : 0, TW.enter, 0)
   if (qOn > 0.01 && qShown) pop(cx, cy - lr - 30, 1, qOn, () => pill(cx, cy - lr - 30 - (1 - qOn) * 6, qShown, C.red, 1, { size: 12, mono: false, fg: C.ink }))
 
   pill(done.x, done.y, 'Done', twc('dc', finished ? fin : C.ash), lerp(dim, 1, wFin), { size: 12, mono: false, fg: twc('df', finished ? fin : C.mute), check: almostDone(c.progress) ? 0 : wFin })
-  if (wFin > 0.01) text(c.progress?.commit ? 'commit message ready' : 'no commit message', done.x, done.y + 24, { size: 11, color: fin, mono: true, weight: 400, alpha: wFin })
+  if (wFin > 0.01) text(commit, w - 12, done.y - 24, { size: 11, color: fin, mono: true, weight: 400, align: 'right', alpha: wFin })
 
   rows.forEach((row, i) => {
     const ly = h - 18 - (rows.length - 1 - i) * 16

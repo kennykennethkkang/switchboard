@@ -125,7 +125,7 @@ export function brief(state: HubState, cwd: string, self: string, now = Date.now
     lines.push('Other chats in this project:')
     for (const s of others) lines.push(`- ${nameOf(s)}${s.prompt ? `: "${s.prompt.slice(0, 120)}"` : ''}${s.file ? ` (in ${rel(s.file)})` : ''}`)
   }
-  if (files.length) lines.push(`Leave alone, another chat is editing: ${files.join(', ')}`)
+  if (files.length) lines.push(`Leave alone, another chat was editing at chat start (check it is still in ListAgents before waiting on it): ${files.join(', ')}`)
   if (task) lines.push(`Next open plan task: ${task}`)
   if (task && state.plan?.decisions?.length) lines.push(`Recent decisions: ${state.plan.decisions.join('; ')}`)
   const todo = Object.entries(state.todos ?? {}).find(([f]) => norm(f) === home.cwd)?.[1].todo.filter(t => t.why !== 'you') ?? []

@@ -10,6 +10,10 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { ClaudeHookDef, ClaudeHookEntry } from './protocol'
 import { HOOK_COMMAND_MARKER } from './discovery'
+import { writeJsonAtomic } from './fs-utils'
+
+// Moved to fs-utils so light modules can use it without pulling in discovery and the hub.
+export { writeJsonAtomic }
 
 /**
  * Legacy Agent Flow HTTP hooks pointed straight at the hook server's origin
@@ -72,18 +76,6 @@ export function readSettingsFile(settingsPath: string): SettingsReadResult {
   }
 }
 
-/** Write JSON via temp file + rename so a crash mid-write can't truncate the file. */
-export function writeJsonAtomic(target: string, value: unknown): void {
-  // Write through a symlink (dotfiles) and keep the mode, or rename replaces both; a new file is owner-only
-  let filePath = target
-  let mode = 0o600
-  try { filePath = fs.realpathSync(target); mode = fs.statSync(filePath).mode & 0o777 } catch { /* new file */ }
-  fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  const tmpPath = `${filePath}.${process.pid}.tmp`
-  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2) + '\n', { mode })
-  fs.chmodSync(tmpPath, mode)
-  fs.renameSync(tmpPath, filePath)
-}
 
 /**
  * Replace Switchboard's entries for each event with `hookEntry`, leaving every

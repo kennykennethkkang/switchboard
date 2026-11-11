@@ -602,3 +602,33 @@ x`)
     assert.equal(reads, 1)
   })
 })
+
+describe('graph data from the live audit', () => {
+  const dir = slugOf('/w/Armasu')
+  it('lists a broken link once, however often it is named', () => {
+    const g = buildGraph(state(), [{ dir, file: 'a.md', text: '---\nname: a\nrelated: crowd-ab\n---\nSee [[crowd-ab]] and [[crowd-ab]].' }], [])
+    assert.deepEqual(g.nodes.find(n => n.label === 'a')!.missing, ['crowd-ab'])
+  })
+
+  it('reads no links inside code, nor ones starting with a colon', () => {
+    const m = parseMemory('a.md', 'Real [[b]].\n```\n[[slug]] in a fence\n```\nInline `[[slug]]` and [[:space:]] too.')
+    assert.deepEqual(m.links, ['b'])
+  })
+
+  it('unescapes quotes and backslashes in a double-quoted value', () => {
+    assert.equal(parseMemory('a.md', '---\nname: a\ndescription: "says \\"hi\\" at C:\\\\x"\n---\nx').description, 'says "hi" at C:\\x')
+  })
+
+  it('leaves out archived chats outside a registered project', () => {
+    const g = buildGraph(state({
+      archive: [
+        { sessionId: 'b1', ai: 'claude', name: 'solo-t11-2', origin: 'x', version: 1, cwd: '/home/k/.claude/bench-kit/runs/solo-t11-2', project: 'x', archivedAt: 3 },
+        { sessionId: 'b2', ai: 'claude', name: 'tmp', origin: 'x', version: 1, cwd: '/private/tmp/claude-501/x', project: 'x', archivedAt: 2 },
+        { sessionId: 'b3', ai: 'claude', name: 'GitHub', origin: 'x', version: 1, cwd: '/w', project: 'x', archivedAt: 2 },
+        { sessionId: 'ok', ai: 'claude', name: 'Armasu', origin: 'x', version: 1, cwd: '/w/Armasu/app', project: 'x', archivedAt: 1 },
+      ],
+    }), [], [])
+    assert.deepEqual(g.nodes.filter(n => n.kind === 'chat').map(n => n.id), ['chat:ok'])
+    assert.deepEqual(g.nodes.filter(n => n.kind === 'project').map(n => n.id), ['project:/w/Armasu'])
+  })
+})

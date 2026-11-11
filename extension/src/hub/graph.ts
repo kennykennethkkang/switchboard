@@ -78,10 +78,16 @@ function frontmatter(head: string): Map<string, Key> {
 export function parseMemory(file: string, text: string) {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text)
   const fm = frontmatter(m?.[1] ?? '')
-  const key = (k: string) => { const e = fm.get(k); return (e?.block ? e.lines.join(' ') : e?.value)?.trim().replace(/^["']|["']$/g, '') || undefined }
+  const key = (k: string) => {
+    const e = fm.get(k), v = (e?.block ? e.lines.join(' ') : e?.value)?.trim()
+    const dq = v && /^"(.*)"$/.exec(v)
+    return (dq ? dq[1].replace(/\\(["\\])/g, '$1') : v?.replace(/^["']|["']$/g, '')) || undefined
+  }
   const body = (m ? text.slice(m[0].length) : text).trim()
   const type = key('type') as MemoryType | undefined
-  const links = [...new Set([...body.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map(x => x[1].trim()))]
+  // Code shows link syntax, it does not link: fences and `spans` out; [[:space:]] is a regex class.
+  const prose = body.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1/gm, '').replace(/`[^`\n]*`/g, '')
+  const links = [...new Set([...prose.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map(x => x[1].trim()).filter(l => l && !l.startsWith(':')))]
   const list = (k: string) => {
     const e = fm.get(k)
     const items = !e || e.block ? [] : e.value ? e.value.split(',') : e.lines
@@ -101,8 +107,9 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
   const nodes = new Map<string, GraphNode>()
   const edges: GraphEdge[] = []
   const add = (n: GraphNode) => { if (!nodes.has(n.id)) nodes.set(n.id, n); return n.id }
-  const archive = [...state.archive].sort((a, b) => b.archivedAt - a.archivedAt).slice(0, ARCHIVE_MAX)
   const known = knownOf(state)
+  // Old chats outside every registered project (bench runs, temp dirs, the GitHub folder) would each add a stray project.
+  const archive = state.archive.filter(c => known.includes(homeIn(known, c.cwd))).sort((a, b) => b.archivedAt - a.archivedAt).slice(0, ARCHIVE_MAX)
   const named = new Map(state.projects.map(p => [norm(p.path), p.name]))
   const projectFor = (cwd: string) => {
     const p = homeIn(known, cwd)
@@ -166,7 +173,7 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
     }
     for (const p of PREDS) for (const l of m.rel[p]) link(l, p)
     for (const l of m.links) link(l, 'link')
-    if (missing.length) nodes.get(id)!.missing = missing
+    if (missing.length) nodes.get(id)!.missing = [...new Set(missing)]
   }
   for (const e of edges) if (e.kind === 'supersedes') nodes.get(e.target)!.superseded = true
 

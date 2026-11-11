@@ -60,7 +60,8 @@ const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) +
 const reply = (id, text, isError) => out({ id, result: { content: [{ type: 'text', text }], ...(isError ? { isError: true } : {}) } })
 const alive = pid => { try { process.kill(pid, 0); return true } catch (e) { return e.code === 'EPERM' } }
 
-function findWindow() {
+/** workspace: only that folder's window, for a retry; the reload may change its pid and port, never its folder. */
+function findWindow(workspace) {
   const dir = path.join(os.homedir(), '.claude', 'switchboard')
   let cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd()
   try { cwd = fs.realpathSync(cwd) } catch { /* keep as is */ }
@@ -71,7 +72,7 @@ function findWindow() {
       try { files.push(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) } catch { /* broken file */ }
     }
   } catch { return undefined }
-  return pickWindow(files, cwd, alive)
+  return pickWindow(workspace ? files.filter(d => d?.workspace === workspace) : files, cwd, alive)
 }
 
 let canElicit = false
@@ -79,22 +80,41 @@ let nextId = 1
 const pending = new Map() // our request id -> resolve
 const calls = new Map() // the client's call id -> stop
 
-/** Posts the question, then polls until the window answers. answer is null once the window cannot (gone, 404, 410, network). */
-function askHub(win, id, questions, signal) {
-  const base = `http://127.0.0.1:${win.port}/hub/question`
-  const q = `?token=${encodeURIComponent(win.hubToken)}`
-  const posted = fetch(base + q, { method: 'POST', body: JSON.stringify({ sessionId: process.env.CLAUDE_CODE_SESSION_ID ?? '', id, questions }) }).then(r => r.ok, () => false)
+// A reload takes the window away for a few seconds and may bring it back on another port and token.
+const RETRY_MS = Number(process.env.SWITCHBOARD_ASK_RETRY_MS) || 60_000
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/** Posts the question, then polls until the window answers. On a failure (network, 404, 410) it finds the window again
+ * and posts again, backing off, for RETRY_MS since the last good reply; answer is null after that. */
+function askHub(first, id, questions, signal) {
+  let win = first
+  const url = (p, more = '') => `http://127.0.0.1:${win.port}/hub/question${p}?token=${encodeURIComponent(win.hubToken)}${more}`
+  const body = JSON.stringify({ sessionId: process.env.CLAUDE_CODE_SESSION_ID ?? '', id, questions })
+  const post = () => fetch(url(''), { method: 'POST', body }).then(r => r.ok, () => false)
+  let posted = post()
   const poll = async () => {
-    if (!await posted) return null
+    let ok = await posted, since = 0, wait = 250
     for (;;) {
-      const g = await fetch(`${base}${q}&id=${id}`, { signal })
-      if (g.status === 200) return (await g.json()).choice ?? null
-      if (g.status !== 204) return null
+      if (ok) {
+        const g = await fetch(url('', `&id=${id}`), { signal }).catch(() => undefined)
+        if (g?.status === 200) return (await g.json()).choice ?? null
+        if (g?.status === 204) { since = 0; wait = 250; continue }
+      }
+      if (signal.aborted) return null
+      since ||= Date.now()
+      if (Date.now() - since > RETRY_MS) return null
+      await sleep(wait)
+      wait = Math.min(wait * 2, 4000)
+      if (signal.aborted) return null
+      // Another project's window would hold a copy nobody answers: wait for this one.
+      win = findWindow(first.workspace) ?? win
+      posted = post()
+      ok = await posted
     }
   }
   const answer = poll().catch(() => null)
   // After the post, so done never reaches the window before its question.
-  const done = () => posted.then(ok => ok && fetch(`${base}/done${q}&id=${id}`, { method: 'POST' })).catch(() => {})
+  const done = () => posted.then(ok => ok && fetch(url('/done', `&id=${id}`), { method: 'POST' })).catch(() => {})
   return { answer, done }
 }
 

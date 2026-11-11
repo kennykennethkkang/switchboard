@@ -40,6 +40,7 @@ export function ChatMenu({ chat, starred, send, onMac, inPicture, onRead, target
   useEffect(() => {
     if (!open) return
     wrap.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    fitMenu(wrap.current)
     const down = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('pointerdown', down)
     return () => document.removeEventListener('pointerdown', down)
@@ -88,4 +89,17 @@ export function ChatMenu({ chat, starred, send, onMac, inPicture, onRead, target
       <span role="status" className="hub-more-said">{said}</span>
     </span>
   )
+}
+
+/** Keeps an open .hub-menu on screen: inside a 16px side gutter, and flipped up (or capped) when it would run under the bottom bars.
+ * Measured unscaled, as the menu opens with a scale. */
+export function fitMenu(wrap: HTMLElement | null) {
+  const m = wrap?.querySelector<HTMLElement>('.hub-menu')
+  if (!m || !wrap) return
+  const r = wrap.getBoundingClientRect(), dx = Math.max(16 - (r.right - m.offsetWidth), Math.min(0, innerWidth - 16 - r.right))
+  m.style.translate = dx ? `${dx}px 0` : ''
+  const floor = Math.min(innerHeight, ...[...document.querySelectorAll('.nav, .sb')].map(e => e.getBoundingClientRect().top).filter(t => t > innerHeight / 2)) - 8
+  if (r.bottom + 4 + m.offsetHeight <= floor) return
+  if (r.top - 4 - m.offsetHeight >= 8) Object.assign(m.style, { top: 'auto', bottom: 'calc(100% + 4px)', transformOrigin: 'bottom right' })
+  else Object.assign(m.style, { maxHeight: `${Math.max(88, floor - r.bottom - 4)}px`, overflowY: 'auto' })
 }

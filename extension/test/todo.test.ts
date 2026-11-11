@@ -4,11 +4,12 @@
  */
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile, moveTodo } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -62,18 +63,18 @@ describe('todo merge', () => {
     assert.equal(finishItem(d, 'nope', undefined, 5), d)
   })
 
-  it('Done on a suggestion (a Finish up row) ticks it, tombstoned', () => {
-    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Reload the window, Kenneth'] } }), 1)
+  it('Done on a suggestion ticks it, tombstoned', () => {
+    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Add rate limits to export'] } }), 1)
     const id = d.suggested![0].id
     const out = finishItem(d, id, undefined, 2)
     assert.equal(out.suggested, undefined)
     assert.ok(out.removed[id])
-    assert.deepEqual(out.ticked, [{ id, text: 'Reload the window, Kenneth', at: 2, from: 's1', why: 'you' }])
-    // Put back, it is a hand step again, also after a round trip through the file.
+    assert.deepEqual(out.ticked, [{ id, text: 'Add rate limits to export', at: 2, from: 's1', why: 'later' }])
+    // Put back, it keeps its why and name, also after a round trip through the file.
     const named = { ...out, ticked: [{ ...out.ticked![0], name: 'Fix login' }] }
     assert.deepEqual(parseDoc(JSON.stringify(named)).ticked, named.ticked)
     const back = restoreTicked(parseDoc(JSON.stringify(named)), id, 3, 'r1').todo[0]
-    assert.equal(back.why, 'you')
+    assert.equal(back.why, 'later')
     assert.equal(back.name, 'Fix login')
   })
 
@@ -145,19 +146,10 @@ describe('todo finish', () => {
     assert.deepEqual(again.suggested?.map(l => l.text), ['Deploy'])
   })
 
-  it('For you lines are hand steps as written, replaced by the chat\'s next Done like its Left', () => {
-    const p = chat({ report: { done: ['x'], left: ['Deploy'], you: ['Untested by eye: the panel itself.', 'Commit the repo'] } })
-    const d = afterFinish(emptyDoc(), p, [], 1, [])
-    assert.deepEqual(d.suggested?.map(l => [l.text, l.why]), [['Untested by eye: the panel itself.', 'you'], ['Commit the repo', 'you']])
-    // Not the Left line's id: the same text as a Left line stays apart.
-    assert.equal(afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Commit the repo'] } }), [], 1).suggested![0].id === d.suggested![1].id, false)
-    const again = afterFinish(d, chat({ report: { done: [], left: [], you: ['Commit the repo'] } }), [], 2)
-    assert.deepEqual(again.suggested?.map(l => l.text), ['Commit the repo'])
-    assert.ok(again.removed[d.suggested![0].id])
-    assert.deepEqual(afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: [], you: ['Sign in'] } }), 1, []).suggested?.map(l => [l.text, l.why]), [['Sign in', 'you']])
-    // An explicit For you line wins over a Left line that holds it.
-    const both = afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Reload the window and check the panel'], you: ['Reload the window'] } }), [], 1)
-    assert.deepEqual(both.suggested?.map(l => [l.text, l.why]), [['Reload the window', 'you']])
+  it('For you lines never land in the to-do; Left lines always do', () => {
+    const p = chat({ report: { done: ['x'], left: ['Deploy', 'Add retries to your webhook handler'], you: ['Commit the repo'] } })
+    assert.deepEqual(afterFinish(emptyDoc(), p, [], 1).suggested?.map(l => [l.text, l.why]), [['Deploy', 'later'], ['Add retries to your webhook handler', 'later']])
+    assert.equal(afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: [], you: ['Sign in'] } }), 1, []).suggested, undefined)
   })
 
   it('keeps only the Left lines the model calls later work; a failed answer keeps them all', async () => {
@@ -259,8 +251,9 @@ describe('todo suggestions', () => {
   it('reads why a Left line was left from its text', () => {
     assert.equal(whyLeft('Blocked: needs the Stripe key'), 'blocked')
     assert.equal(whyLeft('Waiting on the API team for the schema'), 'blocked')
-    assert.equal(whyLeft('Kenneth to decide the pricing tiers'), 'you')
-    assert.equal(whyLeft('Needs your sign in to the AWS console'), 'you')
+    // No hand-step guess from words: real work said "your" too.
+    assert.equal(whyLeft('Kenneth to decide the pricing tiers'), 'later')
+    assert.equal(whyLeft('Add retries to your webhook handler'), 'later')
     assert.equal(whyLeft('Out of scope: rewrite the router'), 'scope')
     assert.equal(whyLeft('Unrelated flaky test in billing'), 'scope')
     assert.equal(whyLeft('Add rate limits to export'), 'later')
@@ -299,8 +292,20 @@ describe('todo suggestions', () => {
     assert.equal(addMissed(emptyDoc(), chat({ asked: ['x'] }), 5).suggested, undefined)
   })
 
+  it('drops an approved chat\'s missed suggestions and keeps its Left and other chats\' rows', () => {
+    const d = addMissed(emptyDoc(), chat({ asked: ['fix the login', 'add dark mode'], covered: [0.1, 0.1] }), 5)
+    const other = addMissed(d, chat({ sessionId: 's2', asked: ['ship the docs'], covered: [0] }), 6)
+    const withLeft = afterEnd(other, chat({ state: 'idle', report: { done: [], left: ['Deploy'] } }), 7)
+    const out = approvedMissed(withLeft, 's1', 8)
+    const kept = (x: typeof out) => (x.suggested ?? []).filter(t => !(t.from === 's1' && t.why === 'missed')).map(t => t.text)
+    assert.deepEqual(out.suggested?.map(t => t.text), kept(withLeft))
+    assert.ok(out.suggested?.some(t => t.from === 's2'))
+    assert.equal(out.removed[withLeft.suggested!.find(t => t.text === 'add dark mode')!.id], 8)
+    assert.equal(approvedMissed(out, 's1', 9), out)
+  })
+
   it('leaves conversational asks out of the missed suggestions', () => {
-    const asked = ['Give me a phone call if anything comes up', 'Call me when it is done', 'Continue from /Users/k/handoff.md', "What's the status?", 'how is it going', 'Are you done yet?', 'add dark mode']
+    const asked = ['Give me a phone call if anything comes up', 'Call me when it is done', 'Continue from /Users/k/handoff.md', "What's the status?", 'how is it going', 'Are you done yet?', '[Cross-session idle notice] "Audit" is idle', 'Switchboard stopped background job "dev": no new output', 'Subagent engineer (a1) has been quiet 20 min.', '<agent-message from="a1"> my dev server is up', 'Developer: Reload Window', 'Complete what is left', 'add dark mode']
     const d = addMissed(emptyDoc(), chat({ asked, covered: asked.map(() => 0) }), 5)
     assert.deepEqual(d.suggested?.map(t => t.text), ['add dark mode'])
   })
@@ -716,29 +721,51 @@ describe('todo storage', () => {
     assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['New thing', 'Busy'])
   })
 
-  it('any finished chat can tick a Finish up step another chat left; its own listed Left line is never asked about', async () => {
+  it('any finished chat ticks tray lines another chat left when its work covers them; its own listed Left line is never asked about', async () => {
     const s = await storeFor(fs.mkdtempSync(path.join(os.tmpdir(), 'you-')), fs.mkdtempSync(path.join(os.tmpdir(), 'you-files-')))
     const keep = (f: (q: string) => Promise<string>) => async (q: string) => q.startsWith("A coding chat's standup") ? '1, 2' : f(q)
-    await updateDoc(s, d => afterEnd(d, chat({ sessionId: 'y1', state: 'idle', report: { done: [], left: ['Reload the window, Kenneth', 'Add rate limits later'] } }), 1))
+    await updateDoc(s, d => afterEnd(d, chat({ sessionId: 'y1', state: 'idle', report: { done: [], left: ['Save typed drafts across reloads', 'Add rate limits later'] } }), 1))
     const sug = (await readDoc(s)).suggested!
-    const you = sug.find(x => x.why === 'you')!, later = sug.find(x => x.why === 'later')!
+    const draft = sug.find(x => x.text.startsWith('Save'))!
     let asked = ''
-    await todoFinished(s, chat({ sessionId: 'y2', report: { done: ['Kenneth reloaded the window'], left: ['Sign in to Vercel yourself'] } }), keep(async q => { asked = q; return `${you.id}, ${later.id}` }))
-    assert.match(asked, /Reload the window/)
-    assert.doesNotMatch(asked, /rate limits/)
+    await todoFinished(s, chat({ sessionId: 'y2', report: { done: ['Drafts now survive a reload'], left: ['Write the deploy docs'] } }), keep(async q => { asked = q; return draft.id }))
+    assert.match(asked, /Save typed drafts/)
+    assert.match(asked, /rate limits/)
     const d = await readDoc(s)
-    assert.deepEqual(d.ticked?.map(t => [t.id, t.by]), [[you.id, 'y2']])
-    assert.deepEqual(d.suggested?.map(x => x.text).sort(), ['Add rate limits later', 'Sign in to Vercel yourself'])
+    assert.deepEqual(d.ticked?.map(t => [t.id, t.by]), [[draft.id, 'y2']])
+    assert.deepEqual(d.suggested?.map(x => x.text).sort(), ['Add rate limits later', 'Write the deploy docs'])
     // y2's own Left line, still listed, is not offered to the model.
-    await todoFinished(s, chat({ sessionId: 'y2', report: { done: ['more'], left: ['Sign in to Vercel yourself'] } }), keep(async q => { asked = q; return 'none' }))
-    assert.doesNotMatch(asked, /Vercel/)
-    // Nor its own For you lines; the Left filter never sees them.
-    await todoFinished(s, chat({ sessionId: 'y3', report: { done: ['x'], left: [], you: ['Tap the mic on the phone'] } }), keep(async () => 'none'))
+    await todoFinished(s, chat({ sessionId: 'y2', report: { done: ['more'], left: ['Write the deploy docs'] } }), keep(async q => { asked = q; return 'none' }))
+    assert.doesNotMatch(asked, /deploy docs/)
+  })
+
+  it('a chat that ends without Done still ticks what its Done list covers; what it was asked is not evidence', async () => {
+    const s = await storeFor(fs.mkdtempSync(path.join(os.tmpdir(), 'end-')), fs.mkdtempSync(path.join(os.tmpdir(), 'end-files-')))
+    await updateDoc(s, d => addTodo(addTodo(d, 'Fix the usage meter', 1, 'u1'), 'Add the Codex tab', 1, 'c1'))
+    let asked = ''
+    const ask = async (q: string) => q.startsWith("A coding chat's standup") ? 'none' : (asked = q, 'u1')
+    const d = await todoEnded(s, chat({ sessionId: 'e1', state: 'idle', asked: ['please add the codex tab'], report: { done: ['Usage meter shows when usage is up'], left: [] } }), ask)
+    assert.doesNotMatch(asked, /please add/)
+    assert.deepEqual(d.todo.map(t => t.id), ['c1'])
+    assert.deepEqual(d.ticked?.map(t => [t.id, t.by]), [['u1', 'e1']])
+    // Nothing done: no question at all.
     asked = ''
-    await todoFinished(s, chat({ sessionId: 'y3', report: { done: ['more'], left: [], you: ['Tap the mic on the phone'] } }), async q => { asked = q; return 'none' })
-    assert.match(asked, /Vercel/)
-    assert.doesNotMatch(asked, /mic/)
-    assert.ok((await readDoc(s)).suggested?.some(x => x.text === 'Tap the mic on the phone' && x.why === 'you'))
+    await todoEnded(s, chat({ sessionId: 'e2', state: 'idle', asked: ['x'], report: { done: [], left: [] } }), ask)
+    assert.equal(asked, '')
+    // A report an earlier Done already judged is not judged again, so a Put back item stays open.
+    await todoEnded(s, chat({ sessionId: 'e3', state: 'working', finishedAt: 5, report: { done: ['Added the Codex tab'], left: [] } }), ask)
+    assert.equal(asked, '')
+  })
+
+  it('a chat\'s own missed requests are never ticked by its own asks', async () => {
+    const s = await storeFor(fs.mkdtempSync(path.join(os.tmpdir(), 'miss-')), fs.mkdtempSync(path.join(os.tmpdir(), 'miss-files-')))
+    await updateDoc(s, d => addMissed(d, chat({ sessionId: 'm1', asked: ['Add a dark mode toggle to settings'], covered: [0.1] }), 1))
+    await updateDoc(s, d => addMissed(d, chat({ sessionId: 'm0', asked: ['Add a CSV export button'], covered: [0.1] }), 1))
+    let asked = ''
+    await todoFinished(s, chat({ sessionId: 'm1', asked: ['Add a dark mode toggle to settings', 'bump it'], report: { done: ['Bumped the version'], left: [] } }), async q => q.startsWith("A coding chat's standup") ? 'none' : (asked = q, 'none'))
+    assert.doesNotMatch(asked.split('\n\n')[0], /dark mode/)
+    // Another chat's missed line is still offered.
+    assert.match(asked, /CSV export/)
   })
 })
 
@@ -991,6 +1018,8 @@ describe('autoStartPlan backs off after an unconfirmed claim', () => {
 describe('suggestion quality', () => {
   const day = 24 * 60 * 60_000
   const sug = (id: string, text: string, why: TodoDoc['todo'][0]['why'], from: string, at: number) => ({ id, text, at, from, why })
+  // The id an old For you line got: those are the hand steps prune drops.
+  const you = (text: string, from: string, at: number) => sug(crypto.createHash('sha1').update(`${from}\nyou\n${text}`).digest('hex').slice(0, 8), text, 'you', from, at)
   const doc = (over: Partial<TodoDoc>): TodoDoc => ({ ...emptyDoc(), ...over })
 
   it('drops pasted wrappers, harness prompts and follow-up nudges from missed requests; keeps real ones', () => {
@@ -1029,21 +1058,6 @@ describe('suggestion quality', () => {
     assert.equal(out.suggested, undefined)
   })
 
-  it('dedupes hand steps across chats by verb and object: one Reload VS Code, but each repo\'s commit', () => {
-    const d = doc({ suggested: [sug('a1', 'Reload VS Code so 0.20.1 keeps the note current.', 'you', 'c1', 1), sug('m1', 'Commit claude-mods', 'you', 'c1', 1)] })
-    const out = afterFinish(d, chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Reload VS Code. That picks up the new hook.', 'Commit switchboard'] } }), [], 2)
-    assert.deepEqual(out.suggested?.map(t => `${t.from} ${t.text}`).sort(), ['c1 Commit claude-mods', 'c2 Commit switchboard', 'c2 Reload VS Code. That picks up the new hook.'])
-    assert.ok(out.removed.a1)
-    // Words after in/to/for are the object: each repo keeps its own step.
-    const repos = afterFinish(doc({ suggested: [sug('i1', 'Commit in claude-mods', 'you', 'c1', 1), sug('t1', 'Push to origin', 'you', 'c1', 1)] }),
-      chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['Commit in switchboard', 'Push to the fork'] } }), [], 2)
-    assert.equal(repos.suggested?.length, 4)
-    // A leading "Optional:" or "First," is not the whole step.
-    const pre = afterFinish(doc({ suggested: [sug('o1', 'Optional: reload VS Code', 'you', 'c1', 1)] }),
-      chat({ sessionId: 'c2', report: { done: ['x'], left: [], you: ['First, commit in claude-mods'] } }), [], 2)
-    assert.equal(pre.suggested?.length, 2)
-  })
-
   it('a Left line saying what an open item or another chat\'s suggestion says is not added', () => {
     const d = doc({ todo: [{ id: 't1', text: 'Add the Transcript tab for Codex chats', at: 1 }], suggested: [sug('s9', 'Write the deploy docs for staging', 'later', 'c1', 1)] })
     const out = afterFinish(d, chat({ sessionId: 'c2', report: { done: ['x'], left: ['Add the Transcript tab for Codex chats', 'Write the deploy docs for staging'] } }), [], 2)
@@ -1055,19 +1069,22 @@ describe('suggestion quality', () => {
     assert.equal(prune(d, 2), d)
   })
 
-  it('prune: For you steps expire after 3 days; others stay', () => {
-    const d = doc({ suggested: [sug('y1', 'Reconnect Remote Control in this chat', 'you', 'c1', 0), sug('l1', 'Add rate limits to export', 'later', 'c1', 0)] })
-    assert.equal(prune(d, 2 * day), d)
-    const out = prune(d, 3 * day + 1)
-    assert.deepEqual(out.suggested?.map(t => t.id), ['l1'])
-    assert.equal(out.removed.y1, 3 * day + 1)
-    assert.equal(out.cleared, 1)
-    assert.equal(prune(d, 2 * day).cleared, undefined)
+  it('prune drops old For you hand steps, open or in the tray, whatever their age; a Left line once guessed as you stays', () => {
+    const mic = you('Tap the mic once', 'c1', 1), y1 = you('Reconnect Remote Control in this chat', 'c1', 0)
+    const d = doc({ todo: [{ ...mic, id: `${mic.id}-ok` }, { id: 't1', text: 'Add the Codex tab', at: 1 }, { id: 'g1-ok', text: 'Add retries to your webhook handler', at: 1, from: 'c1', why: 'you' }],
+      suggested: [y1, sug('g2', 'Decide the pricing tiers', 'you', 'c1', 0), sug('l1', 'Add rate limits to export', 'later', 'c1', 0)] })
+    const out = prune(d, 1)
+    assert.deepEqual(out.todo.map(t => t.id), ['t1', 'g1-ok'])
+    assert.deepEqual(out.suggested?.map(t => t.id), ['g2', 'l1'])
+    assert.equal(out.removed[y1.id], 1)
+    assert.equal(out.removed[`${mic.id}-ok`], 1)
+    assert.equal(out.cleared, 2)
+    assert.equal(prune(out, 2), out)
   })
 
   it('prune counts what it cleared in one pass, open duplicates and suggestions together', () => {
     const d = doc({ todo: [{ id: 'a1', text: 'Add rate limits', at: 1 }, { id: 'a2', text: 'Add rate limits', at: 2, from: 'c1' }],
-      suggested: [sug('y1', 'Reconnect Remote Control in this chat', 'you', 'c1', 0)], cleared: 7 })
+      suggested: [you('Reconnect Remote Control in this chat', 'c1', 0)], cleared: 7 })
     assert.equal(prune(d, 3 * day + 1).cleared, 2)
   })
 
@@ -1094,16 +1111,16 @@ describe('suggestion quality', () => {
       suggested: [
         sug('w1', '<pasted_content id="afb4"> Chat: Add these functions', 'missed', 'c4', now),
         sug('h1', 'Is there anything else?', 'missed', 'c4', now),
-        sug('r1', 'Reload VS Code so 0.20.1 is current.', 'you', 'c5', now - 2),
-        sug('r2', 'Reload VS Code. That picks up the hook.', 'you', 'c6', now - 1),
+        you('Reload VS Code so 0.20.1 is current.', 'c5', now - 2),
+        you('Reload VS Code. That picks up the hook.', 'c6', now - 1),
         sug('p1', 'To-do 8133346b: turn it off.', 'you', 'c6', now - 1),
         sug('ok', 'Add the Transcript tab for Codex chats', 'later', 'c6', now - 1),
       ],
     })
     const out = prune(d, now)
     assert.deepEqual(out.todo.map(t => t.id), ['8133346b', '1ecbfca1-ok', 'k1', 'k2', 'dfd937e0-ok', 'a1-ok'])
-    assert.deepEqual(out.suggested?.map(t => t.id), ['r2', 'ok'])
-    for (const id of ['c9', 'w1', 'h1', 'r1', 'p1']) assert.equal(out.removed[id], now, id)
+    assert.deepEqual(out.suggested?.map(t => t.id), ['ok'])
+    for (const id of ['c9', 'w1', 'h1', d.suggested![2].id, d.suggested![3].id, 'p1']) assert.equal(out.removed[id], now, id)
     assert.equal(prune(out, now), out)
   })
 
@@ -1129,5 +1146,117 @@ describe('moveTodo', () => {
   it('the order survives a write and read', () => {
     const d = moveTodo(doc(['a', 'b']), ['b', 'a'], 3)
     assert.deepEqual(parseDoc(JSON.stringify(d)).order, { ids: ['b', 'a'], at: 3 })
+  })
+})
+
+describe('per-project autopilot and run numbers', () => {
+  const now = 10 * 60_000
+  const item = (id: string, more: Partial<TodoDoc['todo'][number]> = {}) => ({ id, text: `do ${id}`, at: 0, ...more })
+  const base = { on: true, folder: '/p', todo: [item('a'), item('b')], busy: false, limited: false, tried: new Set<string>(), now }
+
+  it('the project pilot overrides the global switch, and paused starts nothing', () => {
+    assert.equal(autoStartPlan({ ...base, pilot: { on: false, at: 1 } }), undefined)
+    assert.ok(autoStartPlan({ ...base, on: false, pilot: { on: true, at: 1 } }))
+    assert.ok(autoStartPlan({ ...base, pilot: { at: 1 } }))
+    assert.equal(autoStartPlan({ ...base, on: false, pilot: { at: 1 } }), undefined)
+    assert.equal(autoStartPlan({ ...base, pilot: { on: true, paused: true, at: 1 } }), undefined)
+  })
+
+  it('only a live chat holding an item of the project keeps it busy', () => {
+    assert.ok(autoStartPlan({ ...base, live: new Set(['other']) }))
+    const todo = [item('a', { chat: 'c1' }), item('b')]
+    assert.equal(autoStartPlan({ ...base, todo, live: new Set(['c1']) }), undefined)
+    assert.deepEqual(autoStartPlan({ ...base, todo, live: new Set(['other']) })?.items.map(t => t.id), ['b'])
+  })
+
+  it('setPilot keeps the other field and stamps at; the newest pilot wins a merge and a read', () => {
+    const d = setPilot(setPilot(emptyDoc(), { on: true }, 5), { paused: true }, 6)
+    assert.deepEqual(d.pilot, { on: true, paused: true, at: 6 })
+    assert.deepEqual(mergeDocs(d, setPilot(emptyDoc(), { on: false }, 9), 10).pilot, { on: false, at: 9 })
+    assert.deepEqual(mergeDocs(setPilot(emptyDoc(), { on: false }, 3), d, 10).pilot, d.pilot)
+    assert.deepEqual(parseDoc(JSON.stringify({ ...d, pilot: { on: 'x', paused: true, at: 6 } })).pilot, { paused: true, at: 6 })
+    assert.equal(parseDoc(JSON.stringify({ ...d, pilot: { on: true } })).pilot, undefined)
+  })
+
+  it('claims number runs, mark auto ones, and a chain restarts once the queue went empty', () => {
+    let d: TodoDoc = { ...emptyDoc(), todo: [item('a'), item('b'), item('y', { why: 'you' })] }
+    d = claimItems(d, ['a'], 'c1', new Set(), now)
+    assert.deepEqual([d.seq, d.streak, d.todo[0].run, d.todo[0].auto], [1, 1, 1, true])
+    d = finishItem(d, 'a', 'c1', now)
+    assert.deepEqual([d.ticked?.[0].run, d.ticked?.[0].auto], [1, true])
+    d = claimItems(d, ['b'], 'c2', new Set(), now, true)
+    assert.deepEqual([d.seq, d.streak, d.todo[0].run, d.todo[0].auto], [2, 1, 2, undefined])
+    d = finishItem(d, 'b', 'c2', now)
+    assert.equal(d.streak, undefined, 'only a hand step left: the chain ended')
+    d = claimItems(addTodo(d, 'do c', now, 'c'), ['c'], 'c3', new Set(), now)
+    assert.deepEqual([d.seq, d.streak, d.todo.find(t => t.id === 'c')?.run], [3, 3, 3])
+  })
+
+  it('run numbers survive a read, a merge with an older copy, and afterFinish', () => {
+    const d = claimItems({ ...emptyDoc(), todo: [item('a'), item('b')] }, ['a', 'b'], 'c1', new Set(), now)
+    const read = parseDoc(JSON.stringify(d))
+    assert.deepEqual([read.seq, read.streak, read.todo[0].run, read.todo[0].auto], [1, 1, 1, true])
+    const older: TodoDoc = { ...emptyDoc(), todo: [item('a', { at: now + 1 })] }
+    assert.equal(mergeDocs(d, older, now).todo.find(t => t.id === 'a')?.run, 1)
+    assert.equal(mergeDocs(d, { ...emptyDoc(), seq: 0 }, now).seq, 1)
+    const p = { sessionId: 'c1', state: 'done', report: { done: ['did it'], left: [] } } as unknown as ChatProgress
+    const done = afterFinish(d, p, ['a'], now)
+    assert.equal(done.ticked?.[0].run, 1)
+  })
+
+  it('hub-todo-pilot passes the command check with optional booleans only', () => {
+    assert.equal(commandProblem({ type: 'hub-todo-pilot', path: '/p', paused: true }), undefined)
+    assert.equal(commandProblem({ type: 'hub-todo-pilot', path: '/p', on: false, paused: false }), undefined)
+    assert.ok(commandProblem({ type: 'hub-todo-pilot', path: '/p', on: 'yes' }))
+  })
+
+  it('runLabel names the run for the terminal env', () => {
+    const d = claimItems({ ...emptyDoc(), todo: [item('a', { name: 'Fix login' }), item('b')] }, ['a', 'b'], 'c1', new Set(), now)
+    assert.deepEqual(runLabel(d.todo, '/Users/k/agent-flow'), { n: 1, auto: true, text: 'do a', from: 'Fix login', project: 'agent-flow', total: 2 })
+    assert.deepEqual(runLabel([item('a', { run: 4 })], '/x/p'), { n: 4, auto: false, text: 'do a', from: 'you', project: 'p', total: 1 })
+    assert.equal(runLabel([item('a')], '/x/p'), undefined)
+  })
+
+  it('todoEnv gives a resumed or handed-off chat the env its run had', () => {
+    const d = claimItems({ ...emptyDoc(), todo: [item('a'), item('b'), item('z')] }, ['a', 'b'], 'old', new Set(), now)
+    const want = { SWITCHBOARD_TODO: JSON.stringify(runLabel(d.todo.slice(0, 2), '/x/p')) }
+    assert.deepEqual(todoEnv(heldLabel(d.todo, '/x/p', ['old'])), want)
+    // Handoff: found by either id, before or after moveChat.
+    assert.deepEqual(todoEnv(heldLabel(moveChat(d, 'old', 'new', now).todo, '/x/p', ['old', 'new'])), want)
+    assert.deepEqual(todoEnv(heldLabel(d.todo, '/x/p', ['other'])), {})
+    assert.deepEqual(todoEnv(heldLabel(undefined, '/x/p', ['old'])), {})
+  })
+
+  it('a chat that dies leaves its item stopped: held, skipped by auto-start without tried, kept on disk, cleared by Start again', () => {
+    let d = claimItems({ ...emptyDoc(), seq: 4, todo: [item('S'), item('Z')] }, ['S'], 'dead', new Set(), now)
+    d = clearGone(d, new Set(), now + START_GRACE_MS + 1)
+    assert.equal(d.todo.find(t => t.id === 'S')?.stopped, true)
+    assert.deepEqual(upcoming(d.todo, d.seq), { runs: [{ n: 6, ids: ['Z'] }], held: [{ id: 'S', why: 'stopped' }] })
+    assert.deepEqual(autoStartPlan({ ...base, todo: d.todo, now: now + START_GRACE_MS * 3 })?.items.map(t => t.id), ['Z'])
+    assert.equal(parseDoc(JSON.stringify(d)).todo.find(t => t.id === 'S')?.stopped, true)
+    assert.equal(mergeDocs(d, { ...d, todo: d.todo.map(t => (t.id === 'S' ? { id: t.id, text: t.text, at: t.at + 1 } : t)) }).todo.find(t => t.id === 'S')?.stopped, true)
+    const again = claimItems(d, ['S'], 'c2', new Set(), now + START_GRACE_MS * 3, true)
+    assert.equal(again.todo.find(t => t.id === 'S')?.stopped, undefined)
+  })
+
+  it('heldLabel survives a prerequisite the chat adds, which takes the run of the item it is before', () => {
+    const d = claimItems({ ...emptyDoc(), seq: 4, todo: [item('b')] }, ['b'], 'c1', new Set(), now)
+    const { doc } = toolStep(d, { op: 'add', text: 'set up the key', before: 'b', session: 'c1' }, now, 'p1')
+    assert.deepEqual(doc.todo.find(t => t.id === 'p1')?.run, 5)
+    assert.deepEqual(heldLabel(doc.todo, '/x/p', ['c1']), { n: 5, auto: true, text: 'do b', from: 'you', project: 'p', total: 2 })
+    // Another chat's add does not take the run.
+    assert.equal(toolStep(d, { op: 'add', text: 'other', before: 'b', session: 'c2' }, now, 'p2').doc.todo.find(t => t.id === 'p2')?.run, undefined)
+  })
+
+  it('upcoming plans what auto-start runs: one number per run, prerequisites with their item, held ones with why', () => {
+    // seq 4, [B, P before B, C]: [P, B] is 5, C is 6.
+    assert.deepEqual(upcoming([item('B'), item('P', { before: 'B' }), item('C')], 4), { runs: [{ n: 5, ids: ['P', 'B'] }, { n: 6, ids: ['C'] }], held: [] })
+    // x waits on a hand step: held as 'you'; w, its other prerequisite, still runs alone. A stopped chat's item is held; a live one is running.
+    const todo = [item('k', { why: 'you', before: 'x' }), item('w', { before: 'x' }), item('x'), item('bl', { why: 'blocked' }), item('s', { chat: 'gone' }), item('r', { chat: 'live' }), item('f')]
+    const p = upcoming(todo, 4, new Set(['live']))
+    assert.deepEqual(p.runs, [{ n: 5, ids: ['w'] }, { n: 6, ids: ['f'] }])
+    assert.deepEqual(p.held, [{ id: 'k', why: 'you' }, { id: 'x', why: 'you' }, { id: 'bl', why: 'blocked' }, { id: 's', why: 'stopped' }])
+    // Waiting on a running chat's item is not held: that item leaves when its chat is done.
+    assert.deepEqual(upcoming([item('q'), item('r', { chat: 'live', before: 'q' })], 2, new Set(['live'])), { runs: [{ n: 3, ids: ['q'] }], held: [] })
   })
 })

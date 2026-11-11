@@ -10,6 +10,8 @@ import { PrCard } from './pr-card'
 import { CiCard } from './check-cards'
 import { useDismiss } from './use-popover'
 import { useDraft } from '@/hooks/use-draft'
+import './git-panel.css'
+import { getDraft } from '@/lib/drafts'
 
 type Git = Omit<Extract<HubCommand, { type: 'hub-git' }>, 'type' | 'sessionId'>
 // danger: loses work or history, so the box and its button read red.
@@ -18,6 +20,9 @@ type Ask = { text: string; yes: string; cmd: Git; danger?: boolean }
 const field = { font: '400 13px/1.4 var(--hub-sans)', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' } as const
 const TAG: Record<RepoFile['status'], string> = { modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: 'U', conflict: '!' }
 const MAIN = /^(main|master)$/
+// Repo name to the Write commit message reply already handled, so a remount (each chat switch) never offers it again.
+const usedDrafts = new Map<string, number>()
+const BOX = { filled: 'Also in Source Control.', typed: 'Source Control has your own text, so it was left alone.', missing: 'No Source Control box for this repo in this window.' } as const
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 // origin/main -> origin, main. A new branch publishes to origin/<branch>.
 const target = (r: RepoView) => {
@@ -40,7 +45,8 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   const [description, setDescription] = useState('')
   const [typed, setTyped] = useState(false)
   // Summary and description saved as one message; a restored draft counts as typed, so the auto-fill leaves it alone.
-  const [draft, setDraft, clearDraft, restored] = useDraft(`commit:${chat?.cwd ?? repo?.name ?? sessionId}`)
+  const formKey = `commit:${chat?.cwd ?? repo?.name ?? sessionId}`
+  const [draft, setDraft, clearDraft, restored] = useDraft(formKey)
   useEffect(() => {
     if (!restored || !draft) return
     const m = splitMessage(draft)
@@ -65,12 +71,36 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
     setSummary(m.summary); setDescription(m.description)
     seen.current = pending?.at ?? 0
   }, [fill, typed, pending?.at])
+  // Write commit message (per repo), each reply handled once. Watched from busy to done: fills the form, or waits behind
+  // Use draft when Kenneth typed meanwhile. Done before this mount: fills only an empty form with nothing saved.
+  const d = mine?.draft
+  const watching = useRef(false)
+  const [ready, setReady] = useState<string>()
+  const applied = useRef('')
+  const applyDraft = (text: string) => {
+    const m = splitMessage(text)
+    applied.current = m.summary + '\n' + m.description
+    setSummary(m.summary); setDescription(m.description); keep(m.summary, m.description); setTyped(true); setReady(undefined)
+    seen.current = pending?.at ?? seen.current
+  }
+  useEffect(() => {
+    if (d?.busy) { watching.current = true; return }
+    const name = mine?.name ?? ''
+    if (!d?.text || usedDrafts.get(name) === d.at) return
+    usedDrafts.set(name, d.at)
+    const mineNow = (typed && !!(summary.trim() || description.trim())) || !!getDraft(formKey)
+    // A form still holding the last draft untouched counts as not typed, so a second click refills it.
+    const own = typed && !!(summary.trim() || description.trim()) && summary + '\n' + description !== applied.current
+    if (watching.current) { if (own) setReady(d.text); else applyDraft(d.text) }
+    else if (!mineNow) applyDraft(d.text)
+    watching.current = false
+  }, [d?.busy, d?.text, d?.at]) // eslint-disable-line react-hooks/exhaustive-deps
   // A commit that went through clears the form.
   const result = mine?.result
   useEffect(() => {
     if (!result?.ok || !sent.current || result.at < sent.current.at) return
     const op = sent.current.op
-    if (op === 'commit' || op === 'commit-push') { setSummary(''); setDescription(''); clearDraft(); spent.current = { commit, at: pending?.at }; setTyped(false); setToggled(new Set()); setPicking(false) }
+    if (op === 'commit' || op === 'commit-push') { setSummary(''); setDescription(''); clearDraft(); spent.current = { commit, at: pending?.at }; setTyped(false); setReady(undefined); applied.current = ''; setToggled(new Set()); setPicking(false) }
     if (op === 'commit') setOfferPush(true)
     if (op === 'push' || op === 'sync' || op === 'commit-push') setOfferPush(false)
     sent.current = undefined
@@ -202,11 +232,21 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
                 </li>
               ))}
             </ul>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 12, color: d?.error ? 'var(--hub-red)' : 'var(--hub-ash)' }}>
+              {/* aria-disabled while busy so keyboard focus stays on the button */}
+              <button type="button" className="hub-btn sm" disabled={!r.files.length} aria-disabled={!!d?.busy}
+                title="Haiku reads every uncommitted change and the finished chats' messages, then fills this form and Source Control"
+                onClick={() => { if (!d?.busy) send({ type: 'hub-draft-commit', sessionId }) }}>{d?.busy ? 'Writing…' : 'Write commit message'}</button>
+              <span role="status">
+                {d && !d.busy && (d.error ?? BOX[d.box ?? 'missing'])}
+                {ready && <>Draft ready<button type="button" className="hub-link" style={{ padding: '2px 4px', fontSize: 12 }} onClick={() => applyDraft(ready)}>Use draft</button></>}
+              </span>
+            </div>
             {fresh && <p role="status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, margin: 0, fontSize: 12, color: 'var(--hub-ash)' }}>
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>New items from a chat: {fresh.last}</span>
               <button type="button" className="hub-link" style={{ padding: '2px 4px', fontSize: 12 }} onClick={addFresh}>Add</button>
             </p>}
-            <input aria-label="Commit summary" placeholder="Summary (required)" aria-describedby={needSummary ? 'git-need-summary' : undefined} aria-invalid={needSummary && !!description.trim() || undefined} value={summary} onChange={e => { setSummary(e.target.value); keep(e.target.value, description); setTyped(true) }} style={{ ...field, fontWeight: 500 }} />
+            <input className="git-summary" aria-label="Commit summary" placeholder="Summary (required)" aria-describedby={needSummary ? 'git-need-summary' : undefined} aria-invalid={needSummary && !!description.trim() || undefined} value={summary} onChange={e => { setSummary(e.target.value); keep(e.target.value, description); setTyped(true) }} style={{ ...field, fontWeight: 500 }} />
             <textarea aria-label="Commit description" placeholder="Description: what this commit did, one bullet per line" rows={Math.min(12, Math.max(3, description.split('\n').length + 1))} value={description} onChange={e => { setDescription(e.target.value); keep(summary, e.target.value); setTyped(true) }} onBlur={fillSummary} style={{ ...field, resize: 'vertical' }} />
             {needSummary && <p id="git-need-summary" style={{ margin: 0, fontSize: 12, color: description.trim() ? 'var(--hub-yellow)' : 'var(--hub-ash)' }}>
               Add a summary to commit.{fallback && <> <button type="button" className="hub-link" style={{ padding: '2px 4px', fontSize: 12 }} onClick={fillSummary}>Use "{fallback.length > 48 ? `${fallback.slice(0, 48)}...` : fallback}"</button></>}

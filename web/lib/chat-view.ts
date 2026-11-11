@@ -15,7 +15,7 @@ export type ChatOutputs = {
   tests: ChatTest[]; errors: ChatError[]; files: string[]; shots: string[]; codex?: true
 }
 export type ChatMessage = { role: 'you' | 'claude' | 'tool' | 'subagent'; text: string }
-export type ChatTranscript = { messages: ChatMessage[]; before: number | null; transcript?: 'unsupported' }
+export type ChatTranscript = { messages: ChatMessage[]; before: number | null; transcript?: 'unsupported'; codex?: true }
 export type ChatAnswer = { outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; problem?: string }
 export type ChatAsk = { before?: number; path?: string }
 

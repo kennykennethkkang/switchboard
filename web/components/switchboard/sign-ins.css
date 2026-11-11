@@ -19,6 +19,9 @@
 .si-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; max-width: 100%; }
 .si-title strong { font: 500 13px/1.4 var(--hub-sans); color: var(--hub-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .si-meta { font: 400 12px/1.5 var(--hub-mono); color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
+/* Who an account signs in as: under the name, a step brighter than the meta line. */
+.si-who { font: 400 12px/1.45 var(--hub-sans); color: var(--hub-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
+.si-main > .si-rename { justify-self: stretch; max-width: 28rem; }
 .si-note { font-size: 12px; line-height: 1.45; color: var(--hub-mute); }
 .si-err { font-size: 12px; line-height: 1.45; color: var(--hub-red); white-space: pre-wrap; overflow-wrap: anywhere; }
 .si-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
@@ -67,6 +70,7 @@
   .si-form { margin-left: 0; }
   .si-form > input { flex-basis: 100% !important; }
   .si-other summary > span:last-child { display: none; }
+  .si-meta, .si-who { white-space: normal; overflow-wrap: anywhere; }
 }
 @media (pointer: coarse) {
   .si .hub-more-btn { width: 44px; height: 44px; }

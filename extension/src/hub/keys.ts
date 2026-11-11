@@ -1,5 +1,5 @@
 /**
- * API keys for the gemini and Jev skills, the Perplexity MCP and project .env setup (Zep). The key lives in the macOS Keychain (service switchboard,
+ * API keys for the gemini and Jev skills, the Perplexity and Firecrawl MCPs and project .env setup (Zep). The key lives in the macOS Keychain (service switchboard,
  * account = the env var name), elsewhere in a 0600 file under ~/.claude/switchboard/keys/.
  * keys.json next to it holds only the last four and the last test, which is all the UI ever gets.
  */
@@ -10,7 +10,7 @@ import * as path from 'path'
 import { writeJsonAtomic } from '../hook-entries'
 import type { ApiKey, ApiKeyName } from './types'
 
-export const KEY_NAMES: ApiKeyName[] = ['GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'PERPLEXITY_API_KEY', 'ZEP_API_KEY']
+export const KEY_NAMES: ApiKeyName[] = ['GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'PERPLEXITY_API_KEY', 'FIRECRAWL_API_KEY', 'ZEP_API_KEY']
 const SB = path.join(os.homedir(), '.claude', 'switchboard')
 export const KEYS_META = path.join(SB, 'keys.json')
 const SERVICE = 'switchboard'
@@ -135,7 +135,7 @@ export async function testKey(name: ApiKeyName, key: string, get: typeof fetch =
   const [url, headers]: [string, Record<string, string>] = name === 'GEMINI_API_KEY'
     ? ['https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', { 'x-goog-api-key': key }]
     : name === 'ZEP_API_KEY' ? ['https://api.getzep.com/api/v2/projects/info', { Authorization: `Api-Key ${key}` }]
-    : [name === 'PERPLEXITY_API_KEY' ? 'https://api.perplexity.ai/v1/models' : 'https://openrouter.ai/api/v1/key', { Authorization: `Bearer ${key}` }]
+    : [name === 'PERPLEXITY_API_KEY' ? 'https://api.perplexity.ai/v1/models' : name === 'FIRECRAWL_API_KEY' ? 'https://api.firecrawl.dev/v2/team/credit-usage' : 'https://openrouter.ai/api/v1/key', { Authorization: `Bearer ${key}` }]
   try {
     const r = await get(url, { headers, signal: AbortSignal.timeout(10_000) })
     if (r.ok) return { ok: true, at: now }

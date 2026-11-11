@@ -4,17 +4,46 @@
  */
 import * as fs from 'fs'
 import * as path from 'path'
+import { writeJsonAtomic } from '../fs-utils'
 import { otherText } from './progress'
 import type { Ask, Choice } from './types'
 
 const EXPIRE_MS = 60 * 60 * 1000
-type Open = { sessionId: string; ask: Ask; at: number; choice?: Choice; wake?: (c: Choice | undefined) => void }
+// The tool polls every 25 s; a question nobody polled for this long belongs to a chat that is gone.
+const POLLED_MS = 2 * 60_000
+// seen: last post or poll, memory only.
+type Open = { sessionId: string; ask: Ask; at: number; seen: number; choice?: Choice; wake?: (c: Choice | undefined) => void }
 const open = new Map<string, Open>()
 
+// Kept on disk so a window reload does not drop the cards; one file per window.
+let file: string | undefined
+const save = () => {
+  if (!file) return
+  try { writeJsonAtomic(file, Object.fromEntries([...open].map(([id, q]) => [id, { sessionId: q.sessionId, ask: q.ask, at: q.at, ...(q.choice ? { choice: q.choice } : {}) }]))) } catch { /* best effort */ }
+}
+
+/** Loads the questions a reload left in file, then keeps it current. */
+export function keepQuestions(f: string, now = Date.now()): void {
+  file = f
+  try {
+    for (const [id, v] of Object.entries(JSON.parse(fs.readFileSync(f, 'utf8')) as Record<string, unknown>)) {
+      const q = v as Partial<Open> | null
+      if (open.has(id) || typeof q?.sessionId !== 'string' || !q.ask || typeof q.at !== 'number' || now - q.at > EXPIRE_MS) continue
+      open.set(id, { sessionId: q.sessionId, ask: q.ask, at: q.at, seen: now, ...(q.choice ? { choice: q.choice } : {}) })
+    }
+  } catch { /* none yet, or broken */ }
+  save()
+}
+
+/** A re-post (the tool found the window again after a reload) keeps an answer already given. */
 export function openQuestion(id: string, sessionId: string, ask: Ask, now = Date.now()): void {
   for (const [k, q] of open) if (now - q.at > EXPIRE_MS) closeQuestion(k)
-  open.set(id, { sessionId, ask, at: now })
+  open.set(id, { ...open.get(id), sessionId, ask, at: now, seen: now })
+  save()
 }
+
+/** Unanswered questions the tool still polls for; any holds off a reload. */
+export const openCount = (now = Date.now()) => [...open.values()].filter(q => !q.choice && now - q.seen < POLLED_MS).length
 
 export const questionOf = (id: string) => open.get(id)
 
@@ -22,14 +51,15 @@ export const questionOf = (id: string) => open.get(id)
 export function waitQuestion(id: string, ms: number): Promise<Choice | undefined> | undefined {
   const q = open.get(id)
   if (!q) return undefined
-  if (q.choice) { open.delete(id); return Promise.resolve(q.choice) }
+  q.seen = Date.now()
+  if (q.choice) { open.delete(id); save(); return Promise.resolve(q.choice) }
   q.wake?.(undefined)
   return new Promise(resolve => {
     const t = setTimeout(() => { if (q.wake === wake) q.wake = undefined; resolve(undefined) }, ms)
     const wake = (c: Choice | undefined) => {
       clearTimeout(t)
       if (q.wake === wake) q.wake = undefined
-      if (c) open.delete(id)
+      if (c) { open.delete(id); save() }
       resolve(c)
     }
     q.wake = wake
@@ -40,6 +70,7 @@ export function answerQuestion(id: string, choice: Choice): boolean {
   const q = open.get(id)
   if (!q || q.choice) return false
   q.choice = choice
+  save()
   q.wake?.(choice)
   return true
 }
@@ -47,7 +78,7 @@ export function answerQuestion(id: string, choice: Choice): boolean {
 /** The chat it was for, when it was still open. */
 export function closeQuestion(id: string): string | undefined {
   const q = open.get(id)
-  open.delete(id)
+  if (open.delete(id)) save()
   q?.wake?.(undefined)
   return q?.sessionId
 }

@@ -8,7 +8,7 @@ import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'child_process'
-import { aarWanted, applyRun, betterOrNot, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, proposeRun, tooBig, usageOk } from '../src/hub/learn'
+import { aarWanted, applyRun, betterOrNot, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, proposeRun, stageMemory, syncMemory, tooBig, usageOk } from '../src/hub/learn'
 
 const row = (id: string, side: string, pass: boolean[]) => ({ id, side, pass })
 const won = { verdict: { baseline: 0.9, candidate: 1, regressed: [] }, judged: [row('a', 'baseline', [true, false]), row('a', 'candidate', [true, true]), row('b', 'baseline', [true]), row('b', 'candidate', [true])] }
@@ -32,6 +32,12 @@ describe('schedule', () => {
     assert.equal(usageOk({ windows: w(100), pauseAt: null, paused: false, retrying: false }), false)
     assert.equal(usageOk({ windows: [], pauseAt: 99, paused: true, retrying: false }), false)
     assert.equal(usageOk({ windows: [], pauseAt: 99, paused: false, retrying: true }), false)
+    // A window whose reset passed is stale: an idle chat keeps its last status line.
+    const now = Date.UTC(2026, 10, 9, 12)
+    const ago = new Date(now - 3_600_000).toISOString(), ahead = new Date(now + 3_600_000).toISOString()
+    assert.equal(usageOk({ windows: [{ percentUsed: 99, resetsAt: ago }], pauseAt: 99, paused: false, retrying: false }, now), true)
+    assert.equal(usageOk({ windows: [{ percentUsed: 99, resetsAt: String((now - 3_600_000) / 1000) }], pauseAt: 99, paused: false, retrying: false }, now), true)
+    assert.equal(usageOk({ windows: [{ percentUsed: 99, resetsAt: ahead }], pauseAt: 99, paused: false, retrying: false }, now), false)
   })
 })
 
@@ -176,11 +182,43 @@ describe('headless runs', () => {
     assert.ok(!flag(a, '--allowedTools').some(x => x.startsWith('Bash')))
     assert.deepEqual(flag(a, '--allowedTools').filter(x => /^(Edit|Write)\(/.test(x)).map(x => x.replace(/^\w+\(|\)$/g, '')).sort(),
       ['~/.claude/projects/*/memory/**', '~/.claude/projects/*/memory/**', '~/Documents/vault/wiki/**', '~/Documents/vault/wiki/**'])
+    assert.ok(flag(jobArgs('aar', 'p', 'id', [], '/h/.cache/s/memory'), '--allowedTools').includes('Write(//h/.cache/s/memory/**)'))
+  })
+  it('aar memory: staged copy syncs back new and changed notes, MEMORY.md only gains lines', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'learn-mem-')), mem = path.join(root, 'memory'), stage = path.join(root, 'stage')
+    fs.mkdirSync(mem)
+    fs.writeFileSync(path.join(mem, 'MEMORY.md'), '- [A](a.md)\n')
+    fs.writeFileSync(path.join(mem, 'a.md'), 'a')
+    fs.writeFileSync(path.join(mem, 'b.md'), 'b')
+    const before = stageMemory(mem, stage)
+    assert.equal(fs.readFileSync(path.join(stage, 'a.md'), 'utf8'), 'a')
+    fs.writeFileSync(path.join(stage, 'MEMORY.md'), '- [A](a.md)\n- [C](c.md)\n')
+    fs.writeFileSync(path.join(stage, 'c.md'), 'c')
+    fs.writeFileSync(path.join(stage, 'a.md'), 'a2')
+    fs.rmSync(path.join(stage, 'b.md'))
+    fs.appendFileSync(path.join(mem, 'MEMORY.md'), '- [D](d.md)\n')
+    assert.deepEqual(syncMemory(stage, mem, before).sort(), ['MEMORY.md', 'a.md', 'c.md'])
+    assert.equal(fs.readFileSync(path.join(mem, 'MEMORY.md'), 'utf8'), '- [A](a.md)\n- [D](d.md)\n- [C](c.md)\n')
+    assert.equal(fs.readFileSync(path.join(mem, 'a.md'), 'utf8'), 'a2')
+    assert.equal(fs.readFileSync(path.join(mem, 'c.md'), 'utf8'), 'c')
+    assert.ok(fs.existsSync(path.join(mem, 'b.md')))
+    const empty = stageMemory(path.join(root, 'none'), path.join(root, 's2'))
+    assert.deepEqual(syncMemory(path.join(root, 's2'), path.join(root, 'fresh'), empty), [])
+    assert.ok(!fs.existsSync(path.join(root, 'fresh')))
+    fs.writeFileSync(path.join(mem, 'MEMORY.md'), '- [A](a.md) old\n- [D](d.md)\n')
+    const b2 = stageMemory(mem, path.join(root, 's3'))
+    fs.writeFileSync(path.join(root, 's3', 'MEMORY.md'), '- [A](a.md) new\n- [D](d.md)\n- [E](e.md)\n')
+    fs.writeFileSync(path.join(mem, 'MEMORY.md'), '- [A](a.md) old\n- [F](f.md)\n')
+    syncMemory(path.join(root, 's3'), mem, b2)
+    assert.equal(fs.readFileSync(path.join(mem, 'MEMORY.md'), 'utf8'), '- [F](f.md)\n- [A](a.md) new\n- [E](e.md)\n')
+    fs.rmSync(root, { recursive: true, force: true })
   })
   it('improve: Bash only for the named scripts, writes under self-improve and notes, never claude-mods', () => {
     const allow = flag(jobArgs('improve', 'p', 'id', ['/s/scan.mjs']), '--allowedTools')
     assert.deepEqual(allow.filter(x => x.startsWith('Bash')), ['Bash(node /s/scan.mjs:*)'])
     assert.ok(allow.includes('Edit(~/.claude/self-improve/**)'))
+    assert.ok(!allow.some(x => /memory/.test(x)), 'headless refuses ~/.claude memory writes')
+    assert.ok(flag(jobArgs('improve', 'p', 'id', [], '/h/.cache/s/memory'), '--allowedTools').includes('Write(//h/.cache/s/memory/**)'))
     assert.ok(!allow.some(x => /claude-mods/.test(x)))
   })
   it('no Skill tool in either job; improve denies shells, fetchers and the web', () => {

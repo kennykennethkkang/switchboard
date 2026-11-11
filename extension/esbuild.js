@@ -25,7 +25,9 @@ const KIT_OUT = path.join(__dirname, 'kit')
 const SECRET = /sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|xox[abp]-[A-Za-z0-9-]{10,}/
 const sha = text => crypto.createHash('sha256').update(text).digest('hex').slice(0, 12)
 // The VSIX goes to other people: their rules name the user, gender neutral. Kenneth's own copy has the same version, so his stays.
-const genericRules = text => text.replace(/Kenneth('s)?/g, (_, s) => `the user${s ?? ''}`).replace(/\bhimself\b/g, 'themselves').replace(/\bhis own\b/g, 'their own').replace(/(^|[.!?] |^- |\/\/ |\/\*\* |['"`])the user/gm, '$1The user')
+// shortcut: pronouns swap file-wide once Kenneth is named; a file that also quotes some other "he" needs a rewording.
+const pronouns = text => !/Kenneth/.test(text) ? text : text.replace(/\bhimself\b/g, 'themselves').replace(/\bhe asks\b/g, 'they ask').replace(/\bhe\b/g, 'they').replace(/\bhim\b/g, 'them').replace(/\bhis\b/g, 'their')
+const genericRules = text => pronouns(text).replace(/Kenneth('s)?/g, (_, s) => `the user${s ?? ''}`).replace(/(^|[.!?] |^- |\/\/ |\/\*\* |['"`])the user/gm, '$1The user')
 // Same marker as src/hub/rules.ts GENERIC: a generic bundle never replaces a kit copy without it.
 const GENERIC = '<!-- switchboard generic copy -->'
 const marked = text => `${genericRules(text).trimEnd()}\n\n${GENERIC}\n`

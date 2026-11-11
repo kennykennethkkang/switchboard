@@ -15,6 +15,7 @@ import { modelOf } from './roles'
 import { digest, needsApproval, readSweep } from '../../kit/sweep.mjs'
 import { newerVersion } from './self-update'
 import { macNames, phoneCode, type MacNames } from './lan'
+import { editor } from '../editor'
 
 const HOME = os.homedir()
 const CLAUDE = path.join(HOME, '.claude')
@@ -174,7 +175,7 @@ export function insideCwd(cwd: string, file: string): boolean {
 const capped = (lines: string[]): Pick<ChangedFile, 'diff' | 'note'> => {
   const text = lines.join('\n')
   return lines.length > DIFF_LINES || text.length > DIFF_BYTES
-    ? { note: `This diff is too big to show here (${lines.length} lines). Open it in VS Code.` }
+    ? { note: `This diff is too big to show here (${lines.length} lines). Open it in ${editor.name}.` }
     : { diff: text }
 }
 
@@ -205,7 +206,7 @@ export function parseChanges(numstat: string, diff: string, untracked: { path: s
   }
   for (const u of untracked) {
     if (u.link) { files.push({ path: u.path, added: 0, removed: 0, status: 'untracked', note: 'Symlink, or a path that leads outside this folder: not shown.' }); continue }
-    if (u.binary || u.text === undefined) { files.push({ path: u.path, added: 0, removed: 0, status: 'untracked', note: u.binary ? 'Binary file: no text diff.' : 'This file is too big to show here. Open it in VS Code.' }); continue }
+    if (u.binary || u.text === undefined) { files.push({ path: u.path, added: 0, removed: 0, status: 'untracked', note: u.binary ? 'Binary file: no text diff.' : `This file is too big to show here. Open it in ${editor.name}.` }); continue }
     const lines = u.text.replace(/\n$/, '').split('\n')
     files.push({ path: u.path, added: lines.length, removed: 0, status: 'untracked', ...capped(lines.map(l => `+${l}`)) })
   }
@@ -447,6 +448,8 @@ export async function keepWeb(root: string, deps: WebDeps & { installed?: boolea
   if (!('problem' in r) || r.problem !== NOT_RUNNING) return r
   // A dev host never starts it: that is the installed build's job, like the keeper.
   if (deps.installed === false) return r
+  // Keep Switchboard app running off (app.nokeep beside app.pid): a stopped app stays stopped.
+  if (fs.existsSync(path.join(path.dirname(deps.pidFile ?? PID_FILE), 'app.nokeep'))) return r
   // Held but not answering as live (a window hub refusing): a second app would only die on EADDRINUSE.
   if ((await (deps.listeners ?? portListeners)('3131')).length) return { problem: 'port 3131 is taken but does not answer' }
   return ensureWeb(root, false, { ...deps, refresh: false })
@@ -705,7 +708,8 @@ export async function connections(repoRoots: string[]): Promise<Connection[]> {
   }
   let projects: string[] = []
   try { projects = await fs.promises.readdir(path.join(CLAUDE, 'projects')) } catch { /* none */ }
-  for (const p of projects) if (!p.startsWith('.')) out.push({ kind: 'project', name: decodeProjectDir(p), status: 'on', detail: 'Claude Code history' })
+  // Dir names are the cwd with / and . as -, so the temp prefix still reads; bench-kit needs its own check.
+  for (const p of projects) if (!p.startsWith('.') && !p.includes('-claude-bench-kit') && !isTempDir(p.replace(/-/g, '/'))) out.push({ kind: 'project', name: decodeProjectDir(p), status: 'on', detail: 'Claude Code history' })
   let windows: string[] = []
   try { windows = (await fs.promises.readdir(path.join(CLAUDE, 'switchboard'))).filter(n => n.endsWith('.json') && n !== 'workspaces.json') } catch { /* none */ }
   for (const w of windows) {

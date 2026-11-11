@@ -20,6 +20,13 @@ describe('genericRules', () => {
   it('reads gender neutral', () => {
     assert.equal(genericRules('Kenneth commits and pushes himself, from his own terminal.'), 'The user commits and pushes themselves, from their own terminal.')
   })
+  it('swaps he, him and his in a file that names Kenneth', () => {
+    assert.equal(
+      genericRules('Never take focus from Kenneth unless he clicked it himself. Agent browsers run headless unless he asks.\nCall him, push to his phone.'),
+      'Never take focus from the user unless they clicked it themselves. Agent browsers run headless unless they ask.\nCall them, push to their phone.',
+    )
+  })
+  it('leaves pronouns alone in a file that never names Kenneth', () => assert.equal(genericRules('The author said he wrote his notes.'), 'The author said he wrote his notes.'))
   it('leaves other text alone', () => assert.equal(genericRules('No names here.'), 'No names here.'))
 })
 

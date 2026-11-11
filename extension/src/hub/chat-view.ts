@@ -285,8 +285,8 @@ export async function chatOutputs(session: string, deps: Deps = {}): Promise<Cha
 
 /** role: you, claude, tool (a call or its result, shown muted) or subagent (a task notification). */
 export type ChatMessage = { role: 'you' | 'claude' | 'tool' | 'subagent'; text: string }
-/** transcript: unsupported for a Codex chat whose rollout is not on this Mac. */
-export type ChatTranscript = { messages: ChatMessage[]; before: number | null; transcript?: 'unsupported' }
+/** transcript: unsupported for a Codex chat whose rollout is not on this Mac. codex: read from a Codex rollout. */
+export type ChatTranscript = { messages: ChatMessage[]; before: number | null; transcript?: 'unsupported'; codex?: true }
 
 const firstLine = (s: string) => { const t = s.trimStart(), nl = t.indexOf('\n'); return clean(nl < 0 ? t : t.slice(0, nl), RESULT_MAX) }
 // The fields toolTarget reads, redacted first: it cuts to 48, which could leave a key's prefix too short to match.
@@ -339,7 +339,7 @@ export async function chatTranscript(session: string, before?: number, deps: { h
     }
     cur = count < PAGE ? page.before : null
   }
-  return { messages: got.reverse().flat(), before: next }
+  return { messages: got.reverse().flat(), before: next, ...(claude ? {} : { codex: true as const }) }
 }
 
 /** A Codex chat's outputs: only what its hook progress kept. */

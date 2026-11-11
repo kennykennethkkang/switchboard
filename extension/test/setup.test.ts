@@ -105,8 +105,8 @@ describe('setup steps', () => {
   })
 
   it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
-    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations'])
-    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations'] } }])
+    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain'] } }])
     assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
   })
@@ -142,6 +142,34 @@ describe('setup steps', () => {
     assert.ok(!done.some(x => x.skills?.names.some(n => ['scrapling-official', 'agent-reach'].includes(n)) || x.run?.includes('scrapling')))
   })
 
+  it('installs agent-browser everywhere and agent-desktop on macOS and Windows with npm, skipped when already on PATH', () => {
+    assert.deepEqual(KIT.npm, [{ pkg: 'agent-browser', then: ['agent-browser', 'install'] }, { pkg: 'agent-desktop', os: ['darwin', 'win32'] }])
+    const npm = (platform: NodeJS.Platform) => steps({ platform }).filter(s => s.run?.[0] === 'npm')
+    assert.deepEqual(npm('darwin'), [
+      { label: 'agent-browser', needs: ['npm'], unless: 'agent-browser', run: ['npm', 'install', '-g', 'agent-browser'], then: ['agent-browser', 'install'] },
+      { label: 'agent-desktop', needs: ['npm'], unless: 'agent-desktop', run: ['npm', 'install', '-g', 'agent-desktop'] },
+    ])
+    assert.deepEqual(npm('win32').map(s => s.label), ['agent-browser', 'agent-desktop'])
+    assert.deepEqual(npm('linux').map(s => s.label), ['agent-browser'])
+  })
+
+  it('runner skips an unless step whose command answers, else runs it and its then', () => {
+    if (process.platform === 'win32') return
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-npm-'))
+    const log = path.join(dir, 'log')
+    for (const c of ['claude', 'npm', 'have']) fs.writeFileSync(path.join(dir, c), `#!/bin/sh\necho "${c} $*" >> "${log}"\n`, { mode: 0o755 })
+    const plan = path.join(dir, 'plan.json')
+    fs.writeFileSync(plan, JSON.stringify([
+      { label: 'have', needs: ['npm'], unless: 'have', run: ['npm', 'install', '-g', 'have'], then: ['have', 'install'] },
+      { label: 'fresh', needs: ['npm'], unless: 'sb-not-there', run: ['npm', 'install', '-g', 'fresh'], then: ['npm', 'after'] },
+    ]))
+    const out = execFileSync(process.execPath, [path.join(__dirname, '..', 'kit', 'setup-run.mjs'), plan], { encoding: 'utf8', env: { ...process.env, PATH: `${dir}:/usr/bin:/bin` } })
+    const calls = fs.readFileSync(log, 'utf8').split('\n').filter(l => !l.startsWith('claude'))
+    assert.deepEqual(calls, ['npm --version', 'have --version', 'npm install -g fresh', 'npm after', ''])
+    assert.match(out, /have: already installed/)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
   it('adds Perplexity to Claude and Codex only with its key saved, reading the key at launch', () => {
     const saved = { keys: [{ name: 'PERPLEXITY_API_KEY' as const, saved: true, last4: 'abcd' }] }
     const mac = steps({ ...saved, platform: 'darwin' })
@@ -155,6 +183,18 @@ describe('setup steps', () => {
     assert.match(text(), /perplexity: no key saved, skipped/)
     assert.ok(!steps({ ...saved, mcps: ['perplexity'], codex: { ...fresh.codex, mcps: ['perplexity'] } }).some(s => s.label?.startsWith('perplexity')))
     assert.match(JSON.stringify(steps({ ...saved, platform: 'win32' })), /perplexity: not added on Windows/)
+  })
+
+  it('adds Firecrawl with its saved key, PostHog and Composio by OAuth sign-in', () => {
+    const mac = steps({ keys: [{ name: 'FIRECRAWL_API_KEY', saved: true, last4: 'abcd' }], platform: 'darwin' })
+    const wrap = 'FIRECRAWL_API_KEY=$(security find-generic-password -s switchboard -a FIRECRAWL_API_KEY -w) exec npx -y firecrawl-mcp'
+    assert.deepEqual(mac.find(s => s.label === 'firecrawl')?.run, ['claude', 'mcp', 'add', '--scope', 'user', 'firecrawl', '--', 'sh', '-c', wrap])
+    assert.match(text(), /firecrawl: no key saved, skipped/)
+    const r = steps().map(s => s.run?.join(' '))
+    assert.ok(r.includes('claude mcp add --scope user --transport http posthog https://mcp.posthog.com/mcp'))
+    assert.ok(r.includes('claude mcp add --scope user --transport http composio https://connect.composio.dev/mcp'))
+    assert.match(text(), /Sign in to slack, cloudflare, posthog, composio with \/mcp/)
+    assert.match(text(), /codex mcp login posthog, codex mcp login composio/)
   })
 
   it('installs caveman as a skill, not as a plugin with hooks', () => {
@@ -365,7 +405,7 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
-    assert.match(out, /copy aar deep-research animation-styles improve-system awwwards crowd-ab self-improve gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
+    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab self-improve gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
     assert.match(out, /codex plugin add superpowers@superpowers-dev/)

@@ -232,6 +232,12 @@ export async function heldNow($: EngineInterface) {
   return holdDenial(h, now)
 }
 
+/** Held and not past the reset: nothing here may start a turn, since the hold denies its every call. */
+async function holding($: EngineInterface) {
+  await loadHold($)
+  return held.hold !== undefined && held.hold.resetsAt > (await $.clock.now())
+}
+
 async function startsToday($: EngineInterface) {
   const day = new Date(await $.clock.now()).toISOString().slice(0, 10)
   const kept = ((await $.store.get('starts')) ?? {}) as { day?: string; used?: Record<string, number> }
@@ -348,7 +354,7 @@ export function summaryOf(answer: string): Summary | undefined {
 export function handoffNote(o: {
   project: string; cwd: string; branch?: string; planPath?: string; planText?: string; session: string; now: number
   tasks?: Task[]; ask?: string; requests?: string[]; errors?: string[]; running?: string[]; changed?: string[]; transcript?: string
-  summary?: Summary; results?: string[]
+  summary?: Summary; results?: string[]; stopped?: string[]
 }): string {
   const stamp = new Date(o.now).toISOString().slice(0, 16).replace('T', ' ')
   const plan = o.planText ? openTasks(o.planText) : []
@@ -377,8 +383,10 @@ export function handoffNote(o: {
     lines.push('', '## State', '', `- Folder: ${o.cwd}`, `- Branch: ${o.branch ?? 'unknown'}`, `- Plan: ${o.planPath ?? 'none'}`, `- Tests last run: ${s.tests ?? 'unknown, run them first'}`)
     const why = [...(s.decisions ?? []).map(d => `- ${d}`), ...picked]
     if (why.length) lines.push('', '## Decisions', '', ...why)
-    lines.push('', '## Open tasks', '', ...(open.length ? open : ['- none']))
-    if (o.running?.length) lines.push('', '## Running work', '', 'Background shells and subagents do not carry over: check each output, rerun what is cut off.', '', ...o.running.map(r => `- ${r}`))
+    // A chat that never used the task tools records none: say so, so the next chat looks elsewhere.
+    const none = tasks.length || plan.length ? '- none' : '- none recorded (task tools may be missing in that chat); check Subagent results and Next action'
+    lines.push('', '## Open tasks', '', ...(o.stopped ?? []).map(a => `- stopped: ${a} (cut off by TaskStop, check what it finished)`), ...(open.length ? open : [none]))
+    if (o.running?.length) lines.push('', '## Running work', '', 'The old chat may still be running these: check its process (ps for its session id) and recent file changes first; if it is alive, wait for its report instead of rerunning. Otherwise check each output and rerun what is cut off.', '', ...o.running.map(r => `- ${r}`))
     if (o.errors?.length) lines.push('', '## Errors', '', '```', ...o.errors, '```')
     if (results.length && resultsCap) lines.push('', '## Subagent results', '', ...results.slice(-resultsCap).map(r => `- ${r}`))
     if (files.length) {
@@ -423,7 +431,7 @@ export function ensureOpenTasks(note: string, tasks: Task[]): string {
     return `${note.slice(0, where)}\n\n## Open tasks\n\n${missing.join('\n')}${note.slice(where)}`
   }
   const cut = end < 0 ? note.length : end
-  return `${note.slice(0, cut).replace(/\n+$/, '').replace(/\n- none$/, '')}\n${missing.join('\n')}\n${note.slice(cut)}`
+  return `${note.slice(0, cut).replace(/\n+$/, '').replace(/\n- none(?: recorded .*)?$/, '')}\n${missing.join('\n')}\n${note.slice(cut)}`
 }
 
 const STOP = new Set(['the', 'a', 'an', 'on', 'in', 'of', 'to', 'for', 'and', 'with', 'my', 'me', 'please', 'can', 'you', 'could', 'i', 'it', 'is', 'this', 'that', 'now'])
@@ -458,10 +466,12 @@ type Result = { id: string; line: string }
 const feed: {
   targets: Target[]; foundAt: number; lastLive: number; compactAt?: number; handedOff?: string; prompt?: string; ask?: string; requests: string[]; errors: string[]
   file?: string; plan?: string; brief?: string; tasks: Map<string, Task>; shells: Map<string, Shell>; results: Result[]; summary?: Summary
+  // Subagents TaskStop cut off since the last request.
+  stopped: string[]
   restored?: string; pausing?: number; freshNote?: string; nudge?: { n: number; tasks: string }
-} = { targets: [], foundAt: -Infinity, lastLive: -Infinity, tasks: new Map(), requests: [], errors: [], shells: new Map(), results: [] }
+} = { targets: [], foundAt: -Infinity, lastLive: -Infinity, tasks: new Map(), requests: [], errors: [], shells: new Map(), results: [], stopped: [] }
 
-type Kept = { tasks?: Array<[string, Task]>; ask?: string; requests?: string[]; errors?: string[]; shells?: Shell[]; results?: Result[]; summary?: Summary; pausing?: number; at: number }
+type Kept = { tasks?: Array<[string, Task]>; ask?: string; requests?: string[]; errors?: string[]; shells?: Shell[]; results?: Result[]; stopped?: string[]; summary?: Summary; pausing?: number; at: number }
 const FEEDS_KEPT = 20
 const REQUESTS_KEPT = 10
 
@@ -480,6 +490,7 @@ export async function restoreFeed($: EngineInterface) {
   feed.errors = k?.errors ?? []
   feed.shells = new Map((k?.shells ?? []).map(x => [x.id, x]))
   feed.results = k?.results ?? []
+  feed.stopped = k?.stopped ?? []
   feed.summary = k?.summary
   feed.pausing = k?.pausing
   feed.freshNote = undefined
@@ -492,7 +503,7 @@ async function saveFeed($: EngineInterface) {
   const all = ((await $.store.get('feeds')) ?? {}) as Record<string, Kept>
   const mine: Kept = {
     tasks: [...feed.tasks], ask: feed.ask, requests: feed.requests.slice(-REQUESTS_KEPT), errors: feed.errors,
-    shells: [...feed.shells.values()], results: feed.results, summary: feed.summary, pausing: feed.pausing, at: await $.clock.now(),
+    shells: [...feed.shells.values()], results: feed.results, stopped: feed.stopped, summary: feed.summary, pausing: feed.pausing, at: await $.clock.now(),
   }
   await $.store.set('feeds', Object.fromEntries(Object.entries({ ...all, [id]: mine }).sort((a, b) => b[1].at - a[1].at).slice(0, FEEDS_KEPT)))
 }
@@ -508,12 +519,34 @@ export function noteShell(tool: string, e: Record<string, unknown>, result: unkn
   } else if (tool === 'TaskStop' || tool === 'KillShell') {
     // Stopped or already gone; either way nothing runs under that id now.
     const id = e.task_id ?? e.shell_id
-    if (typeof id === 'string') feed.shells.delete(id)
+    const type = (result as { task_type?: unknown } | undefined)?.task_type
+    if (typeof id === 'string' && !feed.shells.delete(id) && tool === 'TaskStop' && type !== 'local_bash' && !feed.stopped.includes(id)) feed.stopped.push(id)
   }
 }
 
 export function shellsDone(text: string) {
   for (const m of text.matchAll(/<task-id>([^<]+)<\/task-id>[\s\S]*?<status>(?:completed|failed|killed|stopped)<\/status>/g)) feed.shells.delete(m[1] ?? '')
+}
+
+/** Notices absorbed mid turn never reach prompt.submit; the transcript still has them. */
+export function shellsDoneIn(transcript: string) {
+  for (const line of transcript.split('\n')) {
+    if (!line.includes('absorbed_mid_turn')) continue
+    try {
+      const q = JSON.parse(line) as { type?: unknown; reason?: unknown; content?: unknown }
+      if (q.type === 'queue-operation' && q.reason === 'absorbed_mid_turn' && typeof q.content === 'string') shellsDone(q.content)
+    } catch { /* a line mid-write */ }
+  }
+}
+
+// fs.read refuses files over 4 MiB and a transcript runs to hundreds of MB, so tail seeks to the end.
+// The cut first line fails JSON.parse and is skipped.
+// ponytail: a notice absorbed more than TAIL_BYTES back is missed; keep a scanned byte offset if that bites.
+const TAIL_BYTES = 2_000_000
+async function syncShells($: EngineInterface, transcript: string) {
+  if (!feed.shells.size) return
+  const r = await Promise.resolve().then(() => $.process.run(['tail', '-c', String(TAIL_BYTES), transcript], { timeoutMs: 5_000 })).catch(() => undefined)
+  if (r?.exitCode === 0) shellsDoneIn(r.stdout)
 }
 
 export const liveShells = () => [...feed.shells.values()]
@@ -542,7 +575,7 @@ const OWN = 'Switchboard: '
 const PAUSE_MARK = `${OWN}context is nearly full`
 const pausePrompt = (shells: Shell[]) => [
   `${PAUSE_MARK} and a fresh chat takes over after a clean pause. Finish the step you are on and start no new tasks or subagents.`,
-  'Wait for running subagents to finish, or stop them with TaskStop.',
+  'SendMessage each running subagent to stop new edits, leave its files type-clean and report done vs not done; wait for the reports, and TaskStop only one that does not answer.',
   shells.length ? `Stop these background shells with TaskStop before you end: ${shells.map(x => `${x.id} (${x.command})`).join(', ')}.` : 'Stop any background shell you started with TaskStop before you end.',
   'Update the task list so every open task has its real status; mark one completed only if a check proved it.',
   'Then end your reply with these lines and nothing after them:',
@@ -564,6 +597,7 @@ async function keepGoing($: EngineInterface, answer: string) {
   if (feed.nudge?.tasks !== tasks) feed.nudge = undefined
   const open = [...feed.tasks.values()].filter(t => t.status !== 'completed')
   const n = feed.nudge?.n ?? 0
+  if (await holding($)) return
   if (!open.length || n >= NUDGES || endsAsking(answer) || /commit message[^\n]*\n+```/i.test(answer) || feed.shells.size || (await liveAgents($)).length) return
   feed.nudge = { n: n + 1, tasks }
   await $.prompt.submit({ text: `${OWN}you ended your turn with open tasks: ${open.slice(0, 10).map(t => t.subject.slice(0, 80)).join('; ')}. Keep working on them. ${ASK_RULE}` })
@@ -727,6 +761,13 @@ async function start($: EngineInterface) {
   if (b) await post($, { kind: 'diet', ...dietOf(b, ((await $.store.get('uses')) ?? {}) as Record<string, number>) })
 }
 
+// Claude Code's own layout: the project root with every non-alphanumeric as '-'; a chat's subagents under <id>/subagents.
+async function transcriptOf($: EngineInterface) {
+  const home = norm((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
+  const root = norm(await Promise.resolve().then(() => $.session.root()).catch(() => $.session.cwd()))
+  return `${home}/.claude/projects/${root.replace(/[^a-zA-Z0-9]/g, '-')}/${await $.session.id()}.jsonl`
+}
+
 async function readNote($: EngineInterface) {
   await restoreFeed($)
   const cwd = norm(await $.session.cwd())
@@ -739,10 +780,8 @@ async function readNote($: EngineInterface) {
   const head = String(await $.fs.read(`${cwd}/.git/HEAD`).catch(() => ''))
   const branch = /^ref: refs\/heads\/(.+)$/m.exec(head)?.[1]
   const id = await $.session.id()
-  const home = norm((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
-  // Claude Code's own layout: the project root with every non-alphanumeric as '-'; a chat's subagents under <id>/subagents.
-  const root = norm(await Promise.resolve().then(() => $.session.root()).catch(() => cwd))
-  const transcript = `${home}/.claude/projects/${root.replace(/[^a-zA-Z0-9]/g, '-')}/${id}.jsonl`
+  const transcript = await transcriptOf($)
+  await syncShells($, transcript)
   const subagents = `${transcript.slice(0, -'.jsonl'.length)}/subagents`
   const { running, changed } = await whatIsLive($, cwd, subagents)
   const tasks = [...feed.tasks.values()]
@@ -750,6 +789,7 @@ async function readNote($: EngineInterface) {
     project: cwd.split('/').pop() ?? cwd, cwd, branch, planPath, planText, session: id, now: await $.clock.now(),
     tasks, ask: feed.ask, requests: feed.requests, errors: feed.errors, running, changed, transcript,
     summary: feed.summary, results: feed.results.map(r => `${r.line} (${subagents}/agent-${r.id}.jsonl)`),
+    stopped: feed.stopped.map(a => `${a}, output ${subagents}/agent-${a}.jsonl`),
   }), tasks)
   return { note, planPath, firstTask: planText ? openTasks(planText)[0]?.title : undefined }
 }
@@ -770,12 +810,15 @@ async function keepOf($: EngineInterface) {
 async function settle($: EngineInterface, answer: string) {
   const id = await $.session.id()
   if (feed.handedOff === id || (await handedOff($).catch(() => undefined))) return
+  // Held: no wrap-up, shell or handoff prompt; the first settle after the resume does them.
+  if (await holding($).catch(() => false)) return
   await restoreFeed($)
   const usage = await $.session.usage({ breakdown: 'summary' })
   // A reloaded mod missed session.start.
   feed.compactAt ??= usage.context.breakdown?.autoCompactThreshold
   const tokens = usage.context.tokens ?? 0
   const near = nearFull(tokens, feed.compactAt)
+  await syncShells($, await transcriptOf($)).catch(() => undefined)
   if (!near && feed.pausing === undefined) await keepGoing($, answer)
   // undefined: no window answered, which says nothing about the mode.
   const kept = near ? await keepOf($) : undefined
@@ -918,6 +961,7 @@ export const register: Register = on => {
     if (e.isMeta || e.command || e.origin?.kind === 'task-notification' || e.text.startsWith(OWN) || e.text.startsWith('<task-notification>')) return next(e)
     await restoreFeed($).catch(() => undefined)
     feed.nudge = undefined
+    feed.stopped = []
     feed.prompt = redact(e.text).replace(/\s+/g, ' ').slice(0, 200)
     feed.ask = redact(e.text)
     feed.requests.push(feed.ask)

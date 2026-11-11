@@ -32,10 +32,12 @@ import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
 import { archiveRow, readArchive, recordArchive } from './hub/chains'
 import { dailySummary, fillBoxes, notify } from './hub/notify'
-import { onSwitchboard, pendingReload, readBuild, reloadReady } from './hub/self-update'
+import { onSwitchboard, pendingReload, readBuild, RECHECK_MS } from './hub/self-update'
+import { idle, watchActivity } from './hub/idle'
+import { keepQuestions } from './hub/questions'
 import { refreshWeb } from './hub/hub-panel'
 import { checkAsked } from './hub/coverage'
-import { postLocal, readWindows } from './hub/dev'
+import { markReloading, postLocal, readWindows } from './hub/dev'
 import { chatEnded, chatFinished, chatMissed, chatResumed } from './hub/todo'
 import { queueAar } from './hub/learn'
 import { stopChatServers } from './hub/reap'
@@ -93,6 +95,7 @@ export async function startClaudeRuntime(
       writeDiscoveryFile(hookPort, workspace, vscode.workspace.isTrusted)
       context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => writeDiscoveryFile(hookPort, workspace, true)))
       hub.keepRetries(path.join(os.homedir(), '.claude', 'switchboard', `retries-${hashWorkspace(workspace)}.json`))
+      keepQuestions(path.join(os.homedir(), '.claude', 'switchboard', `questions-${hashWorkspace(workspace)}.json`))
       migrateHttpHooks()
     }
   }
@@ -103,7 +106,8 @@ export async function startClaudeRuntime(
 
   const summary = setInterval(() => dailySummary(), 10 * 60_000)
   const running = { version: context.extension.packageJSON.version as string, build: readBuild(context.extensionPath) }
-  const reload = setInterval(() => reloadIfUpdated(context, running), 15_000)
+  context.subscriptions.push(...watchActivity(vscode))
+  const reload = setInterval(() => reloadIfUpdated(context, running), RECHECK_MS)
   context.subscriptions.push({ dispose: () => { clearInterval(summary); clearInterval(reload) } })
 
   // Route hook events → panel, but filter out events the watcher already owns
@@ -207,17 +211,21 @@ async function withCoverage(change: { from?: ChatState; to: ChatProgress }): Pro
   notify({ ...change, to: scored })
 }
 
-/** A newer Switchboard installed, or in a window on the Switchboard checkout any rebuild of it: offer a reload in the
- * status bar. Never reloads by itself, since a rebuild usually comes from an agent while the user is mid-task.
- * Once per version (or build) per window, so a copy that will not load cannot loop. */
+let refreshedFor: string | undefined
+
+/** A newer Switchboard installed, or in a window on the Switchboard checkout any rebuild of it: reload the window once it is idle
+ * (idle.ts), else look again next tick. Terminal chats and unsaved files outlive a reload. Once per version (or build) per window,
+ * so a copy that will not load cannot loop. */
 function reloadIfUpdated(context: vscode.ExtensionContext, running: { version: string; build?: string }): void {
   const roots = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
   // Not in a dev host: its build is the checkout's, never the installed one.
   const rebuilds = context.extensionMode === vscode.ExtensionMode.Production && onSwitchboard(roots)
-  const key = pendingReload(path.join(os.homedir(), '.vscode', 'extensions'), running, rebuilds)
+  const key = pendingReload(path.dirname(context.extensionPath), running, rebuilds)
   if (!key || context.workspaceState.get('reloadedFor') === key) return
-  void context.workspaceState.update('reloadedFor', key)
   // The browser app and its pages need not wait for this window.
-  if (rebuilds) refreshWeb()
-  reloadReady(vscode, rebuilds ? 'Switchboard rebuilt' : `Switchboard ${key} is installed`)
+  if (rebuilds && refreshedFor !== key) { refreshedFor = key; refreshWeb() }
+  if (!idle()) return
+  log.info(`Reloading for Switchboard ${key}`)
+  markReloading()
+  void context.workspaceState.update('reloadedFor', key).then(() => vscode.commands.executeCommand('workbench.action.reloadWindow'))
 }

@@ -1,6 +1,6 @@
 /**
  * AWS sign-ins: profiles from ~/.aws/config, their status, display labels and which Chrome
- * profile opens their sign-in. The parsers and rewrites are pure (tested); ~/.aws/credentials is never read or written.
+ * profile opens their sign-in. The parsers and rewrites are pure (tested); ~/.aws/credentials is never written, and only its section headers are read.
  */
 import { execFile } from 'child_process'
 import { createHash } from 'crypto'
@@ -13,8 +13,10 @@ import type { AwsProfile, AwsStatus, ChromeProfile } from './types'
 
 const HOME = os.homedir()
 export const AWS_CONFIG = path.join(HOME, '.aws', 'config')
+const AWS_CREDENTIALS = path.join(HOME, '.aws', 'credentials')
 const SB = path.join(HOME, '.claude', 'switchboard')
 const LABELS = path.join(SB, 'aws-labels.json')
+const IDENTITY = path.join(SB, 'aws-identity.json')
 const PREFS = path.join(SB, 'aws-prefs.json')
 const SESSIONS = path.join(SB, 'aws-sessions.json')
 export const OPEN_CHROME = path.join(SB, 'aws-open-chrome.sh')
@@ -28,7 +30,7 @@ export function chromeState(platform: NodeJS.Platform = process.platform, home =
 export const validProfileName = (s: string) => /^[A-Za-z0-9._@+-]{1,64}$/.test(s)
 export const validRegion = (s: string) => /^[a-z]{2}(-[a-z]+)+-\d{1,2}$/.test(s)
 
-export type Section = { name: string; isDefault: boolean; values: Record<string, string> }
+export type Section = { name: string; values: Record<string, string> }
 type Block = { header: string; start: number; end: number }
 
 const HEADER = /^\s*\[([^\]]+)\]\s*$/
@@ -62,7 +64,7 @@ export function parseAwsConfig(text: string): Section[] {
   const lines = text.split(/\r?\n/)
   return blocks(lines).flatMap(b => {
     const name = nameOf(b.header)
-    return name ? [{ name, isDefault: name === 'default', values: valuesOf(body(lines, b)) }] : []
+    return name ? [{ name, values: valuesOf(body(lines, b)) }] : []
   })
 }
 
@@ -74,56 +76,47 @@ export function accountOf(v: Record<string, string>): string | undefined {
 
 const stamp = (now: number) => new Date(now).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')
 
-const CRED_KEYS = new Set(['aws_access_key_id', 'credential_process', 'sso_session', 'sso_start_url', 'login_session', 'web_identity_token_file'])
-
-/**
- * The config with [default] holding `name`'s settings. The old default is kept as
- * [profile previous-default-<time>] whenever it had settings that differ from the new ones. undefined: no such profile.
- */
-export function makeDefault(text: string, name: string, now = Date.now()): string | undefined {
-  if (name === 'default') return undefined
-  const lines = text.split(/\r?\n/)
-  const all = blocks(lines)
-  const target = all.find(b => nameOf(b.header) === name && name !== 'default')
-  if (!target) return undefined
-  const fresh = body(lines, target)
-  const old = all.find(b => b.header === 'default')
-  const oldRows = old ? body(lines, old) : []
-  const same = JSON.stringify(Object.entries(valuesOf(oldRows)).sort()) === JSON.stringify(Object.entries(valuesOf(fresh)).sort())
-  const kept = `previous-default-${stamp(now)}`
-  const backup = oldRows.some(r => r.trim()) && !same ? ['', `[profile ${kept}]`, ...oldRows] : []
-  // When the old [default] held its credentials in config, every profile sourcing from it follows them to the backup.
-  // Keys in the credentials file stay under [default], so source_profile = default stays as is.
-  const moved = Object.keys(valuesOf(oldRows)).some(k => CRED_KEYS.has(k)) && backup.length > 0
-  const def = ['[default]', ...fresh, '']
-  const joined = old ? [...lines.slice(0, old.start), ...def, ...lines.slice(old.end)] : [...def, ...lines]
-  const out = moved ? joined.map(r => (/^\s*source_profile\s*=\s*default\s*$/.test(r) ? `source_profile = ${kept}` : r)) : joined
-  while (out.length && !out[out.length - 1].trim()) out.pop()
-  return [...out, ...backup, ''].join('\n')
+/** The profile `name` copies after a sign-in: same login_session and region, first in the file. */
+export function sameLogin(text: string, name: string): string | undefined {
+  const all = parseAwsConfig(text)
+  const me = all.find(s => s.name === name)
+  const ls = me?.values.login_session
+  if (!me || !ls) return undefined
+  return all.find(s => s !== me && s.values.login_session === ls && s.values.region === me.values.region)?.name
 }
 
-/** The config with a new [profile name] in region; undefined when the name or region is bad or taken. */
+/**
+ * The config with [profile name] in region. A taken name keeps its other lines and gets the new region, so adding
+ * it again is a retry. undefined when the name or region is bad.
+ */
 export function addProfile(text: string, name: string, region: string): string | undefined {
   if (!validProfileName(name) || name === 'default' || !validRegion(region)) return undefined
-  if (parseAwsConfig(text).some(s => s.name === name)) return undefined
-  return `${text.replace(/\s*$/, '')}${text.trim() ? '\n\n' : ''}[profile ${name}]\nregion = ${region}\n`
+  const lines = text.split(/\r?\n/)
+  const b = blocks(lines).find(x => nameOf(x.header) === name)
+  if (!b) return `${text.replace(/\s*$/, '')}${text.trim() ? '\n\n' : ''}[profile ${name}]\nregion = ${region}\n`
+  const at = lines.slice(b.start + 1, b.end).findIndex(l => /^\s*region\s*=/.test(l))
+  if (at >= 0) lines[b.start + 1 + at] = `region = ${region}`
+  else lines.splice(b.start + 1, 0, `region = ${region}`)
+  return lines.join('\n')
 }
 
-/**
- * The config without [profile name] and the comment right above it, or why not: [default] stays, as does the
- * last named profile [default] copies (Make default) and any profile another one names as source_profile.
- */
+/** The config with [profile from] as [profile to] and every source_profile = from following it; undefined when from is missing or to is bad or taken. */
+export function renameProfile(text: string, from: string, to: string): string | undefined {
+  if (!validProfileName(to) || to === 'default') return undefined
+  const lines = text.split(/\r?\n/)
+  const all = blocks(lines)
+  const b = all.find(x => nameOf(x.header) === from)
+  if (!b || all.some(x => nameOf(x.header) === to)) return undefined
+  lines[b.start] = `[profile ${to}]`
+  return lines.map(l => (/^\s*source_profile\s*=\s*(.*?)\s*$/.exec(l)?.[1] === from ? `source_profile = ${to}` : l)).join('\n')
+}
+
+/** The config without [profile name] and the comment right above it, or why not: a profile another one names as source_profile stays. */
 export function removeProfile(text: string, name: string): { text: string } | { problem: string } {
-  if (name === 'default') return { problem: 'the default profile cannot be deleted' }
   const lines = text.split(/\r?\n/)
   const all = blocks(lines)
   const target = all.find(b => nameOf(b.header) === name)
   if (!target) return { problem: `no AWS profile named ${name}` }
-  const def = all.find(b => b.header === 'default')
-  const vals = (b: Block) => JSON.stringify(Object.entries(valuesOf(body(lines, b))).sort())
-  // Many profiles can match [default] (backups, one login shared); only the last named copy is kept, a backup never.
-  const copies = def && body(lines, def).some(r => r.trim()) ? all.filter(b => b !== def && vals(b) === vals(def)) : []
-  if (copies.includes(target) && !isStale(name) && !copies.some(b => b !== target && !isStale(nameOf(b.header) ?? ''))) return { problem: `${name} is the current default; make another profile the default first` }
   const user = parseAwsConfig(text).find(s => s.values.source_profile === name)
   if (user) return { problem: `${user.name} signs in through ${name} (source_profile)` }
   let start = target.start
@@ -158,12 +151,16 @@ export function chromeProfiles(localState: string): ChromeProfile[] {
 }
 
 const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
-/** The profile picked for the deepest project folder holding `cwd`. */
+/** The key for the browser a folder with no pick of its own gets. AWS has no such default. */
+export const ANY_FOLDER = '*'
+/** The pick for the deepest project folder holding `cwd`; none above it means none. */
 export function profileFor(projects: Record<string, string>, cwd: string): string | undefined {
   const c = norm(cwd)
-  const hit = Object.keys(projects).filter(k => c === norm(k) || c.startsWith(`${norm(k)}/`)).sort((a, b) => b.length - a.length)[0]
+  const hit = Object.keys(projects).filter(k => k !== ANY_FOLDER && (c === norm(k) || c.startsWith(`${norm(k)}/`))).sort((a, b) => b.length - a.length)[0]
   return hit ? projects[hit] : undefined
 }
+/** The browser for `cwd`: its folder's pick, else the ANY_FOLDER one. Mirrored in sign-ins.tsx. */
+export const browserFor = (browsers: Record<string, string>, cwd: string) => profileFor(browsers, cwd) ?? browsers[ANY_FOLDER]
 
 /**
  * Where a sign-in opens: its own Chrome pick, else the project's, else '' (Chrome's last used profile).
@@ -248,8 +245,55 @@ const strings = (v: unknown): Record<string, string> =>
 
 /** chrome: per AWS profile; projects: AWS profile per folder; browsers: Chrome folder per project folder ('' system browser). */
 export type AwsPrefs = { chrome: Record<string, string>; projects: Record<string, string>; browsers: Record<string, string> }
+
+/** Picks for `from` under `to` (rename, or a twin folded in); a Chrome pick `to` already has wins. */
+export function moveProfile(p: AwsPrefs, from: string, to: string): AwsPrefs {
+  const { [from]: pick, ...chrome } = p.chrome
+  return { ...p, chrome: { ...chrome, ...(pick !== undefined && chrome[to] === undefined ? { [to]: pick } : {}) },
+    projects: Object.fromEntries(Object.entries(p.projects).map(([f, n]) => [f, n === from ? to : n])) }
+}
+
+/** Who an account signs in as, from AWS at the last sign-in: alias or contact name, and the primary email. */
+export type AwsIdentity = { name?: string; email?: string }
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const trimmed = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 120) : undefined)
+
+/** The identity from the answers of list-account-aliases, get-contact-information and get-primary-email (undefined = refused). */
+export function identityOf(aliases: unknown, contact: unknown, primary: unknown): AwsIdentity {
+  const a = (aliases as { AccountAliases?: unknown[] } | undefined)?.AccountAliases
+  const c = (contact as { ContactInformation?: { FullName?: unknown; CompanyName?: unknown } } | undefined)?.ContactInformation
+  const name = (Array.isArray(a) ? trimmed(a[0]) : undefined) ?? trimmed(c?.CompanyName) ?? trimmed(c?.FullName)
+  const email = trimmed((primary as { PrimaryEmail?: unknown } | undefined)?.PrimaryEmail)
+  return { ...(name ? { name } : {}), ...(email && EMAIL.test(email) ? { email } : {}) }
+}
+
+/** Labels with a profile:<from> key moved to profile:<to>; undefined when there is none. */
+export function renameLabel(labels: Record<string, string>, from: string, to: string): Record<string, string> | undefined {
+  const { [`profile:${from}`]: was, ...rest } = labels
+  return was === undefined ? undefined : { ...rest, [`profile:${to}`]: was }
+}
+
+/** Whether an INI file has a [name] section; header lines only. */
+export const hasSection = (text: string, name: string) => text.split(/\r?\n/).some(l => HEADER.exec(l)?.[1].trim() === name)
+
+/** label: the email set by hand, by account id (profile:<name> without one). */
 export const readLabels = () => strings(readJson(LABELS))
 export const writeLabels = (labels: Record<string, string>) => { fs.mkdirSync(SB, { recursive: true }); writeJsonAtomic(LABELS, labels) }
+export const readIdentities = (): Record<string, AwsIdentity> => Object.fromEntries(Object.entries(readJson(IDENTITY)).map(([k, v]) => [k, { ...strings(v) }]))
+
+/** Asks AWS who `profile` is (each call may be denied; 6 s each) and keeps what answered under its account id. */
+export async function refreshIdentity(profile: string): Promise<void> {
+  const ask = (args: string[]) => new Promise<unknown>(resolve => execFile(awsBinary(), [...args, '--profile', profile, '--output', 'json'],
+    { timeout: 6000, maxBuffer: 1 << 20, windowsHide: true }, (err, out) => { try { resolve(err ? undefined : JSON.parse(String(out))) } catch { resolve(undefined) } }))
+  const account = trimmed((await ask(['sts', 'get-caller-identity']) as { Account?: unknown } | undefined)?.Account)
+  if (!account || !/^\d{12}$/.test(account)) return
+  const [aliases, contact, primary] = await Promise.all([ask(['iam', 'list-account-aliases']), ask(['account', 'get-contact-information']), ask(['account', 'get-primary-email', '--account-id', account])])
+  const got = identityOf(aliases, contact, primary)
+  if (!Object.keys(got).length) return
+  const all = readIdentities()
+  fs.mkdirSync(SB, { recursive: true })
+  writeJsonAtomic(IDENTITY, { ...all, [account]: { ...all[account], ...got } })
+}
 export const readPrefs = (): AwsPrefs => { const j = readJson(PREFS); return { chrome: strings(j.chrome), projects: strings(j.projects), browsers: strings(j.browsers) } }
 export const writePrefs = (p: AwsPrefs) => { fs.mkdirSync(SB, { recursive: true }); writeJsonAtomic(PREFS, p) }
 export const readChrome = (): ChromeProfile[] => { try { return chromeProfiles(fs.readFileSync(chromeState(), 'utf8')) } catch { return [] } }
@@ -283,17 +327,37 @@ export function addAwsProfile(name: string, region: string, chrome: string | und
   return undefined
 }
 
-/** Backups Make default leaves behind, for the UI to fold away. */
-export const isStale = (name: string) => /^previous-default-\d/.test(name)
-
 /** Deletes [profile name] after copying the config to config.backup-<time> beside it. Answers why it could not. */
 export function deleteAwsProfile(name: string, file = AWS_CONFIG, now = Date.now()): string | undefined {
   if (!validProfileName(name)) return 'Not a profile name'
   const text = fs.readFileSync(file, 'utf8')
   const r = removeProfile(text, name)
   if ('problem' in r) return r.problem
-  fs.writeFileSync(`${file}.backup-${stamp(now)}`, text, { mode: 0o600, flag: 'wx' })
+  backUp(file, text, now)
   writeAwsConfig(r.text, file)
+  return undefined
+}
+
+/** config.backup-<time>, then -2, -3 when a change in the same second already wrote one. */
+function backUp(file: string, text: string, now: number): void {
+  for (let n = 1; ; n++) {
+    try { fs.writeFileSync(`${file}.backup-${stamp(now)}${n > 1 ? `-${n}` : ''}`, text, { mode: 0o600, flag: 'wx' }); return } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || n > 99) throw e }
+  }
+}
+
+/** Renames [profile from] to [profile to] after the same backup as deleteAwsProfile. Answers why it could not. */
+export function renameAwsProfile(from: string, to: string, file = AWS_CONFIG, now = Date.now(), creds = AWS_CREDENTIALS): string | undefined {
+  const text = fs.readFileSync(file, 'utf8')
+  let keys = ''
+  try { keys = fs.readFileSync(creds, 'utf8') } catch { /* no credentials file */ }
+  // Keys under [to] would sign the renamed profile in as someone else.
+  if (hasSection(keys, to)) return `~/.aws/credentials already has a [${to}] section; pick another name`
+  // Keys under [from] would stay behind, since credentials is never written.
+  if (hasSection(keys, from)) return `${from} keeps its keys in ~/.aws/credentials, so it cannot be renamed here`
+  const next = renameProfile(text, from, to)
+  if (!next) return !validProfileName(to) || to === 'default' ? 'Names use letters, digits and . _ @ + - (up to 64)' : parseAwsConfig(text).some(s => s.name === to) ? `${to} is already in ~/.aws/config` : `no AWS profile named ${from}`
+  backUp(file, text, now)
+  writeAwsConfig(next, file)
   return undefined
 }
 
@@ -346,27 +410,27 @@ function check(name: string): Promise<{ ok: boolean; account?: string; stderr: s
 
 type Sts = (name: string) => Promise<{ ok: boolean; account?: string; stderr: string }>
 
-/** Every profile with its label and status, by one free STS call each, two at a time; run on the slow refresh only.
- * An old default's backup is not asked: it only waits to be deleted. */
+/** Every profile with its email, account name and status, by one free STS call each, two at a time; run on the slow refresh only. */
 export async function awsProfiles(now = Date.now(), sts: Sts = check, config = readAwsConfig()): Promise<AwsProfile[]> {
-  const labels = readLabels(), { chrome } = readPrefs()
+  const labels = readLabels(), ids = readIdentities(), { chrome } = readPrefs()
   const sections = parseAwsConfig(config)
   const results: Awaited<ReturnType<Sts>>[] = []
   let next = 0
   await Promise.all([0, 1].map(async () => {
     while (next < sections.length) {
       const i = next++
-      results[i] = isStale(sections[i].name) ? { ok: false, stderr: '' } : await sts(sections[i].name)
+      results[i] = await sts(sections[i].name)
     }
   }))
   return sections.map((s, i) => {
     const r = results[i]
     const account = (r.ok ? r.account : undefined) ?? accountOf(s.values)
     const label = (account && labels[account]) || labels[`profile:${s.name}`]
+    const id = account ? ids[account] : undefined
     return {
-      name: s.name, isDefault: s.isDefault, status: awsStatus(r.ok, r.stderr, s.values), checkedAt: now, ...(!r.ok && !isStale(s.name) && !signedOut(r.stderr) ? { unsure: true } : {}),
-      ...(account ? { account } : {}), ...(label ? { label } : {}), ...(s.values.region ? { region: s.values.region } : {}),
-      ...(chrome[s.name] !== undefined ? { chrome: chrome[s.name] } : {}), ...(isStale(s.name) ? { stale: true } : {}), ...(/:root$/.test(s.values.login_session ?? '') ? { root: true } : {}),
+      name: s.name, status: awsStatus(r.ok, r.stderr, s.values), checkedAt: now, ...(!r.ok && !signedOut(r.stderr) ? { unsure: true } : {}),
+      ...(account ? { account } : {}), ...(label ? { label } : {}), ...(id?.name ? { who: id.name } : {}), ...(id?.email ? { email: id.email } : {}), ...(s.values.region ? { region: s.values.region } : {}),
+      ...(chrome[s.name] !== undefined ? { chrome: chrome[s.name] } : {}), ...(/:root$/.test(s.values.login_session ?? '') ? { root: true } : {}),
     }
   })
 }

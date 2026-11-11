@@ -82,8 +82,8 @@ describe('ask-server', () => {
   afterEach(cleanup)
   after(cleanup)
 
-  function start(home: string, cwd: string) {
-    const child = spawn(process.execPath, [server], { env: { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: cwd }, stdio: ['pipe', 'pipe', 'inherit'] })
+  function start(home: string, cwd: string, env: Record<string, string> = {}) {
+    const child = spawn(process.execPath, [server], { env: { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: cwd, ...env }, stdio: ['pipe', 'pipe', 'inherit'] })
     children.push(child)
     const lines: Record<string, unknown>[] = []
     const waiters: Array<() => void> = []
@@ -104,7 +104,7 @@ describe('ask-server', () => {
     return { child, send, next }
   }
 
-  function fakeWindow(home: string, cwd: string, onPoll: (res: http.ServerResponse, n: number) => void) {
+  function fakeWindow(home: string, cwd: string, onPoll: (res: http.ServerResponse, n: number) => void, name = `x-${process.pid}.json`) {
     const seen: Array<{ method?: string; url?: string; body: string }> = []
     let polls = 0
     const srv: http.Server = http.createServer((req, res) => {
@@ -121,7 +121,7 @@ describe('ask-server', () => {
     return new Promise<{ srv: http.Server; seen: typeof seen }>(resolve => srv.listen(0, '127.0.0.1', () => {
       const dir = path.join(home, '.claude', 'switchboard')
       fs.mkdirSync(dir, { recursive: true })
-      fs.writeFileSync(path.join(dir, `x-${process.pid}.json`), JSON.stringify({ port: (srv.address() as { port: number }).port, pid: process.pid, workspace: cwd, hubToken: 'tok' }))
+      fs.writeFileSync(path.join(dir, name), JSON.stringify({ port: (srv.address() as { port: number }).port, pid: process.pid, workspace: cwd, hubToken: 'tok' }))
       resolve({ srv, seen })
     }))
   }
@@ -234,11 +234,54 @@ describe('ask-server', () => {
     } finally { s.child.kill(); srv.close() }
   })
 
-  it('no dialog and the window lost the question: replies at once', T, async () => {
+  it('a reload: the window drops off, comes back on another port, and gets the question again', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    let b: Awaited<ReturnType<typeof fakeWindow>> | undefined
+    const a = await fakeWindow(home, home, res => {
+      // The reload kills the window mid poll; the new one writes its own discovery file.
+      res.destroy()
+      a.srv.close()
+      void fakeWindow(home, home, r => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify({ choice: [1] })) }).then(w => { b = w })
+    })
+    const s = start(home, home)
+    try {
+      await init(s, false)
+      assert.equal((await s.next(m => m.id === 3)).result.content[0].text, '"Pick a color": Blue')
+      const id = JSON.parse(a.seen.find(r => r.method === 'POST')!.body).id
+      assert.equal(JSON.parse(b!.seen.find(r => r.method === 'POST')!.body).id, id, 'the same question, posted again')
+    } finally { s.child.kill() }
+  })
+
+  it('a reload never moves the question to another project window, even while this one is down', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-other-'))
+    const dir = path.join(home, '.claude', 'switchboard')
+    const json = (r: http.ServerResponse, choice: number[]) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify({ choice })) }
+    let b: Awaited<ReturnType<typeof fakeWindow>> | undefined
+    const a = await fakeWindow(home, home, res => {
+      res.destroy()
+      a.srv.close()
+      // Reloading: its pid is dead for a while, and another project's window is live.
+      const file = path.join(dir, `x-${process.pid}.json`)
+      fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), pid: 999_999 }))
+      void fakeWindow(home, other, r => json(r, [0]), 'b.json').then(w => {
+        b = w
+        setTimeout(() => void fakeWindow(home, home, r => json(r, [1])), 700)
+      })
+    })
+    const s = start(home, home)
+    try {
+      await init(s, false)
+      assert.equal((await s.next(m => m.id === 3)).result.content[0].text, '"Pick a color": Blue')
+      assert.deepEqual(b!.seen, [], 'the other window never saw it')
+    } finally { s.child.kill() }
+  })
+
+  it('no dialog and the window keeps failing: gives up after the retry window', T, async () => {
     for (const code of [410, 404]) {
       const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
       const { srv } = await fakeWindow(home, home, status(code))
-      const s = start(home, home)
+      const s = start(home, home, { SWITCHBOARD_ASK_RETRY_MS: '300' })
       try {
         await init(s, false)
         assert.match((await s.next(m => m.id === 3)).result.content[0].text, /could not be shown.*Decide yourself/)

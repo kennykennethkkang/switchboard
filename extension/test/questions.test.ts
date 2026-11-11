@@ -5,7 +5,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { HubService } from '../src/hub/hub-service'
 import { handleHub, type HubReply } from '../src/hub/routes'
-import { answerQuestion, askRegistered, choiceProblem, closeQuestion, installAsk, openQuestion, waitQuestion } from '../src/hub/questions'
+import { answerQuestion, askRegistered, choiceProblem, closeQuestion, installAsk, keepQuestions, openCount, openQuestion, questionOf, waitQuestion } from '../src/hub/questions'
 import { askKeys, step } from '../src/hub/progress'
 import type { Ask } from '../src/hub/types'
 
@@ -21,6 +21,48 @@ function chat(hub: HubService, sessionId = 's1') {
 const post = (hub: HubService, body: object, token = hub.token) => handleHub(hub, 'POST', `/hub/question?token=${token}`, JSON.stringify(body)) as HubReply
 
 describe('question store', () => {
+  it('open questions outlive a window reload: kept in a file and loaded at start', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-q-')), 'questions.json')
+    keepQuestions(file)
+    const a = fresh(), b = fresh(), old = fresh()
+    openQuestion(a, 's1', { id: a, kind: 'question', tool: 'ask', options: [] })
+    openQuestion(b, 's2', { id: b, kind: 'question', tool: 'ask', options: [] })
+    closeQuestion(b)
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'))
+    assert.equal(saved[a].sessionId, 's1')
+    assert.equal(saved[b], undefined, 'a closed one leaves the file')
+    // The reload: memory is gone, the file stays.
+    closeQuestion(a)
+    fs.writeFileSync(file, JSON.stringify({ [a]: saved[a], [old]: { ...saved[a], at: Date.now() - 2 * 60 * 60 * 1000 }, bad: 7 }))
+    keepQuestions(file)
+    assert.equal(questionOf(a)?.sessionId, 's1')
+    assert.equal(questionOf(old), undefined, 'expired')
+    assert.equal(answerQuestion(a, [1]), true)
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8'))[a].choice, [1], 'an answer given just before a reload is kept too')
+    closeQuestion(a)
+  })
+
+  it('a re-post after a reload keeps an answer already given', async () => {
+    const id = fresh()
+    const ask = { id, kind: 'question' as const, tool: 'ask', options: [] }
+    openQuestion(id, 's1', ask)
+    answerQuestion(id, [0])
+    openQuestion(id, 's1', ask)
+    assert.deepEqual(await waitQuestion(id, 10), [0])
+  })
+
+  it('openCount: unanswered questions the tool still polls', () => {
+    const t = Date.now() + 10_000
+    const id = fresh()
+    const before = openCount(t + 1000)
+    openQuestion(id, 's1', { id, kind: 'question', tool: 'ask', options: [] }, t)
+    assert.equal(openCount(t + 1000), before + 1)
+    assert.equal(openCount(t + 5 * 60_000), 0, 'nobody polled for minutes: the chat is gone')
+    answerQuestion(id, [0])
+    assert.equal(openCount(t + 1000), before)
+    closeQuestion(id)
+  })
+
   it('an answer before the wait comes back at once, and only once', async () => {
     const id = fresh()
     openQuestion(id, 's1', { id, kind: 'question', tool: 'ask', options: [] })

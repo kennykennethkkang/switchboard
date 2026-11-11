@@ -1,7 +1,7 @@
 'use client'
 import type { LinkChip } from '@/lib/wait-links'
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
-import type { Ask, ChatProfile, Choice, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, TaskRow } from '@/lib/hub-types'
+import type { Ask, ChatProfile, Choice, DoneCheck, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, TaskRow } from '@/lib/hub-types'
 import { askChoice } from '@/lib/ask'
 import { limitLine, testsPrompt } from '@/lib/checks'
 import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
@@ -15,7 +15,7 @@ import { CommitText } from './commit-text'
 import { TestsCard } from './check-cards'
 import { onMac } from './dev-rows'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import { Warn } from './approve'
+import { CheckStamp, Warn } from './approve'
 import './centre.css'
 
 const TOOLS_KEY = 'switchboard.toolCalls'
@@ -165,9 +165,9 @@ const NO_MODELS: Record<string, string> = {}
 /** profile: the chat's own plugins and skills, when Switchboard started it with a set; onProfile saves a change. */
 /** limits and autoContinue: for the usage-limit note; onSend: queues a message to this chat. note: an extra mute line under the head (a pause). */
 /** place: the VS Code window holding the chat. menu: Outputs and the more menu. message: the message box; given a function, it gets the Tools popover body. */
-export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend, approve, links = [] }: {
+export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend, approve, check, links = [] }: {
   chat: ChatRow; progress?: ChatProgress; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
-  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode
+  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode; /** The done-check stamp under the closing question. */ check?: DoneCheck
   place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode | ((tools: ReactNode) => ReactNode); note?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void; /** Its wait links, for the Orbit arcs and the waiting word. */ links?: LinkChip[]
 }) {
   const [showTools, setShowTools] = useState(true)
@@ -199,6 +199,7 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
     ? <section className="cp-card cp-ask" aria-labelledby="cp-q">
         <span className="cp-label">{progress?.limited ? 'Usage limit' : `${progress?.ask?.sub ? 'A subagent in ' : ''}${name} asks`}</span>
         <p id="cp-q" className="cp-q">{(progress?.ask?.questions?.length ?? 0) > 1 ? `${progress!.ask!.questions!.length} questions` : progress?.question ?? 'This chat is waiting on you.'}</p>
+        <CheckStamp check={check} wrap />
         {progress?.ask && onAnswer && chat.ai !== 'codex' && <AskButtons ask={progress.ask} onAnswer={onAnswer} />}
         <div className="cp-alt"><button type="button" className={progress?.ask && onAnswer ? 'hub-btn sm' : 'hub-btn primary'} onClick={onFocus}>{remote ? 'Open terminal on Mac' : 'Answer in terminal'}</button></div>
       </section>
@@ -249,7 +250,7 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
         <div style={{ minWidth: 0 }}>
           <h1 id="pic-name" className="cp-title">{name}</h1>
           <p className="cp-sub">
-            <span><i aria-hidden className="cp-dot" style={{ background: wait ? 'var(--hub-mute)' : s.color }} />{wait ? cap(wait) : approve ? 'Ready to approve' : s.label}</span>
+            <span><i aria-hidden className="cp-dot" style={{ background: wait ? 'var(--hub-mute)' : s.color }} />{wait ? cap(wait) : approve ? 'Ready for your OK' : s.label}</span>
             <span>
               {place && <span title={`In the ${place.name} window`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: place.color, marginRight: place.name === projectName(chat) ? 0 : 6 }}><i aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />{place.name}{place.name === projectName(chat) && <span className="sr-only"> window</span>}</span>}
               {place?.name === projectName(chat) ? '' : projectName(chat)}

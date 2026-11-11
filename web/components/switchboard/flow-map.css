@@ -3,16 +3,15 @@
   position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
   background: var(--hub-canvas); color: var(--hub-body); font: 400 14px/1.5 var(--hub-sans); overflow: hidden; }
 .fm::backdrop { background: var(--hub-canvas); }
-.fm[open] { display: grid; grid-template: auto minmax(0, 1fr) / minmax(0, 1fr); }
+.fm[open] { display: grid; grid-template: auto minmax(0, 1fr) auto / minmax(0, 1fr); outline: none; }
+.fm-main { grid-row: 2; grid-column: 1; }
+.fm-card { grid-row: 2 / 4; grid-column: 2; }
 .fm[open][data-picked] { grid-template-columns: minmax(0, 1fr) 360px; }
 .fm-bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-surface); }
 .fm-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin-right: auto; }
 .fm-title h2 { margin: 0; font: 600 16px/1.3 var(--hub-sans); color: var(--hub-ink); }
 .fm-title p { margin: 0; color: var(--hub-mute); font-size: 13px; }
 .fm-title select { font: 400 13px/1.2 var(--hub-sans); color: var(--hub-body); background: var(--hub-elev); border: 1px solid var(--hub-hair); border-radius: 6px; padding: 5px 8px; }
-.fm-mode { display: flex; gap: 3px; padding: 3px; border-radius: 10px; border: 1px solid var(--hub-hair); background: var(--hub-canvas); }
-.fm-mode button { font: 500 13px/1 var(--hub-sans); padding: 7px 12px; border: 0; border-radius: 6px; background: none; color: var(--hub-mute); cursor: pointer; }
-.fm-mode button[aria-pressed='true'] { background: var(--hub-elev); color: var(--hub-ink); box-shadow: inset 0 0 0 1px var(--hub-hair); }
 .fm button:focus-visible, .fm select:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
 .fm-find { position: relative; width: min(280px, 32vw); }
 .fm-find svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--hub-ash); pointer-events: none; }
@@ -22,7 +21,9 @@
 
 .fm-main { position: relative; min-height: 0; min-width: 0; }
 .fm-note { margin: 0; padding: 48px 24px; text-align: center; color: var(--hub-mute); }
-.fm-foot { position: absolute; left: 12px; bottom: 8px; margin: 0; font-size: 12px; color: var(--hub-ash); pointer-events: none; font-variant-numeric: tabular-nums; }
+/* Legend and footer get their own row under the canvas, so nothing floats over the boxes. */
+.fm-under { grid-row: 3; grid-column: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 12px; border-top: 1px solid var(--hub-hair); background: var(--hub-surface); }
+.fm-foot { margin: 0; font-size: 12px; color: var(--hub-ash); font-variant-numeric: tabular-nums; }
 
 .fm-flow { position: absolute; inset: 0; }
 .fm .react-flow { --xy-background-color: var(--hub-canvas); --xy-edge-stroke: var(--hub-hair-strong); --xy-controls-button-background-color: var(--hub-surface); --xy-controls-button-background-color-hover: var(--hub-elev); --xy-controls-button-color: var(--hub-body); --xy-controls-button-color-hover: var(--hub-ink); --xy-controls-button-border-color: var(--hub-hair); }
@@ -40,7 +41,11 @@
 .fm-edge.used .react-flow__edge-path { stroke: var(--fm-plugin); stroke-opacity: 0.35; stroke-dasharray: 4 3; }
 .fm-edge.touched .react-flow__edge-path { stroke: var(--fm-chat); }
 /* A big map would be a hairball at rest: lines stay faint until a part is focused. */
-.fm-flow[data-dense] .fm-edge .react-flow__edge-path { stroke-opacity: 0.12; }
+.fm-flow[data-dense] .fm-edge .react-flow__edge-path { stroke-opacity: 0.3; }
+/* Most chats use the same few tools, so on a big map those lines only show for the focused part; the tool's box gives the count. */
+.fm-flow[data-dense]:not([data-focus]) .fm-edge.used { opacity: 0; }
+/* Past 40 imports the ones inside a lane are a grey wall; they show for the hovered or picked box. */
+.fm-flow:not([data-focus]) .fm-edge.quiet { opacity: 0; }
 /* Focus: everything but the focused part and its neighbours fades; the style tag lights those back up. */
 .fm-flow[data-focus] .react-flow__node:not(.fm-lane-n) { opacity: 0.14; }
 .fm-flow[data-focus] .react-flow__edge { opacity: 0.03; }
@@ -50,12 +55,15 @@
 .fm-lane b { font-weight: 400; color: var(--hub-ash); font-variant-numeric: tabular-nums; }
 .fm .react-flow__node.fm-lane-n { pointer-events: none; }
 
-.fm-node { all: unset; display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: 216px; height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-body); cursor: pointer; transition: border-color 140ms var(--hub-ease-out), background-color 140ms var(--hub-ease-out); }
+.fm-node { all: unset; display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: 216px; height: 56px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-body); cursor: pointer; transition: border-color 140ms var(--hub-ease-out), background-color 140ms var(--hub-ease-out); }
+.fm-node[data-kind='chat'] { height: 72px; }
 .fm-node:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 .fm-node[data-hit] { border-color: var(--hub-yellow); background: var(--hub-yellow-soft); }
 .fm-node > span { display: grid; min-width: 0; line-height: 1.25; }
 .fm-node b { font: 500 13px/1.25 var(--hub-sans); color: var(--hub-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.fm-node small { font-size: 11px; color: var(--hub-mute); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.fm-node:is([data-kind='chat'], [data-kind='skill']) b { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
+.fm-node[data-kind='chat'] b { -webkit-line-clamp: 3; }
+.fm-node small { font-size: 12px; color: var(--hub-mute); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 @media (hover: hover) and (pointer: fine) { .fm-node:hover { border-color: var(--hub-hair-strong); background: var(--hub-elev); } }
 .fm-node:active { transform: scale(0.98); }
 .fm-flow[data-enter] .fm-node { animation: fm-in 420ms var(--hub-ease-out) both; }
@@ -94,7 +102,7 @@
 .fm-list li > button[aria-pressed='true'] { background: var(--hub-elev); color: var(--hub-ink); }
 .fm-open { min-width: 56px; border: 1px solid var(--hub-hair); border-radius: 6px; background: none; color: var(--hub-mute); font: 500 12px var(--hub-sans); cursor: pointer; }
 
-.fm-legend { position: absolute; left: 12px; bottom: 36px; z-index: 5; max-width: calc(100% - 96px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px; border-radius: 10px; border: 1px solid var(--hub-hair); background: var(--hub-surface); font-size: 12px; color: var(--hub-mute); }
+.fm-legend { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; color: var(--hub-mute); }
 .fm-legend ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px; }
 .fm-legend button { display: flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--hub-body); font: 500 12px/1 var(--hub-sans); cursor: pointer; transition: background-color 140ms var(--hub-ease-out), color 140ms var(--hub-ease-out), opacity 140ms var(--hub-ease-out); }
 .fm-legend button b { font-weight: 400; color: var(--hub-ash); font-variant-numeric: tabular-nums; }
@@ -107,18 +115,26 @@
 .fm-legend path.touched { stroke: var(--fm-chat); }
 .fm-legend path.used { stroke: var(--fm-plugin); stroke-dasharray: 4 3; }
 @media (pointer: coarse) {
-  .fm-mode button, .fm-title select, .fm-find input, .fm .hub-btn { min-height: 44px; }
+  .fm-title select, .fm-find input, .fm .hub-btn { min-height: 44px; }
   .fm-list li > button:first-child, .fm-open { min-height: 44px; }
   .fm .react-flow__controls-button { width: 44px; height: 44px; }
   .fm-legend button { min-height: 44px; }
 }
 @media (max-width: 600px) {
   .fm-bar { flex-wrap: wrap; padding: 10px 16px; }
-  .fm-mode { order: 2; }
   .fm-find { order: 3; width: 100%; }
-  .fm[open][data-picked] { grid-template: auto minmax(0, 1fr) minmax(0, 55%) / minmax(0, 1fr); }
-  .fm-card { border-left: 0; border-top: 1px solid var(--hub-hair); }
+  /* list view: chips on top, scrolling sideways with a fade at the right edge */
+  .fm[open] { grid-template: auto auto minmax(0, 1fr) / minmax(0, 1fr); }
+  .fm[open][data-picked] { grid-template: auto auto minmax(0, 1fr) minmax(0, 55%) / minmax(0, 1fr); }
+  .fm-under { grid-row: 2; padding: 8px 0 0 16px; border-top: 0; background: none; }
+  .fm-main { grid-row: 3; }
+  .fm-card { grid-row: 4; grid-column: 1; border-left: 0; border-top: 1px solid var(--hub-hair); }
   .fm-foot { display: none; }
+  .fm-legend { width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-right: 24px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+  .fm-legend ul { flex-wrap: nowrap; }
+  .fm-legend button { white-space: nowrap; }
+  .fm-key { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fm-node, .fm .react-flow__node, .fm .react-flow__edge, .fm-edge .react-flow__edge-path, .fm-legend button { transition: none; }

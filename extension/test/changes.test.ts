@@ -429,6 +429,16 @@ describe('browser link', () => {
     assert.ok('problem' in r)
     assert.equal(none, 3, 'the first try and two retries, then it gives up')
   })
+  it('keepWeb with Keep Switchboard app running off leaves a stopped app stopped, and still finds a running one', async () => {
+    let starts = 0, up = false
+    const file = pidFile()
+    fs.writeFileSync(path.join(path.dirname(file), 'app.nokeep'), '')
+    const deps = { find: async () => (up ? 'http://127.0.0.1:3131' : null), start: () => { starts++; up = true }, listeners: async () => [], tries: 3, waitMs: 1, pidFile: file }
+    assert.ok('problem' in await keepWeb(appDir(), deps))
+    assert.equal(starts, 0)
+    up = true
+    assert.deepEqual(await keepWeb(appDir(), deps), { url: 'http://127.0.0.1:3131' })
+  })
   it('keepWeb on a dev host leaves a stopped app stopped: only the installed build starts it', async () => {
     let starts = 0
     const deps = { find: async () => null, start: () => { starts++ }, listeners: async () => [], tries: 3, waitMs: 1, pidFile: pidFile(), installed: false }

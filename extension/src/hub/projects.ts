@@ -6,7 +6,7 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { upperDrive } from '../fs-utils'
+import { upperDrive, writeJsonAtomic } from '../fs-utils'
 import type { AiId, Project } from './types'
 
 // Cached for the window's life, so a folder git-inited later keeps its old name until reload.
@@ -30,10 +30,16 @@ export const projectName = (cwd: string) => path.basename(repoTop(cwd) ?? cwd) |
 export function mergeProjects(repos: string[], claudeDirs: string[], open?: string): Project[] {
   const seen = new Set<string>()
   const out: Project[] = []
-  const add = (p: string, kind: Project['kind']) => {
-    if (seen.has(p)) return
-    seen.add(p)
-    out.push({ name: path.basename(p), path: p, kind, isOpen: p === open })
+  // One row per folder on disk: ~/.claude/projects names Switchboard as switchboard on a case-insensitive Mac.
+  const real = (p: string) => { try { return fs.realpathSync.native(p) } catch { return p } }
+  const openReal = open && real(open)
+  const add = (given: string, kind: Project['kind']) => {
+    const key = real(given)
+    if (seen.has(key)) return
+    seen.add(key)
+    // The window's own spelling for its row, so its chats and folder still match it.
+    const p = key === openReal ? open! : key
+    out.push({ name: path.basename(p), path: p, kind, isOpen: key === openReal })
   }
   repos.forEach(p => add(p, 'repo'))
   claudeDirs.forEach(p => add(p, 'project'))
@@ -72,11 +78,42 @@ export function cloneTarget(input: string): { url: string; name: string } | unde
   return m ? { url: `https://github.com/${m[1]}/${m[2]}.git`, name: m[2] } : undefined
 }
 
+/** New chat's repo step: a new GitHub repo, or one to clone. */
+export type RepoAsk = { create: string; private: boolean } | { clone: string }
+// GitHub's repo name rule, plus no leading dot or dash.
+const REPO_NAME = /^(?![.-])[A-Za-z0-9_.-]{1,100}$/
+const keys = (v: object, ks: string[]) => Object.keys(v).sort().join() === ks.join()
+export const isRepoAsk = (v: unknown): v is RepoAsk => typeof v === 'object' && v !== null && (
+  keys(v, ['create', 'private']) ? typeof (v as { create: unknown }).create === 'string' && REPO_NAME.test((v as { create: string }).create) && typeof (v as { private: unknown }).private === 'boolean'
+    : keys(v, ['clone']) && typeof (v as { clone: unknown }).clone === 'string' && !!cloneTarget((v as { clone: string }).clone))
+
+/** The folder a repo lands in under root and the command (execFile, no shell) that makes it; a string is why not. */
+export function repoPlan(repo: RepoAsk, root: string, gh: string | undefined): { folder: string; file: string; args: string[]; cwd: string } | string {
+  if (!isRepoAsk(repo)) return 'that is not a GitHub repo name'
+  const name = 'create' in repo ? repo.create : cloneTarget(repo.clone)!.name
+  const folder = path.join(root, name)
+  if (fs.existsSync(folder)) return `${folder} already exists`
+  if ('clone' in repo) return { folder, file: 'git', args: ['clone', cloneTarget(repo.clone)!.url, folder], cwd: root }
+  if (!gh) return 'gh is not installed (brew install gh, then gh auth login)'
+  return { folder, file: gh, args: ['repo', 'create', name, repo.private ? '--private' : '--public', '--clone'], cwd: root }
+}
+
 // Quoted for the shell, so git judges the rest of the name itself; only a flag, an empty name or whitespace is refused here.
 const BRANCH = /^(?!-)[^\s\x00-\x1f]+$/
 
-/** Settings, Ask before actions: on brings the CLI's own approval prompts back for new and resumed chats. hub-panel sets it. */
-export const ask = { claude: false, codex: false }
+/** Where the Claude toggle goes for bash-approve (claude-mods), which keeps core's Bash prompt while it is on. Unset under node --test. */
+export const askMode: { file?: string } = { file: process.env.NODE_TEST_CONTEXT ? undefined : path.join(os.homedir(), '.claude', 'switchboard', 'ask-mode.json') }
+
+let askClaude = false
+/** Settings, Ask before actions: on brings the CLI's own approval prompts back for new and resumed chats. hub-panel sets it at start and on change. */
+export const ask = {
+  codex: false,
+  get claude() { return askClaude },
+  set claude(on: boolean) {
+    askClaude = on
+    if (askMode.file) try { writeJsonAtomic(askMode.file, { claude: on }) } catch { /* bash-approve then allows as before */ }
+  },
+}
 
 // Like Claude chats in bypassPermissions: no approval prompt and no sandbox; resume takes the flags after its name.
 // Codex runs a hooks.json hook only with a trust hash it computes itself, so ours (hooks-config.ts) need the trust bypass even when asking.

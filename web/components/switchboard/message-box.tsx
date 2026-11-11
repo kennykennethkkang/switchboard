@@ -95,13 +95,16 @@ export function MessageBox({ chat, send, upload, problem, tools }: { chat: ChatR
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); go() } }}
               className="cp-say" />
             <AttachChips items={files.items} onRemove={files.remove} />
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span role="status" style={{ minWidth: 0, flex: 1, fontSize: 13, color: failed || over > 0 ? 'var(--hub-red)' : 'var(--hub-ash)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(failed ? (kept ? `Not sent, your text is kept: ${failed}` : failed) : undefined) ?? hint ?? (restoredDraft ? 'Draft restored' : undefined) ?? (sent ? `${codex ? 'Typed into its terminal' : 'Queued, picked up within seconds'}: ${sent.text}` : touch ? '' : 'Enter to send, Shift+Enter new line')}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 10px', alignItems: 'center' }}>
+              <span role="status" className="hub-say-hint" style={{ minWidth: 0, flex: '1 1 150px', fontSize: 13, color: failed || over > 0 ? 'var(--hub-red)' : 'var(--hub-ash)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(failed ? (kept ? `Not sent, your text is kept: ${failed}` : failed) : undefined) ?? hint ?? (restoredDraft ? 'Draft restored' : undefined) ?? (sent ? `${codex ? 'Typed into its terminal' : 'Queued, picked up within seconds'}: ${sent.text}` : touch ? '' : 'Shift+Enter for a new line')}
               </span>
-              <ToolsPop kw={kw} setKw={setKw} codex={codex}>{tools}</ToolsPop>
-              <AttachButton onFiles={files.add} />
-              <button type="submit" className="hub-btn primary" disabled={!msg || files.busy || over > 0}>Send ⏎</button>
+              {/* one group, so on a narrow box the buttons drop below the hint together */}
+              <span style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
+                <ToolsPop kw={kw} setKw={setKw} codex={codex}>{tools}</ToolsPop>
+                <AttachButton onFiles={files.add} />
+                <button type="submit" className="hub-btn primary" disabled={!msg || files.busy || over > 0}>Send ⏎</button>
+              </span>
             </div>
           </>}
     </form>

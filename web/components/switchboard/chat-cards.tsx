@@ -34,7 +34,7 @@ export const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 export const hhmm = (at: number) => new Date(at).toTimeString().slice(0, 5)
 
 // Done waits on Kenneth's Approve, so the chip says that.
-const READY = { ...STATE.done, label: 'Ready to approve' }
+const READY = { ...STATE.done, label: 'Ready for your OK' }
 /** The state chip: a chat whose lead stopped while agents or shells run is still Working; a done one with a request not covered is almost done. */
 export const chipOf = (p?: ChatProgress) => almostDone(p) ? ALMOST : p?.state === 'done' ? READY : STATE[p?.state ?? 'idle']
 /** An idle chat that waits on another chat is held, not idle. */
@@ -120,14 +120,14 @@ export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (tex
 /** all: every chat's progress (hub.progress), the history behind the estimates, so the cards and the chat page agree. */
 /** stuck: hub.stuck, for the Stuck note in the meta line. cache: hub.cache, for the warm/cold chip. */
 /** held: chats the usage pause holds. links: a chat's wait chips; onUnlink: the x on a Waiting on chip. */
-export function ChatCards({ cards, all = [], waits = [], held = [], links, onUnlink, stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, extra, onSelect, tabs, onTab, summaries, onSummary, onCopy, send }: { send?: (c: HubCommand) => void; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; held?: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; menu?: (chat: ChatRow) => ReactNode; /** Under a card, outside its button: the Approve bar. */ extra?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; tabs?: WindowTabs; onTab?: (op: TabOp, workspace?: string) => void }) {
+export function ChatCards({ cards, all = [], waits = [], held = [], links, onUnlink, stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, extra, onSelect, tabs, onTab, summaries, onSummary, onCopy, send, editor = 'VS Code' }: { send?: (c: HubCommand) => void; editor?: string; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; held?: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; menu?: (chat: ChatRow) => ReactNode; /** Under a card, outside its button: the Approve bar. */ extra?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; tabs?: WindowTabs; onTab?: (op: TabOp, workspace?: string) => void }) {
   if (!cards.length) return <p style={{ color: 'var(--hub-ash)', margin: 0, padding: 4 }}>{empty}</p>
   const groups = byWindow(cards, windows, here)
   const now = Date.now()
   const more = { waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, onSelect, all, now, summaries, onSummary, onCopy }
   if (!groups.some(g => g.window)) return <CardList cards={cards} label="Chats" {...more} />
   // Native tabs only work on a Mac with One window on since VS Code started.
-  const tabOff = !tabs?.mac ? 'Windows as tabs need macOS' : !tabs.live ? 'Turn on One window in Settings, then quit and reopen VS Code' : undefined
+  const tabOff = !tabs?.mac ? 'Windows as tabs need macOS' : !tabs.live ? `Turn on One window in Settings, then quit and reopen ${editor}` : undefined
   const tabBtn = (op: TabOp, text: string, aria: string, workspace?: string) => onTab && (
     <button type="button" className="hub-btn sm" aria-label={aria} title={tabOff ?? aria} disabled={!!tabOff} onClick={() => onTab(op, workspace)} style={{ textTransform: 'none', letterSpacing: 0, flexShrink: 0 }}>{text}</button>
   )
@@ -144,9 +144,9 @@ export function ChatCards({ cards, all = [], waits = [], held = [], links, onUnl
         const left = busy.length > 1 ? projectLeft(busy.map(c => timeLeft(c.progress!, all, now))) : undefined
         return (
           <section key={g.window?.workspace ?? ''} aria-label={g.here ? `${name}, this window` : name} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
-            <h3 title={g.window?.workspace} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 4px', minWidth: 0, font: 'var(--hub-caps-font, 600 12px/1.2 var(--hub-sans))', letterSpacing: 'var(--hub-caps-track, 0.5px)', textTransform: 'var(--hub-caps-case, uppercase)' as 'uppercase', color: color ?? 'var(--hub-ash)' }}>
+            <h3 title={g.window?.workspace} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, margin: '0 4px', minWidth: 0, font: 'var(--hub-caps-font, 600 12px/1.2 var(--hub-sans))', letterSpacing: 'var(--hub-caps-track, 0.5px)', textTransform: 'var(--hub-caps-case, uppercase)' as 'uppercase', color: color ?? 'var(--hub-ash)' }}>
               {color && <i aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />}
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+              <span title={name} style={{ minWidth: '6em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
               {g.here && <span style={{ fontWeight: 400, flexShrink: 0, textTransform: 'none' }}>· this window</span>}
               {busy.length > 1 && <span style={{ marginLeft: 'auto', font: '400 12px/1 var(--hub-mono)', letterSpacing: 0, flexShrink: 0, textTransform: 'none', color: 'var(--hub-blue)' }}>{busy.length} working{left ? ` · ${sayLeft(left)}` : ''}</span>}
               {g.window && onTab && <span style={{ display: 'flex', gap: 4, marginLeft: busy.length > 1 ? 0 : 'auto' }}>
@@ -190,16 +190,16 @@ function CardList({ cards, label, stripe, grouped, waits, held, links, onUnlink,
                   {starred.includes(chat.sessionId) && <span title="Starred" style={{ color: 'var(--hub-yellow)', flex: 'none' }}>★<span className="sr-only"> starred</span></span>}
                   <span className="hub-card-name" style={{ color: 'var(--hub-ink)', fontWeight: 500, letterSpacing: 0.2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{origin || projectName(chat)}</span>
                   {version > 1 && <Version n={version} />}
-                  {warm && <span className="hub-chip ver" title={warm.title} style={{ flexShrink: 0 }}>{warm.label}</span>}
                 </span>
                 {paused
                   ? <span className="hub-chip hub-frost-chip" title="Held by the usage pause; it resumes in order when the limit resets"><svg aria-hidden width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"><path d="M5 .8v8.4M1.4 2.9l7.2 4.2M1.4 7.1l7.2-4.2M3.8 1.6 5 2.6l1.2-1M3.8 8.4 5 7.4l1.2 1" /></svg>Paused</span>
                   : <span className="hub-chip" style={{ color: s.color, background: s.soft, flexShrink: 0 }}>{finished ? (s === ALMOST ? <Warn size={10} /> : <Check />) : <i aria-hidden />}{s.label}</span>}
               </span>
-              {/* Stuck rides in the meta line, so the name keeps the room beside the one chip. */}
+              {/* Stuck and cache warm ride in the meta line, so the name keeps the room beside the one chip. */}
               <span style={{ font: '400 12px/1.5 var(--hub-mono)', color: 'var(--hub-ash)' }}>
                 {tone && <span title="Something in this chat looks stuck: see Needs attention" style={{ color: `var(--hub-${tone})`, fontWeight: 500 }}>Stuck{meta ? ' · ' : ''}</span>}
                 {meta}
+                {warm && <span title={warm.title}>{meta ? ' · ' : ''}<span style={{ whiteSpace: 'nowrap' }}>{warm.label}</span></span>}
               </span>
               {/* A button reads its children as flat text, so the progressbar screen readers get sits beside it; this one is the look. */}
               {tasks.length > 0 && !finished && <span aria-hidden style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
@@ -212,7 +212,7 @@ function CardList({ cards, label, stripe, grouped, waits, held, links, onUnlink,
               {finished && <span style={{ color: s.color, fontSize: 13 }}>{finishedLine(progress)}{progress.finishedAt ? <span className="hub-num"> · {hhmm(progress.finishedAt)}</span> : ''}</span>}
               {wait && <span style={{ color: 'var(--hub-yellow)', fontSize: 13 }}>Waiting for {wait.tasks} task{wait.tasks === 1 ? '' : 's'} to finish before moving to {wait.next}</span>}
               {/* One link chip per card: Waiting on wins over waits on this. */}
-              {!outs.length && chips.filter(c => c.dir === 'in').slice(0, 1).map(c => <span key={c.id} className="hub-chip hub-wait" data-dir="in"><i aria-hidden /><span>{chipText(c)}</span></span>)}
+              {!outs.length && chips.filter(c => c.dir === 'in').slice(0, 1).map(c => <span key={c.id} className="hub-chip hub-wait" data-dir="in" title={chipText(c)}><i aria-hidden /><span>{chipText(c)}</span></span>)}
               {progress?.state === 'needs-you' && progress.question && <span style={{ color: 'var(--hub-red)', fontSize: 13 }}>{progress.question}</span>}
               {/* The Waiting on chips hold a button, so they sit over the card, outside it; these keep their room and their words. */}
               {outs.map(c => <span key={c.id} className="hub-wait-gap"><span className="sr-only">{chipText(c)}</span></span>)}
@@ -241,6 +241,7 @@ function CardList({ cards, label, stripe, grouped, waits, held, links, onUnlink,
 export function ProjectFilter({ projects, picked, tint, busy, onChange }: { projects: { name: string; count: number }[]; picked: string[]; tint?: (name: string) => string | undefined; busy?: (name: string) => number; onChange: (picked: string[]) => void }) {
   return (
     <div role="group" aria-label="Show chats from these projects" className="hub-filter" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+      <button type="button" aria-pressed={!picked.length} style={chip(!picked.length)} onClick={() => onChange([])}>All projects</button>
       {projects.map(({ name, count }) => {
         const on = picked.includes(name)
         return (
@@ -251,7 +252,6 @@ export function ProjectFilter({ projects, picked, tint, busy, onChange }: { proj
           </button>
         )
       })}
-      {picked.length > 0 && <button type="button" className="hub-link" onClick={() => onChange([])}>All</button>}
     </div>
   )
 }
@@ -314,7 +314,7 @@ export function History({ archive, chats, search, reveal, running = [], onSearch
         <span style={ellipsis}>Archive <span style={{ color: 'var(--hub-mute)', marginLeft: 4 }}>{historyCount(all)}</span></span>
         <b aria-hidden>›</b>
       </button>
-      <input type="search" className="hub-search" aria-label="Search History by name or handoff note" placeholder="Search names and handoff notes" value={q}
+      <input type="search" className="hub-search" aria-label="Search History by name or handoff note" placeholder="Search names and notes" value={q}
         onChange={e => type(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && q) { e.stopPropagation(); type('') } }} />
       {open && !query && <p style={{ margin: '0 4px 4px', color: 'var(--hub-ash)', fontSize: 12, lineHeight: 1.5 }}>Chats you archived, chats that ended, and chats that filled up and carried on in a new version.</p>}
       {open && query && <p role="status" style={{ margin: '0 4px 4px', color: 'var(--hub-ash)', fontSize: 12 }}>{chains.length ? `${chains.length} of ${all.length} chains match` : `No chain matches "${query}".`}</p>}

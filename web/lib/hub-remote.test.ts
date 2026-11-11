@@ -44,7 +44,7 @@ describe('hub-remote', () => {
   it('says why the hub is out of reach', async () => {
     assert.match(downReason(401), /signed out/)
     assert.match(downReason(403), /signed out/)
-    assert.match(downReason(502), /No VS Code window/)
+    assert.match(downReason(502), /No editor window/)
     assert.match(downReason(undefined), /Cannot reach the Mac/)
     const gone = (async () => new Response('', { status: 403 })) as typeof fetch
     const r = await fetchHubWhy(gone)

@@ -9,7 +9,7 @@ const STATE: Record<TerminalRow['state'], { text: string; color: string; bg: str
   ended: { text: 'ended', color: 'var(--hub-ash)', bg: 'transparent' },
   exited: { text: 'exited', color: 'var(--hub-ash)', bg: 'transparent' },
 }
-const row = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6 } as const
+const row = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6, minWidth: 0 } as const
 const label = { color: 'var(--hub-ink)', fontWeight: 500, minWidth: 0, flex: '1 1 80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
 
 /** This window's terminals by owner: Switchboard's chat terminals (plus chats with none, to Open) or the ones you opened. */

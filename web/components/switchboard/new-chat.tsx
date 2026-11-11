@@ -7,13 +7,19 @@ import { ToolChips } from './tool-chips'
 import { MAX_MESSAGE, withAttached, type Upload } from '@/lib/attach'
 import { AttachButton, AttachChips, dropStyle, useAttach } from './attach'
 import { useDraft } from '@/hooks/use-draft'
+import { CLONE_REPO, NEW_REPO, repoAsk } from '@/lib/new-repo'
 
-export function NewChat({ hub, send, upload, onDone }: { hub: HubState; send: (c: HubCommand) => void; upload: Upload; onDone: () => void }) {
+export function NewChat({ hub, send, upload, onDone, startAt }: { hub: HubState; send: (c: HubCommand) => void; upload: Upload; onDone: () => void; startAt?: string }) {
   // Focus goes back to whatever opened the dialog.
   const [was] = useState(() => typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null)
   useEffect(() => () => was?.focus(), [was])
   const open = hub.projects.find(p => p.isOpen) ?? hub.projects[0]
-  const [path, setPath] = useState(open?.path ?? '')
+  const [path, setPath] = useState(startAt ?? open?.path ?? '')
+  // New GitHub repo or Clone: the folder is made on Start, so Tools waits and files go under the open project.
+  const making = path === NEW_REPO || path === CLONE_REPO
+  const [repoInput, setRepoInput] = useState('')
+  const [priv, setPriv] = useState(true)
+  const repo = repoAsk(path, repoInput, priv)
   // Kept across a closed dialog, reload or killed tab; dropped on Start.
   const [text, setText, clearText, restored] = useDraft('newchat')
   // Claude unless another installed AI is picked; the picker only shows when there is one.
@@ -24,21 +30,21 @@ export function NewChat({ hub, send, upload, onDone }: { hub: HubState; send: (c
   const [edited, setEdited] = useState<ChatProfile>()
   const goal = text.trim()
   // Files go under the project picked when they were added; their paths are absolute, so a later switch still works.
-  const files = useAttach(upload, path)
+  const files = useAttach(upload, making ? open?.path ?? '' : path)
   const msg = withAttached(text, files.paths)
   const over = msg.length - MAX_MESSAGE
-  const ready = !!msg && !!path && !files.busy && over <= 0
+  const ready = !!msg && !!path && (!making || !!repo) && !files.busy && over <= 0
   const pick = hub.tools?.pick?.folder === path ? hub.tools.pick.profile : undefined
   const tools = toolsFor === path ? edited ?? pick : undefined
   const askPick = () => {
-    if (!path) return
+    if (!path || making) return
     setToolsFor(path)
     setEdited(undefined)
     send({ type: 'hub-pick-tools', text: goal, path })
   }
   const start = () => {
     if (!ready) return
-    send({ type: 'hub-new-chat', path, text: msg, remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}) })
+    send({ type: 'hub-new-chat', path: repo ? '' : path, text: msg, ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}) })
     clearText()
     files.clear()
     onDone()
@@ -55,21 +61,35 @@ export function NewChat({ hub, send, upload, onDone }: { hub: HubState; send: (c
       {restored && over <= 0 && !files.busy && <p role="status" style={{ ...caps, textTransform: 'none' }}>Draft restored</p>}
       {(over > 0 || files.busy) && <p role="status" style={{ ...caps, textTransform: 'none', color: over > 0 ? 'var(--hub-red)' : undefined }}>{over > 0 ? `${over} characters over the ${MAX_MESSAGE} limit with the file paths` : 'Uploading, Start waits for it'}</p>}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
         <label htmlFor="folder" style={{ color: 'var(--hub-mute)', fontSize: 13 }}>Project</label>
         <select id="folder" value={path} onChange={e => setPath(e.target.value)} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }}>
           {hub.projects.map(p => <option key={p.path} value={p.path}>{p.name}</option>)}
+          <option disabled>──────────</option>
+          <option value={NEW_REPO}>New GitHub repo…</option>
+          <option value={CLONE_REPO}>Clone from GitHub…</option>
         </select>
-        {others.length > 0 && <>
+        </span>
+        {others.length > 0 && <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
           <label htmlFor="ai" style={{ color: 'var(--hub-mute)', fontSize: 13 }}>AI</label>
           <select id="ai" value={ai} onChange={e => setAi(e.target.value as AiId)} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }}>
             <option value="claude">Claude</option>
             {others.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
-        </>}
-        <button type="button" className="hub-btn" style={{ marginLeft: 'auto' }} disabled={!path || ai !== 'claude'} onClick={askPick} title="Every plugin and skill starts on; turn any off for this chat">Tools</button>
+        </span>}
+        <button type="button" className="hub-btn" style={{ marginLeft: 'auto' }} disabled={!path || making || ai !== 'claude'} onClick={askPick} title="Every plugin and skill starts on; turn any off for this chat">Tools</button>
         <AttachButton onFiles={files.add} />
         <button type="submit" className="hub-btn primary" disabled={!ready}>Start ⏎</button>
       </div>
+      {making && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        <label htmlFor="repo" style={{ color: 'var(--hub-mute)', fontSize: 13 }}>{path === NEW_REPO ? 'Repo name' : 'owner/repo or GitHub link'}</label>
+        <input id="repo" value={repoInput} onChange={e => setRepoInput(e.target.value)} spellCheck={false} autoCapitalize="off" autoCorrect="off"
+          placeholder={path === NEW_REPO ? 'my-app' : 'owner/repo'} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, flex: '1 1 160px', minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />
+        {path === NEW_REPO && <span role="radiogroup" aria-label="Visibility" style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13, color: 'var(--hub-ink)' }}>
+          <label><input type="radio" name="vis" checked={priv} onChange={() => setPriv(true)} /> Private</label>
+          <label><input type="radio" name="vis" checked={!priv} onChange={() => setPriv(false)} /> Public</label>
+        </span>}
+      </div>}
       {toolsFor && (toolsFor !== path
         ? <p style={{ ...caps, textTransform: 'none' }}>Project changed. Press Tools again, or Start with everything on.</p>
         : tools

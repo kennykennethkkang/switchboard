@@ -36,7 +36,11 @@ test('beltCounts reads needs and the fullest usage window', async () => {
   const { beltCounts } = await belt
   const hub = { ...emptyHub(), progress: [{ sessionId: 'a', cwd: '/x', state: 'needs-you', roles: [], tasks: [], startedAt: 0, at: 0 }, { sessionId: 'b', cwd: '/x', state: 'working', roles: [], tasks: [], startedAt: 0, at: 0 }],
     limitsKept: { at: 0, windows: [{ kind: 'five_hour', percentUsed: 41.6 }, { kind: 'seven_day', percentUsed: 12 }] } } as ReturnType<typeof emptyHub>
-  assert.deepEqual(beltCounts(hub), { next: 1, limits: '41%' })
+  assert.deepEqual(beltCounts(hub), { next: 1, limits: '41%', usage: 'Usage: 5h 41%, week 12%' })
+  const { BoardTools } = await belt
+  const out = renderToStaticMarkup(createElement(BoardTools, { skin: skinOf('journey-west'), on: { limits: () => {} }, counts: beltCounts(hub) }))
+  assert.match(out, /aria-label="Usage: 5h 41%, week 12%, /)
+  assert.match(out, /<span>Usage: 5h 41%, week 12%<\/span>/)
   assert.deepEqual(beltCounts(emptyHub()), { next: 0 })
 })
 

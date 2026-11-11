@@ -257,3 +257,40 @@ test('a Codex role run (SWITCHBOARD_ROLE_RUN set) posts its events tagged role_r
     fs.rmSync(home, { recursive: true, force: true })
   }
 })
+
+test('with no editor window live, the standalone app gets the chat; with one live, only the editor does', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-app-'))
+  const appDir = path.join(home, '.claude', 'switchboard-app')
+  fs.mkdirSync(appDir, { recursive: true })
+  const script = path.join(home, 'hook.js')
+  fs.writeFileSync(script, getHookScriptContent())
+  const hits: string[] = []
+  const app = await listen(hits, 'app')
+  const ed = await listen(hits, 'editor')
+  const port = (s: http.Server) => (s.address() as { port: number }).port
+  fs.writeFileSync(path.join(appDir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(app), workspace: '/nowhere/app', hubToken: 't' }))
+  const fire = async () => {
+    const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'Stop' }))
+    await new Promise(resolve => child.on('exit', resolve))
+  }
+  try {
+    await fire()
+    assert.deepEqual(hits, ['app'])
+    // Under the app's own folder its own hook delivers, so this one stays out of the way.
+    fs.writeFileSync(path.join(appDir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(app), workspace: home, hubToken: 't' }))
+    hits.length = 0
+    await fire()
+    assert.deepEqual(hits, [])
+    const dir = path.join(home, '.claude', 'switchboard')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'w.json'), JSON.stringify({ pid: process.pid, port: port(ed), workspace: '/nowhere/w' }))
+    hits.length = 0
+    await fire()
+    assert.deepEqual(hits, ['editor'])
+  } finally {
+    app.close()
+    ed.close()
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})

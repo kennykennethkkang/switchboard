@@ -660,6 +660,17 @@ export function fillBox(current: string, box: Box | undefined, session: string, 
   return { text: by.map(([, m]) => m).reduce((acc, m) => mergeCommit(acc, m)), by }
 }
 
+/** Write commit message's text into root's box under fillBox's rule; it stands for every chat's part, so a later chat merges on top.
+ *  typed: Kenneth's text was there; missing: this window has no box for root. */
+export function fillDraftBox(repos: { rootUri: { fsPath: string }; inputBox: { value: string } }[], root: string, text: string, boxes: Map<string, Box>): 'filled' | 'typed' | 'missing' {
+  const repo = repos.find(r => foldPathCase(r.rootUri.fsPath) === foldPathCase(root))
+  if (!repo) return 'missing'
+  if (!canPrefill(repo.inputBox.value, boxes.get(repo.rootUri.fsPath)?.text)) return 'typed'
+  repo.inputBox.value = text
+  boxes.set(repo.rootUri.fsPath, { text, by: [['draft', text]] })
+  return 'filled'
+}
+
 /** A repo's merged message from every chat that finished since its last commit, whatever the box holds.
  * Each part keeps the HEAD it arrived under, so any window drops what a commit made anywhere already took. last: the newest summary; at: when it last grew. */
 export type Pending = { text: string; at: number; last: string }

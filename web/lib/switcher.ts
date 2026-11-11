@@ -1,14 +1,21 @@
 /**
- * The quick switcher (Cmd+K): every live chat and every History version, matched by name.
+ * The quick switcher (Cmd+K): named commands, every live chat and every History version, matched by name.
  * A substring wins over letters found in order; switcher.tsx draws the result.
  */
 import type { ArchivedChat, ChatProgress, ChatRow, ChatState } from './hub-types'
 import { archiveChains, projectName, splitVersion } from './archive'
 import { almostDone } from '../components/switchboard/look'
 
+export type Command = { id: string; label: string; group: 'Go to' | 'Do'; hint?: string; keywords?: string }
+
 export type SwitchItem =
-  | { kind: 'live'; id: string; name: string; version: number; state: ChatState; almost?: boolean }
+  | { kind: 'live'; id: string; name: string; version: number; state: ChatState; almost?: boolean; chip?: string }
   | { kind: 'history'; id: string; chain: string; name: string; version: number }
+  | { kind: 'command'; id: string; label: string; group: Command['group']; hint?: string; keywords?: string }
+
+type Cards = { chat: ChatRow; progress?: ChatProgress }[]
+
+const chatName = (chat: ChatRow) => splitVersion(chat.name).origin || projectName(chat) || chat.sessionId.slice(0, 8)
 
 /** The indices of q's letters in name: a substring if there is one, else letters in order; null when none fit. */
 /** Indices count letters (code points), the unit switcher.tsx marks by, so an emoji is one letter. */
@@ -23,25 +30,54 @@ export function matchName(name: string, q: string): number[] | null {
   return out.length === query.length ? out : null
 }
 
-export function switcherItems(cards: { chat: ChatRow; progress?: ChatProgress }[], archive: ArchivedChat[]): SwitchItem[] {
-  const live: SwitchItem[] = cards.map(({ chat, progress }) => {
-    const { origin, version } = splitVersion(chat.name)
-    return { kind: 'live', id: chat.sessionId, name: origin || projectName(chat) || chat.sessionId.slice(0, 8), version, state: progress?.state ?? 'idle', ...(almostDone(progress) ? { almost: true } : {}) }
-  })
+/** Empty-query order: Go to commands, live chats, Do commands, History. */
+export function switcherItems(cards: Cards, archive: ArchivedChat[], commands: Command[] = []): SwitchItem[] {
+  const live: SwitchItem[] = cards.map(({ chat, progress }) => (
+    { kind: 'live', id: chat.sessionId, name: chatName(chat), version: splitVersion(chat.name).version, state: progress?.state ?? 'idle', ...(almostDone(progress) ? { almost: true } : {}), ...(progress?.state === 'done' ? { chip: 'Ready for your OK' } : {}) }
+  ))
   const history: SwitchItem[] = archiveChains(archive).flatMap(c => c.versions.map(v => ({ kind: 'history' as const, id: v.sessionId, chain: `${c.latest.cwd}\n${c.origin}`, name: c.origin, version: v.version })))
-  return [...live, ...history]
+  const cmd = (g: Command['group']): SwitchItem[] => commands.filter(c => c.group === g).map(c => ({ kind: 'command', ...c }))
+  return [...cmd('Go to'), ...live, ...cmd('Do'), ...history]
 }
 
-/** Matching items, best first: a substring at the start, then anywhere, then loose; live before History on a tie. */
+/** The shell's command list; it maps each id to an action. */
+export function defaultCommands(o: { cards: Cards; repoChanges: boolean; vscode: boolean; awake?: boolean; calls?: boolean }): Command[] {
+  const go = (id: string, label: string, keywords?: string): Command => ({ id: `go:${id}`, label, group: 'Go to', ...(keywords ? { keywords } : {}) })
+  const onOff = (on?: boolean) => (on ? 'On' : 'Off')
+  return [
+    go('now', 'Now', 'home today needs'),
+    go('chats', 'Chats', 'sessions history'),
+    go('plan', 'Plan', 'todo to-do jev'),
+    go('ship', 'Ship', 'git dev servers terminals ci'),
+    go('map-board', 'Map: Agents', 'board'),
+    go('map-flow', 'Map: Code', 'flow'),
+    go('map-memory', 'Map: Memory', 'vault notes'),
+    go('settings', 'Settings', 'gear preferences'),
+    { id: 'do:new', label: 'New chat', group: 'Do', keywords: 'start' },
+    ...(o.repoChanges ? [{ id: 'do:commit-draft', label: 'Write commit message', group: 'Do' as const, keywords: 'git' }] : []),
+    ...o.cards.filter(c => c.progress?.state === 'done').map(({ chat }): Command => ({ id: `do:approve:${chat.sessionId}`, label: `Approve ${chatName(chat)}`, group: 'Do', keywords: 'ok done' })),
+    { id: 'do:awake', label: 'Toggle Keep awake', group: 'Do', hint: onOff(o.awake), keywords: 'sleep caffeinate' },
+    { id: 'do:calls', label: 'Toggle Call me', group: 'Do', hint: onOff(o.calls), keywords: 'phone bland' },
+    ...(o.vscode ? [{ id: 'do:phone', label: 'Open phone link', group: 'Do' as const, keywords: 'qr mobile' }] : []),
+  ]
+}
+
+/** Matching items, best first: a substring at the start, then anywhere, then loose, then a command keyword; list order on a tie. */
 export function rankItems(items: SwitchItem[], q: string): { item: SwitchItem; hits: number[] }[] {
   const score = (hits: number[]) => {
     if (!hits.length) return 0
     const tight = hits[hits.length - 1] - hits[0] === hits.length - 1
     return (tight ? (hits[0] === 0 ? 0 : 1) : 2) * 1000 + hits[0]
   }
+  const rank = (item: SwitchItem): { hits: number[]; s: number } | null => {
+    const hits = matchName(item.kind === 'command' ? item.label : item.name, q)
+    if (hits) return { hits, s: score(hits) }
+    // Keyword hit: nothing to mark in the label, ranked after any label hit.
+    return item.kind === 'command' && item.keywords && matchName(item.keywords, q) ? { hits: [], s: 3000 } : null
+  }
   return items
-    .map((item, i) => ({ item, i, hits: matchName(item.name, q) }))
-    .filter((r): r is { item: SwitchItem; i: number; hits: number[] } => r.hits !== null)
-    .sort((a, b) => score(a.hits) - score(b.hits) || a.i - b.i)
-    .map(({ item, hits }) => ({ item, hits }))
+    .map((item, i) => ({ item, i, r: rank(item) }))
+    .filter((x): x is { item: SwitchItem; i: number; r: { hits: number[]; s: number } } => x.r !== null)
+    .sort((a, b) => a.r.s - b.r.s || a.i - b.i)
+    .map(({ item, r }) => ({ item, hits: r.hits }))
 }

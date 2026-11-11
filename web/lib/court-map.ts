@@ -2,13 +2,13 @@
  * When VS Code windows are known, each window gets its own island on the ring and its chats fan out from it instead. Pure, so it is tested. */
 import type { ChatProgress, HubState, WindowColor } from './hub-types'
 import { byWindow } from './windows'
-import { ORDER } from '../components/switchboard/look'
+import { ORDER, almostDone, missedCount } from '../components/switchboard/look'
 import type { MemoryGraph } from './memory-graph'
 import { armoryList, gardenList, keyList, mapList, memoryTally, studyList, todoList, towerList, uploadList, uploadSummary, type Item } from './court-places'
 
 export type CourtState = 'working' | 'waiting' | 'done' | 'needs' | 'idle'
 /** x, y: top left corner in world px; the council's center sits on 0,0. */
-export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Problems a place flags (memory health, missing keys). */ warn?: number }
+export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Done with this many requests Jev found not covered (look.ts almostDone). */ missed?: number; /** Problems a place flags (memory health, missing keys). */ warn?: number }
 /** Ring places after the AIs, in ring order. */
 export const PLACES = ['garden', 'armory', 'library', 'notice', 'tower', 'study', 'treasury', 'maps', 'uploads'] as const
 export type Place = typeof PLACES[number]
@@ -25,7 +25,7 @@ type P = [number, number]
 const COUNCIL = { w: 240, h: 160 }, ISLE = { w: 160, h: 120 }
 // ROOM: under every desk row, so a plate (46px + 2px drop, at zoom 1 or more) never lands on the row below or off the island.
 const DESK = { w: 96, h: 56 }, DGAP = 16, ROOM = PLATE.h + 10, PAD = 24, TOP = 28, COLS = 3, MARGIN = 24, GAP = 96
-const NAMES: Record<string, string> = { claude: 'Claude', codex: 'Codex', hermes: 'Hermes', gemini: 'Gemini', jev: 'Jev', perplexity: 'Perplexity' }
+const NAMES: Record<string, string> = { claude: 'Claude', codex: 'Codex', hermes: 'Hermes', gemini: 'Gemini', jev: 'Jev', perplexity: 'Perplexity', research: 'Research' }
 // DOCK: sky between yard box and realm, where board.tsx hangs the gate; RGAP clears a realm's rock and spikes.
 // PLQ: sky kept beside the realms for their plaques at zoom 0.5 (realmPlaque); RGAP grows with the tallest realm so halos and rocks clear.
 const REALM = { w: 140, h: 72 }, RGAP = 100, DOCK = 72, PLQ = 448
@@ -43,6 +43,11 @@ function chatState(p?: ChatProgress): CourtState {
   return p.state
 }
 
+// Where the road from p meets n's edge, 12px out, so the petition's callout stays off n's label.
+const rimOf = (n: CourtNode, p: P): P => {
+  const [cx, cy] = mid(n), dx = p[0] - cx, dy = p[1] - cy, k = Math.min((n.w / 2 + 12) / (Math.abs(dx) || 1e-9), (n.h / 2 + 12) / (Math.abs(dy) || 1e-9), 1)
+  return [Math.round(cx + dx * k), Math.round(cy + dy * k)]
+}
 const hits = (a: CourtNode, b: CourtNode, m = 0) => a.x - m < b.x + b.w && b.x - m < a.x + a.w && a.y - m < b.y + b.h && b.y - m < a.y + a.h
 // Liang-Barsky clip against the rect grown by MARGIN.
 function segHits(p: P, q: P, n: CourtNode) {
@@ -73,6 +78,8 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
   const ids = ['claude', 'codex', ...h.ais.filter(a => a.installed || a.chats).map(a => a.id), ...live.map(c => c.ai ?? 'claude')]
   if (h.signIns.keys?.some(k => k.name === 'GEMINI_API_KEY' && k.saved)) ids.push('gemini')
   if (h.jev.length || Object.keys(h.jevProjects ?? {}).length) ids.push('jev')
+  // Research pseudo-island: always on the ring, launches a deep-research chat.
+  ids.push('research')
   const ais = [...new Set(ids)]
   // window: its workspace, '' for chats no window holds.
   // Every open window shows, chats or not; Other only when some chat sits outside them all.
@@ -105,7 +112,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
   })
   const busy = new Set(live.flatMap(c => progress.get(c.sessionId)?.roles.filter(r => r.state === 'active').map(r => r.role) ?? []))
   const files = uploadList(h), idle = gardenList(h, busy), tools = armoryList(h), todo = todoList(h), keys = keyList(h), study = studyList(h)
-  const tally = mem && memoryTally(mem), problems = (l: Item[]) => l.filter(i => i.ok === false).length
+  const rated = keys.filter(k => k.ok !== undefined), tally = mem && memoryTally(mem), problems = (l: Item[]) => l.filter(i => i.ok === false).length
   const extra: Record<Place, Partial<CourtNode>> = {
     garden: { task: idle.length ? idle.map(i => i.name).join(', ') : undefined, list: idle },
     armory: { task: `${tools.length} tools`, list: tools, warn: problems(tools) },
@@ -113,7 +120,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     notice: { task: todo.length ? `${todo.length} open in all projects` : undefined, list: todo },
     tower: { list: towerList(h), task: h.rc.atStartup ? 'Remote Control on' : undefined },
     study: { list: study, task: h.learnReady?.length ? `${h.learnReady.length} waiting` : undefined, warn: h.learnReady?.length },
-    treasury: { list: keys, task: keys.length ? `${keys.length - problems(keys)}/${keys.length} ok` : undefined, warn: problems(keys) },
+    treasury: { list: keys, task: rated.length ? `${rated.length - problems(rated)}/${rated.length} ok` : undefined, warn: problems(keys) },
     maps: { list: mapList(h), task: h.projects.length ? `${h.projects.length} projects` : undefined },
     uploads: { list: files, task: uploadSummary(h) },
   }
@@ -145,8 +152,8 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const rgap = Math.round(RGAP + 0.4 * Math.max(0, ...realmAis.map(x => realmSize(x).h)))
     const rim = realmAis.length ? { w: Math.max(...realmAis.map(x => realmSize(x).w)), h: realmAis.reduce((s, x) => s + realmSize(x).h + rgap, -rgap) } : { w: 0, h: 0 }
     const side = rim.w ? DOCK + rim.w + PLQ : 0, whole = { w: size.w + side, h: Math.max(size.h, rim.h) }
-    // Far enough out that all of this AI's courtyards fit side by side in the fan.
-    const d0 = Math.max(320, Math.round((whole.w + GAP) * live.filter(o => homeKey(o) === key).length / 2.4))
+    // Far enough out that this home's yards fit side by side in the fan. The yard alone sets the width: with realms and plaque sky (800px) it flung yards past 1500.
+    const d0 = Math.max(320, Math.round((size.w + GAP) * live.filter(o => homeKey(o) === key).length / 2.4))
     // The bridge lands on the yard, which sits on the home's side of the box when realms dock on it.
     // hub: what the bridge comes from, the home or, once its sky runs out, a sibling yard further out.
     let hub = home
@@ -169,9 +176,10 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     // Realms dock on the rim away from the hub, so its bridge never runs under one.
     const left = rim.w > 0 && mid(hub)[0] > spotFor.x + whole.w / 2
     const yard = { ...spotFor, x: spotFor.x + (left ? side : 0), y: spotFor.y + Math.round((whole.h - size.h) / 2), w: size.w, h: size.h }
+    const missed = almostDone(p) ? missedCount(p) : undefined
     const ask = state === 'needs' ? p?.question ?? p?.ask?.preview ?? p?.asks?.[0]?.preview : undefined
     const leadTask = tasks.find(t => t.status === 'in_progress' && (!t.role || t.role === 'lead'))?.subject
-    Object.assign(yard, { id: `yard:${c.sessionId}`, kind: 'courtyard', label: c.name ?? c.project ?? 'chat', ai, chatId: c.sessionId, state, task: leadTask, since: p?.startedAt, ask, parent: hub.id, from })
+    Object.assign(yard, { id: `yard:${c.sessionId}`, kind: 'courtyard', label: c.name ?? c.project ?? 'chat', ai, chatId: c.sessionId, state, task: leadTask, since: p?.startedAt, ask, parent: hub.id, from, missed })
     nodes.push(yard); link(hub, yard); yardsOf.set(key, [...yardsOf.get(key) ?? [], yard])
 
     // Docked off the yard's rim, stacked top down, the stack centered on the yard.
@@ -182,7 +190,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
       const working = mine.some(h => h.state === 'working') || codexRuns.some(s => s.state === 'active')
       const latest = [...mine].sort((a, b) => b.last - a.last)[0]
       const n: CourtNode = { id: `realm:${c.sessionId}:${x}`, kind: 'realm', x: left ? spotFor.x + PLQ + (rim.w - r.w) : yard.x + yard.w + DOCK, y: rimY, ...r, label: `${(NAMES[x] ?? x).toUpperCase()} REALM`,
-        sub: `from ${NAMES[ai] ?? ai} · ${c.name ?? c.project ?? 'chat'}`, ai: x, chatId: c.sessionId, parent: yard.id,
+        sub: `${x === ai ? '' : `from ${NAMES[ai] ?? ai} · `}${c.name ?? c.project ?? 'chat'}`, ai: x, chatId: c.sessionId, parent: yard.id,
         state: working ? 'working' : mine.some(h => h.state === 'done') || codexRuns.length ? 'done' : 'idle',
         task: latest?.label ?? (deskRoles(x).length ? tasks.find(t => t.status === 'in_progress' && t.role && deskRoles(x).includes(t.role))?.subject : undefined), since: working ? Math.max(...mine.filter(h => h.state === 'working').map(h => h.since), ...codexRuns.filter(s => s.state === 'active').map(s => s.startedAt)) : undefined,
         runs: mine.length ? mine.reduce((t, h) => t + h.count, 0) : codexRuns.length }
@@ -194,8 +202,8 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
         x: box.x + PAD + (k % COLS) * (DESK.w + DGAP), y: box.y + TOP + PAD + Math.floor(k / COLS) * (DESK.h + ROOM), w: DESK.w, h: DESK.h, ...extra }
       nodes.push(d); link(box, d); return d
     }
-    const lead = desk(0, 'lead', { state, task: leadTask, since: p?.startedAt, ask })
-    if (state === 'needs' && !petition) petition = { deskId: lead.id, path: [mid(lead), mid(yard), ...chain(hub), mid(council)] }
+    const lead = desk(0, 'lead', { state, task: leadTask, since: p?.startedAt, ask, missed })
+    if (state === 'needs' && !petition) petition = { deskId: lead.id, path: [mid(lead), mid(yard), ...chain(hub), rimOf(council, chain(hub).at(-1)!)] }
     for (const r of realms.values()) { nodes.push(r); link(yard, r) }
     const roleDesk = (k: number, role: string, box = yard) => {
       const mine = runs.filter(r => r.role === role), active = mine.filter(r => r.state === 'active')
@@ -294,18 +302,22 @@ export function lod(zoom: number, courtyardPx: number): Lod {
 
 /** The zoom and screen offset (screen = world * zoom + offset) that frames every node in a w by h stage. */
 export function fitCourt(c: Court, w: number, h: number) {
-  // Realm plaques hang outside their islands and keep a fixed screen size, so the zoom is refined a few times with them in.
-  const by = new Map(c.nodes.map(n => [n.id, n])), pad = 32, top = 48
-  let boxes: Array<{ x: number; y: number; w: number; h: number }> = c.nodes, zoom = 1, x0 = 0, y0 = 0, bw = 1, bh = 1
-  for (let i = 0; i < 4; i++) {
-    x0 = Math.min(...boxes.map(b => b.x)); y0 = Math.min(...boxes.map(b => b.y))
-    bw = Math.max(...boxes.map(b => b.x + b.w)) - x0; bh = Math.max(...boxes.map(b => b.y + b.h)) - y0
-    zoom = Math.min((w - 2 * pad) / bw, (h - pad - top) / bh)
-    boxes = [...c.nodes, ...c.nodes.flatMap(r => r.kind === 'realm' && by.get(r.parent ?? '') ? [realmPlaque(r, by.get(r.parent!)!, zoom)] : [])]
-  }
+  // Islands only: board.tsx keeps every plaque on stage when it draws it (freeSpot/forcedSpot), so reserving 220px
+  // of plaque beside each realm just shrank the court and pushed it off centre. Tighter pad on a phone.
+  const narrow = w < 600, pad = narrow ? 12 : 32, top = narrow ? 24 : 48
+  const x0 = Math.min(...c.nodes.map(b => b.x)), y0 = Math.min(...c.nodes.map(b => b.y))
+  const bw = Math.max(...c.nodes.map(b => b.x + b.w)) - x0, bh = Math.max(...c.nodes.map(b => b.y + b.h)) - y0
+  const zoom = Math.min((w - 2 * pad) / bw, (h - pad - top) / bh)
   // cx, cy: the framed box's world center; sy: where its center sits on screen.
   const cx = x0 + bw / 2, cy = y0 + bh / 2, sy = top + (h - pad - top) / 2
   return { zoom, x: Math.round(w / 2 - cx * zoom), y: Math.round(sy - cy * zoom), cx, cy, sy }
+}
+
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
+/** The Council's line, plaque and card alike: AIs that have chats, chats, agents. */
+export function courtSummary(c: Court) {
+  const yards = c.nodes.filter(n => n.kind === 'courtyard')
+  return `${plural(new Set(yards.map(y => y.ai)).size, 'AI')} · ${plural(yards.length, 'chat')} · ${plural(c.nodes.filter(n => n.kind === 'desk').length, 'agent')}`
 }
 
 /** The chat a node opens: its own, else the nearest parent's. */

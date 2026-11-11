@@ -10,14 +10,23 @@ export const Warn = ({ size = 12 }: { size?: number }) => (
   </svg>
 )
 
-/** Ready to approve: the done-check verdict, Approve and Send back. */
-export function ApproveBar({ sessionId, check, send, small }: { sessionId: string; check?: DoneCheck; send: (c: HubCommand) => void; small?: boolean }) {
+/** The done-check verdict: green Verified, or red Unverified with what is missing. wrap: long lists wrap instead of cutting off. */
+export function CheckStamp({ check, wrap }: { check?: DoneCheck; wrap?: boolean }) {
   const line = checkLine(check)
+  if (!line) return null
+  return <span className="hub-stamp" title={line} style={{ display: 'inline-flex', alignItems: wrap ? 'flex-start' : 'center', gap: 5, color: check?.verified ? 'var(--hub-green)' : 'var(--hub-red)', minWidth: 0, fontSize: 13 }}>
+    {!check?.verified && <span style={{ display: 'inline-flex', height: '1.4em', alignItems: 'center' }}><Warn /></span>}
+    <span style={wrap ? { overflowWrap: 'anywhere' } : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line}</span>
+  </span>
+}
+
+/** Ready for your OK: the done-check verdict, Approve and Send back. */
+export function ApproveBar({ sessionId, check, send, small, noLabel }: { sessionId: string; check?: DoneCheck; send: (c: HubCommand) => void; small?: boolean; noLabel?: boolean }) {
   const sm = small ? ' sm' : ''
   return (
     <div className="hub-approve" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 13 }}>
-      <span style={{ color: 'var(--hub-yellow)' }}>Ready to approve</span>
-      {line && <span title={line} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: check?.verified ? 'var(--hub-green)' : 'var(--hub-red)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{!check?.verified && <Warn />}{line}</span>}
+      {!noLabel && <span style={{ color: 'var(--hub-yellow)' }}>Ready for your OK</span>}
+      <CheckStamp check={check} />
       <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
         <button type="button" className={`hub-btn primary${sm}`} onClick={() => send({ type: 'hub-approve', sessionId })}>Approve</button>
         <button type="button" className={`hub-btn${sm}`} onClick={() => send({ type: 'hub-send', sessionId, text: sendBackText(check) })}>Send back</button>

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { ask, chainBase, chainVersion, chatLabel, codexArgs, cloneTarget, codexNote, crossNote, freshPrompt, handoffFile, labelNote, mergeProjects, newChatCommand, nextChainName, projectName, repoTop, scriptBody, scriptLine, stillRunning } from '../src/hub/projects'
+import { ask, askMode, isRepoAsk, repoPlan, chainBase, chainVersion, chatLabel, codexArgs, cloneTarget, codexNote, crossNote, freshPrompt, handoffFile, labelNote, mergeProjects, newChatCommand, nextChainName, projectName, repoTop, scriptBody, scriptLine, stillRunning } from '../src/hub/projects'
 
 describe('projectName', () => {
   it('names a folder by the git repo holding it, else its last part', () => {
@@ -38,6 +38,22 @@ describe('projects', () => {
       ['claude-mods', 'repo', false],
       ['CSEN122', 'project', false],
     ])
+  })
+
+  it('lists a folder once when a chat ran from it under another case', () => {
+    const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-case-')))
+    try {
+      const real = path.join(tmp, 'Switchboard')
+      fs.mkdirSync(real)
+      const lower = path.join(tmp, 'switchboard')
+      // Only a case-insensitive disk sees both spellings as one folder.
+      if (!fs.existsSync(lower)) return
+      const list = mergeProjects([real], [lower])
+      assert.deepEqual(list.map(p => p.path), [real])
+      assert.deepEqual(mergeProjects([], [lower]).map(p => [p.name, p.path]), [['Switchboard', real]])
+      // A window opened under the other spelling keeps it for its own row.
+      assert.deepEqual(mergeProjects([real], [lower], lower).map(p => [p.path, p.isOpen]), [[lower, true]])
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
   })
 
   it('accepts GitHub repos as owner/repo or a URL and refuses anything else', () => {
@@ -184,4 +200,45 @@ it('Ask before actions on for Codex: approvals come back, our hooks stay trusted
     assert.deepEqual(codexArgs(['Fix login']), ['--dangerously-bypass-hook-trust', 'Fix login'])
     assert.deepEqual(codexArgs(['resume', 'abc']), ['resume', '--dangerously-bypass-hook-trust', 'abc'])
   } finally { ask.codex = false }
+})
+
+it('Ask before actions for Claude goes to ask-mode.json, so bash-approve keeps the prompt', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'askmode-'))
+  const was = askMode.file
+  askMode.file = path.join(dir, 'ask-mode.json')
+  try {
+    Object.assign(ask, { claude: true, codex: false })
+    assert.deepEqual(JSON.parse(fs.readFileSync(askMode.file, 'utf8')), { claude: true })
+    ask.claude = false
+    assert.deepEqual(JSON.parse(fs.readFileSync(askMode.file, 'utf8')), { claude: false })
+    assert.equal(ask.claude, false)
+  } finally { askMode.file = was; fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+it('tests never write the real ask-mode.json', () => {
+  assert.equal(askMode.file, undefined)
+})
+
+describe('repoPlan', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-root-'))
+  it('creates with gh in the repos root, private or public', () => {
+    assert.deepEqual(repoPlan({ create: 'my-app', private: true }, root, '/bin/gh'), { folder: path.join(root, 'my-app'), file: '/bin/gh', args: ['repo', 'create', 'my-app', '--private', '--clone'], cwd: root })
+    assert.deepEqual((repoPlan({ create: 'my.app_2', private: false }, root, '/bin/gh') as { args: string[] }).args, ['repo', 'create', 'my.app_2', '--public', '--clone'])
+  })
+  it('clones with git into root/<name>', () => {
+    assert.deepEqual(repoPlan({ clone: 'https://github.com/o/r.git' }, root, undefined), { folder: path.join(root, 'r'), file: 'git', args: ['clone', 'https://github.com/o/r.git', path.join(root, 'r')], cwd: root })
+  })
+  it('refuses bad names, a missing gh and an existing folder', () => {
+    for (const create of ['', '.x', '-x', 'a b', 'a/b', '..', 'x'.repeat(101)]) assert.equal(typeof repoPlan({ create, private: true }, root, '/bin/gh'), 'string', create)
+    assert.equal(typeof repoPlan({ clone: 'not a repo' }, root, undefined), 'string')
+    assert.match(repoPlan({ create: 'ok', private: true }, root, undefined) as string, /gh/)
+    fs.mkdirSync(path.join(root, 'taken'))
+    assert.match(repoPlan({ create: 'taken', private: true }, root, '/bin/gh') as string, /already exists/)
+    assert.match(repoPlan({ clone: 'o/taken' }, root, undefined) as string, /already exists/)
+  })
+  it('isRepoAsk takes only the two exact shapes', () => {
+    assert.ok(isRepoAsk({ create: 'x', private: false }))
+    assert.ok(isRepoAsk({ clone: 'o/r' }))
+    for (const v of [null, 'x', {}, { create: 'x' }, { create: 1, private: true }, { create: 'x', private: true, clone: 'o/r' }, { clone: 'nope nope' }, { create: '-x', private: true }]) assert.equal(isRepoAsk(v), false, JSON.stringify(v))
+  })
 })

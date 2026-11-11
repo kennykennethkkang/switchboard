@@ -7,7 +7,7 @@ import type { Ask, Choice, HubState, TaskRow } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { demoGraph, healthLine, loadGraph, relations, type MemoryGraph } from '@/lib/memory-graph'
 import { keepGraph, memoryTally, withDemoLearn, type GraphHold, type Item } from '@/lib/court-places'
-import { PLACES, PLATE, buildCourt, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
+import { PLACES, PLATE, buildCourt, courtSummary, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
 import { askChoice } from '@/lib/ask'
 import { END_S, THAW_S, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
 import { BASKET, CARP, pixCanvas } from '@/lib/sprites/carp'
@@ -21,7 +21,7 @@ import './board.css'
 type View = { x: number; y: number; z: number }
 type Box = { x: number; y: number; w: number; h: number; id: string }
 type Frame = { ox: number; oy: number; cx: number; cy: number; cv: HTMLCanvasElement; sig: string }
-export type Send = (m: Extract<HubCommand, { type: 'hub-answer' | 'hub-focus-chat' | 'hub-rc' | 'hub-rc-server' | 'hub-learn' | 'hub-key-test' }>) => void
+export type Send = (m: Extract<HubCommand, { type: 'hub-answer' | 'hub-focus-chat' | 'hub-rc' | 'hub-rc-server' | 'hub-learn' | 'hub-key-test' | 'hub-new-chat' }>) => void
 // World units per art pixel; the art is drawn at whole-number device pixels per art pixel once zoomed in.
 const ART = 2, WALK = 90, STEP_HZ = 4, MAX_Z = 3
 // One-off sprite moves, seconds: a tap hop, a finish cheer, a lead and new subagent walking to meet.
@@ -30,17 +30,18 @@ const DUR: Record<Fx['kind'], number> = { hop: 0.45, cheer: 1.6, meet: 2, move: 
 const CONFETTI = ['gold_lt', 'jade_lt', 'red_lt', 'peach', 'sky'] as const
 const PIX = (s: number) => `400 ${s}px Silkscreen, ui-monospace, monospace`
 const SANS = (s: number, w = 600) => `${w} ${s}px 'Hanken Grotesk', system-ui, sans-serif`
-const WORD: Record<CourtState, string> = { working: 'RUN', waiting: 'WAIT', done: 'SHIPPED', needs: 'ASK', idle: 'IDLE' }
-const SAY: Record<CourtState, string> = { working: 'working', waiting: 'waiting', done: 'shipped', needs: 'needs you', idle: 'idle' }
-const LEGEND: Array<[CourtState, string]> = [['working', 'Working'], ['needs', 'Needs you'], ['waiting', 'Waiting'], ['done', 'Shipped'], ['idle', 'Idle']]
+const WORD: Record<CourtState, string> = { working: 'RUN', waiting: 'WAIT', done: 'DONE', needs: 'ASK', idle: 'IDLE' }
+const SAY: Record<CourtState, string> = { working: 'working', waiting: 'waiting', done: 'done', needs: 'needs you', idle: 'idle' }
+const LEGEND: Array<[CourtState, string]> = [['working', 'Working'], ['needs', 'Needs you'], ['waiting', 'Waiting'], ['done', 'Done'], ['idle', 'Idle']]
 const RANK: Record<CourtState, number> = { needs: 4, working: 3, waiting: 2, done: 1, idle: 0 }
-const AI_KEY: Record<string, keyof C> = { claude: 'red_lt', codex: 'blue_lt', gemini: 'sky', jev: 'jade_lt', hermes: 'gold_lt', perplexity: 'sky' }
+const AI_KEY: Record<string, keyof C> = { claude: 'red_lt', codex: 'blue_lt', gemini: 'sky', jev: 'jade_lt', hermes: 'gold_lt', perplexity: 'sky', research: 'plum' }
 const ROLE_KEY: Record<string, [keyof C, keyof C]> = { lead: ['gold', 'gold_dk'], researcher: ['blue_lt', 'blue'], engineer: ['red', 'red_dk'], qa: ['jade', 'jade_dk'], designer: ['peach', 'peach_dk'], ops: ['brown', 'brown_dk'], growth: ['plum', 'ink2'], pilgrim: ['brown', 'brown_dk'] }
 const KINDS: Record<CourtNode['kind'], string> = { council: 'Council Hall', pavilion: 'Pavilion', window: 'Window', courtyard: 'Courtyard', realm: 'Realm', desk: 'Desk', garden: 'Tea garden', armory: 'Armory', library: 'Memory library', notice: 'Notice board', tower: 'Signal tower', study: 'Study hall', treasury: 'Treasury', maps: 'Map room', uploads: 'Uploads' }
 const BIG = new Set<CourtNode['kind']>(['council', 'pavilion', 'window', 'courtyard', 'realm', ...PLACES])
 const isPlace = (k: CourtNode['kind']) => (PLACES as readonly string[]).includes(k)
 // The board is always dark: --hub-w-* from .hub-dark in globals.css.
 const WIN: Record<string, string> = { violet: '#a08bff', amber: '#f2b24c', teal: '#4fd1c9', rose: '#ff7ab3', lime: '#9bd65a', cobalt: '#7ea2ff' }
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 const folder = (p = '') => p.replace(/^\/Users\/[^/]+/, '~')
 const PLATE_BG = 'rgba(16,17,17,.94)', MUTE = '#a29cae', TEXT = '#f4f1ea'
 // Realm palettes: another AI's annex docked on a courtyard's rim.
@@ -50,9 +51,10 @@ const REALM: Record<string, Realm> = {
   jev: { top: '#3b2d5e', rim: '#6c55a6', dk: '#1d1533', hi: '#b6f26e', glow: '#e6ffc4' },
   perplexity: { top: '#0e4a50', rim: '#1f8a92', dk: '#072a2e', hi: '#7ff0e6', glow: '#d8fffa' },
   gemini: { top: '#232a6e', rim: '#4b5fd0', dk: '#121640', hi: '#a9c1ff', glow: '#fff3c4' },
+  claude: { top: '#5a2c1e', rim: '#b8603f', dk: '#2c140d', hi: '#f0a07a', glow: '#ffe2cf' },
 }
-// Claude's realm takes the skin's own reds, so it reads as the same Claude as the pavilion.
-const realmOf = (ai: string | undefined, c: C): Realm => ai === 'claude' ? { top: c.red_dk, rim: c.red, dk: c.ink2, hi: c.peach, glow: c.gold_lt } : REALM[ai ?? ''] ?? REALM.codex
+// Fixed palettes, not skin colors: the skin's reds also paint courtyards, so a Claude realm in them read as another yard.
+const realmOf = (ai?: string): Realm => REALM[ai ?? ''] ?? REALM.codex
 
 function realmDesk(g: G, x: number, y: number, lit: boolean, R: Realm, c: C) {
   rect(g, x, y + 1, 24, 9, c.ink); rect(g, x + 1, y, 22, 9, R.rim); rect(g, x + 1, y, 22, 1, R.hi); rect(g, x + 1, y + 6, 22, 3, R.dk)
@@ -98,7 +100,7 @@ function landmark(g: G, ai: string | undefined, bx: number, by: number, R: Realm
 }
 // An annex islet in its own sky, a gate where it meets its courtyard, the origin AI's badge on the lintel.
 function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x: number) => number, B: (y: number) => number) {
-  const R = realmOf(n.ai, c), x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = n.w / ART / 2, ry = n.h / ART / 2
+  const R = realmOf(n.ai), x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = n.w / ART / 2, ry = n.h / ART / 2
   ell(g, x, y + 6, rx * 1.65, ry * 1.8, R.rim, 0.24); ell(g, x, y + 4, rx * 1.25, ry * 1.35, R.hi, 0.12)
   for (let i = 0; i < 18; i++) { const a = i * 2.4, d = 1.15 + (i % 4) * 0.14; rect(g, x + Math.cos(a) * rx * d, y + 4 + Math.sin(a) * ry * d * 1.2, 1, 1, R.glow) }
   const depth = Math.round(ry * 0.45), bot = y + ry + depth
@@ -254,14 +256,14 @@ const timer = (n: CourtNode, now: number) => {
   const st = n.state ?? 'idle'
   return (st === 'working' || st === 'needs') && n.since ? `${WORD[st]} ${fmt(now - n.since)}` : WORD[st]
 }
-const tally = (n: CourtNode) => `${n.runs ?? 0} ${n.runs === 1 ? 'run' : 'runs'} · ${n.shipped ?? 0} shipped`
+const tally = (n: CourtNode) => `${n.runs ?? 0} ${n.runs === 1 ? 'run' : 'runs'} · ${n.shipped ?? 0} done`
 
 // 12x16 chibi per role, hat by role, sash in the AI's color, outlined in ink.
 const BODY = ['...hhhh...', '..hhhhhh..', '..hssssh..', '..sesses..', '..ssssss..', '...rrrr...', '..rrkkrr..', '.srrkkrrs.', '..rrrrrr..', '..rrrrrr..', '..ff..ff..']
 const LEGS = ['..ff...f..', '...f..ff..']
 // Cast: Journey to the West, one character per role; grid letters and pal in court-cast.ts.
 import { ICONS, LOOKS, badgeOf, cast, castOf, type Icon } from '@/lib/court-cast'
-const AI_NAME: Record<string, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini', jev: 'Jev', hermes: 'Hermes', perplexity: 'Perplexity' }
+const AI_NAME: Record<string, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini', jev: 'Jev', hermes: 'Hermes', perplexity: 'Perplexity', research: 'Research' }
 const aiName = (ai = 'claude') => AI_NAME[ai] ?? ai
 // Moved from: the chat's handover, or a desk run on another AI than its courtyard's.
 const fromOf = (n: CourtNode, by: Map<string, CourtNode>) => {
@@ -435,8 +437,8 @@ function bake(court: Court, c: C, sig: string): Frame {
     for (let yy = -py + 3; yy < py; yy += 5) { const half = px * Math.sqrt(1 - (yy / py) ** 2); rect(g, x - half, y + yy, half * 2, 1, c.stone_ln) }
   }
   // A hall: walls, a beam in its color, one roof tier per rank.
-  const hall = (n: CourtNode, w: number, roof: [string, string, string], walls: string, tiers: number, beam: string) => {
-    const x = Math.round(A(n.x + n.w / 2) - w / 2), y = Math.round(B(n.y + n.h / 2)) - 26
+  const hall = (n: CourtNode, w: number, roof: [string, string, string], walls: string, tiers: number, beam: string, dx = 0) => {
+    const x = Math.round(A(n.x + n.w / 2) - w / 2) + dx, y = Math.round(B(n.y + n.h / 2)) - 26
     rect(g, x - 1, y + 8, w + 2, 20, c.ink); rect(g, x, y + 8, w, 19, walls)
     for (let i = 0; i < w; i += 6) rect(g, x + i, y + 12, 1, 15, c.wood_dk)
     rect(g, x + w / 2 - 4, y + 17, 8, 10, c.wood_dk); rect(g, x, y + 8, w, 2, beam); rect(g, x, y + 10, w, 1, c.azure)
@@ -454,7 +456,12 @@ function bake(court: Court, c: C, sig: string): Frame {
       // Gate studs: 9 by 9, one per shipped run.
       const sx = Math.round(A(n.x + n.w / 2)) + 42, sy = Math.round(B(n.y + n.h / 2)) + 4
       for (let i = 0; i < 81; i++) rect(g, sx + (i % 9) * 3, sy + Math.floor(i / 9) * 3, 2, 2, i < shipped ? c.roof : c.stone_dk)
-    } else if (n.kind === 'pavilion') { island(n, c.jade, c.jade_lt, false); hall(n, 40, [c.azure, c.azure_dk, c.azure_lt], c.wood, 1, c[AI_KEY[n.ai ?? ''] ?? 'cloud']) }
+    } else if (n.kind === 'pavilion') {
+      // An AI with a realm stands its realm's landmark beside the hall, so pavilion and realm read as one system.
+      const own = REALM[n.ai ?? '']
+      island(n, c.jade, c.jade_lt, false); hall(n, 40, [c.azure, c.azure_dk, c.azure_lt], c.wood, 1, c[AI_KEY[n.ai ?? ''] ?? 'cloud'], own ? -10 : 0)
+      if (own) landmark(g, n.ai, Math.round(A(n.x + n.w / 2)) + 28, Math.round(B(n.y + n.h / 2)) + 4, own, c)
+    }
     else if (n.kind === 'window') {
       island(n, c.jade, c.jade_lt, false)
       // Banner on a pole in the window's color; here gets a gold finial.
@@ -526,7 +533,7 @@ function index(court: Court) {
   if (!ix) {
     const by = new Map(court.nodes.map(n => [n.id, n])), kids = new Map<string, CourtNode[]>(), desks = court.nodes.filter(n => n.kind === 'desk')
     for (const n of court.nodes) if (n.parent) kids.set(n.parent, [...kids.get(n.parent) ?? [], n])
-    const sub = `${court.nodes.filter(m => m.kind === 'pavilion').length} AIs · ${court.nodes.filter(m => m.kind === 'courtyard').length} chats · ${desks.length} agents`
+    const sub = courtSummary(court)
     ix = { by, kids, desks, sub }; indexes.set(court, ix)
   }
   return ix
@@ -539,8 +546,8 @@ function card(g: G, x: number, y: number, w: number, h: number, edge: string, ho
   g.strokeStyle = hot ? edge : 'rgba(255,255,255,.14)'; g.lineWidth = hot ? 1.5 : 1; g.stroke()
 }
 
-/** inset: CSS px the tool belt (left) and bottom bars cover, from the last Fit. */
-type St = { court: Court; frame?: Frame; inset?: [number, number]; view: View; zc: number; colors: C; bands: string[]; picked?: string; pet?: { id: string; at: number }; hits: Box[]; fx: Map<string, Fx>; hover?: string
+/** inset: CSS px the tool belt (left), bottom bars and the side panel (right) cover, from the last Fit. */
+type St = { court: Court; frame?: Frame; inset?: [number, number, number]; view: View; zc: number; colors: C; bands: string[]; picked?: string; pet?: { id: string; at: number }; hits: Box[]; fx: Map<string, Fx>; hover?: string
   /** over: any hit under the mouse; ropes: live wait ropes; ends: ropes playing their end flash; waits: chats waiting on another. */
   over?: string; ropes: Rope[]; ends: Map<string, { r: Rope; at: number }>; waits: Set<string> } & PauseFx
 /** Where the petitioning lead is on its path: world point, and whether it still walks. */
@@ -603,11 +610,16 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   const awake = (r: Rope) => ropeAwake(r, v.z, hotChats), sp = spans(by, s.ropes, s.ends, now)
   // Art layer, in art pixels.
   g.setTransform(k, 0, 0, k, X0, Y0)
-  if (t) for (let i = 0; i < 5; i++) cloud(g, ((i * 311 + t * (5 + i * 2)) % (F.cv.width + 120)) - 60, ((i + 0.5) / 5) * F.cv.height, 9 + (i % 3) * 3, 'rgba(251,246,236,.8)', 'rgba(217,212,230,.6)')
+  // A drifting cloud skips the stretch where it would cover an island (it hid the treasury chest).
+  if (t) for (let i = 0; i < 5; i++) {
+    const x = ((i * 311 + t * (5 + i * 2)) % (F.cv.width + 120)) - 60, y = ((i + 0.5) / 5) * F.cv.height, r = 9 + (i % 3) * 3
+    if (court.nodes.some(n => BIG.has(n.kind) && x + 2.7 * r > A(n.x) && x - r < A(n.x + n.w) && y + 1.4 * r > B(n.y) && y - 1.4 * r < B(n.y + n.h))) continue
+    cloud(g, x, y, r, 'rgba(251,246,236,.8)', 'rgba(217,212,230,.6)')
+  }
   // A working realm's landmark breathes; still under reduced motion (t is 0).
   for (const n of court.nodes) {
     if (n.kind !== 'realm' || n.state !== 'working' || !seen(n)) continue
-    const [mx, my] = markAt(n, A, B), R = realmOf(n.ai, c)
+    const [mx, my] = markAt(n, A, B), R = realmOf(n.ai)
     ell(g, mx, my - 18, 15, 20, R.glow, 0.16 + (t ? 0.12 * Math.sin(t * 2.4) : 0.06)); ell(g, mx, my - 18, 8, 11, R.hi, 0.18 + (t ? 0.1 * Math.sin(t * 2.4) : 0))
   }
   if (th) iceYards(g, by, held, th, A, B)
@@ -650,7 +662,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       sprHit(n.id, sx, sy + bob)
     }
     const up = by.get(n.parent ?? '')
-    if (!tea) { if (up?.kind === 'realm') realmDesk(g, x - 12, y - 2, n.state === 'working', realmOf(up.ai, c), c); else desk(g, x - 12, y - 2, n.state === 'working', c) }
+    if (!tea) { if (up?.kind === 'realm') realmDesk(g, x - 12, y - 2, n.state === 'working', realmOf(up.ai), c); else desk(g, x - 12, y - 2, n.state === 'working', c) }
     if (seat === 'wait' && !tea) hourglass(g, x - 9, y - 1, t, c)
     if (seat === 'pause' && !tea) frostDesk(g, x - 12, y - 2, th!.ice)
     // Typing: hands take turns on the desk and a line of ink grows across the scroll.
@@ -714,7 +726,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   // Every label tries its spots in order and takes the first that covers no other label and no island but its owner's.
   const taken: Box4[] = []
   const isles = court.nodes.filter(n => BIG.has(n.kind) && seen(n, 300)).map(n => ({ id: n.id, r: [X(n.x), Y(n.y), n.w * v.z, n.h * v.z] as Box4 }))
-  const stageBox: Box4 = [(s.inset?.[0] ?? 0) + 4, 4, cw - 8 - (s.inset?.[0] ?? 0), ch - 8 - (s.inset?.[1] ?? 0)]
+  const [il, ib, ir] = s.inset ?? [0, 0, 0], stageBox: Box4 = [il + 4, 4, cw - 8 - il - ir, ch - 8 - ib]
   const place = (spots: Array<[number, number]>, w: number, h: number, owner?: string, inside = false) => {
     const at = freeSpot(spots, w, h, taken, isles, owner, inside ? stageBox : undefined)
     if (at) taken.push([at[0], at[1], w, h])
@@ -736,7 +748,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       const yd = n.kind === 'realm' ? by.get(n.parent ?? '') : undefined
       if (yd) spots.unshift(...spots.splice(n.x > yd.x ? 2 : 3, 1))
       // A realm with no free spot goes further out or narrower, never onto another label or the petition.
-      let at = place(spots, w, h, n.id, n.kind === 'realm')
+      let at = place(spots, w, h, n.id, true)
       const forced = !at && n.kind === 'realm' ? forcedSpot(spots, w, h, [cx, mid], taken, isles, n.id, stageBox) : undefined
       if (forced) { at = forced.at; w = forced.w; taken.push([at[0], at[1], w, h]) }
       if (!at) continue
@@ -778,7 +790,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       for (const d of desks) {
         if (!seen(d)) continue
         const w = Math.min(PLATE.maxW, Math.max(PLATE.minW, d.w * v.z - 6)), x = X(d.x + d.w / 2) - w / 2, y = Y(d.y + d.h) + 2, t = timer(d, wall)
-        const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai, c) : undefined, rc = HR ? HR.hi : roleColor(d.role, c)
+        const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai) : undefined, rc = HR ? HR.hi : roleColor(d.role, c)
         card(g, x, y, w, PLATE.h, HR ? HR.hi : c.red_lt, d.state === 'needs' || !!HR)
         if (HR) { g.globalAlpha = 0.6; g.fillStyle = HR.dk; g.beginPath(); g.roundRect(x + 1, y + 1, w - 2, PLATE.h - 2, 3); g.fill(); g.globalAlpha = 1 }
         rect(g, x, y + 1, 3, PLATE.h - 2, d.state === 'needs' ? c.red_lt : rc)
@@ -805,7 +817,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
         rows.forEach((d, i) => {
           const ry = y + 24 + i * 20, t = timer(d, wall)
           const tw = wid(g, PIX(8), t)
-          const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai, c) : undefined
+          const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai) : undefined
           rect(g, x + 1, ry, w - 2, 1, 'rgba(255,255,255,.07)')
           if (HR) rect(g, x + 1, ry + 1, 3, 18, HR.hi)
           text(g, (d.role ?? 'lead').toUpperCase(), x + 8, ry + 10, PIX(8), HR ? HR.hi : roleColor(d.role, c), 62)
@@ -823,13 +835,23 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
     let dot: [number, number] = [cx, Y(yard.y + yard.h / 2)]
     g.font = PIX(8)
     // Crowded phone Fit: a short stub beside the island still beats a bare dot.
-    for (const [max, force] of [[180, false], [120, false], [90, false], [90, true]] as const) {
-      const label = fit(g, yard.label.toUpperCase(), max), w = g.measureText(label).width + 26
-      const at = force ? [cx - w / 2, above] as const : place([[cx - w / 2, above], [cx - w / 2, below], [cx - w, above], [cx, above], [cx - w, below], [cx, below], ...([[X(yard.x + yard.w) + 4, my], [X(yard.x) - w - 4, my]] as Array<[number, number]>).filter(([x]) => x >= 4 && x + w <= cw - 4)], w, 18, yard.id)
+    // full name on two lines first, then the shortened one-liners
+    const name = yard.label.toUpperCase()
+    const two = (max: number): string[] => {
+      if (g.measureText(name).width <= max) return [name]
+      const words = name.split(' ')
+      let a = ''
+      while (words.length > 1 && g.measureText(a ? `${a} ${words[0]}` : words[0]).width <= max) a = a ? `${a} ${words.shift()}` : words.shift()!
+      return a ? [a, fit(g, words.join(' '), max)] : [fit(g, name, max)]
+    }
+    for (const [max, force, wrap] of [[180, false, true], [180, false, false], [120, false, false], [90, false, false], [90, true, false]] as const) {
+      const lines = wrap ? two(max) : [fit(g, name, max)]
+      const w = Math.max(...lines.map(l => g.measureText(l).width)) + 26, h = 18 + (lines.length - 1) * 12, up = above - (h - 18)
+      const at = force ? [Math.min(Math.max(cx - w / 2, stageBox[0]), stageBox[0] + stageBox[2] - w), up] as const : place([[cx - w / 2, up], [cx - w / 2, below], [cx - w, up], [cx, up], [cx - w, below], [cx, below], ...([[X(yard.x + yard.w) + 4, my], [X(yard.x) - w - 4, my]] as Array<[number, number]>).filter(([x]) => x >= 4 && x + w <= cw - 4)], w, h, yard.id, true)
       if (!at) continue
       const [x, y] = at
-      card(g, x, y, w, 18, c.red_lt, hot); text(g, label, x + 17, y + 9.5, PIX(8), TEXT, max + 10)
-      hits.push({ x, y, w, h: 18, id: yard.id })
+      card(g, x, y, w, h, c.red_lt, hot); lines.forEach((l, i) => text(g, l, x + 17, y + 9.5 + i * 12, PIX(8), TEXT, max + 10))
+      hits.push({ x, y, w, h, id: yard.id })
       dot = [x + 9, y + 9]
       break
     }
@@ -838,7 +860,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   }
   // Garden task: idle roles, comma list; armory task: "<n> tools".
   for (const n of court.nodes) {
-    if (n.kind === 'realm') plaque(n, n.sub, false, realmOf(n.ai, c).hi, realmOf(n.ai, c).glow)
+    if (n.kind === 'realm') plaque(n, n.sub, false, realmOf(n.ai).hi, realmOf(n.ai).glow)
     else if (n.kind === 'garden') plaque(n, n.task ? `${n.task.split(',').length} resting` : undefined)
     else if (n.kind === 'armory' || isPlace(n.kind)) plaque(n, n.task, false, n.warn ? c.red_lt : undefined)
     // Problem count on a place: memory health, missing keys, proposals waiting.
@@ -983,6 +1005,7 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
   onPick: (id: string) => void; onAnswer: (sessionId: string, ask: Ask, choice: Choice, said: string) => void; onClose: () => void
 }) {
   const [tab, setTab] = useState<'t' | 'd'>('t')
+  const [ask0, setAsk0] = useState('')
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
   // A pavilion's chats are its AI's, wherever they hang.
@@ -992,20 +1015,20 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
   const yard = up?.kind === 'realm' ? court.nodes.find(n => n.id === up.parent) : up ?? node
   const lead = node.kind === 'desk' && roleKey(node.role) === 'lead'
   const ask = p?.ask && (node.kind === 'courtyard' || lead || node.state === 'needs') ? p.ask : undefined
-  const n = (k: CourtNode['kind']) => court.nodes.filter(m => m.kind === k).length
-  const count = (st: CourtState) => desks.filter(d => d.state === st).length
+  // Chats, like the header.
+  const count = (st: CourtState) => court.nodes.filter(d => d.kind === 'courtyard' && d.state === st).length
   const roster = node.kind === 'council' ? desks.filter(d => d.state === 'needs') : kids
   const eye = node.kind === 'desk' ? node.role ?? 'lead' : node.here ? 'This window' : node.kind === 'courtyard' ? `${node.ai ?? 'chat'} courtyard` : node.kind === 'realm' ? `${aiName(node.ai)} realm` : KINDS[node.kind]
-  const eyeColor = node.kind === 'desk' ? roleColor(node.role, c) : node.kind === 'council' ? c.gold : node.kind === 'window' ? WIN[node.color ?? ''] ?? MUTE : node.kind === 'realm' ? realmOf(node.ai, c).hi : c[AI_KEY[node.ai ?? ''] ?? 'jade_lt']
+  const eyeColor = node.kind === 'desk' ? roleColor(node.role, c) : node.kind === 'council' ? c.gold : node.kind === 'window' ? WIN[node.color ?? ''] ?? MUTE : node.kind === 'realm' ? realmOf(node.ai).hi : c[AI_KEY[node.ai ?? ''] ?? 'jade_lt']
   const placeSub = isPlace(node.kind) ? node.task : undefined
-  const title = node.kind === 'realm' ? node.task ?? SAY[node.state ?? 'idle'] : node.kind === 'desk' ? node.task ?? node.ask ?? SAY[node.state ?? 'idle'] : node.kind === 'council' ? 'Switchboard' : node.label
+  const title = node.kind === 'realm' ? node.task ?? SAY[node.state ?? 'idle'] : node.kind === 'desk' ? node.task ?? node.ask ?? yard?.label ?? SAY[node.state ?? 'idle'] : node.kind === 'council' ? 'Switchboard' : node.label
   const nf = node.from ?? (node.kind === 'desk' && yard?.ai && node.ai && yard.ai !== node.ai && up?.kind !== 'realm' ? yard.ai : undefined), via = nf ? ` · Moved from ${aiName(nf)}` : ''
-  const sub = node.kind === 'desk' ? `${castOf(node.role).name} · ${aiName(node.ai)}${yard ? ` · ${yard.label}` : ''}${via}` : node.kind === 'council' ? `${n('pavilion')} AIs · ${n('courtyard')} chats · ${desks.length} agents`
-    : node.kind === 'courtyard' ? `${aiName(node.ai)} · ${kids.filter(k => k.kind === 'desk').length} agents${via}` : node.kind === 'realm' ? node.sub : node.kind === 'window' ? (node.window ? folder(node.window) : 'Chats outside every open window') : placeSub
-  const stats: Array<[string, string, boolean?]> = node.kind === 'desk' ? [[timer(node, now), 'status', node.state === 'needs'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'shipped']]
-    : node.kind === 'council' ? [[`${count('working')}`, 'working'], [`${count('needs')}`, 'need you', count('needs') > 0], [`${count('done')}`, 'shipped']]
-    : node.kind === 'window' ? [[`${kids.length}`, 'chats'], [`${kids.filter(k => k.state === 'needs').length}`, 'need you', kids.some(k => k.state === 'needs')], [`${kids.filter(k => k.state === 'done').length}`, 'shipped']]
-    : node.kind === 'pavilion' ? [[`${kids.length}`, 'chats'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'shipped']]
+  const sub = node.kind === 'desk' ? `${castOf(node.role).name} · ${aiName(node.ai)}${yard ? ` · ${yard.label}` : ''}${via}` : node.kind === 'council' ? courtSummary(court)
+    : node.kind === 'courtyard' ? `${aiName(node.ai)} · ${plural(kids.filter(k => k.kind === 'desk').length, 'agent')}${via}` : node.kind === 'pavilion' && !kids.length ? 'No chats yet' : node.kind === 'realm' ? node.sub : node.kind === 'window' ? (node.window ? folder(node.window) : 'Chats outside every open window') : placeSub
+  const stats: Array<[string, string, boolean?]> = node.kind === 'desk' ? [[timer(node, now), 'status', node.state === 'needs'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'done']]
+    : node.kind === 'council' ? [[`${count('working')}`, 'working'], [`${count('needs')}`, 'need you', count('needs') > 0], [`${count('done')}`, 'done']]
+    : node.kind === 'window' ? [[`${kids.length}`, 'chats'], [`${kids.filter(k => k.state === 'needs').length}`, 'need you', kids.some(k => k.state === 'needs')], [`${kids.filter(k => k.state === 'done').length}`, 'done']]
+    : node.kind === 'pavilion' ? [[`${kids.length}`, 'chats'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'done']]
     : node.kind === 'realm' ? [[timer(node, now), 'status'], [`${node.runs ?? 0}`, 'runs'], [`${kids.length}`, 'desks']] : []
   // A realm lists its helper's jobs and the tasks of the desks handed to it.
   const mine = node.kind === 'realm' ? new Set([node.ai, ...kids.map(k => k.id.split(':').pop())]) : undefined
@@ -1019,6 +1042,16 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
       <button type="button" className="bp-close" aria-label="Close details" onClick={onClose}>×</button>
       <header><p className="bp-eye" style={{ color: eyeColor }}>{eye}</p><h3>{title}</h3>{sub && <p className="bp-sub">{sub}</p>}</header>
       {stats.length > 0 && <dl className="bp-stats">{stats.map(([v, l, hot]) => <div key={l}><dt>{l}</dt><dd className={hot ? 'hot' : undefined}>{v}</dd></div>)}</dl>}
+      {node.kind === 'pavilion' && node.ai === 'research' && (() => {
+        const proj = hub.projects.find(p => p.isOpen)?.path ?? hub.projects[0]?.path
+        const go = () => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false }); setAsk0(''); onClose() } }
+        return <div className="bp-pad" style={{ display: 'grid', gap: 8 }}>
+          <textarea rows={3} placeholder="What should the research chat look into?" value={ask0}
+            onChange={e => setAsk0(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go() }}
+            style={{ font: 'inherit', padding: 10, borderRadius: 8, resize: 'vertical', background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />
+          <button type="button" className="hub-btn primary sm" style={{ justifySelf: 'start' }} disabled={!ask0.trim() || !proj} onClick={go}>Research</button>
+        </div>
+      })()}
       {node.kind === 'courtyard' && node.chatId && onSummary && <div className="bp-pad"><SummaryFold id={node.chatId} name={node.label} summary={hub.summaries?.[node.chatId]} onAsk={refresh => onSummary(node.chatId!, refresh)} onCopy={onCopy} /></div>}
       {ask && node.chatId && <AskBlock key={ask.id} ask={ask} sent={sent[ask.id]} onAnswer={(ch, said) => onAnswer(node.chatId!, ask, ch, said)} />}
       {!ask && p?.question && p.state === 'needs-you' && (node.kind === 'courtyard' || lead) &&
@@ -1144,24 +1177,27 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     // Whole device pixels per art pixel once zoomed in; quarter steps below one so the whole court still fits.
     const snap = (z: number, down = false) => {
       const k = z * dpr * ART, r = down ? Math.floor : Math.round
-      return Math.min(k >= 1 ? r(k) : Math.max(0.25, r(k * 4) / 4), Math.floor(MAX_Z * dpr * ART)) / (dpr * ART)
+      // Whole art pixels from 1 up; sixteenths below, so a low Fit zoom is not cut by up to a quarter.
+      return Math.min(k >= 1 ? r(k) : Math.max(1 / 16, r(k * 16) / 16), Math.floor(MAX_Z * dpr * ART)) / (dpr * ART)
     }
     const setZ = (nz: number, cx: number, cy: number) => { const v = s.view; v.x = cx - ((cx - v.x) * nz) / v.z; v.y = cy - ((cy - v.y) * nz) / v.z; v.z = nz }
     const fit = () => {
       if (!s.frame) return
       // Fit in the sky the tool belt and legend leave free: a tall belt takes the left edge, wide bars the bottom.
       const stage = el.getBoundingClientRect(), cw = W / dpr, ch = H / dpr
-      let l = 0, b = 0
-      for (const o of el.parentElement?.querySelectorAll('.bt, .board-legend') ?? []) {
+      // The open card panel docks right on desktop, at the bottom on a phone.
+      let l = 0, b = 0, rt = 0
+      for (const o of el.parentElement?.querySelectorAll('.bt, .board-legend, .bp') ?? []) {
         const r = o.getBoundingClientRect()
         if (!r.width) continue
-        if (r.height > r.width && r.left - stage.left < cw / 3) l = Math.max(l, r.right - stage.left)
-        else if (r.top - stage.top > ch / 2) b = Math.max(b, stage.bottom - r.top)
+        if (o.classList.contains('bp')) { if (r.left - stage.left > cw / 3) rt = Math.max(rt, stage.right - r.left); else b = Math.max(b, stage.bottom - r.top) }
+        else if (r.height > r.width && r.left - stage.left < cw / 3) l = Math.max(l, r.right - stage.left)
+        else if (r.top - stage.top > ch / 3) b = Math.max(b, stage.bottom - r.top)
       }
-      s.inset = [l, b]
-      const f = fitCourt(s.court, cw - l, ch - b), z = snap(f.zoom, true)
+      s.inset = [l, b, rt]
+      const f = fitCourt(s.court, cw - l - rt, ch - b), z = snap(f.zoom, true)
       // Center on the box Fit framed (plaques in), not the baked art.
-      s.view = { z, x: l + (cw - l) / 2 - (f.cx - s.frame.ox) * z, y: f.sy - (f.cy - s.frame.oy) * z }
+      s.view = { z, x: l + (cw - l - rt) / 2 - (f.cx - s.frame.ox) * z, y: f.sy - (f.cy - s.frame.oy) * z }
       s.zc = z
     }
     // After a needs-you jump the camera eases after the walker until it arrives, the panel closes, or the user moves the view.
@@ -1297,7 +1333,8 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   const open = (id: string, close?: boolean) => { setPicked(id); requestAnimationFrame(() => st.current.show(id, close)) }
   const answer = (sessionId: string, ask: Ask, choice: Choice, said: string) => { send({ type: 'hub-answer', sessionId, askId: ask.id, choice }); setSent(m => ({ ...m, [ask.id]: said })) }
   const desks = court.nodes.filter(n => n.kind === 'desk'), yards = court.nodes.filter(n => n.kind === 'courtyard')
-  const count = (x: CourtState) => desks.filter(d => d.state === x).length
+  // Header counts chats, the same unit as its chats total.
+  const count = (x: CourtState) => yards.filter(d => d.state === x).length
   const needs = court.petition?.deskId
   const note = !yards.length ? skin.copy.empty : desks.length && desks.every(d => d.state === 'done') ? skin.copy.done : undefined
   const node = picked ? court.nodes.find(n => n.id === picked) : undefined
@@ -1305,15 +1342,22 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   const deskWhere = (d: CourtNode) => { const up = court.nodes.find(y => y.id === d.parent); return up?.kind === 'realm' ? `${court.nodes.find(y => y.id === up.parent)?.label ?? ''}, ${aiName(up.ai)} realm` : up?.label ?? '' }
   const c = skin.court.colors
   return (
-    <dialog ref={dlg} className="hub hub-dark board" aria-label="Board" style={{ '--b-bg': skin.court.bands[0], '--b-ink': skin.palette.ink, '--b-font': skin.font, '--b-hot': c.red_lt, '--b-gold': c.gold } as React.CSSProperties}
+    <dialog ref={dlg} className="hub hub-dark board" aria-label="Agents" style={{ '--b-bg': skin.court.bands[0], '--b-ink': skin.palette.ink, '--b-font': skin.font, '--b-hot': c.red_lt, '--b-gold': c.gold } as React.CSSProperties}
       // Esc is handled on keydown: Chrome only lets a dialog cancel be stopped once per user activation.
       onCancel={e => { e.preventDefault(); if (picked) setPicked(undefined); else onClose() }}
       onKeyDown={e => {
-        if (e.key === 'Escape') { e.preventDefault(); if (picked) setPicked(undefined); else onClose(); return }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          // Cast list first, then the card, then the board.
+          const cast = (e.currentTarget as HTMLElement).querySelector<HTMLDetailsElement>('.board-cast details[open]')
+          if (cast) { cast.open = false; cast.querySelector('summary')?.focus() } else if (picked) setPicked(undefined); else onClose()
+          return
+        }
         if ((e.target as HTMLElement).closest?.('input, select')) return; if (e.key === '+' || e.key === '=') st.current.zoom(1); else if (e.key === '-') st.current.zoom(-1); else if (e.key === '0') st.current.refit() }}>
       <header className="board-head">
-        <h2>{skin.copy.title}</h2>
-        <span className="board-meta"><b>{count('working')}</b> working <b>{count('waiting')}</b> waiting <b>{count('done')}</b> shipped <b>{yards.length}</b> chats</span>
+        <h2>Agents</h2>
+        <span className="board-sub">{skin.copy.title}</span>
+        <span className="board-meta"><b>{count('working')}</b> working <b>{count('waiting')}</b> waiting <b>{count('done')}</b> done <b>{yards.length}</b> chats</span>
         {needs && <button type="button" className="hub-btn board-need" aria-label={`${count('needs')} needs you`} onClick={() => open(needs, true)}><i aria-hidden />{count('needs')}<span className="board-need-word"> needs you</span></button>}
         {SKINS.length > 1 && <label className="board-skin">Skin
           <select value={skin.id} onChange={e => pickSkin(e.target.value)} title={skin.info}>
@@ -1323,12 +1367,11 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
         <button type="button" className="hub-btn board-z" aria-label="Zoom out" onClick={() => st.current.zoom(-1)}>-</button>
         <button type="button" className="hub-btn" onClick={() => st.current.refit()}>Fit</button>
         <button type="button" className="hub-btn board-z" aria-label="Zoom in" onClick={() => st.current.zoom(1)}>+</button>
-        <button type="button" className="hub-btn" onClick={onClose}>Close</button>
       </header>
       <div className="board-stage">
         <canvas ref={canvas} className="board-canvas" aria-hidden />
         {note && <p className="board-note">{note}</p>}
-        <BoardTools skin={skin} night={mode === 'night'} counts={{ ...beltCounts(shown), next: yards.filter(y => y.state === 'needs').length, todo: todoCount, changes: files }}
+        <BoardTools skin={skin} night={mode === 'night'} counts={{ ...beltCounts(shown), next: yards.filter(y => y.state === 'needs').length, todo: todoCount, todoAll: court.nodes.find(n => n.kind === 'notice')?.list?.length, changes: files }}
           on={{ new: onNew, next: () => { if (needs) { open(needs, true); go(needs) } }, todo: onTodo, limits: onLimits, changes: onChanges, mode: flip }} />
         <ul className="board-legend" aria-label="Legend">
           {LEGEND.map(([k, word]) => <li key={k}><i style={{ background: stateColor(k, c) }} />{word}</li>)}

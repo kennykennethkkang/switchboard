@@ -42,6 +42,12 @@ describe('chatRows', () => {
   it('drops rows without a pid or session id', () => {
     assert.equal(chatRows([{ cwd: '/x' }, { pid: 'x', sessionId: 's' }], () => true, NOW).length, 0)
   })
+  it('drops headless claude -p runs and an untouched Remote Control standby', () => {
+    const sdk = { ...base, entrypoint: 'sdk-cli' }
+    const files = [{ ...sdk, sessionId: 'bench' }, { ...sdk, sessionId: 'standby', bridgeSessionId: 'br_s' }, { ...sdk, sessionId: 'phone', bridgeSessionId: 'br_p' }, { ...base, sessionId: 'term' }]
+    const rows = chatRows(files, () => true, NOW, r => r.sessionId !== 'standby')
+    assert.deepEqual(rows.map(r => r.sessionId), ['phone', 'term'])
+  })
 })
 
 describe('newer', () => {

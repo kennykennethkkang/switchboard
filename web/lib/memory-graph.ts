@@ -26,10 +26,44 @@ export const GROUPS: { id: Group; label: string; color: string; set: 'Memory' | 
   { id: 'project', label: 'Projects', color: '#f4f4f6', set: 'Workspace' },
   { id: 'chat', label: 'Chats', color: '#f2994a', set: 'Workspace' },
   { id: 'todo', label: 'To-do', color: '#ffc533', set: 'Workspace' },
-  { id: 'rule', label: 'Rules', color: '#ff7ab3', set: 'Workspace' },
+  { id: 'rule', label: 'CLAUDE.md files', color: '#ff7ab3', set: 'Workspace' },
 ]
 export const groupOf = (n: GraphNode): Group => n.kind === 'memory' ? (n.type === 'project' ? 'project-memory' : n.type ?? 'reference') : n.kind
 export const colorOf = (n: GraphNode) => GROUPS.find(g => g.id === groupOf(n))!.color
+
+
+export type P3 = { x: number; y: number; z: number }
+/** Camera spot that fits pts in `fill` of a view with this vertical fov (degrees) and aspect, level, from the side cam is on.
+ * Centred on what lands on screen, not the box: perspective makes near points bigger, so the box centre sits off. */
+export function framePose(pts: P3[], cam: P3, fov: number, aspect: number, fill = 0.8): { at: P3; pos: P3 } | undefined {
+  if (!pts.length) return undefined
+  const mid = (k: keyof P3) => { const v = pts.map(p => p[k]); return (Math.min(...v) + Math.max(...v)) / 2 }
+  const o = { x: mid('x'), y: mid('y'), z: mid('z') }
+  const h = Math.hypot(cam.x - o.x, cam.z - o.z) || 1
+  const f = { x: (cam.x - o.x) / h, z: (cam.z - o.z) / h }
+  const t = Math.tan((fov * Math.PI) / 360)
+  // near: toward the camera; side: screen right, (f.z, -f.x) on the ground.
+  const r = pts.map(p => ({ near: (p.x - o.x) * f.x + (p.z - o.z) * f.z, side: (p.x - o.x) * f.z - (p.z - o.z) * f.x, y: p.y - o.y }))
+  const deep = Math.max(...r.map(p => p.near))
+  // Both by bisection: the screen centre falls as the offset grows, the spread as the camera backs off.
+  const bisect = (lo: number, hi: number, up: (v: number) => boolean) => { for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (up(m)) lo = m; else hi = m } return (lo + hi) / 2 }
+  const fit = (d: number, k: 'side' | 'y') => {
+    const at = (c: number) => { const v = r.map(p => (p[k] - c) / (d - p.near)); return [Math.min(...v), Math.max(...v)] }
+    const c = bisect(Math.min(...r.map(p => p[k])), Math.max(...r.map(p => p[k])), c => { const [lo, hi] = at(c); return lo + hi > 0 })
+    const [lo, hi] = at(c)
+    return { c, e: (hi - lo) / 2 / (k === 'side' ? t * aspect : t) }
+  }
+  const spread = (d: number) => Math.max(fit(d, 'side').e, fit(d, 'y').e)
+  let hi = Math.max(60, deep + 1)
+  while (spread(hi) > fill) hi *= 2
+  const d = Math.max(60, bisect(deep + 1e-6, hi, d => spread(d) > fill))
+  const sc = fit(d, 'side').c, yc = fit(d, 'y').c
+  const at = { x: o.x + f.z * sc, y: o.y + yc, z: o.z - f.x * sc }
+  return { at, pos: { x: at.x + f.x * d, y: at.y, z: at.z + f.z * d } }
+}
+
+/** cam moved along its line to at, k times as far. */
+export const dolly = (cam: P3, at: P3, k: number): P3 => ({ x: at.x + (cam.x - at.x) * k, y: at.y + (cam.y - at.y) * k, z: at.z + (cam.z - at.z) * k })
 
 const aka = (n: GraphNode, s: string) => !!n.aliases?.some(a => a.toLowerCase().includes(s))
 
@@ -38,7 +72,7 @@ export function findNodes(nodes: GraphNode[], q: string, off: Set<string>): Grap
   const s = q.trim().toLowerCase()
   if (!s) return []
   return nodes.filter(n => !off.has(groupOf(n)) && (n.label.toLowerCase().includes(s) || aka(n, s)))
-    .sort((a, b) => Number(!a.label.toLowerCase().startsWith(s)) - Number(!b.label.toLowerCase().startsWith(s)) || a.label.length - b.label.length)
+    .sort((a, b) => Number(!!a.superseded) - Number(!!b.superseded) || Number(!a.label.toLowerCase().startsWith(s)) - Number(!b.label.toLowerCase().startsWith(s)) || a.label.length - b.label.length)
     .slice(0, 8)
 }
 
@@ -48,20 +82,39 @@ export function neighbors(g: MemoryGraph, id: string): GraphNode[] {
   return g.nodes.filter(n => ids.has(n.id))
 }
 
-/** Every visible node matching q by label, alias or description, for the list view. */
-export function listNodes(nodes: GraphNode[], q: string, off: Set<string>): GraphNode[] {
+/** Every visible node matching q by label, alias or description, for the list view: by project, superseded last. */
+export function listNodes(nodes: GraphNode[], q: string, off: Set<string>, proj = new Map<string, string>()): GraphNode[] {
   const s = q.trim().toLowerCase()
+  const by = (n: GraphNode) => proj.get(n.id)
   return nodes.filter(n => !off.has(groupOf(n)) && (!s || n.label.toLowerCase().includes(s) || aka(n, s) || !!n.description?.toLowerCase().includes(s)))
+    .sort((a, b) => Number(!!a.superseded) - Number(!!b.superseded) || Number(!by(a)) - Number(!by(b)) || (by(a) ?? '').localeCompare(by(b) ?? ''))
 }
 
-/** The list view's health line: each nonzero count, singular or plural. */
-export function healthLine(h: GraphHealth): string {
-  const rows: [unknown[], string, string][] = [
-    [h.dangling, 'note with broken links', 'notes with broken links'], [h.orphans, 'unlinked note', 'unlinked notes'], [h.duplicates, 'shared name', 'shared names'],
-    [h.contradictions, 'contradiction', 'contradictions'], [h.superseded, 'superseded note', 'superseded notes'], [h.invalid, 'invalid note', 'invalid notes'], [h.stale, 'stale note', 'stale notes'],
-  ]
-  return rows.filter(([l]) => l.length).map(([l, one, many]) => `${l.length} ${l.length === 1 ? one : many}`).join(', ')
+/** Node id to the name of the one project its `in` edges lead to; none for the vault or a file every project shares. */
+export function projectOf(g: MemoryGraph): Map<string, string> {
+  const names = new Map(g.nodes.filter(n => n.kind === 'project').map(n => [n.id, n.label]))
+  const ups = new Map<string, string[]>()
+  for (const e of g.edges) if (e.kind === 'in' && names.has(e.target)) ups.set(e.source, [...(ups.get(e.source) ?? []), e.target])
+  return new Map([...ups].filter(([, l]) => l.length === 1).map(([id, l]) => [id, names.get(l[0])!]))
 }
+
+const NOTE = new Set<GraphNode['kind']>(['memory', 'wiki', 'raw'])
+/** Notes, and the links and typed relations between them; in, from and todo only say where a thing sits. */
+export const graphCounts = (g: MemoryGraph) => ({ notes: g.nodes.filter(n => NOTE.has(n.kind)).length, links: g.edges.filter(e => !['in', 'from', 'todo'].includes(e.kind)).length })
+
+/** The list view's health line as parts: each nonzero count, singular or plural, and the nodes it counts. */
+export function healthParts(h: GraphHealth, nodes: GraphNode[]): { text: string; ids: string[] }[] {
+  const dup = new Set(h.duplicates)
+  const named = nodes.filter(n => dup.has(n.label.toLowerCase()) || !!n.aliases?.some(a => dup.has(a.toLowerCase()))).map(n => n.id)
+  const rows: [unknown[], string[], string, string][] = [
+    [h.dangling, h.dangling, 'note with broken links', 'notes with broken links'], [h.orphans, h.orphans, 'unlinked note', 'unlinked notes'], [h.duplicates, named, 'shared name', 'shared names'],
+    [h.contradictions, [...new Set(h.contradictions.flat())], 'contradiction', 'contradictions'], [h.superseded, h.superseded, 'superseded note', 'superseded notes'],
+    [h.invalid, h.invalid, 'invalid note', 'invalid notes'], [h.stale, h.stale, 'stale note', 'stale notes'],
+  ]
+  return rows.filter(([l]) => l.length).map(([l, ids, one, many]) => ({ text: `${l.length} ${l.length === 1 ? one : many}`, ids }))
+}
+
+export const healthLine = (h: GraphHealth) => healthParts(h, []).map(p => p.text).join(', ')
 
 /** Section titles for a typed edge, read from its source and from its target. */
 const TYPED: [GraphEdge['kind'], string, string][] = [

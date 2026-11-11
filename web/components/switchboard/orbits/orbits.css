@@ -142,7 +142,10 @@
 }
 .ovl-label > span { min-width: 0; display: grid; gap: 2px; }
 .ovl-label b { font: 500 13px/1.2 var(--hub-sans); color: var(--hub-ink); }
-.ovl-label small { font: 400 11px/1.2 var(--hub-mono); color: var(--hub-ash); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ovl-label small { font: 400 11px/1.2 var(--hub-mono); color: var(--hub-ash); overflow-wrap: anywhere; }
+/* phone: the label column only has room for the state, so the model drops rather than cut it */
+@media (max-width: 420px) { .ovl-model { display: none; } }
+@media (pointer: coarse) { .ovl-row { min-height: 45px; } .ovl-jump button { min-height: 44px; } }
 .ovl-word { color: var(--c, var(--hub-ash)); }
 .ovl-row[data-s='active'] .ovl-label, .ovl-row[data-s='needs'] .ovl-label { box-shadow: inset 2px 0 0 var(--c); background: color-mix(in srgb, var(--c) 7%, var(--hub-canvas)); }
 .ovl-row[data-s='active'] .ovl-track, .ovl-row[data-s='needs'] .ovl-track { background: color-mix(in srgb, var(--c) 4%, transparent); }

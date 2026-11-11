@@ -4,7 +4,7 @@
  * Feed posts from the usage mods come through ingest(); what the extension gathers itself comes through set(). Every
  * change fires onChange, which extension.ts throttles into `hub-state`.
  */
-import { approvalBlock, closingApprove, isTempDir } from './approve'
+import { approvalBlock, closingApprove, isTempDir, stampedChats } from './approve'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -20,7 +20,7 @@ import { createLogger } from '../logger'
 import { foldPathCase } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
 import { MirofishPoller } from './mirofish'
-import type { AiId, Ask, CacheKeep, ChatLink, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, KeptLimits, Limit, LimitPause, Server, SessionLive, StuckItem } from './types'
+import type { AiId, Ask, CacheKeep, ChatLink, ChatUnlink, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, KeptLimits, Limit, LimitPause, Server, SessionLive, StuckItem } from './types'
 import { isTabCommand } from './window-tabs'
 
 const log = createLogger('Hub')
@@ -43,6 +43,10 @@ const JEV_MATCH_MS = 10 * 60 * 1000
 // brain.ts GUARD_MS: an auto link lasts while the target's edit would still be guarded, and 15 minutes at most.
 const EDIT_FRESH_MS = 10 * 60 * 1000
 const AUTO_LINK_MS = 15 * 60 * 1000
+// Kenneth's unlink stays readable this long, so the waiting chat's mod tells it from a link that just went missing.
+const UNLINK_MS = 5 * 60 * 1000
+// A waiter with no row and no live entry: a reload for this long, from the link or the load, else it closed.
+const NO_ROW_MS = 2 * 60 * 1000
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x))
 const idList = (v: unknown) => (Array.isArray(v) && v.length && v.length <= 20 && v.every(x => typeof x === 'string' && x) ? [...new Set(v as string[])] : undefined)
 // Past cache-keeper's 3h idle cap plus a cache lifetime: a chat that quiet is long cold.
@@ -105,7 +109,7 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : u
 // resetsAt may arrive as epoch s or ms; kept as a string, the web parses all three.
 const resetOf = (v: unknown) => str(v) ?? (num(v) === undefined ? undefined : String(v))
 // Same rule as web/lib/limits.ts resetAt: digits under 1e12 are seconds.
-const resetMs = (v = '') => {
+export const resetMs = (v = '') => {
   if (!/^\d+(\.\d+)?$/.test(v.trim())) return Date.parse(v)
   const n = Number(v)
   return n < 1e12 ? n * 1000 : n
@@ -136,6 +140,7 @@ export class HubService {
   private pendingClose: { sessionId: string; cwd: string; at: number }[] = []
   // Old chats whose fresh chat has posted, closed once no subagent of theirs runs.
   private closing: { sessionId: string; at: number }[] = []
+  private readonly closeAtStop = new Set<string>()
   // Handoffs held while the full chat still has subagents running.
   private waiting: { h: Handoff; since: number }[] = []
   // Chats Kenneth handed off by hand: no waiting on subagents.
@@ -191,6 +196,9 @@ export class HubService {
   private readonly owned = new Set<string>()
 
   private retriesFile?: string
+  private linksFile?: string
+  private keptLinks: unknown[] = []
+  private linksAt = 0
   /** One file per workspace, so only this window's own chats load back and no other window sends them. None: memory only. */
   keepRetries(file: string): void {
     this.retriesFile = file
@@ -203,6 +211,16 @@ export class HubService {
         if (typeof r.due === 'number' && typeof r.cwd === 'string' && Date.now() - r.due < PROGRESS_STALE_MS) this.retries.set(id, { due: r.due, cwd: r.cwd, ...(agents.length ? { agents } : {}), ...(r.paused === true ? { paused: true, at: num(r.at) ?? r.due } : {}) })
       }
     } catch { /* none yet, or broken: start empty */ }
+    // Links and Kenneth's unlinks beside it, so a reload does not read as an unlink to a waiting chat.
+    this.linksFile = path.join(path.dirname(file), `links-${path.basename(file).replace(/^retries-/, '')}`)
+    try {
+      const k = JSON.parse(fs.readFileSync(this.linksFile, 'utf8')) as { links?: unknown; unlinks?: unknown }
+      const links = Array.isArray(k.links) ? (k.links as ChatLink[]).filter(l => typeof l?.from === 'string' && Array.isArray(l.to) && typeof l.since === 'number') : []
+      const unlinks = Array.isArray(k.unlinks) ? (k.unlinks as ChatUnlink[]).filter(u => typeof u?.from === 'string' && typeof u.to === 'string' && typeof u.at === 'number') : []
+      this.state = { ...this.state, links, unlinks }
+      this.keptLinks = [this.state.links, this.state.unlinks]
+    } catch { /* none yet */ }
+    this.linksAt = Date.now()
     // limits.json sits beside it, shared by every window.
     this.limitsFile = path.join(path.dirname(file), 'limits.json')
     try {
@@ -210,11 +228,31 @@ export class HubService {
       if (typeof k.at === 'number') this.state = { ...this.state, limitsKept: { at: k.at, windows: limitsOf(k.windows), ...(k.out ? { out: k.out } : {}) } }
       if (k.pause && Array.isArray(k.pause.chats)) this.state = { ...this.state, pause: k.pause }
     } catch { /* none yet */ }
+    this.syncOff()
+  }
+
+  /** Another window (or this one before a reload) may have resumed: take the newest pauseOff on disk, and drop a pause it ended. */
+  private syncOff(): void {
+    if (!this.limitsFile) return
+    let k: { pauseOff?: unknown; paused?: unknown } = {}
+    try { k = JSON.parse(fs.readFileSync(this.limitsFile, 'utf8')) } catch { return }
+    const off = num(k.pauseOff)
+    if (off === undefined) return
+    const news = off > this.pauseOff
+    this.pauseOff = Math.max(this.pauseOff, off)
+    const p = this.state.pause
+    if (!p || !((news && k.paused !== true) || (p.resumeAt ?? Infinity) <= this.pauseOff)) return
+    // Ended elsewhere: this window's held chats go on now, same as a resume here.
+    const now = Date.now()
+    for (const r of this.retries.values()) if (r.paused) r.due = Math.min(r.due, now)
+    this.saveRetries()
+    this.state = { ...this.state, pause: undefined }
   }
 
   private saveLimits(): void {
     const k = this.state.limitsKept
     if (!this.limitsFile) return
+    this.syncOff()
     // paused: the usage-meter mod reads this and holds every tool call. pauseAt (null off) and pauseOff (resumed by hand up to then) let it hold on its own. phone: the phone-mode mod denies AskUserQuestion for a call.
     const pauseAt = this.state.controls.switchboard.pauseAt === undefined ? 99 : this.state.controls.switchboard.pauseAt
     const off = Number.isFinite(this.pauseOff) ? { pauseOff: this.pauseOff } : {}
@@ -227,6 +265,7 @@ export class HubService {
     const rest = (p?.chats ?? []).filter(c => c.sessionId !== sessionId)
     const o = hold && typeof hold === 'object' ? (hold as Record<string, unknown>) : undefined
     if (o) {
+      this.syncOff()
       // Resumed by hand up to then: a late hold from the mod must not pause again.
       if ((num(o.resetsAt) ?? Infinity) <= this.pauseOff) return
       const name = this.state.chats.find(c => c.sessionId === sessionId)?.name
@@ -254,6 +293,7 @@ export class HubService {
     const kept: KeptLimits = { at: now, windows, ...out }
     const changed = JSON.stringify({ ...kept, at: 0 }) !== JSON.stringify({ ...was, at: 0 })
     this.state = { ...this.state, limitsKept: kept }
+    this.syncOff()
     const due = !this.state.pause && pauseDue(windows, this.state.controls.switchboard.pauseAt === undefined ? 99 : this.state.controls.switchboard.pauseAt, resetMs, now)
     if (due && (due.resetsAt ?? Infinity) > this.pauseOff) this.startPause(due, now)
     else if (changed || now - (was?.at ?? 0) > 60_000) this.saveLimits()
@@ -297,6 +337,12 @@ export class HubService {
     if (this.state.pause && now >= (this.state.pause.resumeAt ?? Infinity)) { this.ringPause(true); this.pauseOff = this.state.pause.resumeAt!; this.state = { ...this.state, pause: undefined }; this.saveLimits(); this.emit(now) }
   }
 
+  private saveLinks(): void {
+    if (!this.linksFile || (this.keptLinks[0] === this.state.links && this.keptLinks[1] === this.state.unlinks)) return
+    this.keptLinks = [this.state.links, this.state.unlinks]
+    try { writeJsonAtomic(this.linksFile, { links: this.state.links ?? [], unlinks: this.state.unlinks ?? [] }) } catch (err) { log.warn('Links not kept:', err) }
+  }
+
   private saveRetries(): void {
     if (!this.retriesFile) return
     try { writeJsonAtomic(this.retriesFile, Object.fromEntries(this.retries)) } catch (err) { log.warn('Retries not kept:', err) }
@@ -328,6 +374,13 @@ export class HubService {
   }
 
   /** What the extension gathered itself (history, plan, servers, ...). */
+  // doneChecks is rebuilt every 15s; drop a stamp at once when its chat moves on, so it never sits under another prompt.
+  private keepStamps(s: HubState): HubState {
+    if (!s.doneChecks) return s
+    const keep = new Set(stampedChats(s.progress))
+    return Object.keys(s.doneChecks).every(id => keep.has(id)) ? s : { ...s, doneChecks: Object.fromEntries(Object.entries(s.doneChecks).filter(([id]) => keep.has(id))) }
+  }
+
   set(part: Partial<HubState>, now = Date.now()): void {
     if (part.servers) {
       const up = new Set(part.servers.map(s => s.port))
@@ -339,7 +392,7 @@ export class HubService {
       const list = part[k] as { cwd: string }[] | undefined
       if (list) part = { ...part, [k]: list.filter(c => !isTempDir(c.cwd)) }
     }
-    this.state = { ...this.state, ...part }
+    this.state = this.keepStamps({ ...this.state, ...part })
     if (part.controls) this.saveLimits()
     this.emit(now)
   }
@@ -372,13 +425,16 @@ export class HubService {
       this.retries.set(id, { due: pause?.resumeAt ?? this.resetAt(now), cwd: payload.cwd, ...cutAgents(was), ...(pause ? { paused: true, at: now } : {}) })
       this.saveRetries()
     }
-    this.state = { ...this.state, progress: next ? [next, ...rest] : rest }
+    this.state = this.keepStamps({ ...this.state, progress: next ? [next, ...rest] : rest })
     this.emit(now)
     if (payload.hook_event_name === 'SessionEnd' && was && !this.handedOff.delete(id) && !mirror) this.endedChat.fire(was)
+    // The closing question is answered mid-turn, so approveChat cannot close it yet; it closes at this turn's Stop.
+    if (payload.hook_event_name === 'SessionEnd') this.closeAtStop.delete(id)
+    else if (!mirror && payload.hook_event_name === 'Stop' && (next?.state === 'done' || next?.state === 'idle' || next?.waiting) && this.closeAtStop.delete(id)) this.approvedChat.fire(id)
     if (!mirror && closingApprove(payload)) {
       const why = approvalBlock(was, now)
       if (why) log.warn(`Approve for chat ${id.slice(0, 8)} not taken: ${why}`)
-      else this.approvedChat.fire(id)
+      else { this.closeAtStop.add(id); this.approvedChat.fire(id) }
     }
     return !mirror && next && next.state !== (was?.state ?? 'working') ? { from: was?.state, to: next } : undefined
   }
@@ -556,7 +612,9 @@ export class HubService {
     if (this.fixed.size > 500) for (const id of this.fixed) if (!this.stuckAll.some(i => i.id === id)) this.fixed.delete(id)
     const fix: StuckItem[] = [], paused: { sessionId: string; why: string }[] = []
     for (const id of this.paused) if (!this.waitsOnUser(id)) this.paused.delete(id)
-    for (const item of (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId))) {
+    // Held for usage (paused or waiting on a retry): a quiet job there is expected, as in reapChat.
+    const held = new Set([...(this.state.pause?.chats ?? []).map(c => c.sessionId), ...this.retries.keys()])
+    for (const item of (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId) && !held.has(i.sessionId))) {
       const why = this.waitsOnUser(item.sessionId)
       if (!why) fix.push(item)
       else if (!this.paused.has(item.sessionId)) { this.paused.add(item.sessionId); paused.push({ sessionId: item.sessionId, why }) }
@@ -715,14 +773,16 @@ export class HubService {
 
   /** A chat waiting on others; one per waiting chat and target set. */
   link(l: ChatLink, now = Date.now()): void {
-    this.state = { ...this.state, links: [...(this.state.links ?? []).filter(x => x.from !== l.from || !sameSet(x.to, l.to)), l] }
+    const unlinks = this.state.unlinks?.filter(u => u.from !== l.from || !l.to.includes(u.to))
+    this.state = { ...this.state, links: [...(this.state.links ?? []).filter(x => x.from !== l.from || !sameSet(x.to, l.to)), l], unlinks }
     this.emit(now)
   }
 
-  /** exact: the chat's own link-end, for that target set. Otherwise Kenneth's unlink: drops just those targets, and a link with none left. */
+  /** exact: the chat's own link-end, for that target set. Otherwise Kenneth's unlink: drops just those targets, and a link with none left, and leaves a tombstone. */
   unlink(from: string, to: string[], now = Date.now(), exact = false): void {
     const links = (this.state.links ?? []).flatMap(x => { const left = x.from !== from ? x.to : exact ? (sameSet(x.to, to) ? [] : x.to) : x.to.filter(t => !to.includes(t)); return left.length ? [left.length === x.to.length ? x : { ...x, to: left }] : [] })
-    this.state = { ...this.state, links }
+    const unlinks = exact ? this.state.unlinks : [...(this.state.unlinks ?? []).filter(u => u.from !== from || !to.includes(u.to)), ...to.map(t => ({ from, to: t, at: now }))]
+    this.state = { ...this.state, links, unlinks }
     this.emit(now)
   }
 
@@ -732,9 +792,11 @@ export class HubService {
     return c ? c.live : this.state.live.some(s => s.sessionId === id)
   }
 
-  /** Auto links never get a link-end: they go with the target's fresh edit of that file. */
+  /** A link goes with its waiting chat, not its targets: an ended target's outcome is what the wait reads. No row yet (a reload) keeps it NO_ROW_MS.
+   * Auto links never get a link-end: they go with the target's fresh edit of that file. */
   private linkHolds(l: ChatLink, now: number): boolean {
-    if (!this.alive(l.from) || !l.to.some(id => this.alive(id))) return false
+    const from = this.state.chats.find(x => x.sessionId === l.from)
+    if (from ? !from.live : !this.alive(l.from) && now - Math.max(l.since, this.linksAt) >= NO_ROW_MS) return false
     if (!l.auto) return true
     if (now - l.since >= AUTO_LINK_MS) return false
     const file = l.reason.replace(/\\/g, '/')
@@ -753,6 +815,9 @@ export class HubService {
     if (progress.some((p, i) => p !== this.state.progress[i]) || progress.length !== this.state.progress.length) this.state = { ...this.state, progress }
     const links = this.state.links?.filter(l => this.linkHolds(l, now))
     if (links && links.length !== this.state.links?.length) this.state = { ...this.state, links }
+    const unlinks = this.state.unlinks?.filter(u => now - u.at < UNLINK_MS)
+    if (unlinks && unlinks.length !== this.state.unlinks?.length) this.state = { ...this.state, unlinks }
+    this.saveLinks()
     this.flush(now)
     this.changed.fire(this.state)
   }

@@ -1,0 +1,124 @@
+/* Now page and the bottom status bar. */
+.now { display: grid; gap: 16px; min-width: 0; }
+
+.now-day { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-surface); overflow: hidden; }
+.now-day > div { display: flex; flex-direction: column-reverse; gap: 6px; padding: 12px 14px; min-width: 0; }
+.now-day > div + div { border-left: 1px solid var(--hub-hair); }
+.now-day dd { margin: 0; font: 600 18px/1.1 var(--hub-sans); color: var(--hub-ink); font-variant-numeric: tabular-nums; }
+.now-day dt { font-size: 12px; color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.now-lanes { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.now-lane { display: grid; gap: 10px; min-width: 0; }
+.now-lane-head { display: flex; align-items: center; gap: 8px; margin: 0; font: inherit; }
+.now-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 99px; font: 500 12px/1 var(--hub-sans); }
+.now-badge > i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.now-badge[data-tone='red'] { color: var(--hub-red); background: var(--hub-red-soft); }
+.now-badge[data-tone='blue'] { color: var(--hub-blue); background: var(--hub-blue-soft); }
+.now-badge[data-tone='green'] { color: var(--hub-green); background: var(--hub-green-soft); }
+.now-count { font: 500 12px/1 var(--hub-mono); color: var(--hub-body); font-variant-numeric: tabular-nums; }
+.now-empty { margin: 0; padding: 12px 14px; border: 1px dashed var(--hub-hair); border-radius: 10px; font-size: 13px; color: var(--hub-mute); }
+
+.now-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.now-row {
+  width: 100%; display: grid; gap: 8px; padding: 12px 14px; text-align: left; cursor: pointer;
+  background: var(--hub-card); border: 1px solid var(--hub-hair); border-radius: 10px; color: inherit; font: inherit;
+  transition: transform 160ms var(--hub-ease-out), background-color 160ms ease, border-color 160ms ease;
+}
+.now-row > strong { font: 500 14px/1.3 var(--hub-sans); color: var(--hub-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--hub-mute); min-width: 0; }
+.now-meta > i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.now-bar { flex: 1; min-width: 40px; height: 4px; border-radius: 2px; background: var(--hub-hair); overflow: hidden; }
+.now-bar > b { display: block; height: 100%; background: var(--hub-blue); transform-origin: left; transition: transform 300ms var(--hub-ease-out); }
+.now-step { font: 400 12px/1.3 var(--hub-mono); color: var(--hub-ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-row:active { transform: scale(0.97); }
+.now-row:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .now-row:hover { background: var(--hub-elev); border-color: var(--hub-hair-strong); } }
+
+@media (max-width: 760px) {
+  .now-day { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .now-day > div:nth-child(n + 3) { display: none; }
+  .now-lanes { grid-template-columns: minmax(0, 1fr); }
+}
+/* Mid widths keep every lane >= 300px: one column to 1000, then Needs you left with Working over Done.
+   The 1fr row soaks up Needs you's extra height so Done sits right under Working. */
+@media (max-width: 1000px) and (min-width: 761px) { .now-lanes { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1330px) and (min-width: 1001px) {
+  .now-lanes { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .now-lanes > .now-lane:first-child { grid-row: 1 / span 2; }
+  .now-lanes > .now-lane:nth-child(3) { grid-column: 2; }
+}
+
+/* Needs-you strip inside the lane: no strip chrome, neutral cards with a red rule. Beats globals .hub-stuck. */
+.now-lane > .hub-stuck { padding: 0; border: 0; background: none; }
+.now-lane .hub-stuck ul { gap: 8px; }
+.now-lane .hub-stuck li, .now-lane .hub-stuck li[data-tone='red'] {
+  background: var(--hub-card); border: 1px solid var(--hub-hair); border-left: 3px solid var(--hub-red);
+  border-radius: 10px; padding: 12px 14px; gap: 8px 10px;
+}
+.now-lane .hub-stuck li > i { display: none; }
+/* Answer chips: one row, scrolls sideways. */
+.now-lane .hub-stuck-acts { flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-snap-type: x proximity; }
+.now-lane .hub-stuck-acts::-webkit-scrollbar { display: none; }
+.now-lane .hub-stuck .hub-stuck-opt { flex: none; white-space: nowrap; max-width: none; scroll-snap-align: start; }
+
+/* Status bar: sticky at the bottom, clear of the home indicator. */
+.sb {
+  position: sticky; bottom: 0; z-index: 5; box-sizing: border-box;
+  display: flex; align-items: center; gap: 16px; min-width: 0;
+  height: calc(34px + env(safe-area-inset-bottom)); padding: 0 16px env(safe-area-inset-bottom);
+  background: var(--hub-surface); border-top: 1px solid var(--hub-hair); font-size: 12px; color: var(--hub-mute);
+}
+.sb-meters { display: inline-flex; align-items: center; gap: 14px; flex: none; }
+.sb .hub-limit > i { display: inline-block; width: 36px; height: 3px; border-radius: 2px; background: var(--hub-hair); overflow: hidden; }
+.sb .hub-limit > i > b { display: block; height: 100%; background: var(--hub-blue); transform-origin: left; }
+.sb .hub-limit[data-level='high'] > i > b { background: var(--hub-yellow); }
+.sb .hub-limit[data-level='out'] > i > b { background: var(--hub-red); }
+.sb-end { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.sb-slot { display: inline-flex; align-items: center; min-width: 0; }
+/* Ship chip gives way first: block so the text can ellipsize, toggles keep their size. */
+.sb-slot:has(> .hub-ship-chip) { flex: 0 1 auto; overflow: hidden; }
+.sb .hub-ship-chip { display: block; flex-shrink: 1; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; line-height: 26px; }
+.sb .hub-ship-chip > i { display: inline-block; margin-right: 6px; vertical-align: 1px; }
+/* needs.css hides the name up to 1440 for the header; the status bar has room above 1180. */
+@media (min-width: 1181px) { .sb .hub-ship-name { display: inline; } }
+/* Keep "Push N" readable at 761-940: drop the meter bars, not the chip text. */
+@media (max-width: 940px) { .sb-slot:has(> .hub-ship-chip) { min-width: 64px; } .sb .hub-limit > i { display: none; } }
+.sb-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px;
+  background: none; color: var(--hub-body); font: 500 12px/1 var(--hub-sans); white-space: nowrap; cursor: pointer;
+  transition: transform 160ms var(--hub-ease-out), background-color 160ms ease;
+}
+.sb-btn:active { transform: scale(0.97); }
+.sb-btn:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) { .sb-btn:hover { background: var(--hub-elev); color: var(--hub-ink); } }
+.sb-dev { font-family: var(--hub-mono); }
+.sb-dev > i { width: 6px; height: 6px; border-radius: 50%; background: var(--hub-ash); }
+.sb-dev[data-on] > i { background: var(--hub-green); }
+.sb-toggle[aria-pressed='true'] { color: var(--hub-green); }
+
+/* Narrow: one line, meters plus the toggles as chips. */
+.sb[data-narrow] { gap: 10px; padding-inline: 12px; }
+.sb[data-narrow] :is(.sb-dev, .sb-slot) { display: none; }
+.sb[data-narrow] .hub-limit > i { width: 20px; }
+.sb[data-narrow] .sb-toggle { border-color: var(--hub-hair); border-radius: 99px; }
+@media (max-width: 760px) {
+  .sb { gap: 10px; padding-inline: 12px; }
+  .sb :is(.sb-dev, .sb-slot) { display: none; }
+  .sb .hub-limit > i { display: none; }
+  .sb-meters { gap: 10px; }
+  .sb .sb-toggle { border-color: var(--hub-hair); border-radius: 99px; }
+}
+@media (pointer: coarse) { .sb-btn { height: auto; min-height: 44px; } .sb { height: calc(48px + env(safe-area-inset-bottom)); } .sb .hub-ship-chip { line-height: 42px; } }
+/* Bottom tab bar under 760: the bar sits on top of it, so the nav takes the safe area. */
+@media (max-width: 760px) {
+  .sb { bottom: calc(var(--nav-h, 0px) + env(safe-area-inset-bottom)); height: 34px; padding-bottom: 0; }
+}
+@media (max-width: 760px) and (pointer: coarse) { .sb { height: 48px; } }
+@media (prefers-reduced-motion: reduce) { .now-row, .sb-btn, .now-bar > b { transition: none; } .now-row:active, .sb-btn:active { transform: none; } }
+
+/* Your OK: the chat's changes fold open under the row. */
+.hub-stuck-diff { margin-top: 6px; min-width: 0; }
+.hub-stuck-diff > summary { cursor: pointer; width: fit-content; font-size: 12px; color: var(--hub-mute); border-radius: 4px; }
+.hub-stuck-diff > summary:hover { color: var(--hub-ink); }
+.hub-stuck-diff > summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+.hub-stuck-diff[open] > summary { margin-bottom: 8px; }

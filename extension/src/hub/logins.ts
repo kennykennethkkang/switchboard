@@ -9,9 +9,10 @@ import * as path from 'path'
 import { writeJsonAtomic } from '../hook-entries'
 import type { WebviewToExtensionMessage } from '../protocol'
 import type { ChromeProfile, Links, WebApp, WebLogin } from './types'
+import { CLI_APPS } from './cli-logins'
 
 export const LOGINS = path.join(os.homedir(), '.claude', 'switchboard', 'logins.json')
-export const AUTH0: WebApp = { id: 'auth0', name: 'Auth0', url: 'https://manage.auth0.com/', logins: [] }
+export const AUTH0: WebApp = { id: 'auth0', name: 'Auth0', url: 'https://manage.auth0.com/', logins: [], cli: true }
 
 // Short, ambiguous words only as whole words of the name (api_key, apiKey), so authuser=1 or keyword= pass;
 // unambiguous ones anywhere, so run-together names like authtoken or secretkey are still caught.
@@ -28,13 +29,15 @@ export function loginUrl(s: string): string | undefined {
   return u.href
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const clean = (s: string, max: number) => s.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, max)
 const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0
 
 function login(v: unknown): WebLogin | undefined {
   const o = v as Record<string, unknown> | null
   if (!o || !str(o.id) || !str(o.label) || !str(o.url) || loginUrl(o.url) !== o.url) return undefined
-  return { id: o.id, label: o.label, url: o.url, ...(typeof o.chrome === 'string' ? { chrome: o.chrome } : {}) }
+  return { id: o.id, label: o.label, url: o.url, ...(typeof o.chrome === 'string' ? { chrome: o.chrome } : {}), ...(str(o.email) && EMAIL.test(o.email) ? { email: o.email } : {}),
+    ...(str(o.domain) && /^[a-z0-9.-]+$/i.test(o.domain) ? { domain: o.domain } : {}), ...(o.status === 'signed-in' || o.status === 'expired' || o.status === 'never' ? { status: o.status } : {}) }
 }
 
 /** The saved apps; Auth0 alone when there is no file yet. Entries a hand edit broke are dropped. */
@@ -47,20 +50,19 @@ export function readLogins(file = LOGINS): WebApp[] {
     if (!a || !str(a.id) || !str(a.name) || !str(a.url) || loginUrl(a.url) !== a.url) return []
     const logins = (Array.isArray(a.logins) ? a.logins : []).flatMap((l: unknown) => login(l) ?? [])
     const active = logins.some((l: WebLogin) => l.id === a.active) ? a.active as string : undefined
-    return [{ id: a.id, name: a.name, url: a.url, logins, ...(active ? { active } : {}) }]
+    return [{ id: a.id, name: a.name, url: a.url, logins, ...(active ? { active } : {}), ...(CLI_APPS[a.id] ? { cli: true } : {}) }]
   })
 }
 
-/** Links to apps and logins that still exist; a gone login falls back to the app default (null). */
+/** Links to apps and logins that still exist; a gone login, or a stored null (the old Default pick), is not used. */
 export function pruneLinks(links: unknown, apps: WebApp[]): Links {
   const out: Links = {}
   if (!links || typeof links !== 'object') return out
   for (const [folder, row] of Object.entries(links)) {
     if (!row || typeof row !== 'object') continue
-    const kept: Record<string, string | null> = {}
+    const kept: Record<string, string> = {}
     for (const [id, login] of Object.entries(row)) {
-      const app = apps.find(a => a.id === id)
-      if (app) kept[id] = typeof login === 'string' && app.logins.some(l => l.id === login) ? login : null
+      if (typeof login === 'string' && apps.find(a => a.id === id)?.logins.some(l => l.id === login)) kept[id] = login
     }
     if (Object.keys(kept).length) out[folder] = kept
   }
@@ -85,16 +87,17 @@ export function applyLink(apps: WebApp[], links: Links, c: LinkCommand, folders:
   if (!folders.includes(c.folder)) return 'that folder is not in the project list'
   const app = apps.find(a => a.id === c.app)
   if (!app) return 'no such app'
-  if (c.login !== null && c.login !== 'off' && !app.logins.some(l => l.id === c.login)) return 'no such login'
+  const off = c.login === null || c.login === 'off'
+  if (!off && !app.logins.some(l => l.id === c.login)) return 'no such login'
   const { [app.id]: _was, ...rest } = links[c.folder] ?? {}
-  const row = c.login === 'off' ? rest : { ...rest, [app.id]: c.login }
+  const row = off ? rest : { ...rest, [app.id]: c.login as string }
   const { [c.folder]: _old, ...others } = links
   return Object.keys(row).length ? { ...others, [c.folder]: row } : others
 }
 
-/** The login Sign in opens with no id: the project's pick, else the app's active one. */
+/** The login Sign in opens with no id: the project's pick; none without one. */
 export const loginFor = (app: WebApp, links: Links, folder: string | undefined): string | undefined =>
-  (folder ? links[folder]?.[app.id] : undefined) ?? app.active
+  folder ? links[folder]?.[app.id] : undefined
 
 /** One line for a new chat's system note naming the project's accounts; labels and Chrome profile names only. */
 export function accountsNote(apps: WebApp[], links: Links, folder: string, chrome: ChromeProfile[], project?: string): string | undefined {
@@ -128,11 +131,13 @@ export function applyLogin(apps: WebApp[], c: LoginCommand, newId = () => random
   if (!app) return 'no such app'
   if (c.type === 'hub-login-app-delete') return apps.filter(a => a.id !== app.id)
   const put = (next: WebApp) => apps.map(a => (a.id === app.id ? next : a))
+  const email = 'email' in c && c.email !== undefined ? clean(c.email, 120) : undefined
+  if (email && !EMAIL.test(email)) return 'that email does not look right'
   if (c.type === 'hub-login-add') {
     const label = clean(c.label, 80), url = loginUrl(c.url)
     if (!label) return 'give the login a name'
     if (!url) return 'the login URL must start with https:// or http:// and hold no password or token'
-    const fresh: WebLogin = { id: newId(), label, url, ...(c.chrome !== undefined ? { chrome: c.chrome } : {}) }
+    const fresh: WebLogin = { id: newId(), label, url, ...(c.chrome !== undefined ? { chrome: c.chrome } : {}), ...(email ? { email } : {}) }
     return put({ ...app, logins: [...app.logins, fresh], active: app.active ?? fresh.id })
   }
   const row = app.logins.find(l => l.id === c.id)
@@ -142,8 +147,12 @@ export function applyLogin(apps: WebApp[], c: LoginCommand, newId = () => random
     case 'hub-login-open': return c.chrome === undefined ? apps : edit({ chrome: c.chrome })
     case 'hub-login-active': return put({ ...app, active: row.id })
     case 'hub-login-rename': {
+      // email: undefined keeps it, '' clears it.
       const label = clean(c.label, 80)
-      return label ? edit({ label }) : 'give the login a name'
+      if (!label) return 'give the login a name'
+      if (email === undefined) return edit({ label })
+      const { email: _e, ...rest } = row
+      return put({ ...app, logins: app.logins.map(x => (x.id === row.id ? { ...rest, label, ...(email ? { email } : {}) } : x)) })
     }
     case 'hub-login-delete': {
       const logins = app.logins.filter(l => l.id !== row.id)

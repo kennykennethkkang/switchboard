@@ -263,7 +263,7 @@ test('loops: six identical calls, never polling ones', () => {
   const call = { tool: 'Bash', target: 'curl :8080', role: 'qa', at: T0 }
   assert.equal(loops(prog({ tools: Array(6).fill(call) })), 'Bash curl :8080')
   assert.equal(loops(prog({ tools: Array(5).fill(call) })), undefined)
-  for (const poll of [{ tool: 'BashOutput', target: 'b1' }, { tool: 'TaskOutput' }, { tool: 'Monitor' }, { tool: 'ScheduleWakeup' }, { tool: 'Bash', target: 'sleep 30' }, { tool: 'Bash', target: 'wait' }])
+  for (const poll of [{ tool: 'BashOutput', target: 'b1' }, { tool: 'TaskOutput' }, { tool: 'Monitor' }, { tool: 'ScheduleWakeup' }, { tool: 'Bash', target: 'sleep 30' }, { tool: 'Bash', target: 'wait' }, { tool: 'mcp__chat-wait__chats_wait', target: 'hub engineer' }])
     assert.equal(loops(prog({ tools: Array(8).fill({ ...call, ...poll }) })), undefined, poll.tool)
   const agent = { id: 'agent:s:a1', kind: 'agent' as const, sessionId: 's', what: 'qa subagent: no tool call', since: T0 - 12 * MIN }
   assert.match(fixText(agent, T0, false, 'Bash curl :8080'), /repeated Bash curl :8080/)
@@ -289,4 +289,17 @@ test('waiting on user -> no auto-fix, no nudge, one notice', async () => {
   assert.deepEqual(h.dueFix(T0 + 2 * MIN).fix.map(i => i.id), ['job:s:j', 'job:s:k'])
   state({ state: 'needs-you', question: 'Again?' })
   assert.equal(h.dueFix(T0 + 3 * MIN).paused.length, 1)
+})
+
+test('dueFix: no auto-fix for a chat held by the usage pause or a limit retry', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  for (const id of ['p', 'r']) h.hook({ session_id: id, hook_event_name: 'SessionStart', cwd: '/r' }, T0)
+  h.hook({ session_id: 'r', cwd: '/r', hook_event_name: 'StopFailure', error: 'rate_limit', last_assistant_message: 'resets 11:50pm (America/Los_Angeles)' }, T0)
+  h.set({ pause: { kind: 'five_hour', percent: 99, resumeAt: T0 + 60 * MIN, chats: [{ sessionId: 'p' }] } }, T0)
+  const job = (sessionId: string) => ({ id: `job:${sessionId}:j`, kind: 'job' as const, sessionId, what: 'Background job: no end', since: T0 - 90 * MIN, pid: 5, started: 1 })
+  h.setStuck([job('p'), job('r')], T0)
+  assert.deepEqual(h.dueFix(T0), { fix: [], paused: [] })
+  h.set({ pause: undefined }, T0)
+  assert.deepEqual(h.dueFix(T0 + MIN).fix.map(i => i.id), ['job:p:j'])
 })

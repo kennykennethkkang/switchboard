@@ -346,6 +346,8 @@ export interface Relay {
   handleSSE: (req: http.IncomingMessage, res: http.ServerResponse) => void
   /** Clean up all resources */
   dispose: () => void
+  /** The hook server's port, which also answers /hub/* for the app's own hub; undefined when Claude is not watched. */
+  hookPort?: number
 }
 
 export type RelayRuntimeMode = 'claude' | 'codex' | 'auto'
@@ -382,12 +384,13 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
   log(`[relay] Runtime mode: ${mode} (watching: ${[wantClaude && 'claude', wantCodex && 'codex'].filter(Boolean).join(', ')})`)
 
   let hookServer: HookServer | null = null
+  let hookPort: number | undefined
   let scanInterval: NodeJS.Timeout | null = null
   let projectDirWatcher: fs.FSWatcher | null = null
 
   if (wantClaude) {
     hookServer = new HookServer()
-    const hookPort = await hookServer.start()
+    hookPort = await hookServer.start()
     if (hookPort === HOOK_SERVER_NOT_STARTED) {
       throw new Error('Failed to start hook server (port in use)')
     }
@@ -395,6 +398,9 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
     hookServer.onEvent((event: AgentEvent) => {
       broadcast(JSON.stringify({ type: 'agent-event', event }))
     })
+
+    // Chat progress for the app's own hub; editor windows feed theirs the same way (claude-runtime.ts).
+    hookServer.onRaw(({ payload, mirror }) => { hub.hook(payload, Date.now(), mirror) })
 
     writeDiscoveryFile(hookPort, workspace)
 
@@ -432,6 +438,7 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
   let relayDisposed = false
 
   return {
+    hookPort,
     handleSSE(req: http.IncomingMessage, res: http.ServerResponse) {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',

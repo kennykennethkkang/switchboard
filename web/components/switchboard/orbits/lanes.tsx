@@ -96,7 +96,7 @@ export function Lanes(v: ViewProps) {
     <i key={`${t.at}:${t.tool}`} className="ovl-tick" style={{ left: pct(f(t.at)) }} title={`${t.tool}${t.target ? ` ${t.target}` : ''} · ${new Date(t.at).toTimeString().slice(0, 8)}`} />)
   // A role's label is its node: a button that opens the drawer. The lead's too.
   const label = (k: string, name: string, word: string, s: string, model?: string, node?: ReturnType<typeof nodeProps>) => {
-    const inner = <><Glyph k={k} size={14} /><span><b>{name}</b><small><span className="ovl-word">{word}</span>{model ? ` · ${model}` : ''}</small></span></>
+    const inner = <><Glyph k={k} size={14} /><span><b>{name}</b><small><span className="ovl-word">{word}</span>{model && <span className="ovl-model"> · {model}</span>}</small></span></>
     return node ? <button type="button" className="ovl-label" data-s={s} {...node}>{inner}</button> : <div className="ovl-label" data-s={s}>{inner}</div>
   }
   // A bar too narrow for its label: the lane's last one says it beside itself, on the side with room; earlier ones stay quiet.
@@ -155,7 +155,7 @@ export function Lanes(v: ViewProps) {
       </div>
       {unused.length > 0 && <p className="ovl-unused">Not used: {unused.map(m => NAME(m.role)).join(', ')}</p>}
       <Reveal on={chat.state === 'needs-you'} className="ov-call"><span data-tone="needs"><b>Needs you</b>{p?.question ?? 'This chat is waiting on you.'}</span></Reveal>
-      <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{'Ready to approve'}</b>{p?.commit ? <Commit text={p.commit} /> : 'No commit message.'}</span></Reveal>
+      <Reveal on={chat.state === 'done'} className="ov-call"><span data-tone={almost ? 'almost' : 'done'}><b>{'Ready for your OK'}</b>{p?.commit ? <Commit text={p.commit} /> : 'No commit message.'}</span></Reveal>
       <p className="ov-legend" aria-hidden>
         <span style={{ '--c': 'var(--hub-blue)' } as CSSProperties}><i />working</span>
         <span style={{ '--c': almost ? 'var(--hub-teal)' : 'var(--hub-green)' } as CSSProperties}><i />done</span>

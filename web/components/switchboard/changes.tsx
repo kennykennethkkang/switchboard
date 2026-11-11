@@ -9,7 +9,8 @@ const Counts = ({ a, r }: { a: number; r: number }) => <span style={{ ...mono, w
 const TAG = { modified: '', added: 'new', deleted: 'deleted', untracked: 'new' } as const
 
 /** The files a chat's folder has uncommitted, each with an inline diff, to review before committing. */
-export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen }: {
+export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen, editor = 'VS Code' }: {
+  editor?: string
   changes: Changes | null; sessionId: string; cwd: string; commit?: string; onCopy: (text: string) => Promise<boolean>; onOpen: (file: string) => void
 }) {
   const [open, setOpen] = useState<string>()
@@ -35,7 +36,10 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen }
                   style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: '8px 10px', borderRadius: 0, color: 'var(--hub-body)' }}>
                   <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
                     <b aria-hidden>›</b>
-                    <span style={{ ...mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path}</span>
+                    <span title={f.path} style={{ ...mono, display: 'flex', minWidth: 0, whiteSpace: 'nowrap' }}>
+                      {f.path.includes('/') && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{f.path.slice(0, f.path.lastIndexOf('/') + 1)}</span>}
+                      <span style={{ flex: 'none' }}>{f.path.slice(f.path.lastIndexOf('/') + 1)}</span>
+                    </span>
                     {TAG[f.status] && <span className="hub-chip ver">{TAG[f.status]}</span>}
                   </span>
                   <Counts a={f.added} r={f.removed} />
@@ -53,7 +57,7 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen }
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {commit && !(mine && !files.length) && <CopyCommit small text={commit} onCopy={onCopy} />}
         {target && <button type="button" className="hub-btn sm" onClick={() => onOpen(target.path)}
-          title={`Opens ${target.path} against the last commit`}>Open in VS Code diff</button>}
+          title={`Opens ${target.path} against the last commit`}>Open in {editor} diff</button>}
       </div>
     </section>
   )

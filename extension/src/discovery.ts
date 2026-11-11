@@ -18,6 +18,7 @@ import { execSync } from 'child_process'
 import { HOOK_TIMEOUT_S, HOOK_SAFETY_MARGIN_MS, HOOK_FORWARD_TIMEOUT_MS, WORKSPACE_HASH_LENGTH } from './constants'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
+import { editor } from './editor'
 
 const log = createLogger('Discovery')
 
@@ -88,6 +89,7 @@ export function writeDiscoveryFile(port: number, workspace: string, trusted = fa
     workspace: normalizePath(workspace),
     hubToken: hub.token,
     trusted,
+    editor: editor.name,
   }, null, 2) + '\n', { mode: 0o600 })
   try { fs.chmodSync(filePath, 0o600) } catch { /* Windows keeps its own ACLs */ }
   log.info(`Wrote ${filePath}`)
@@ -193,6 +195,17 @@ setTimeout(() => process.exit(0), ${HOOK_TIMEOUT_S * 1000 - HOOK_SAFETY_MARGIN_M
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard');
 const IS_WIN = process.platform === 'win32';
+const APP_DIR = path.join(os.homedir(), '.claude', 'switchboard-app');
+
+function appFiles() {
+  let names = [];
+  try { names = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.json')); } catch { return []; }
+  const out = [];
+  for (const n of names) {
+    try { const d = JSON.parse(fs.readFileSync(path.join(APP_DIR, n), 'utf8')); if (d.pid && d.port && isAlive(d.pid)) out.push(d); } catch {}
+  }
+  return out;
+}
 
 /** Normalize a path: resolve and follow symlinks where possible */
 function normPath(p) {
@@ -246,8 +259,7 @@ process.stdin.on('end', () => {
   let allFiles;
   try {
     allFiles = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && f !== 'workspaces.json');
-  } catch { process.exit(0); }
-  if (!allFiles.length) process.exit(0);
+  } catch { allFiles = []; }
 
   // Parse discovery files and find workspaces that contain this cwd.
   // Use longest-match-wins so /project/sub matches before /project.
@@ -275,6 +287,8 @@ process.stdin.on('end', () => {
   // A chat in a folder no window has open goes to the live window with the lowest pid, so Switchboard
   // still sees it and the target stays put when another window opens mid-chat.
   if (!matches.length) {
+    // No editor window: the standalone app takes the chat. Its own hook (switchboard-app/hook.js) already sends it the chats under its folder.
+    if (!live.length) live.push(...appFiles().filter(d => { const ws = normPath(d.workspace || '/'); return resolvedCwd !== ws && !resolvedCwd.startsWith(ws + path.sep); }));
     if (!live.length) process.exit(0);
     matches.push({ d: [...live].sort((a, b) => a.pid - b.pid)[0], file: '', wsLen: 0 });
   }

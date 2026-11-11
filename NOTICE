@@ -11,6 +11,7 @@ Set up installs these third-party skills from their own repos; none are bundled:
 - find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc., MIT License.
 - Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License.
 - Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong, MIT License.
+- agent-browser (https://github.com/vercel-labs/agent-browser) and agent-desktop (https://github.com/vercel-labs/agent-desktop) by Vercel Labs, Apache License 2.0.
 
 Pixel Agents (https://github.com/pablodelucca/pixel-agents), MIT License.
 The Board page (web/components/switchboard/board.tsx) borrows its idea of an animated pixel character per agent; no code is copied.
@@ -42,3 +43,6 @@ Kit skills that ship in claude-mods/kit/skills and are copied with their LICENSE
 - caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0, is fetched by Set up into ~/.claude/skills; not bundled.
 
 The Git panel's invisible character cleanup on commit is an idea from watermarks-remover (https://github.com/guillaumemeyer/watermarks-remover) by Guillaume Meyer, MIT License; no code is copied.
+
+Playwright MCP (https://github.com/microsoft/playwright-mcp) by Microsoft, Apache License 2.0, comes in through Anthropic's playwright plugin; not bundled.
+MiroFish (https://github.com/666ghj/MiroFish) by 666ghj, AGPL-3.0, runs as a separate local server that Switchboard calls over HTTP and fills the .env of; no code from it ships here.

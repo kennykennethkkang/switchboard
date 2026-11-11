@@ -10,7 +10,7 @@ Switchboard is based on [Agent Flow](https://github.com/patoles/agent-flow) by S
 ## What it does
 
 - **Always one click away.** An Activity Bar icon opens a sidebar view labeled Switchboard, with an Open in editor button. There is also a status bar button, and `Cmd+Option+A` opens it from anywhere, including a focused terminal.
-- **New chat and roles.** Pick a project, pick a role (lead, researcher, engineer, qa, designer, ops, growth), and start a Claude Code or Codex chat. Both runtimes are supported.
+- **New chat and roles.** Pick a project (or make a new GitHub repo or clone one right there), pick a role (lead, researcher, engineer, qa, designer, ops, growth), and start a Claude Code or Codex chat. Both runtimes are supported.
 - **Live chat map.** Every running chat shows as a bubble with its role and its tool calls as they happen.
 - **Today card.** What ran today, at a glance.
 - **Changes panel.** Files a chat changed, with inline diffs and an Open in VS Code diff button. Symlinks and paths outside the project are never shown.
@@ -27,12 +27,21 @@ Switchboard is based on [Agent Flow](https://github.com/patoles/agent-flow) by S
 
 ## What's included
 
-- **Always-on plugins.** superpowers, ponytail, code-review, context7 and playwright are on in every Claude chat Switchboard starts and cannot be turned off there. Flagged duplicates and noise (the second security-guidance, code-simplifier, the github MCP, image-to-code, gsap-greensock) start off and are never turned on by a pick; turn one on by hand or with tool_on.
+- **Always-on plugins.** superpowers, ponytail, code-review, context7 and playwright are on in every Claude chat Switchboard starts and cannot be turned off there. Flagged conflicts (only the second security-guidance, which would run the same hooks twice) start off and are never turned on by a pick; turn one on by hand or with tool_on.
 - **Picked per chat.** A new Claude chat with a goal gets its own plugins, skills and design references, picked by one quick Haiku call from the goal, each one's description, and the project: folder name, the top of its CLAUDE.md or AGENTS.md, and its dependencies. If the pick fails or is slow, the chat gets your own settings and the fallback is logged. Change the set in the chat's Tools section; it applies when the chat is resumed.
 - **Project skills.** Skills in the project's `.claude/skills` and `.agents/skills` are listed for that project's chats and can be turned off per chat like your own.
 - **Design references.** `design-md/<brand>/`, `docs/design/*.md` and a root `DESIGN.md` in the project. A pick takes up to three for UI work, and the chat is told their paths.
 - **Roles.** lead, researcher, engineer, qa, designer, ops and growth, from `extension/kit/agents`.
 - **The kit.** On start, the extension writes the working rules (`extension/kit/rules.md`) to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and the role agents to `~/.claude/agents`. `extension/kit/bundle.json` holds the rules version, so newer rules are never overwritten by older ones. A role file you edited is left alone, with the new copy saved beside it.
+
+## Built here
+
+Written by Kenneth, from the repos as they stand:
+
+- **Switchboard.** The VS Code extension (`extension/`), the web app (`web/`) and the phone app (`app/`), all showing the same chats.
+- **Mods** in [claude-mods](https://github.com/kennykennethkkang/claude-mods): usage-meter, repo-rules, paid-guard, bash-approve, chat-wait, done-check, cache-keeper, phone-mode, todo-band and tab-close. Each is described in that README (phone-mode ships in the repo but is not in the install list there).
+- **Kit skills:** animation-styles, crowd-ab (synthetic user votes between two options), deep-research (answers with re-read citations), gemini (images and video through Gemini), harden (runs BLA to harden a build against AI reverse-engineering before a release), improve-system, phone (calls Kenneth through Bland for a decision), self-improve (tunes a role or skill against held-out tasks), toolchain (reads a repo's manifests and prints its test, lint, typecheck and build commands and the matching ecc-agents reviewer, so roles work in any language).
+- **Role agents:** researcher, engineer, qa, designer, ops, growth, Explore, and the Codex hand-offs engineer-codex and qa-codex.
 
 ## Coming next
 
@@ -48,7 +57,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` runs the event relay on port 3001 and the web app on port 3010. http://localhost:3010 shows sample data only, for working on the page. Switchboard never uses port 3000.
+`pnpm dev` runs the event relay on port 3001 and the web app on port 3010 with live data (it sets `NEXT_PUBLIC_DEMO=0`). For sample data only, when working on the page, run `pnpm run dev:demo`, which serves it on 3010. Switchboard never uses port 3000.
 
 The browser version with your real chats is the standalone app. VS Code's browser link finds it on any port:
 
@@ -64,9 +73,29 @@ cd extension
 pnpm run build:all && npx @vscode/vsce package --no-dependencies && code --install-extension switchboard-<version>.vsix --force
 ```
 
-Then run **Developer: Reload Window** in VS Code.
+Switchboard runs in VS Code, VS Code Insiders, Cursor, Windsurf, Antigravity and VSCodium. Install the same .vsix with that editor's CLI:
 
-Requirements: Node 20+, pnpm, VS Code 1.85+ (or a compatible editor), and the Claude Code CLI and/or Codex CLI.
+```bash
+code --install-extension switchboard-<version>.vsix --force            # VS Code
+code-insiders --install-extension switchboard-<version>.vsix --force   # VS Code Insiders
+cursor --install-extension switchboard-<version>.vsix --force          # Cursor
+windsurf --install-extension switchboard-<version>.vsix --force        # Windsurf
+antigravity --install-extension switchboard-<version>.vsix --force     # Antigravity
+codium --install-extension switchboard-<version>.vsix --force          # VSCodium
+```
+
+It is not on Open VSX yet, so the forks install it from the .vsix only.
+
+Then run **Developer: Reload Window** in the editor.
+
+Requirements: Node 20+, pnpm, VS Code 1.85+ (or one of the editors above), and the Claude Code CLI and/or Codex CLI.
+
+### Without an editor
+
+Working in JetBrains, Zed or a plain terminal? Run the standalone app (`pnpm build:app`, then `node app/dist/app.js`). While no editor window with Switchboard is open, the app runs its own hub; once one opens, the app goes back to that window.
+
+- Works: the chat list, projects, to-do lists, chat progress from hooks, and New chat for Claude and Codex. A new chat starts in a detached tmux session (`tmux attach` to see it) when tmux is installed, else in a Terminal.app window opened behind whatever has focus.
+- Missing: terminal tabs, window colors, inline diffs, and every other command (tool picks, dev servers, handoffs, voice). Those answer "Open an editor window with Switchboard for that."
 
 ## Moving to another computer
 
@@ -113,6 +142,7 @@ Shipped with Switchboard:
 - Hanken Grotesk font by [The Hanken Grotesk Project Authors](https://github.com/marcologous/hanken-grotesk), SIL Open Font License 1.1.
 - Kit skills, each with its LICENSE: aar, adapted from aar-loop by Cooper Simson, MIT; the awwwards rubric, adapted from [claude-skill-awwwards](https://github.com/tponscr-debug/claude-skill-awwwards) by Thomas Pons, MIT; accessibility, click-path-audit and e2e-testing from ECC by Affaan Mustafa, MIT; accessible-motion, gsap-greensock, hover-interactions, page-transitions and scroll-animations by Dylan Tarre, MIT; image-to-code-skill by Leonxlnx, MIT; extract-design-md, extract-static-html and taste-design from [stitch-skills](https://github.com/google-labs-code/stitch-skills) by Google, Apache 2.0.
 - web-design-guidelines by Vercel; claude-x-jev and jev-setup-project by Charles J Dove (Jev).
+- The harden skill and the Harden build check run [BLA (bla-agents)](https://github.com/qybaihe/bla) by qybaihe, MIT, to harden a build against AI reverse-engineering; it runs via npx, no code is bundled.
 - The Board page's pixel character per agent is an idea from [Pixel Agents](https://github.com/pablodelucca/pixel-agents) by pablodelucca, MIT; no code is copied.
 - Stripping invisible characters on commit is an idea from [watermarks-remover](https://github.com/guillaumemeyer/watermarks-remover) by Guillaume Meyer, MIT; no code is copied.
 
@@ -130,6 +160,12 @@ Installed by Set up from their own repos (not bundled):
 - [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache-2.0
 - [Scrapling](https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause
 - [Agent Reach](https://github.com/Panniantong/Agent-Reach) by Panniantong
+- [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs, Apache 2.0; npm install -g, then agent-browser install for its browser, skipped when already on PATH
+- [agent-desktop](https://github.com/vercel-labs/agent-desktop) by Vercel Labs, Apache 2.0; npm install -g on macOS and Windows, skipped when already on PATH
+- [Playwright MCP](https://github.com/microsoft/playwright-mcp) by Microsoft, Apache 2.0 (the playwright plugin below)
+- MCP servers added by Set up: Slack, Cloudflare, 21st.dev, Perplexity and [Firecrawl](https://github.com/firecrawl/firecrawl-mcp-server) (MIT, needs its key saved in Sign-ins), PostHog and Composio Connect (OAuth sign-in with /mcp)
+- [MiroFish](https://github.com/666ghj/MiroFish) by 666ghj, AGPL-3.0; run on its own at localhost:5001 for crowd runs, the MiroFish card only reads its API
+- Claude in Chrome, Anthropic's browser extension, used for Kenneth's signed-in Chrome
 - [archify](https://github.com/tt-a1i/archify) by tt-a1i, Apache 2.0
 - [diagram-design](https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery
 - grill-me by [Matt Pocock](https://github.com/mattpocock/skills)

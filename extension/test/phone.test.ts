@@ -47,6 +47,16 @@ describe('phone line', () => {
     assert.match(calls[1].text, /Shop is done/)
     assert.equal(calls[1].say, true)
   })
+
+  it('leaves an AskUserQuestion to the chat own call, but rings the closing Approve once', async () => {
+    calls.length = 0
+    const q = (sessionId: string, question: string) => ({ sessionId, cwd: '/w', state: 'needs-you', tasks: [], question, ask: { id: `t-${sessionId}`, kind: 'question', tool: 'AskUserQuestion', options: [], questions: [{ question, options: ['Approve', 'Send back'] }] } }) as unknown as ChatProgress
+    phoneChange(q('pc3', 'Which layout?'), 'Shop')
+    phoneChange(q('pc4', 'Approve this chat as finished?'), 'Shop')
+    phoneChange(q('pc4', 'Approve this chat as finished?'), 'Shop')
+    await tick()
+    assert.deepEqual(calls.map(c => c.text), ['Shop needs you: Approve this chat as finished?'])
+  })
 })
 
 describe('phone mode in the hub', () => {

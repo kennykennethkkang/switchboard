@@ -122,7 +122,7 @@ function Transcript({ sessionId, demo, body }: { sessionId: string; demo?: HubSt
     setBusy(false)
     if (!r || typeof r === 'string') return
     keep.current = (body.current?.scrollHeight ?? 0) - (body.current?.scrollTop ?? 0)
-    setT({ messages: [...r.messages, ...t.messages], before: r.before })
+    setT({ ...t, messages: [...r.messages, ...t.messages], before: r.before })
   }
   if (t === undefined) return <p className="cv-mute" role="status">Reading the transcript…</p>
   if (t === null) return <p className="cv-mute">No transcript for this chat on this Mac.</p>
@@ -135,7 +135,7 @@ function Transcript({ sessionId, demo, body }: { sessionId: string; demo?: HubSt
       <ol className="cv-msgs" aria-label="Messages, oldest first">
         {t.messages.map((m, i) => (
           <li key={i} data-r={m.role}>
-            {m.role !== 'tool' && <b>{ROLE[m.role]}</b>}
+            {m.role !== 'tool' && <b>{m.role === 'claude' && t.codex ? 'Codex' : ROLE[m.role]}</b>}
             {m.role === 'tool' ? <code>{m.text}</code> : <p>{m.text}</p>}
           </li>
         ))}

@@ -7,6 +7,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { cliPath } from './ais'
 import { cleanInvisible } from './clean-text'
+import { hold } from './idle'
 import { insideCwd } from './local'
 import { dropPending, leftovers, pendingAt } from './progress'
 import type { GitOp, LaneCommit, RepoFile, RepoView } from './types'
@@ -421,7 +422,13 @@ async function removeUntracked(root: string, files: RepoFile[]): Promise<string 
 }
 
 /** One button press. Refuses rather than guesses; confirmed comes from the in-page confirm. */
+/** Holds off an update reload while the op runs. */
 export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
+  const release = hold()
+  try { return await runOp(root, c, gh) } finally { release() }
+}
+
+async function runOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
   // Any op may change the branch's PR and run; look again after it.
   prs.clear()
   runs.clear()

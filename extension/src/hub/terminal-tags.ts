@@ -9,7 +9,13 @@ export const ANSI: Record<WindowColor, string> = {
 
 type Term = { name: string; exitStatus?: unknown; dispose(): void }
 // prefix: the AI's name in front of the chat's ("Claude"); named: the last name we gave it, VS Code may lag.
-type Tag = { id: number; owner: 'switchboard' | 'user'; sessionId?: string; prefix?: string; named?: string }
+// at: when this window first saw it, so a chat resumed after its approval keeps the new terminal.
+type Tag = { id: number; owner: 'switchboard' | 'user'; sessionId?: string; prefix?: string; named?: string; at: number }
+
+// Chat terminals are named `<AI>: <chat>` (actions.ts); AIS names include "Claude Code".
+export const CHAT_PREFIX = /^(Claude Code|Claude|Codex|Hermes): /
+/** A terminal VS Code revived after a reload: the icon comes back as a plain { id }, so match the id, or the chat name if the icon was dropped. */
+export const restoredOurs = (icon: unknown, name: string, iconId = 'radio-tower') => (icon as { id?: unknown } | undefined)?.id === iconId || CHAT_PREFIX.test(name)
 
 const inside = (cwd: string, root: string) => cwd === root || cwd.startsWith(root + path.sep)
 
@@ -17,16 +23,17 @@ export class TerminalTags<T extends Term> {
   private tags = new Map<T, Tag>()
   private lost = new Set<string>()
   private next = 1
+  constructor(private now: () => number = Date.now) {}
 
   own(t: T, prefix?: string, sessionId?: string): void {
-    this.tags.set(t, { id: this.next++, owner: 'switchboard', prefix, sessionId, named: t.name })
+    this.tags.set(t, { id: this.next++, owner: 'switchboard', prefix, sessionId, named: t.name, at: this.now() })
   }
 
   /** onDidOpenTerminal or a terminal there at startup; ours: it carries our icon (restored after a reload). */
   seen(t: T, ours = false): void {
     if (this.tags.has(t)) return
-    if (ours) this.own(t, /^(\w+): /.exec(t.name)?.[1])
-    else this.tags.set(t, { id: this.next++, owner: 'user' })
+    if (ours) this.own(t, CHAT_PREFIX.exec(t.name)?.[1])
+    else this.tags.set(t, { id: this.next++, owner: 'user', at: this.now() })
   }
 
   gone(t: T): void {
@@ -86,6 +93,22 @@ export class TerminalTags<T extends Term> {
     let n = 0
     for (const [t, tag] of this.tags) {
       if (tag.owner !== 'switchboard' || tag.sessionId !== sessionId) continue
+      t.dispose()
+      n++
+    }
+    return n
+  }
+
+  /** Approved chats that ended: their Switchboard terminals close, however long the last turn ran. The count closed.
+   * Ended = the terminal's process exited, or the chat is listed as not live; a chat missing from the list is not
+   * enough, a failed read lists none. */
+  closeEnded(chats: ChatRow[], approved: ReadonlyMap<string, number>): number {
+    const ended = new Set(chats.filter(c => !c.live).map(c => c.sessionId))
+    let n = 0
+    for (const [t, tag] of this.tags) {
+      const at = tag.sessionId ? approved.get(tag.sessionId) : undefined
+      if (tag.owner !== 'switchboard' || at === undefined || tag.at > at) continue
+      if (t.exitStatus === undefined && !ended.has(tag.sessionId!)) continue
       t.dispose()
       n++
     }

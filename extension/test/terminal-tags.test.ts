@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { TerminalTags, ANSI } from '../src/hub/terminal-tags'
+import { TerminalTags, ANSI, restoredOurs } from '../src/hub/terminal-tags'
 import type { ChatRow } from '../src/hub/types'
 
 type Fake = { name: string; exitStatus?: unknown; disposed: boolean; pid: number; processId: Promise<number>; dispose(): void }
@@ -8,6 +8,23 @@ const term = (name: string, pid = 0): Fake => ({ name, pid, disposed: false, pro
 const chat = (sessionId: string, name: string, o: Partial<ChatRow> = {}): ChatRow => ({ pid: 0, sessionId, name, cwd: '/w/app', link: '', live: true, why: [], ...o })
 
 describe('terminal tags', () => {
+  it('a terminal restored after a reload is ours by its icon id or chat name', () => {
+    // revived terminals hand back the icon as a plain { id }, not a ThemeIcon
+    assert.equal(restoredOurs({ id: 'radio-tower' }, 'zsh'), true)
+    assert.equal(restoredOurs(undefined, 'Claude Code: Deploy Armasu'), true)
+    assert.equal(restoredOurs(undefined, 'Codex: x'), true)
+    assert.equal(restoredOurs({ id: 'terminal' }, 'zsh'), false)
+    assert.equal(restoredOurs(undefined, 'claude'), false)
+  })
+
+  it('a restored Claude Code terminal keeps its two-word prefix', () => {
+    const tags = new TerminalTags<Fake>()
+    const a = term('Claude Code: old name')
+    tags.seen(a, true)
+    tags.host(a, 's1')
+    assert.deepEqual(tags.renames([chat('s1', 'new name')]).map(([, n]) => n), ['Claude Code: new name'])
+  })
+
   it('ours are switchboard, the rest are user', () => {
     const tags = new TerminalTags<Fake>()
     const a = term('Claude: fix login'), mine = term('zsh')
@@ -29,6 +46,26 @@ describe('terminal tags', () => {
     assert.equal(tags.closeChat('s1'), 2)
     assert.deepEqual([a.disposed, b.disposed, other.disposed, mine.disposed], [true, true, false, false])
     assert.equal(tags.closeChat('nope'), 0)
+  })
+
+  it('closeEnded closes the terminal of an approved chat once the chat is no longer live', () => {
+    let now = 100
+    const tags = new TerminalTags<Fake>(() => now)
+    const a = term('Claude: a'), b = term('Claude: b'), c = term('Claude: c'), mine = term('zsh')
+    tags.own(a, 'Claude', 's1'); tags.own(b, 'Claude', 's2'); tags.own(c, 'Claude', 's3'); tags.seen(mine); tags.host(mine, 's1')
+    const approved = new Map([['s1', 200], ['s2', 200], ['s4', 200]])
+    // s4 resumed from History after its approval: its new terminal is never closed for that old approval
+    now = 300
+    const back = term('Codex: d'); tags.own(back, 'Codex', 's4')
+    assert.equal(tags.closeEnded([chat('s4', 'd', { live: false })], approved), 0)
+    assert.equal(back.disposed, false)
+    // s1 still running its last turn: stays; s3 ended but never approved: stays
+    assert.equal(tags.closeEnded([chat('s1', 'a'), chat('s2', 'b'), chat('s3', 'c', { live: false })], approved), 0)
+    // a failed read lists no chats: nothing closes on that alone
+    assert.equal(tags.closeEnded([], approved), 0)
+    b.exitStatus = { code: 0 }
+    assert.equal(tags.closeEnded([chat('s1', 'a', { live: false })], approved), 2)
+    assert.deepEqual([a.disposed, b.disposed, c.disposed, mine.disposed], [true, true, false, false])
   })
 
   it('renames only the active terminal; the others wait until they are active', () => {

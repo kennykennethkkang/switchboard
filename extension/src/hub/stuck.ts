@@ -230,7 +230,7 @@ export function waitsOnUser(p?: ChatProgress): string | undefined {
 }
 
 // Waiting on a job is fine however often it repeats.
-const POLL = /^(BashOutput|TaskOutput|Monitor|ScheduleWakeup)\b|^Bash (sleep|wait)\b/
+const POLL = /^(BashOutput|TaskOutput|Monitor|ScheduleWakeup|mcp__chat-wait__chats_wait)\b|^Bash (sleep|wait)\b/
 
 /** The call a chat repeated six times running, polls left out, or undefined. Fix mentions it to the lead. */
 export function loops(p?: ChatProgress): string | undefined {

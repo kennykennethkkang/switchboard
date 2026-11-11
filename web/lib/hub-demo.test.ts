@@ -57,15 +57,20 @@ test('the demo working chat has a Jev bubble, and a tick now and then draws a Je
   assert.ok(h.jev.length >= 2)
 })
 
-test('the demo Sign-ins: make default, rename, add, pick for this window', () => {
+test('the demo Sign-ins: rename, email, add again, pick for this window', () => {
   let h = demoHub()
-  assert.ok(h.aws.some(a => a.isDefault) && h.signIns.chrome.length > 0 && h.signIns.window)
-  h = demoApply(h, { type: 'hub-aws-default', profile: 'yo' })
-  assert.equal(h.aws.find(a => a.isDefault)?.account, h.aws.find(a => a.name === 'yo')?.account)
-  h = demoApply(h, { type: 'hub-aws-label', profile: 'yo', label: 'Work' })
-  assert.equal(h.aws.find(a => a.name === 'yo')?.label, 'Work')
+  assert.ok(h.signIns.chrome.length > 0 && h.signIns.window)
+  assert.ok(!Object.values(h.signIns.links ?? {}).some(r => Object.values(r).includes(null as never)), 'no Default picks')
+  h = demoApply(h, { type: 'hub-aws-window', profile: 'yo' })
+  h = demoApply(h, { type: 'hub-aws-rename', profile: 'yo', to: 'sandbox' })
+  assert.ok(h.aws.some(a => a.name === 'sandbox') && !h.aws.some(a => a.name === 'yo'))
+  assert.equal(h.signIns.projects[h.signIns.window!], 'sandbox')
+  h = demoApply(h, { type: 'hub-aws-label', profile: 'sandbox', label: 'me@work.com' })
+  assert.equal(h.aws.find(a => a.name === 'sandbox')?.label, 'me@work.com')
   h = demoApply(h, { type: 'hub-aws-add', profile: 'new', region: 'us-east-2' })
   assert.equal(h.aws.find(a => a.name === 'new')?.status, 'never')
+  h = demoApply(h, { type: 'hub-aws-add', profile: 'new', region: 'eu-west-1' })
+  assert.deepEqual(h.aws.filter(a => a.name === 'new').map(a => a.region), ['eu-west-1'])
   h = demoApply(h, { type: 'hub-aws-window', profile: 'yo' })
   assert.equal(h.signIns.projects[h.signIns.window!], 'yo')
   h = demoApply(h, { type: 'hub-aws-window', profile: null })
@@ -287,4 +292,21 @@ test('demo Approve moves the chat to History as approved', () => {
   assert.ok(a?.approvedAt)
   assert.equal(a?.name, 'Hub AIs and Starred')
   assert.equal(demoApply(h, { type: 'hub-approve', sessionId: 'd-done' }).archive?.filter(x => x.sessionId === 'd-done').length, 1)
+})
+
+test('demo Write commit message is busy, then fills a draft; a commit moves HEAD and drops it', () => {
+  const h = demoApply(demoApply(demoHub(), { type: 'hub-changes', sessionId: 'd-work' }), { type: 'hub-draft-commit', sessionId: 'd-work' })
+  const at = h.repo!.draft!.at
+  assert.equal(h.repo!.draft!.busy, true)
+  assert.equal(demoTick(h, at + 1000).repo!.draft!.busy, true)
+  const d = demoTick(h, at + 1600).repo!.draft!
+  assert.equal(d.busy, undefined)
+  assert.equal(d.box, 'filled')
+  const [summary, blank, ...rest] = d.text!.split('\n')
+  assert.ok(summary && blank === '' && rest.some(l => l.startsWith('- ')))
+  assert.ok(!d.text!.includes(String.fromCharCode(0x2014)))
+  const c = demoApply(demoTick(h, at + 1600), { type: 'hub-git', sessionId: 'd-work', op: 'commit', files: ['auth/middleware.ts'], summary })
+  assert.equal(c.repo!.draft, undefined)
+  assert.notEqual(c.repo!.log[0].hash, h.repo!.log[0].hash)
+  assert.equal(c.repo!.log[0].subject, summary)
 })

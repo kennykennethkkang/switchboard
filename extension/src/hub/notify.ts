@@ -13,7 +13,7 @@ import { focusChat } from './actions'
 import { noticeKind } from './background'
 import { phoneChange } from './phone'
 import { sendPush } from './web-push'
-import { desktopNotice, doneText, fillRepos, notifyStep, todayText, type Box } from './progress'
+import { desktopNotice, doneText, fillDraftBox, fillRepos, notifyStep, todayText, type Box } from './progress'
 import type { ChatProgress, ChatState, StuckItem } from './types'
 
 const titleOf = (p: ChatProgress) => hub.get().chats.find(c => c.sessionId === p.sessionId)?.name ?? p.cwd.split(/[\\/]/).pop() ?? 'A chat'
@@ -40,12 +40,16 @@ const notified = new Map<string, string>()
 /** A Done chat's commit messages into the Source Control boxes of this window's open repos: the plain one to the repo holding
  * its folder, each "Commit message (<folder>)" one to that repo. Every window runs it for every chat, mirrored ones too,
  * so a repo open in another window still gets its message. Merged into Switchboard's uncommitted text, never over Kenneth's. */
+const gitRepos = () => vscode.extensions.getExtension<{ getAPI(v: 1): { repositories: { rootUri: vscode.Uri; inputBox: { value: string } }[] } }>('vscode.git')?.exports?.getAPI(1)?.repositories ?? []
+
 export function fillBoxes(p: ChatProgress | undefined): void {
   if (p?.state !== 'done') return
-  try {
-    const repos = vscode.extensions.getExtension<{ getAPI(v: 1): { repositories: { rootUri: vscode.Uri; inputBox: { value: string } }[] } }>('vscode.git')?.exports?.getAPI(1)?.repositories ?? []
-    fillRepos(repos, p, boxes, filled)
-  } catch { /* no git extension: Copy on the card still works */ }
+  try { fillRepos(gitRepos(), p, boxes, filled) } catch { /* no git extension: Copy on the card still works */ }
+}
+
+/** Write commit message's text into root's Source Control box, unless Kenneth typed there. */
+export function fillDraft(root: string, text: string): 'filled' | 'typed' | 'missing' {
+  try { return fillDraftBox(gitRepos(), root, text, boxes) } catch { return 'missing' }
 }
 
 export function notify(change: { from?: ChatState; to: ChatProgress }): void {

@@ -68,7 +68,7 @@ describe('app keeper', () => {
     const pidOf = () => Number(fs.readFileSync(path.join(dir, 'app.pid'), 'utf8').trim() || 0)
     const pids: number[] = []
     // Nothing recorded yet: never started by the extension, so nothing to start.
-    const k = keep({ dir, everyMs: 30, misses: 2, log: () => {} })
+    const k = keep({ dir, everyMs: 30, misses: 2, stableMs: 100, log: () => {} })
     try {
       await new Promise(r => setTimeout(r, 200))
       assert.equal(fs.existsSync(path.join(dir, 'app.pid')), false)
@@ -163,5 +163,36 @@ fs.writeFileSync(${JSON.stringify(path.join(dir, 'grand'))}, String(g.pid)); set
       const starts = logs.filter(l => / starting /.test(l)).length
       assert.ok(starts >= 1 && starts <= 2, logs.join('\n'))
     } finally { k.stop() }
+  })
+
+  it('backs off an app that serves for a moment and then crashes, and forgets that once one stays up', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-keeper-'))
+    const port = await freePort()
+    const app = path.join(dir, 'fake-app.js')
+    const life = path.join(dir, 'life')
+    // Serves, then exits after the ms in the life file.
+    fs.writeFileSync(app, `require('http').createServer().listen(Number(process.argv[3]), '127.0.0.1', () => setTimeout(() => process.exit(1), Number(require('fs').readFileSync(${JSON.stringify(life)}, 'utf8'))))`)
+    fs.writeFileSync(life, '600')
+    fs.writeFileSync(path.join(dir, 'app.args'), JSON.stringify({ cwd: dir, args: [app, '-p', String(port)] }))
+    const logs: string[] = []
+    const starts = () => logs.filter(l => / starting /.test(l)).length
+    const waits = () => logs.filter(l => /trying again in/.test(l)).length
+    const k = keep({ dir, everyMs: 20, misses: 1, backoffMs: 700, stableMs: 1000, log: (m: string) => logs.push(m) })
+    try {
+      // Starts at 0, dies at ~0.7 s, waits 0.7 s, starts, dies, waits 1.4 s: two starts by 3.2 s, where no backoff makes four.
+      await new Promise(r => setTimeout(r, 3200))
+      assert.ok(starts() >= 1 && starts() <= 2, logs.join('\n'))
+      assert.ok(waits() >= 1, logs.join('\n'))
+      // Up past stableMs: its crash restarts at once, with no wait logged.
+      fs.writeFileSync(life, '1300')
+      const n = starts()
+      assert.ok(await until(() => starts() > n, 5000), logs.join('\n'))
+      const w = waits()
+      assert.ok(await until(() => starts() >= n + 2, 4000), logs.join('\n'))
+      assert.equal(waits(), w, logs.join('\n'))
+    } finally {
+      k.stop()
+      try { process.kill(Number(fs.readFileSync(path.join(dir, 'app.pid'), 'utf8'))) } catch { /* gone */ }
+    }
   })
 })

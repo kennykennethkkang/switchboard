@@ -83,7 +83,7 @@ export async function sampleStuck(now = Date.now()): Promise<StuckItem[]> {
 }
 
 // VS Code and its helpers, never stopped whatever the tree says.
-const EDITOR = /Visual Studio Code|Code Helper|Code - Insiders|Cursor Helper|\bElectron\b/
+export const EDITOR = /Visual Studio Code|Code Helper|Code - Insiders|Cursor Helper|Windsurf Helper|Antigravity Helper|VSCodium Helper|\bElectron\b/
 
 /** Stop process: only the item's own process, found again under its chat's claude with the same start time. A string is why not. */
 export async function stopStuck(sessionId: string, id: string): Promise<string | undefined> {

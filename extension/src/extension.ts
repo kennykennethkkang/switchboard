@@ -8,6 +8,7 @@ import { promptHookSetupIfNeeded, configureClaudeHooks, isDisable1MContext } fro
 import { createLogger } from './logger'
 import { startHub, addHubPoster, handleHubMessage, bindStatusBar, hubViewShown, resendHubState, KIT_DIR } from './hub/hub-panel'
 import { startSelfUpdate } from './hub/self-update'
+import { watchCloseForMove } from './close-for-move'
 import type { AgentRuntime, AgentRuntimeMode } from './session-runtime'
 import { withSkipShell } from './hub/controls'
 import { orphanTab } from './orphan-tab'
@@ -64,6 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // without waiting for the session runtimes below to start.
   startHub(context)
   startSelfUpdate(context, KIT_DIR)
+  watchCloseForMove(context)
 
   // Activity Bar icon: VS Code can only open a sidebar view from it, so the view opens Switchboard as an
   // editor tab, which has the room, and closes the sidebar again.

@@ -181,9 +181,9 @@ export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo 
   if (bare) return <div className="hub-jarvis-pal"><span className="pal-mics">{mics}</span>{live}</div>
   return (
     <section className="hub-jarvis" aria-label="Jarvis">
-      <form className="hub-jarvis-bar" onSubmit={e => { e.preventDefault(); ask() }}>
+      <form className="hub-jarvis-bar" style={{ minWidth: 0 }} onSubmit={e => { e.preventDefault(); ask() }}>
         <svg aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5 6.5 8 3 11.5M8.5 11.5H13" /></svg>
-        <input ref={input} type="text" aria-label="Ask Jarvis" placeholder="Ask Jarvis, or say start a chat to…" value={q} maxLength={2000}
+        <input ref={input} type="text" aria-label="Ask Jarvis" placeholder="Ask Jarvis" value={q} maxLength={2000}
           enterKeyHint="send" autoComplete="off" spellCheck={false} onChange={e => setQ(e.target.value)}
           onKeyDown={e => { if (e.key === 'Escape' && reply && !reply.busy) { e.preventDefault(); clear() } }} />
         {mics}
