@@ -5,10 +5,10 @@
    "id": "ab0e2056",
    "text": "model-bench: find why --rescore judge calls stall 4+ min idle on API sockets inside claude-mods/kit/skills/model-bench/scripts/bench.mjs while the same prompt via a standalone spawnSync script returns in 15s; fix so --rescore needs no scratch grader",
    "at": 1794425869899,
-   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
-   "name": "Model Benchmarking And Switchboard Settings v2",
    "chat": "d34d6a42-43cb-45fd-a45a-f76271428c28",
    "host": "62903adf5e340f87",
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2",
    "run": 41,
    "auto": true
   }
@@ -390,9 +390,11 @@
   "3652a3ab": 1794366181698,
   "34c517e2": 1794366512192,
   "0ce5630a": 1794374197784,
-  "504d0438": 1794374236966
+  "504d0438": 1794374236966,
+  "1f041144": 1794426128142
  },
  "seq": 41,
+ "streak": 41,
  "ticked": [
   {
    "id": "504d0438",
@@ -523,14 +525,6 @@
    "why": "later"
   },
   {
-   "id": "1f041144",
-   "text": "How much longer is the estimate for this test?",
-   "at": 1794395271814,
-   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
-   "name": "Model Benchmarking And Switchboard Settings v2",
-   "why": "missed"
-  },
-  {
    "id": "67f98475",
    "text": "Indefinite loop mode. This mode will keep running fixes and changes on the site. Not anything that is cosmetic changes unless it is fixing issues but it does a deep search, deep run, and long run to c",
    "at": 1794420824682,
@@ -570,6 +564,5 @@
    "name": "Indefinite Mode Site Audit",
    "why": "later"
   }
- ],
- "streak": 41
+ ]
 }
