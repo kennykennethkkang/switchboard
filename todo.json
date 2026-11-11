@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "3652a3ab",
+   "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
+   "at": 1794365934035,
+   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
+   "name": "Self-Improving Switchboard Agents"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -381,10 +389,10 @@
   {
    "id": "85459f6e",
    "text": "Why was renaming blocked please make sure they are not blocked and fix them I want to make sure this folder is renamed to switchboard also",
-   "run": 36,
-   "auto": true,
    "at": 1794346935635,
-   "by": "4452d4cb-11ba-4264-8d2e-e318ef108c8d"
+   "by": "4452d4cb-11ba-4264-8d2e-e318ef108c8d",
+   "run": 36,
+   "auto": true
   },
   {
    "id": "58d13898-ok",
