@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "ab0e2056",
+   "text": "model-bench: find why --rescore judge calls stall 4+ min idle on API sockets inside claude-mods/kit/skills/model-bench/scripts/bench.mjs while the same prompt via a standalone spawnSync script returns in 15s; fix so --rescore needs no scratch grader",
+   "at": 1794425865179,
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
