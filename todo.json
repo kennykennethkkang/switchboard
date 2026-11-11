@@ -533,6 +533,30 @@
    "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
    "name": "Indefinite Mode Site Audit",
    "why": "missed"
+  },
+  {
+   "id": "d83be755",
+   "text": "Keep waiting for \"Route Chat Items to Topic\" to end, as you chose. It's been idle for about 40 minutes, so it may need your Approve or another answer before it",
+   "at": 1794420827501,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "blocked"
+  },
+  {
+   "id": "b1340f56",
+   "text": "Once it ends, start the open-ended audit loop: a deep run for bugs and fixes, plus a plain-language \"what was done and why\" record for each chat.",
+   "at": 1794420827501,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "later"
+  },
+  {
+   "id": "f2185b32",
+   "text": "Redo button placement on the main site and the maps page using MiroFish and A/B testing, keeping the current look and removing parts that aren't useful.",
+   "at": 1794420827501,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "later"
   }
  ]
 }
