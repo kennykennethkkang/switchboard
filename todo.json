@@ -1,17 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "504d0438",
-   "text": "Proposed kit rule (approve before applying): claude-mods/kit/rules.md, Finishing, after \"The Commit message block stays last in the final message.\" add: \"If Kenneth asks whether an approved chat is finished or why it sits idle, end it at once with EndConversation (the second call ends it); no explanation, no confirm question.\"",
-   "at": 1794374202465,
-   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
-   "chat": "b11a3c43-e007-4ff3-8832-f248dab325ba",
-   "host": "62903adf5e340f87",
-   "run": 40,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -388,11 +377,20 @@
   "85459f6e": 1794346935635,
   "3652a3ab": 1794366181698,
   "34c517e2": 1794366512192,
-  "0ce5630a": 1794374197784
+  "0ce5630a": 1794374197784,
+  "504d0438": 1794374236966
  },
  "seq": 40,
- "streak": 39,
  "ticked": [
+  {
+   "id": "504d0438",
+   "text": "Proposed kit rule (approve before applying): claude-mods/kit/rules.md, Finishing, after \"The Commit message block stays last in the final message.\" add: \"If Kenneth asks whether an approved chat is finished or why it sits idle, end it at once with EndConversation (the second call ends it); no explanation, no confirm question.\"",
+   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
+   "run": 40,
+   "auto": true,
+   "at": 1794374236966,
+   "by": "b11a3c43-e007-4ff3-8832-f248dab325ba"
+  },
   {
    "id": "0ce5630a",
    "text": "Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never closed it. Suspects: approvalBlock saw state 'working' at PostToolUse, or the event was handled as a mirror (lowercase -switchboard transcript slug). Log approvalBlock refusals somewhere that survives a reload, and add an approve.test.ts case for the cause.",
@@ -477,14 +475,6 @@
    "from": "00411535-d088-4716-bdec-a80217f97b50",
    "name": "Switchboard Adjustment Updates",
    "why": "blocked"
-  },
-  {
-   "id": "f03c196c",
-   "text": "Newly filed: since I started, other chats have added items 7bb98bd3, fc6b9569, b2b2ae1c, 20b046b5, ea2f8c40, e14ca1da and 08e0bf2a. Some are probably tasks for",
-   "at": 1794346358419,
-   "by": "79bd8605-e785-4d59-8f45-607ba5fb7503",
-   "from": "e00a90da-1c1f-4b22-8c7c-ca3326a47a87",
-   "why": "later"
   }
  ]
 }
