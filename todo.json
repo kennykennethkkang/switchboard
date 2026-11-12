@@ -1,6 +1,12 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "36c29162",
+   "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
+   "at": 1794508783990
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -406,11 +412,11 @@
   {
    "id": "b46dbe93",
    "text": "the first real run happens at the next improve-system slot. Its proposals have only been tested with a stand-in runner, not a real model run.",
+   "at": 1794486816517,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "why": "later",
-   "at": 1794486816517,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd"
+   "why": "later"
   },
   {
    "id": "b6447aa8",
