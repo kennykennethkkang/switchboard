@@ -1,18 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "dc3c394a",
-   "text": "Proposed kit rule (claude-mods/kit/rules.md, Working style, after the \"Every design question is shown\" bullet): add \"Before the design AskUserQuestion, run crowd-ab and a MiroFish sim on the options (written by an agent that built neither) and quote both results in the question.\" Why: 2026-11-11 Kenneth sent back the wait-picker question asking whether it was crowd tested.",
-   "at": 1794464486099,
-   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
-   "name": "Route Chat Items to Topic",
-   "chat": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "host": "62903adf5e340f87",
-   "run": 45,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -396,106 +384,10 @@
   "afd3ecc5": 1794445711775,
   "52aff8fd": 1794445931950,
   "73a68f82": 1794454592064,
-  "366db837": 1794454813478
+  "366db837": 1794454813478,
+  "dc3c394a": 1794464538599
  },
  "seq": 45,
- "ticked": [
-  {
-   "id": "366db837",
-   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
-   "at": 1794454813478,
-   "by": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217",
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "run": 44,
-   "auto": true
-  },
-  {
-   "id": "73a68f82",
-   "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
-   "at": 1794454592064,
-   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "from": "f855caa1-c700-4ee2-a002-61708e972bcd",
-   "name": "To-do 39: Switchboard approvedAt investigation",
-   "why": "missed"
-  },
-  {
-   "id": "52aff8fd",
-   "text": "Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node and flow, and a raised role's model from escalations (raiseLine). Files: web/lib/court-map.ts, flow-map.ts and their components; asked the map realm rework chat on 2026-11-11, no reply",
-   "at": 1794445931950,
-   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
-   "name": "Model Benchmarking And Switchboard Settings v2",
-   "run": 43,
-   "auto": true
-  },
-  {
-   "id": "afd3ecc5",
-   "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
-   "at": 1794445711775,
-   "by": "84b2da19-6a6c-4683-af91-e27990511cdc",
-   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
-   "name": "To-do 41: Model-bench rescore API stall fix",
-   "run": 42,
-   "auto": true
-  },
-  {
-   "id": "ab0e2056",
-   "text": "model-bench: find why --rescore judge calls stall 4+ min idle on API sockets inside claude-mods/kit/skills/model-bench/scripts/bench.mjs while the same prompt via a standalone spawnSync script returns in 15s; fix so --rescore needs no scratch grader",
-   "at": 1794428181523,
-   "by": "d34d6a42-43cb-45fd-a45a-f76271428c28",
-   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
-   "name": "Model Benchmarking And Switchboard Settings v2",
-   "run": 41,
-   "auto": true
-  },
-  {
-   "id": "504d0438",
-   "text": "Proposed kit rule (approve before applying): claude-mods/kit/rules.md, Finishing, after \"The Commit message block stays last in the final message.\" add: \"If Kenneth asks whether an approved chat is finished or why it sits idle, end it at once with EndConversation (the second call ends it); no explanation, no confirm question.\"",
-   "at": 1794374236966,
-   "by": "b11a3c43-e007-4ff3-8832-f248dab325ba",
-   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
-   "run": 40,
-   "auto": true
-  },
-  {
-   "id": "0ce5630a",
-   "text": "Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never closed it. Suspects: approvalBlock saw state 'working' at PostToolUse, or the event was handled as a mirror (lowercase -switchboard transcript slug). Log approvalBlock refusals somewhere that survives a reload, and add an approve.test.ts case for the cause.",
-   "at": 1794374197784,
-   "by": "f855caa1-c700-4ee2-a002-61708e972bcd",
-   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
-   "run": 39,
-   "auto": true
-  },
-  {
-   "id": "34c517e2",
-   "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
-   "at": 1794366512192,
-   "by": "8a5be37e-284a-4476-a0d2-6463cba7f9b9",
-   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
-   "name": "Self-Improving Switchboard Agents",
-   "run": 38,
-   "auto": true
-  },
-  {
-   "id": "3652a3ab",
-   "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
-   "at": 1794366181698,
-   "by": "5ec52720-8f6b-4ced-8345-39dc30715d27",
-   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
-   "name": "Self-Improving Switchboard Agents",
-   "run": 37,
-   "auto": true
-  },
-  {
-   "id": "85459f6e",
-   "text": "Why was renaming blocked please make sure they are not blocked and fix them I want to make sure this folder is renamed to switchboard also",
-   "at": 1794346935635,
-   "by": "4452d4cb-11ba-4264-8d2e-e318ef108c8d",
-   "run": 36,
-   "auto": true
-  }
- ],
  "suggested": [
   {
    "id": "f92819f4",
@@ -586,5 +478,103 @@
    "why": "missed"
   }
  ],
- "streak": 45
+ "ticked": [
+  {
+   "id": "dc3c394a",
+   "text": "Proposed kit rule (claude-mods/kit/rules.md, Working style, after the \"Every design question is shown\" bullet): add \"Before the design AskUserQuestion, run crowd-ab and a MiroFish sim on the options (written by an agent that built neither) and quote both results in the question.\" Why: 2026-11-11 Kenneth sent back the wait-picker question asking whether it was crowd tested.",
+   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
+   "name": "Route Chat Items to Topic",
+   "run": 45,
+   "auto": true,
+   "at": 1794464538599,
+   "by": "f925d27a-d0a1-48f8-a857-82ef9838b377"
+  },
+  {
+   "id": "366db837",
+   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
+   "at": 1794454813478,
+   "by": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217",
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "run": 44,
+   "auto": true
+  },
+  {
+   "id": "73a68f82",
+   "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
+   "at": 1794454592064,
+   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "from": "f855caa1-c700-4ee2-a002-61708e972bcd",
+   "name": "To-do 39: Switchboard approvedAt investigation",
+   "why": "missed"
+  },
+  {
+   "id": "52aff8fd",
+   "text": "Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node and flow, and a raised role's model from escalations (raiseLine). Files: web/lib/court-map.ts, flow-map.ts and their components; asked the map realm rework chat on 2026-11-11, no reply",
+   "at": 1794445931950,
+   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2",
+   "run": 43,
+   "auto": true
+  },
+  {
+   "id": "afd3ecc5",
+   "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
+   "at": 1794445711775,
+   "by": "84b2da19-6a6c-4683-af91-e27990511cdc",
+   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
+   "name": "To-do 41: Model-bench rescore API stall fix",
+   "run": 42,
+   "auto": true
+  },
+  {
+   "id": "ab0e2056",
+   "text": "model-bench: find why --rescore judge calls stall 4+ min idle on API sockets inside claude-mods/kit/skills/model-bench/scripts/bench.mjs while the same prompt via a standalone spawnSync script returns in 15s; fix so --rescore needs no scratch grader",
+   "at": 1794428181523,
+   "by": "d34d6a42-43cb-45fd-a45a-f76271428c28",
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2",
+   "run": 41,
+   "auto": true
+  },
+  {
+   "id": "504d0438",
+   "text": "Proposed kit rule (approve before applying): claude-mods/kit/rules.md, Finishing, after \"The Commit message block stays last in the final message.\" add: \"If Kenneth asks whether an approved chat is finished or why it sits idle, end it at once with EndConversation (the second call ends it); no explanation, no confirm question.\"",
+   "at": 1794374236966,
+   "by": "b11a3c43-e007-4ff3-8832-f248dab325ba",
+   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
+   "run": 40,
+   "auto": true
+  },
+  {
+   "id": "0ce5630a",
+   "text": "Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never closed it. Suspects: approvalBlock saw state 'working' at PostToolUse, or the event was handled as a mirror (lowercase -switchboard transcript slug). Log approvalBlock refusals somewhere that survives a reload, and add an approve.test.ts case for the cause.",
+   "at": 1794374197784,
+   "by": "f855caa1-c700-4ee2-a002-61708e972bcd",
+   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
+   "run": 39,
+   "auto": true
+  },
+  {
+   "id": "34c517e2",
+   "text": "Fix the 24 dangling memory links that memory-health.mjs lists (old slugs like split-qa-per-workstream, switchboard-install-reload now in memory/archive/ or renamed)",
+   "at": 1794366512192,
+   "by": "8a5be37e-284a-4476-a0d2-6463cba7f9b9",
+   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
+   "name": "Self-Improving Switchboard Agents",
+   "run": 38,
+   "auto": true
+  },
+  {
+   "id": "3652a3ab",
+   "text": "Add self-improve held-out evals (1 dev + 2 heldout, text-only) for Explore, growth, engineer-codex/qa-codex and the most used kit skills (aar, toolchain, crowd-ab) in claude-mods/kit/skills/self-improve/evals/tasks.json, so Learn can tune them too",
+   "at": 1794366181698,
+   "by": "5ec52720-8f6b-4ced-8345-39dc30715d27",
+   "from": "bf0fd642-972d-4cc9-9f5b-b8d4bcc33503",
+   "name": "Self-Improving Switchboard Agents",
+   "run": 37,
+   "auto": true
+  }
+ ]
 }
