@@ -1,18 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "366db837",
-   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
-   "at": 1794454763453,
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "chat": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217",
-   "host": "62903adf5e340f87",
-   "run": 44,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -395,10 +383,103 @@
   "ab0e2056": 1794428181523,
   "afd3ecc5": 1794445711775,
   "52aff8fd": 1794445931950,
-  "73a68f82": 1794454592064
+  "73a68f82": 1794454592064,
+  "366db837": 1794454813478
  },
  "seq": 44,
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "6befc914",
+   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "2194ab17",
+   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "67f98475",
+   "text": "Indefinite loop mode. This mode will keep running fixes and changes on the site. Not anything that is cosmetic changes unless it is fixing issues but it does a deep search, deep run, and long run to c",
+   "at": 1794420824682,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "missed"
+  },
+  {
+   "id": "f331187a",
+   "text": "This should still be waiting on the same chat I mentioned.",
+   "at": 1794420824682,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "missed"
+  },
+  {
+   "id": "d83be755",
+   "text": "Keep waiting for \"Route Chat Items to Topic\" to end, as you chose. It's been idle for about 40 minutes, so it may need your Approve or another answer before it",
+   "at": 1794420827501,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "blocked"
+  },
+  {
+   "id": "b1340f56",
+   "text": "Once it ends, start the open-ended audit loop: a deep run for bugs and fixes, plus a plain-language \"what was done and why\" record for each chat.",
+   "at": 1794420827501,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "later"
+  },
+  {
+   "id": "f2185b32",
+   "text": "Redo button placement on the main site and the maps page using MiroFish and A/B testing, keeping the current look and removing parts that aren't useful.",
+   "at": 1794420827501,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "why": "later"
+  },
+  {
+   "id": "310588c4",
+   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
+   "at": 1794454585734,
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "missed"
+  },
+  {
+   "id": "19b07494",
+   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
+   "at": 1794454592064,
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "366db837",
+   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "run": 44,
+   "auto": true,
+   "at": 1794454813478,
+   "by": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217"
+  },
   {
    "id": "73a68f82",
    "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
@@ -483,100 +564,6 @@
    "by": "4452d4cb-11ba-4264-8d2e-e318ef108c8d",
    "run": 36,
    "auto": true
-  },
-  {
-   "id": "58d13898-ok",
-   "text": "claude-mods also has a lot of uncommitted work from other chats. The message below covers only this edit; their own messages should merge in through Switchboard",
-   "at": 1794346458368,
-   "by": "f42846f5-47f4-4e76-8e15-2fb01c38a37d",
-   "from": "286cc713-1cb8-477c-a9ce-6a1a4eba43d2",
-   "name": "To-do 32: AAR fix rules md update",
-   "why": "later",
-   "run": 35,
-   "auto": true
   }
- ],
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "6befc914",
-   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "2194ab17",
-   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "67f98475",
-   "text": "Indefinite loop mode. This mode will keep running fixes and changes on the site. Not anything that is cosmetic changes unless it is fixing issues but it does a deep search, deep run, and long run to c",
-   "at": 1794420824682,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "missed"
-  },
-  {
-   "id": "f331187a",
-   "text": "This should still be waiting on the same chat I mentioned.",
-   "at": 1794420824682,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "missed"
-  },
-  {
-   "id": "d83be755",
-   "text": "Keep waiting for \"Route Chat Items to Topic\" to end, as you chose. It's been idle for about 40 minutes, so it may need your Approve or another answer before it",
-   "at": 1794420827501,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "blocked"
-  },
-  {
-   "id": "b1340f56",
-   "text": "Once it ends, start the open-ended audit loop: a deep run for bugs and fixes, plus a plain-language \"what was done and why\" record for each chat.",
-   "at": 1794420827501,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "later"
-  },
-  {
-   "id": "f2185b32",
-   "text": "Redo button placement on the main site and the maps page using MiroFish and A/B testing, keeping the current look and removing parts that aren't useful.",
-   "at": 1794420827501,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "later"
-  },
-  {
-   "id": "310588c4",
-   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
-   "at": 1794454585734,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "missed"
-  },
-  {
-   "id": "19b07494",
-   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
-   "at": 1794454592064,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "later"
-  }
- ],
- "streak": 44
+ ]
 }
