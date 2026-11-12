@@ -574,6 +574,22 @@
    "at": 1794468343973,
    "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
    "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "17474366",
+   "text": "The map page and its flow view weren't updated for this fix.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
   }
  ]
 }
