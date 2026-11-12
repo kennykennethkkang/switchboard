@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "b6447aa8",
+   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "at": 1794486133130,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -403,11 +411,11 @@
   {
    "id": "5a6de9aa",
    "text": "Other chat finished continue.",
+   "at": 1794485618664,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
    "name": "Switchboard map agent realm rework",
-   "why": "missed",
-   "at": 1794485618664,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd"
+   "why": "missed"
   },
   {
    "id": "28c58a49",
