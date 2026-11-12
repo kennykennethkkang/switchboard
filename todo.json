@@ -2,17 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "1a9ecdee",
-   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
-   "at": 1794485096455,
-   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "name": "Memory Fix Agent Skill",
-   "chat": "62fe660b-d602-495a-b495-60f7aab538df",
-   "host": "62903adf5e340f87",
-   "run": 49,
-   "auto": true
-  },
-  {
    "id": "28c58a49",
    "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
    "at": 1794485084019,
@@ -412,109 +401,11 @@
   "f2185b32": 1794472306341,
   "7392a158": 1794472342006,
   "c2163362": 1794472843198,
-  "479d6249": 1794479088250
+  "479d6249": 1794479088250,
+  "1a9ecdee": 1794485290627
  },
  "seq": 49,
- "ticked": [
-  {
-   "id": "479d6249",
-   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
-   "at": 1794479088250,
-   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
-   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
-   "name": "Codex Engineer Setup Fix",
-   "run": 48,
-   "auto": true
-  },
-  {
-   "id": "c2163362",
-   "text": "Audit round 3: extension/src outside hub/ (session-watcher, transcript-parser, hook-server, codex-runtime) and web pages not yet read (now-page, today, changes, check-cards); plus the AWS profile delete refusal matched by substring in web/components/switchboard/sign-ins.tsx:324, which needs a structured error from extension/src/hub/hub-panel.ts deleteAwsProfile. Findings so far: .switchboard/stages/2026-11-11-indefinite-audit-b4ca9c89/",
-   "at": 1794472843198,
-   "by": "99696cb4-5a8e-4ea3-887f-55f0195714d3",
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "run": 47,
-   "auto": true
-  },
-  {
-   "id": "7392a158",
-   "text": "Proposed kit edit (needs Kenneth's OK): claude-mods/kit/skills/stages/SKILL.md, in \"The lead's loop\" step 2, replace \"Tell it to write its outputs into that stage's `output/`.\" with \"Ask it for the Report in its reply and save it into that stage's `output/` yourself; a hook refuses subagent writes of report files there.\" Why: 5 subagents in the Indefinite Mode Site Audit chat could not write their stage reports.",
-   "at": 1794472342006,
-   "by": "d9bc85c0-c709-4e4a-ba7b-f74debb2bf6a",
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "run": 46,
-   "auto": true
-  },
-  {
-   "id": "dc3c394a",
-   "text": "Proposed kit rule (claude-mods/kit/rules.md, Working style, after the \"Every design question is shown\" bullet): add \"Before the design AskUserQuestion, run crowd-ab and a MiroFish sim on the options (written by an agent that built neither) and quote both results in the question.\" Why: 2026-11-11 Kenneth sent back the wait-picker question asking whether it was crowd tested.",
-   "at": 1794464538599,
-   "by": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
-   "name": "Route Chat Items to Topic",
-   "run": 45,
-   "auto": true
-  },
-  {
-   "id": "366db837",
-   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
-   "at": 1794454813478,
-   "by": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217",
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "run": 44,
-   "auto": true
-  },
-  {
-   "id": "73a68f82",
-   "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
-   "at": 1794454592064,
-   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "from": "f855caa1-c700-4ee2-a002-61708e972bcd",
-   "name": "To-do 39: Switchboard approvedAt investigation",
-   "why": "missed"
-  },
-  {
-   "id": "52aff8fd",
-   "text": "Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node and flow, and a raised role's model from escalations (raiseLine). Files: web/lib/court-map.ts, flow-map.ts and their components; asked the map realm rework chat on 2026-11-11, no reply",
-   "at": 1794445931950,
-   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
-   "name": "Model Benchmarking And Switchboard Settings v2",
-   "run": 43,
-   "auto": true
-  },
-  {
-   "id": "afd3ecc5",
-   "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
-   "at": 1794445711775,
-   "by": "84b2da19-6a6c-4683-af91-e27990511cdc",
-   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
-   "name": "To-do 41: Model-bench rescore API stall fix",
-   "run": 42,
-   "auto": true
-  },
-  {
-   "id": "ab0e2056",
-   "text": "model-bench: find why --rescore judge calls stall 4+ min idle on API sockets inside claude-mods/kit/skills/model-bench/scripts/bench.mjs while the same prompt via a standalone spawnSync script returns in 15s; fix so --rescore needs no scratch grader",
-   "at": 1794428181523,
-   "by": "d34d6a42-43cb-45fd-a45a-f76271428c28",
-   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
-   "name": "Model Benchmarking And Switchboard Settings v2",
-   "run": 41,
-   "auto": true
-  },
-  {
-   "id": "504d0438",
-   "text": "Proposed kit rule (approve before applying): claude-mods/kit/rules.md, Finishing, after \"The Commit message block stays last in the final message.\" add: \"If Kenneth asks whether an approved chat is finished or why it sits idle, end it at once with EndConversation (the second call ends it); no explanation, no confirm question.\"",
-   "at": 1794374236966,
-   "by": "b11a3c43-e007-4ff3-8832-f248dab325ba",
-   "from": "a7fa5b5e-b2a0-4168-b37b-8c2b2cff4dfd",
-   "run": 40,
-   "auto": true
-  }
- ],
+ "streak": 49,
  "suggested": [
   {
    "id": "f92819f4",
@@ -603,5 +494,105 @@
    "why": "missed"
   }
  ],
- "streak": 49
+ "ticked": [
+  {
+   "id": "1a9ecdee",
+   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill",
+   "run": 49,
+   "auto": true,
+   "at": 1794485290627,
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532"
+  },
+  {
+   "id": "479d6249",
+   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
+   "at": 1794479088250,
+   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
+   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
+   "name": "Codex Engineer Setup Fix",
+   "run": 48,
+   "auto": true
+  },
+  {
+   "id": "c2163362",
+   "text": "Audit round 3: extension/src outside hub/ (session-watcher, transcript-parser, hook-server, codex-runtime) and web pages not yet read (now-page, today, changes, check-cards); plus the AWS profile delete refusal matched by substring in web/components/switchboard/sign-ins.tsx:324, which needs a structured error from extension/src/hub/hub-panel.ts deleteAwsProfile. Findings so far: .switchboard/stages/2026-11-11-indefinite-audit-b4ca9c89/",
+   "at": 1794472843198,
+   "by": "99696cb4-5a8e-4ea3-887f-55f0195714d3",
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "run": 47,
+   "auto": true
+  },
+  {
+   "id": "7392a158",
+   "text": "Proposed kit edit (needs Kenneth's OK): claude-mods/kit/skills/stages/SKILL.md, in \"The lead's loop\" step 2, replace \"Tell it to write its outputs into that stage's `output/`.\" with \"Ask it for the Report in its reply and save it into that stage's `output/` yourself; a hook refuses subagent writes of report files there.\" Why: 5 subagents in the Indefinite Mode Site Audit chat could not write their stage reports.",
+   "at": 1794472342006,
+   "by": "d9bc85c0-c709-4e4a-ba7b-f74debb2bf6a",
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "run": 46,
+   "auto": true
+  },
+  {
+   "id": "dc3c394a",
+   "text": "Proposed kit rule (claude-mods/kit/rules.md, Working style, after the \"Every design question is shown\" bullet): add \"Before the design AskUserQuestion, run crowd-ab and a MiroFish sim on the options (written by an agent that built neither) and quote both results in the question.\" Why: 2026-11-11 Kenneth sent back the wait-picker question asking whether it was crowd tested.",
+   "at": 1794464538599,
+   "by": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
+   "name": "Route Chat Items to Topic",
+   "run": 45,
+   "auto": true
+  },
+  {
+   "id": "366db837",
+   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
+   "at": 1794454813478,
+   "by": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217",
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "run": 44,
+   "auto": true
+  },
+  {
+   "id": "73a68f82",
+   "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
+   "at": 1794454592064,
+   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "from": "f855caa1-c700-4ee2-a002-61708e972bcd",
+   "name": "To-do 39: Switchboard approvedAt investigation",
+   "why": "missed"
+  },
+  {
+   "id": "52aff8fd",
+   "text": "Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node and flow, and a raised role's model from escalations (raiseLine). Files: web/lib/court-map.ts, flow-map.ts and their components; asked the map realm rework chat on 2026-11-11, no reply",
+   "at": 1794445931950,
+   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2",
+   "run": 43,
+   "auto": true
+  },
+  {
+   "id": "afd3ecc5",
+   "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
+   "at": 1794445711775,
+   "by": "84b2da19-6a6c-4683-af91-e27990511cdc",
+   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
+   "name": "To-do 41: Model-bench rescore API stall fix",
+   "run": 42,
+   "auto": true
+  },
+  {
+   "id": "ab0e2056",
+   "text": "model-bench: find why --rescore judge calls stall 4+ min idle on API sockets inside claude-mods/kit/skills/model-bench/scripts/bench.mjs while the same prompt via a standalone spawnSync script returns in 15s; fix so --rescore needs no scratch grader",
+   "at": 1794428181523,
+   "by": "d34d6a42-43cb-45fd-a45a-f76271428c28",
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2",
+   "run": 41,
+   "auto": true
+  }
+ ]
 }
