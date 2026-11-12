@@ -4,9 +4,13 @@
   {
    "id": "b6447aa8",
    "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794486133130,
+   "at": 1794486133528,
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals"
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "chat": "afc62795-c062-4360-b5ba-d8be2089652f",
+   "host": "62903adf5e340f87",
+   "run": 51,
+   "auto": true
   }
  ],
  "removed": {
@@ -406,7 +410,7 @@
   "28c58a49": 1794485583219,
   "5a6de9aa": 1794485618664
  },
- "seq": 50,
+ "seq": 51,
  "ticked": [
   {
    "id": "5a6de9aa",
@@ -602,5 +606,6 @@
    "name": "To-do 50: Sleep-time memory consolidation proposals",
    "why": "later"
   }
- ]
+ ],
+ "streak": 51
 }
