@@ -582,6 +582,13 @@
    "at": 1794465087354,
    "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
    "why": "later"
+  },
+  {
+   "id": "1d2d4fff",
+   "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
+   "at": 1794468343973,
+   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
+   "why": "later"
   }
  ]
 }
