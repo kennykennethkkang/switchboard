@@ -7,6 +7,13 @@
    "at": 1794485083386,
    "from": "daea81e0-2547-4a04-a969-335bebf6c532",
    "name": "Memory Fix Agent Skill"
+  },
+  {
+   "id": "28c58a49",
+   "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
+   "at": 1794485084019,
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill"
   }
  ],
  "removed": {
