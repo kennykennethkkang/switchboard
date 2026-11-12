@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "19b07494-ok",
-   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
-   "at": 1794510655734,
-   "chat": "25488749-da59-4412-ac02-a031141dbb61",
-   "host": "62903adf5e340f87",
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "later",
-   "run": 61,
-   "auto": true
-  },
-  {
    "id": "2194ab17-ok",
    "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
    "at": 1794509912711,
@@ -439,7 +427,8 @@
   "310588c4-ok": 1794510290785,
   "17474366-ok": 1794510367738,
   "1d2d4fff-ok": 1794510641912,
-  "c62364f4": 1794510893341
+  "c62364f4": 1794510893341,
+  "19b07494-ok": 1794510895494
  },
  "seq": 61,
  "streak": 55,
@@ -477,15 +466,26 @@
  ],
  "ticked": [
   {
+   "id": "19b07494-ok",
+   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "later",
+   "run": 61,
+   "auto": true,
+   "at": 1794510895494,
+   "by": "25488749-da59-4412-ac02-a031141dbb61"
+  },
+  {
    "id": "c62364f4",
    "text": "Next Switchboard release: add CHANGELOG line \"New chat, Related: links, filler words (please, sure, these, ask questions...) and the project's own name no longer count toward a match; a 28-day replay showed every 0.2 hit on typed prompts came from them\" (web/lib/related-chat.ts, done 2026-11-12, not yet released)",
+   "at": 1794510893341,
+   "by": "25488749-da59-4412-ac02-a031141dbb61",
    "from": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
    "before": "19b07494-ok",
    "name": "To-do 60: Verify similarity threshold",
    "run": 61,
-   "auto": true,
-   "at": 1794510893341,
-   "by": "25488749-da59-4412-ac02-a031141dbb61"
+   "auto": true
   },
   {
    "id": "1d2d4fff-ok",
@@ -568,14 +568,6 @@
    "at": 1794509259712,
    "by": "332cb39f-596a-40fb-b007-65463dbb6303",
    "run": 53,
-   "auto": true
-  },
-  {
-   "id": "36c29162",
-   "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
-   "at": 1794508929235,
-   "by": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
-   "run": 52,
    "auto": true
   }
  ]
