@@ -4,9 +4,13 @@
   {
    "id": "366db837",
    "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
-   "at": 1794454749160,
+   "at": 1794454763453,
    "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework"
+   "name": "Switchboard map agent realm rework",
+   "chat": "f0e67b1c-2750-41b7-a2e6-a3e4c9218217",
+   "host": "62903adf5e340f87",
+   "run": 44,
+   "auto": true
   }
  ],
  "removed": {
@@ -393,7 +397,7 @@
   "52aff8fd": 1794445931950,
   "73a68f82": 1794454592064
  },
- "seq": 43,
+ "seq": 44,
  "ticked": [
   {
    "id": "73a68f82",
@@ -573,5 +577,6 @@
    "name": "To-do 43: Chat map and flow stage",
    "why": "later"
   }
- ]
+ ],
+ "streak": 44
 }
