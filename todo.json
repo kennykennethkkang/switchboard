@@ -16,6 +16,14 @@
    "from": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
    "name": "To-do 52: Learn rules md proposal review",
    "why": "missed"
+  },
+  {
+   "id": "dc2fbcf8-ok",
+   "text": "Also are all the updates that were created for switchboard showing here? It seems like some of the stuff is missing please check and make sure it is all in.",
+   "at": 1794509858715,
+   "from": "47abf55f-e55a-461f-93fd-9d34dc17e82a",
+   "name": "Verify Switchboard updates missing",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -421,7 +429,8 @@
   "91f89b21": 1794509259712,
   "1a96b234": 1794509298736,
   "28d060a1": 1794509856376,
-  "6d17a143": 1794509857533
+  "6d17a143": 1794509857533,
+  "dc2fbcf8": 1794509858715
  },
  "seq": 54,
  "ticked": [
@@ -589,14 +598,6 @@
    "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
    "name": "Terminal approval reload fix",
    "why": "later"
-  },
-  {
-   "id": "dc2fbcf8",
-   "text": "Also are all the updates that were created for switchboard showing here? It seems like some of the stuff is missing please check and make sure it is all in.",
-   "at": 1794482622177,
-   "from": "47abf55f-e55a-461f-93fd-9d34dc17e82a",
-   "name": "Verify Switchboard updates missing",
-   "why": "missed"
   },
   {
    "id": "0a4a36e6",
