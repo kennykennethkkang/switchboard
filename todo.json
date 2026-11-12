@@ -1,18 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "b6447aa8",
-   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794486133528,
-   "chat": "afc62795-c062-4360-b5ba-d8be2089652f",
-   "host": "62903adf5e340f87",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "run": 51,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -409,10 +397,10 @@
   "1a9ecdee": 1794485290627,
   "28c58a49": 1794485583219,
   "5a6de9aa": 1794485618664,
-  "0935cf75": 1794486152747
+  "0935cf75": 1794486152747,
+  "b6447aa8": 1794486358432
  },
  "seq": 51,
- "streak": 51,
  "suggested": [
   {
    "id": "f92819f4",
@@ -503,13 +491,23 @@
  ],
  "ticked": [
   {
-   "id": "0935cf75",
-   "text": "Switchboard to-do, in this order: 1. Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only (id 28c58a49) Do prerequisites fi",
+   "id": "b6447aa8",
+   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "why": "missed",
+   "run": 51,
+   "auto": true,
+   "at": 1794486358432,
+   "by": "afc62795-c062-4360-b5ba-d8be2089652f"
+  },
+  {
+   "id": "0935cf75",
+   "text": "Switchboard to-do, in this order: 1. Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only (id 28c58a49) Do prerequisites fi",
    "at": 1794486152747,
-   "by": "daea81e0-2547-4a04-a969-335bebf6c532"
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "missed"
   },
   {
    "id": "5a6de9aa",
@@ -589,15 +587,6 @@
    "name": "Switchboard map agent realm rework",
    "run": 44,
    "auto": true
-  },
-  {
-   "id": "73a68f82",
-   "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
-   "at": 1794454592064,
-   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "from": "f855caa1-c700-4ee2-a002-61708e972bcd",
-   "name": "To-do 39: Switchboard approvedAt investigation",
-   "why": "missed"
   }
  ]
 }
