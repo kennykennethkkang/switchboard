@@ -44,6 +44,13 @@
    "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
    "name": "Terminal approval reload fix",
    "why": "later"
+  },
+  {
+   "id": "1d2d4fff-ok",
+   "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
+   "at": 1794509886162,
+   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
+   "why": "later"
   }
  ],
  "removed": {
@@ -452,7 +459,8 @@
   "28d060a1": 1794509856376,
   "6d17a143": 1794509857533,
   "dc2fbcf8": 1794509858715,
-  "310588c4": 1794509863281
+  "310588c4": 1794509863281,
+  "1d2d4fff": 1794509886162
  },
  "seq": 55,
  "streak": 55,
@@ -589,13 +597,6 @@
    "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
    "at": 1794465087354,
    "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "why": "later"
-  },
-  {
-   "id": "1d2d4fff",
-   "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
-   "at": 1794468343973,
-   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
    "why": "later"
   },
   {
