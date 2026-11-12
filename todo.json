@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "366db837",
+   "text": "Map and Code view: show each chat's current stage (name, role, status from hub stages/StageRun, helpers in web/lib/stages-ui.ts) on its Agents desk/yard and in the Code view roles, plus a raised role's model (e.g. \"qa: opus, raised\" from escalations). Asked by the Model Benchmarking chat, which ended before doing it. Files: web/lib/court-map.ts, board.tsx Panel, web/lib/flow-map.ts components, flow-map.tsx",
+   "at": 1794454749160,
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -390,11 +398,11 @@
   {
    "id": "73a68f82",
    "text": "Switchboard to-do, in this order: 1. Find why chat 5ec52720's Approve (AskUserQuestion answered at 2026-11-11 03:03 UTC) set no approvedAt in ~/.claude/switchboard/archive.json, so closeAtStop never c",
+   "at": 1794454592064,
+   "by": "06a07f13-5707-47c1-a490-326cfd0e199a",
    "from": "f855caa1-c700-4ee2-a002-61708e972bcd",
    "name": "To-do 39: Switchboard approvedAt investigation",
-   "why": "missed",
-   "at": 1794454592064,
-   "by": "06a07f13-5707-47c1-a490-326cfd0e199a"
+   "why": "missed"
   },
   {
    "id": "52aff8fd",
