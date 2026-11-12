@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "7392a158",
+   "text": "Proposed kit edit (needs Kenneth's OK): claude-mods/kit/skills/stages/SKILL.md, in \"The lead's loop\" step 2, replace \"Tell it to write its outputs into that stage's `output/`.\" with \"Ask it for the Report in its reply and save it into that stage's `output/` yourself; a hook refuses subagent writes of report files there.\" Why: 5 subagents in the Indefinite Mode Site Audit chat could not write their stage reports.",
+   "at": 1794471931674,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
