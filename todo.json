@@ -36,9 +36,18 @@
    "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
    "name": "To-do 43: Chat map and flow stage",
    "why": "missed"
+  },
+  {
+   "id": "17474366-ok",
+   "text": "The map page and its flow view weren't updated for this fix.",
+   "at": 1794509875435,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
   }
  ],
  "removed": {
+  "17474366": 1794509875435,
   "60191406": 1793870136284,
   "88264666": 1793822810406,
   "4323189c": 1793339057827,
@@ -592,14 +601,6 @@
   {
    "id": "fb269eb8",
    "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "17474366",
-   "text": "The map page and its flow view weren't updated for this fix.",
    "at": 1794472322516,
    "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
    "name": "Terminal approval reload fix",
