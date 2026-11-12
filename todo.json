@@ -471,7 +471,8 @@
   "1d2d4fff": 1794509886162,
   "19b07494": 1794509895671,
   "28d060a1-ok": 1794509902074,
-  "2194ab17": 1794509912711
+  "2194ab17": 1794509912711,
+  "6befc914": 1794509921020
  },
  "seq": 56,
  "streak": 55,
@@ -575,14 +576,6 @@
   {
    "id": "f92819f4",
    "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "6befc914",
-   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
    "at": 1794375841358,
    "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
    "name": "Model Benchmarking And Switchboard Settings",
