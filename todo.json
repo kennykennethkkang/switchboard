@@ -4,9 +4,13 @@
   {
    "id": "dc3c394a",
    "text": "Proposed kit rule (claude-mods/kit/rules.md, Working style, after the \"Every design question is shown\" bullet): add \"Before the design AskUserQuestion, run crowd-ab and a MiroFish sim on the options (written by an agent that built neither) and quote both results in the question.\" Why: 2026-11-11 Kenneth sent back the wait-picker question asking whether it was crowd tested.",
-   "at": 1794464477368,
+   "at": 1794464486099,
    "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
-   "name": "Route Chat Items to Topic"
+   "name": "Route Chat Items to Topic",
+   "chat": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "host": "62903adf5e340f87",
+   "run": 45,
+   "auto": true
   }
  ],
  "removed": {
@@ -394,7 +398,7 @@
   "73a68f82": 1794454592064,
   "366db837": 1794454813478
  },
- "seq": 44,
+ "seq": 45,
  "ticked": [
   {
    "id": "366db837",
@@ -581,5 +585,6 @@
    "name": "Switchboard map agent realm rework",
    "why": "missed"
   }
- ]
+ ],
+ "streak": 45
 }
