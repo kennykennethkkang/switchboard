@@ -1,17 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "258bdd03",
-   "text": "Proposed fix from Learn AAR of 7b134777 (approve before applying): chats keep asking \"Approve this chat as finished?\" with no standup and no aar (d0c9b084, 1b4609a7, 7b134777); rules.md lines 66-67 and memory standup-before-approve did not stop it. Add a PreToolUse deny for AskUserQuestion when the question is the closing one (isClosing in extension/src/hub/approve.ts): read transcript_path since the last real user prompt and deny unless (a) an assistant text holds \"For you\" and \"Left\" headings and (b) a Read of aar/SKILL.md or a Skill call for aar happened, or the wiki/aar-<project>.md file changed this turn. Deny text: \"Run the aar skill and print the standup (done, for you, left, risks) before the Approve question.\" Skip the check when the chat changed no files (close-means-approved). Test in extension/test with a fixture transcript for each case.",
-   "at": 1794513468217,
-   "from": "fd54c6ec-6d5c-4c17-8d53-9f4240783485",
-   "chat": "288271e7-7af9-4562-92dc-ca57a7c71540",
-   "host": "62903adf5e340f87",
-   "run": 63,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -432,10 +421,45 @@
   "c62364f4": 1794510893341,
   "19b07494-ok": 1794510895494,
   "d83cd26f": 1794513031467,
-  "2194ab17-ok": 1794513085154
+  "2194ab17-ok": 1794513085154,
+  "258bdd03": 1794513749422
  },
  "seq": 63,
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "0a4a36e6",
+   "text": "reviewing to-do b6447aa8.",
+   "at": 1794486816517,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "258bdd03",
+   "text": "Proposed fix from Learn AAR of 7b134777 (approve before applying): chats keep asking \"Approve this chat as finished?\" with no standup and no aar (d0c9b084, 1b4609a7, 7b134777); rules.md lines 66-67 and memory standup-before-approve did not stop it. Add a PreToolUse deny for AskUserQuestion when the question is the closing one (isClosing in extension/src/hub/approve.ts): read transcript_path since the last real user prompt and deny unless (a) an assistant text holds \"For you\" and \"Left\" headings and (b) a Read of aar/SKILL.md or a Skill call for aar happened, or the wiki/aar-<project>.md file changed this turn. Deny text: \"Run the aar skill and print the standup (done, for you, left, risks) before the Approve question.\" Skip the check when the chat changed no files (close-means-approved). Test in extension/test with a fixture transcript for each case.",
+   "from": "fd54c6ec-6d5c-4c17-8d53-9f4240783485",
+   "run": 63,
+   "auto": true,
+   "at": 1794513749422,
+   "by": "288271e7-7af9-4562-92dc-ca57a7c71540"
+  },
   {
    "id": "2194ab17-ok",
    "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
@@ -530,43 +554,6 @@
    "why": "missed",
    "run": 56,
    "auto": true
-  },
-  {
-   "id": "28d060a1-ok",
-   "text": "Switchboard to-do, in this order: 1. memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the go",
-   "at": 1794509902074,
-   "by": "aeaba189-2e9a-4051-b53d-ae7f1983a11e",
-   "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
-   "name": "To-do 54: Memory-fix SKILL expect-list update",
-   "why": "missed",
-   "run": 55,
-   "auto": true
   }
- ],
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "fb269eb8",
-   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "0a4a36e6",
-   "text": "reviewing to-do b6447aa8.",
-   "at": 1794486816517,
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "why": "later"
-  }
- ],
- "streak": 63
+ ]
 }
