@@ -5,10 +5,10 @@
    "id": "1d2d4fff-ok",
    "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
    "at": 1794510370670,
-   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
-   "why": "later",
    "chat": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
    "host": "62903adf5e340f87",
+   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
+   "why": "later",
    "run": 60,
    "auto": true
   },
@@ -27,6 +27,14 @@
    "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
    "name": "Model Benchmarking And Switchboard Settings",
    "why": "later"
+  },
+  {
+   "id": "c62364f4",
+   "text": "Next Switchboard release: add CHANGELOG line \"New chat, Related: links, filler words (please, sure, these, ask questions...) and the project's own name no longer count toward a match; a 28-day replay showed every 0.2 hit on typed prompts came from them\" (web/lib/related-chat.ts, done 2026-11-12, not yet released)",
+   "at": 1794510641642,
+   "before": "19b07494-ok",
+   "from": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
+   "name": "To-do 60: Verify similarity threshold"
   }
  ],
  "removed": {
