@@ -1,16 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "36c29162",
-   "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
-   "at": 1794508810339,
-   "chat": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
-   "host": "62903adf5e340f87",
-   "run": 52,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
@@ -409,108 +399,10 @@
   "5a6de9aa": 1794485618664,
   "0935cf75": 1794486152747,
   "b6447aa8": 1794486358432,
-  "b46dbe93": 1794486816517
+  "b46dbe93": 1794486816517,
+  "36c29162": 1794508929235
  },
  "seq": 52,
- "ticked": [
-  {
-   "id": "b46dbe93",
-   "text": "the first real run happens at the next improve-system slot. Its proposals have only been tested with a stand-in runner, not a real model run.",
-   "at": 1794486816517,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "why": "later"
-  },
-  {
-   "id": "b6447aa8",
-   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794486358432,
-   "by": "afc62795-c062-4360-b5ba-d8be2089652f",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "run": 51,
-   "auto": true
-  },
-  {
-   "id": "0935cf75",
-   "text": "Switchboard to-do, in this order: 1. Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only (id 28c58a49) Do prerequisites fi",
-   "at": 1794486152747,
-   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "why": "missed"
-  },
-  {
-   "id": "5a6de9aa",
-   "text": "Other chat finished continue.",
-   "at": 1794485618664,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "why": "missed"
-  },
-  {
-   "id": "28c58a49",
-   "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
-   "at": 1794485583219,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "name": "Memory Fix Agent Skill",
-   "run": 50,
-   "auto": true
-  },
-  {
-   "id": "1a9ecdee",
-   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
-   "at": 1794485290627,
-   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "name": "Memory Fix Agent Skill",
-   "run": 49,
-   "auto": true
-  },
-  {
-   "id": "479d6249",
-   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
-   "at": 1794479088250,
-   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
-   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
-   "name": "Codex Engineer Setup Fix",
-   "run": 48,
-   "auto": true
-  },
-  {
-   "id": "c2163362",
-   "text": "Audit round 3: extension/src outside hub/ (session-watcher, transcript-parser, hook-server, codex-runtime) and web pages not yet read (now-page, today, changes, check-cards); plus the AWS profile delete refusal matched by substring in web/components/switchboard/sign-ins.tsx:324, which needs a structured error from extension/src/hub/hub-panel.ts deleteAwsProfile. Findings so far: .switchboard/stages/2026-11-11-indefinite-audit-b4ca9c89/",
-   "at": 1794472843198,
-   "by": "99696cb4-5a8e-4ea3-887f-55f0195714d3",
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "run": 47,
-   "auto": true
-  },
-  {
-   "id": "7392a158",
-   "text": "Proposed kit edit (needs Kenneth's OK): claude-mods/kit/skills/stages/SKILL.md, in \"The lead's loop\" step 2, replace \"Tell it to write its outputs into that stage's `output/`.\" with \"Ask it for the Report in its reply and save it into that stage's `output/` yourself; a hook refuses subagent writes of report files there.\" Why: 5 subagents in the Indefinite Mode Site Audit chat could not write their stage reports.",
-   "at": 1794472342006,
-   "by": "d9bc85c0-c709-4e4a-ba7b-f74debb2bf6a",
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "run": 46,
-   "auto": true
-  },
-  {
-   "id": "dc3c394a",
-   "text": "Proposed kit rule (claude-mods/kit/rules.md, Working style, after the \"Every design question is shown\" bullet): add \"Before the design AskUserQuestion, run crowd-ab and a MiroFish sim on the options (written by an agent that built neither) and quote both results in the question.\" Why: 2026-11-11 Kenneth sent back the wait-picker question asking whether it was crowd tested.",
-   "at": 1794464538599,
-   "by": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
-   "name": "Route Chat Items to Topic",
-   "run": 45,
-   "auto": true
-  }
- ],
  "suggested": [
   {
    "id": "f92819f4",
@@ -598,5 +490,101 @@
    "why": "later"
   }
  ],
- "streak": 52
+ "ticked": [
+  {
+   "id": "36c29162",
+   "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
+   "run": 52,
+   "auto": true,
+   "at": 1794508929235,
+   "by": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6"
+  },
+  {
+   "id": "b46dbe93",
+   "text": "the first real run happens at the next improve-system slot. Its proposals have only been tested with a stand-in runner, not a real model run.",
+   "at": 1794486816517,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "later"
+  },
+  {
+   "id": "b6447aa8",
+   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "at": 1794486358432,
+   "by": "afc62795-c062-4360-b5ba-d8be2089652f",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "run": 51,
+   "auto": true
+  },
+  {
+   "id": "0935cf75",
+   "text": "Switchboard to-do, in this order: 1. Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only (id 28c58a49) Do prerequisites fi",
+   "at": 1794486152747,
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "missed"
+  },
+  {
+   "id": "5a6de9aa",
+   "text": "Other chat finished continue.",
+   "at": 1794485618664,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "why": "missed"
+  },
+  {
+   "id": "28c58a49",
+   "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
+   "at": 1794485583219,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill",
+   "run": 50,
+   "auto": true
+  },
+  {
+   "id": "1a9ecdee",
+   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
+   "at": 1794485290627,
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill",
+   "run": 49,
+   "auto": true
+  },
+  {
+   "id": "479d6249",
+   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
+   "at": 1794479088250,
+   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
+   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
+   "name": "Codex Engineer Setup Fix",
+   "run": 48,
+   "auto": true
+  },
+  {
+   "id": "c2163362",
+   "text": "Audit round 3: extension/src outside hub/ (session-watcher, transcript-parser, hook-server, codex-runtime) and web pages not yet read (now-page, today, changes, check-cards); plus the AWS profile delete refusal matched by substring in web/components/switchboard/sign-ins.tsx:324, which needs a structured error from extension/src/hub/hub-panel.ts deleteAwsProfile. Findings so far: .switchboard/stages/2026-11-11-indefinite-audit-b4ca9c89/",
+   "at": 1794472843198,
+   "by": "99696cb4-5a8e-4ea3-887f-55f0195714d3",
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "run": 47,
+   "auto": true
+  },
+  {
+   "id": "7392a158",
+   "text": "Proposed kit edit (needs Kenneth's OK): claude-mods/kit/skills/stages/SKILL.md, in \"The lead's loop\" step 2, replace \"Tell it to write its outputs into that stage's `output/`.\" with \"Ask it for the Report in its reply and save it into that stage's `output/` yourself; a hook refuses subagent writes of report files there.\" Why: 5 subagents in the Indefinite Mode Site Audit chat could not write their stage reports.",
+   "at": 1794472342006,
+   "by": "d9bc85c0-c709-4e4a-ba7b-f74debb2bf6a",
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
+   "run": 46,
+   "auto": true
+  }
+ ]
 }
