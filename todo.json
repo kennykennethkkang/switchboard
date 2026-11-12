@@ -405,6 +405,101 @@
   "1a96b234": 1794509298736
  },
  "seq": 54,
+ "ticked": [
+  {
+   "id": "1a96b234",
+   "text": "memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the gold check.\" with \"write the new note, archive the old ones, append each merged note's slug to every ~/.claude/memory-gold.json expect list that names a note it supersedes, rerun the gold check.\" Why: 2026-11-12 apply reported a false lost hit until the expect list was updated.",
+   "at": 1794509298736,
+   "by": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
+   "from": "332cb39f-596a-40fb-b007-65463dbb6303",
+   "name": "To-do 53: Memory consolidation review",
+   "run": 54,
+   "auto": true
+  },
+  {
+   "id": "91f89b21",
+   "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-12-b9ff33de.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "at": 1794509259712,
+   "by": "332cb39f-596a-40fb-b007-65463dbb6303",
+   "run": 53,
+   "auto": true
+  },
+  {
+   "id": "36c29162",
+   "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
+   "at": 1794508929235,
+   "by": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
+   "run": 52,
+   "auto": true
+  },
+  {
+   "id": "b46dbe93",
+   "text": "the first real run happens at the next improve-system slot. Its proposals have only been tested with a stand-in runner, not a real model run.",
+   "at": 1794486816517,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "later"
+  },
+  {
+   "id": "b6447aa8",
+   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "at": 1794486358432,
+   "by": "afc62795-c062-4360-b5ba-d8be2089652f",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "run": 51,
+   "auto": true
+  },
+  {
+   "id": "0935cf75",
+   "text": "Switchboard to-do, in this order: 1. Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only (id 28c58a49) Do prerequisites fi",
+   "at": 1794486152747,
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "missed"
+  },
+  {
+   "id": "5a6de9aa",
+   "text": "Other chat finished continue.",
+   "at": 1794485618664,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "why": "missed"
+  },
+  {
+   "id": "28c58a49",
+   "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
+   "at": 1794485583219,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill",
+   "run": 50,
+   "auto": true
+  },
+  {
+   "id": "1a9ecdee",
+   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
+   "at": 1794485290627,
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill",
+   "run": 49,
+   "auto": true
+  },
+  {
+   "id": "479d6249",
+   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
+   "at": 1794479088250,
+   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
+   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
+   "name": "Codex Engineer Setup Fix",
+   "run": 48,
+   "auto": true
+  }
+ ],
  "suggested": [
   {
    "id": "f92819f4",
@@ -490,101 +585,14 @@
    "at": 1794486816517,
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
-  }
- ],
- "ticked": [
-  {
-   "id": "1a96b234",
-   "text": "memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the gold check.\" with \"write the new note, archive the old ones, append each merged note's slug to every ~/.claude/memory-gold.json expect list that names a note it supersedes, rerun the gold check.\" Why: 2026-11-12 apply reported a false lost hit until the expect list was updated.",
-   "from": "332cb39f-596a-40fb-b007-65463dbb6303",
-   "name": "To-do 53: Memory consolidation review",
-   "run": 54,
-   "auto": true,
-   "at": 1794509298736,
-   "by": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c"
   },
   {
-   "id": "91f89b21",
-   "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-12-b9ff33de.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794509259712,
-   "by": "332cb39f-596a-40fb-b007-65463dbb6303",
-   "run": 53,
-   "auto": true
-  },
-  {
-   "id": "36c29162",
-   "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
-   "at": 1794508929235,
-   "by": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
-   "run": 52,
-   "auto": true
-  },
-  {
-   "id": "b46dbe93",
-   "text": "the first real run happens at the next improve-system slot. Its proposals have only been tested with a stand-in runner, not a real model run.",
-   "at": 1794486816517,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "why": "later"
-  },
-  {
-   "id": "b6447aa8",
-   "text": "Memory consolidation: 7 proposed merges or rewrites of Switchboard memory notes in ~/.claude/switchboard/consolidate/2026-11-12-298f57a6.md (first real run). Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794486358432,
-   "by": "afc62795-c062-4360-b5ba-d8be2089652f",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
-   "run": 51,
-   "auto": true
-  },
-  {
-   "id": "0935cf75",
-   "text": "Switchboard to-do, in this order: 1. Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only (id 28c58a49) Do prerequisites fi",
-   "at": 1794486152747,
-   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "id": "28d060a1",
+   "text": "Switchboard to-do, in this order: 1. memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the go",
+   "at": 1794509817972,
+   "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
+   "name": "To-do 54: Memory-fix SKILL expect-list update",
    "why": "missed"
-  },
-  {
-   "id": "5a6de9aa",
-   "text": "Other chat finished continue.",
-   "at": 1794485618664,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "why": "missed"
-  },
-  {
-   "id": "28c58a49",
-   "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
-   "at": 1794485583219,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "name": "Memory Fix Agent Skill",
-   "run": 50,
-   "auto": true
-  },
-  {
-   "id": "1a9ecdee",
-   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
-   "at": 1794485290627,
-   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "name": "Memory Fix Agent Skill",
-   "run": 49,
-   "auto": true
-  },
-  {
-   "id": "479d6249",
-   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
-   "at": 1794479088250,
-   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
-   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
-   "name": "Codex Engineer Setup Fix",
-   "run": 48,
-   "auto": true
   }
  ]
 }
