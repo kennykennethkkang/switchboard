@@ -5,12 +5,19 @@
    "id": "c2163362",
    "text": "Audit round 3: extension/src outside hub/ (session-watcher, transcript-parser, hook-server, codex-runtime) and web pages not yet read (now-page, today, changes, check-cards); plus the AWS profile delete refusal matched by substring in web/components/switchboard/sign-ins.tsx:324, which needs a structured error from extension/src/hub/hub-panel.ts deleteAwsProfile. Findings so far: .switchboard/stages/2026-11-11-indefinite-audit-b4ca9c89/",
    "at": 1794472345723,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
    "chat": "99696cb4-5a8e-4ea3-887f-55f0195714d3",
    "host": "62903adf5e340f87",
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit",
    "run": 47,
    "auto": true
+  },
+  {
+   "id": "479d6249",
+   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
+   "at": 1794472352961,
+   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
+   "name": "Codex Engineer Setup Fix"
   }
  ],
  "removed": {
