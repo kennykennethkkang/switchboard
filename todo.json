@@ -7,6 +7,13 @@
    "at": 1794471931674,
    "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
    "name": "Indefinite Mode Site Audit"
+  },
+  {
+   "id": "c2163362",
+   "text": "Audit round 3: extension/src outside hub/ (session-watcher, transcript-parser, hook-server, codex-runtime) and web pages not yet read (now-page, today, changes, check-cards); plus the AWS profile delete refusal matched by substring in web/components/switchboard/sign-ins.tsx:324, which needs a structured error from extension/src/hub/hub-panel.ts deleteAwsProfile. Findings so far: .switchboard/stages/2026-11-11-indefinite-audit-b4ca9c89/",
+   "at": 1794471933106,
+   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
+   "name": "Indefinite Mode Site Audit"
   }
  ],
  "removed": {
