@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "28d060a1-ok",
-   "text": "Switchboard to-do, in this order: 1. memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the go",
-   "at": 1794509860803,
-   "chat": "aeaba189-2e9a-4051-b53d-ae7f1983a11e",
-   "host": "62903adf5e340f87",
-   "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
-   "name": "To-do 54: Memory-fix SKILL expect-list update",
-   "why": "missed",
-   "run": 55,
-   "auto": true
-  },
-  {
    "id": "6d17a143-ok",
    "text": "Switchboard to-do, in this order: 1. Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candid",
    "at": 1794509857533,
@@ -469,11 +457,71 @@
   "dc2fbcf8": 1794509858715,
   "310588c4": 1794509863281,
   "1d2d4fff": 1794509886162,
-  "19b07494": 1794509895671
+  "19b07494": 1794509895671,
+  "28d060a1-ok": 1794509902074
  },
  "seq": 55,
  "streak": 55,
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "6befc914",
+   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "2194ab17",
+   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "d83cd26f",
+   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
+   "at": 1794465087354,
+   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "0a4a36e6",
+   "text": "reviewing to-do b6447aa8.",
+   "at": 1794486816517,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "28d060a1-ok",
+   "text": "Switchboard to-do, in this order: 1. memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the go",
+   "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
+   "name": "To-do 54: Memory-fix SKILL expect-list update",
+   "why": "missed",
+   "run": 55,
+   "auto": true,
+   "at": 1794509902074,
+   "by": "aeaba189-2e9a-4051-b53d-ae7f1983a11e"
+  },
   {
    "id": "1a96b234",
    "text": "memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the gold check.\" with \"write the new note, archive the old ones, append each merged note's slug to every ~/.claude/memory-gold.json expect list that names a note it supersedes, rerun the gold check.\" Why: 2026-11-12 apply reported a false lost hit until the expect list was updated.",
@@ -556,64 +604,6 @@
    "name": "Memory Fix Agent Skill",
    "run": 49,
    "auto": true
-  },
-  {
-   "id": "479d6249",
-   "text": "Finish the Codex model bench after the Codex usage limit resets: from claude-mods/kit/skills/model-bench/scripts run `node bench.mjs --codex gpt-6-luna@medium,gpt-6-luna@high,gpt-6-luna@xhigh,gpt-5.6-terra@medium,gpt-5.6-terra@high,gpt-5.6-luna@high --roles engineer --tasks t12,t13,p2 --jobs 3`, then the same with `--roles qa --tasks q1,q3`. Update vault wiki/codex-model-bench.md and the -m/effort flags in kit/agents/*-codex.md if a different pick wins.",
-   "at": 1794479088250,
-   "by": "0499df01-8151-471c-acfb-9abfd354bcf7",
-   "from": "3fcaaf59-4df3-4583-84e6-c79fc0930803",
-   "name": "Codex Engineer Setup Fix",
-   "run": 48,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "6befc914",
-   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "2194ab17",
-   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "d83cd26f",
-   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
-   "at": 1794465087354,
-   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "why": "later"
-  },
-  {
-   "id": "fb269eb8",
-   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "0a4a36e6",
-   "text": "reviewing to-do b6447aa8.",
-   "at": 1794486816517,
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "why": "later"
   }
  ]
 }
