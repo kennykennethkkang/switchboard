@@ -406,7 +406,10 @@
   "366db837": 1794454813478,
   "dc3c394a": 1794464538599,
   "67f98475": 1794472295969,
-  "f331187a": 1794472295969
+  "f331187a": 1794472295969,
+  "d83be755": 1794472306341,
+  "b1340f56": 1794472306341,
+  "f2185b32": 1794472306341
  },
  "seq": 46,
  "streak": 46,
@@ -532,30 +535,6 @@
    "at": 1794375841358,
    "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
    "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "d83be755",
-   "text": "Keep waiting for \"Route Chat Items to Topic\" to end, as you chose. It's been idle for about 40 minutes, so it may need your Approve or another answer before it",
-   "at": 1794420827501,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "blocked"
-  },
-  {
-   "id": "b1340f56",
-   "text": "Once it ends, start the open-ended audit loop: a deep run for bugs and fixes, plus a plain-language \"what was done and why\" record for each chat.",
-   "at": 1794420827501,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
-   "why": "later"
-  },
-  {
-   "id": "f2185b32",
-   "text": "Redo button placement on the main site and the maps page using MiroFish and A/B testing, keeping the current look and removing parts that aren't useful.",
-   "at": 1794420827501,
-   "from": "b4ca9c89-da52-4230-b8e0-f2aa151ab56d",
-   "name": "Indefinite Mode Site Audit",
    "why": "later"
   },
   {
