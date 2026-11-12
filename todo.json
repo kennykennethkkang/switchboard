@@ -4,7 +4,11 @@
   {
    "id": "36c29162",
    "text": "Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candidate.diff",
-   "at": 1794508783990
+   "at": 1794508810339,
+   "chat": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
+   "host": "62903adf5e340f87",
+   "run": 52,
+   "auto": true
   }
  ],
  "removed": {
@@ -407,7 +411,7 @@
   "b6447aa8": 1794486358432,
   "b46dbe93": 1794486816517
  },
- "seq": 51,
+ "seq": 52,
  "ticked": [
   {
    "id": "b46dbe93",
@@ -593,5 +597,6 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
   }
- ]
+ ],
+ "streak": 52
 }
