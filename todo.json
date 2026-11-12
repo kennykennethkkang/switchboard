@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "310588c4-ok",
-   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
-   "at": 1794510235672,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "missed",
-   "chat": "4028ce56-6281-4336-adb4-8ee33da18aa2",
-   "host": "62903adf5e340f87",
-   "run": 58,
-   "auto": true
-  },
-  {
    "id": "17474366-ok",
    "text": "The map page and its flow view weren't updated for this fix.",
    "at": 1794509875435,
@@ -458,11 +446,55 @@
   "2194ab17": 1794509912711,
   "6befc914": 1794509921020,
   "6d17a143-ok": 1794509945573,
-  "dc2fbcf8-ok": 1794510227273
+  "dc2fbcf8-ok": 1794510227273,
+  "310588c4-ok": 1794510290785
  },
  "seq": 58,
  "streak": 55,
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "d83cd26f",
+   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
+   "at": 1794465087354,
+   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "0a4a36e6",
+   "text": "reviewing to-do b6447aa8.",
+   "at": 1794486816517,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "310588c4-ok",
+   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "missed",
+   "run": 58,
+   "auto": true,
+   "at": 1794510290785,
+   "by": "4028ce56-6281-4336-adb4-8ee33da18aa2"
+  },
   {
    "id": "dc2fbcf8-ok",
    "text": "Also are all the updates that were created for switchboard showing here? It seems like some of the stuff is missing please check and make sure it is all in.",
@@ -549,47 +581,6 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "name": "To-do 50: Sleep-time memory consolidation proposals",
    "why": "missed"
-  },
-  {
-   "id": "5a6de9aa",
-   "text": "Other chat finished continue.",
-   "at": 1794485618664,
-   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "why": "missed"
-  }
- ],
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "d83cd26f",
-   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
-   "at": 1794465087354,
-   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "why": "later"
-  },
-  {
-   "id": "fb269eb8",
-   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "0a4a36e6",
-   "text": "reviewing to-do b6447aa8.",
-   "at": 1794486816517,
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "why": "later"
   }
  ]
 }
