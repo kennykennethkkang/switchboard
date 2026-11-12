@@ -4,8 +4,12 @@
   {
    "id": "258bdd03",
    "text": "Proposed fix from Learn AAR of 7b134777 (approve before applying): chats keep asking \"Approve this chat as finished?\" with no standup and no aar (d0c9b084, 1b4609a7, 7b134777); rules.md lines 66-67 and memory standup-before-approve did not stop it. Add a PreToolUse deny for AskUserQuestion when the question is the closing one (isClosing in extension/src/hub/approve.ts): read transcript_path since the last real user prompt and deny unless (a) an assistant text holds \"For you\" and \"Left\" headings and (b) a Read of aar/SKILL.md or a Skill call for aar happened, or the wiki/aar-<project>.md file changed this turn. Deny text: \"Run the aar skill and print the standup (done, for you, left, risks) before the Approve question.\" Skip the check when the chat changed no files (close-means-approved). Test in extension/test with a fixture transcript for each case.",
-   "at": 1794513453180,
-   "from": "fd54c6ec-6d5c-4c17-8d53-9f4240783485"
+   "at": 1794513468217,
+   "from": "fd54c6ec-6d5c-4c17-8d53-9f4240783485",
+   "chat": "288271e7-7af9-4562-92dc-ca57a7c71540",
+   "host": "62903adf5e340f87",
+   "run": 63,
+   "auto": true
   }
  ],
  "removed": {
@@ -430,7 +434,7 @@
   "d83cd26f": 1794513031467,
   "2194ab17-ok": 1794513085154
  },
- "seq": 62,
+ "seq": 63,
  "ticked": [
   {
    "id": "2194ab17-ok",
@@ -563,5 +567,6 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
   }
- ]
+ ],
+ "streak": 63
 }
