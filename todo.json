@@ -8,6 +8,14 @@
    "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
    "name": "To-do 54: Memory-fix SKILL expect-list update",
    "why": "missed"
+  },
+  {
+   "id": "6d17a143-ok",
+   "text": "Switchboard to-do, in this order: 1. Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candid",
+   "at": 1794509857533,
+   "from": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
+   "name": "To-do 52: Learn rules md proposal review",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -412,7 +420,8 @@
   "36c29162": 1794508929235,
   "91f89b21": 1794509259712,
   "1a96b234": 1794509298736,
-  "28d060a1": 1794509856376
+  "28d060a1": 1794509856376,
+  "6d17a143": 1794509857533
  },
  "seq": 54,
  "ticked": [
@@ -595,14 +604,6 @@
    "at": 1794486816517,
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
-  },
-  {
-   "id": "6d17a143",
-   "text": "Switchboard to-do, in this order: 1. Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candid",
-   "at": 1794509824610,
-   "from": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
-   "name": "To-do 52: Learn rules md proposal review",
-   "why": "missed"
   }
  ]
 }
