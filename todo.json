@@ -4,10 +4,14 @@
   {
    "id": "19b07494-ok",
    "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
-   "at": 1794509895671,
+   "at": 1794510655734,
    "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
    "name": "To-do 43: Chat map and flow stage",
-   "why": "later"
+   "why": "later",
+   "chat": "25488749-da59-4412-ac02-a031141dbb61",
+   "host": "62903adf5e340f87",
+   "run": 61,
+   "auto": true
   },
   {
    "id": "2194ab17-ok",
@@ -20,10 +24,14 @@
   {
    "id": "c62364f4",
    "text": "Next Switchboard release: add CHANGELOG line \"New chat, Related: links, filler words (please, sure, these, ask questions...) and the project's own name no longer count toward a match; a 28-day replay showed every 0.2 hit on typed prompts came from them\" (web/lib/related-chat.ts, done 2026-11-12, not yet released)",
-   "at": 1794510641642,
+   "at": 1794510655734,
    "from": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
    "before": "19b07494-ok",
-   "name": "To-do 60: Verify similarity threshold"
+   "name": "To-do 60: Verify similarity threshold",
+   "chat": "25488749-da59-4412-ac02-a031141dbb61",
+   "host": "62903adf5e340f87",
+   "run": 61,
+   "auto": true
   }
  ],
  "removed": {
@@ -444,50 +452,18 @@
   "17474366-ok": 1794510367738,
   "1d2d4fff-ok": 1794510641912
  },
- "seq": 60,
+ "seq": 61,
  "streak": 55,
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "d83cd26f",
-   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
-   "at": 1794465087354,
-   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "why": "later"
-  },
-  {
-   "id": "fb269eb8",
-   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "0a4a36e6",
-   "text": "reviewing to-do b6447aa8.",
-   "at": 1794486816517,
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "1d2d4fff-ok",
    "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
+   "at": 1794510641912,
+   "by": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
    "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
    "why": "later",
    "run": 60,
-   "auto": true,
-   "at": 1794510641912,
-   "by": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2"
+   "auto": true
   },
   {
    "id": "17474366-ok",
@@ -577,6 +553,38 @@
    "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "later"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "d83cd26f",
+   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
+   "at": 1794465087354,
+   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "0a4a36e6",
+   "text": "reviewing to-do b6447aa8.",
+   "at": 1794486816517,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
   }
  ]
