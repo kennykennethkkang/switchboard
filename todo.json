@@ -4,10 +4,14 @@
   {
    "id": "28d060a1-ok",
    "text": "Switchboard to-do, in this order: 1. memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the go",
-   "at": 1794509856376,
+   "at": 1794509860803,
    "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
    "name": "To-do 54: Memory-fix SKILL expect-list update",
-   "why": "missed"
+   "why": "missed",
+   "chat": "aeaba189-2e9a-4051-b53d-ae7f1983a11e",
+   "host": "62903adf5e340f87",
+   "run": 55,
+   "auto": true
   },
   {
    "id": "6d17a143-ok",
@@ -432,7 +436,7 @@
   "6d17a143": 1794509857533,
   "dc2fbcf8": 1794509858715
  },
- "seq": 54,
+ "seq": 55,
  "ticked": [
   {
    "id": "1a96b234",
@@ -606,5 +610,6 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
   }
- ]
+ ],
+ "streak": 55
 }
