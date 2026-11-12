@@ -5,11 +5,11 @@
    "id": "6d17a143-ok",
    "text": "Switchboard to-do, in this order: 1. Learn proposal for kit/rules.md, not applied (regressed on final-message). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-12T18-27-59-605Z/candid",
    "at": 1794509905483,
+   "chat": "ba269d9a-792c-4c9a-9a3f-8a8d83c2377c",
+   "host": "62903adf5e340f87",
    "from": "8a36b47e-75fd-4ce0-93a5-c6424a486cc6",
    "name": "To-do 52: Learn rules md proposal review",
    "why": "missed",
-   "chat": "ba269d9a-792c-4c9a-9a3f-8a8d83c2377c",
-   "host": "62903adf5e340f87",
    "run": 56,
    "auto": true
   },
@@ -50,6 +50,14 @@
    "at": 1794509895671,
    "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
    "name": "To-do 43: Chat map and flow stage",
+   "why": "later"
+  },
+  {
+   "id": "2194ab17-ok",
+   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
+   "at": 1794509912711,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
    "why": "later"
   }
  ],
@@ -462,7 +470,8 @@
   "310588c4": 1794509863281,
   "1d2d4fff": 1794509886162,
   "19b07494": 1794509895671,
-  "28d060a1-ok": 1794509902074
+  "28d060a1-ok": 1794509902074,
+  "2194ab17": 1794509912711
  },
  "seq": 56,
  "streak": 55,
@@ -574,14 +583,6 @@
   {
    "id": "6befc914",
    "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "2194ab17",
-   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
    "at": 1794375841358,
    "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
    "name": "Model Benchmarking And Switchboard Settings",
