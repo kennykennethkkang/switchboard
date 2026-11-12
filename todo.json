@@ -5,12 +5,19 @@
    "id": "afd3ecc5",
    "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
    "at": 1794428183218,
-   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
-   "name": "To-do 41: Model-bench rescore API stall fix",
    "chat": "84b2da19-6a6c-4683-af91-e27990511cdc",
    "host": "62903adf5e340f87",
+   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
+   "name": "To-do 41: Model-bench rescore API stall fix",
    "run": 42,
    "auto": true
+  },
+  {
+   "id": "52aff8fd",
+   "text": "Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node and flow, and a raised role's model from escalations (raiseLine). Files: web/lib/court-map.ts, flow-map.ts and their components; asked the map realm rework chat on 2026-11-11, no reply",
+   "at": 1794443042123,
+   "from": "039bd81b-ca2c-44a4-b310-96ed5ae53a72",
+   "name": "Model Benchmarking And Switchboard Settings v2"
   }
  ],
  "removed": {
