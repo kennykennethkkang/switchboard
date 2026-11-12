@@ -5,11 +5,11 @@
    "id": "28d060a1-ok",
    "text": "Switchboard to-do, in this order: 1. memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the go",
    "at": 1794509860803,
+   "chat": "aeaba189-2e9a-4051-b53d-ae7f1983a11e",
+   "host": "62903adf5e340f87",
    "from": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
    "name": "To-do 54: Memory-fix SKILL expect-list update",
    "why": "missed",
-   "chat": "aeaba189-2e9a-4051-b53d-ae7f1983a11e",
-   "host": "62903adf5e340f87",
    "run": 55,
    "auto": true
   },
@@ -27,6 +27,14 @@
    "at": 1794509858715,
    "from": "47abf55f-e55a-461f-93fd-9d34dc17e82a",
    "name": "Verify Switchboard updates missing",
+   "why": "missed"
+  },
+  {
+   "id": "310588c4-ok",
+   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
+   "at": 1794509863281,
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
    "why": "missed"
   }
  ],
@@ -434,9 +442,11 @@
   "1a96b234": 1794509298736,
   "28d060a1": 1794509856376,
   "6d17a143": 1794509857533,
-  "dc2fbcf8": 1794509858715
+  "dc2fbcf8": 1794509858715,
+  "310588c4": 1794509863281
  },
  "seq": 55,
+ "streak": 55,
  "ticked": [
   {
    "id": "1a96b234",
@@ -558,14 +568,6 @@
    "why": "later"
   },
   {
-   "id": "310588c4",
-   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
-   "at": 1794454585734,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "missed"
-  },
-  {
    "id": "19b07494",
    "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
    "at": 1794454592064,
@@ -610,6 +612,5 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
   }
- ],
- "streak": 55
+ ]
 }
