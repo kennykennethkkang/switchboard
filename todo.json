@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "2194ab17-ok",
-   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
-   "at": 1794510902177,
-   "chat": "3e51845d-7200-4bab-aa83-6f4aa0265dd9",
-   "host": "62903adf5e340f87",
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later",
-   "run": 62,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -433,10 +420,10 @@
   "1d2d4fff-ok": 1794510641912,
   "c62364f4": 1794510893341,
   "19b07494-ok": 1794510895494,
-  "d83cd26f": 1794513031467
+  "d83cd26f": 1794513031467,
+  "2194ab17-ok": 1794513085154
  },
  "seq": 62,
- "streak": 55,
  "suggested": [
   {
    "id": "f92819f4",
@@ -464,12 +451,23 @@
  ],
  "ticked": [
   {
+   "id": "2194ab17-ok",
+   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later",
+   "run": 62,
+   "auto": true,
+   "at": 1794513085154,
+   "by": "3e51845d-7200-4bab-aa83-6f4aa0265dd9"
+  },
+  {
    "id": "d83cd26f",
    "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
-   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "why": "later",
    "at": 1794513031467,
-   "by": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2"
+   "by": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
+   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "why": "later"
   },
   {
    "id": "19b07494-ok",
@@ -556,16 +554,6 @@
    "name": "To-do 54: Memory-fix SKILL expect-list update",
    "why": "missed",
    "run": 55,
-   "auto": true
-  },
-  {
-   "id": "1a96b234",
-   "text": "memory-fix SKILL.md fix (from AAR 332cb39f): in claude-mods/kit/skills/memory-fix/SKILL.md line 38, replace \"write the new note, archive the old ones, rerun the gold check.\" with \"write the new note, archive the old ones, append each merged note's slug to every ~/.claude/memory-gold.json expect list that names a note it supersedes, rerun the gold check.\" Why: 2026-11-12 apply reported a false lost hit until the expect list was updated.",
-   "at": 1794509298736,
-   "by": "e3b6a4a6-b93b-45b0-b59c-51278b10bf6c",
-   "from": "332cb39f-596a-40fb-b007-65463dbb6303",
-   "name": "To-do 53: Memory consolidation review",
-   "run": 54,
    "auto": true
   }
  ]
