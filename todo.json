@@ -51,6 +51,14 @@
    "at": 1794509886162,
    "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
    "why": "later"
+  },
+  {
+   "id": "19b07494-ok",
+   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
+   "at": 1794509895671,
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "later"
   }
  ],
  "removed": {
@@ -460,7 +468,8 @@
   "6d17a143": 1794509857533,
   "dc2fbcf8": 1794509858715,
   "310588c4": 1794509863281,
-  "1d2d4fff": 1794509886162
+  "1d2d4fff": 1794509886162,
+  "19b07494": 1794509895671
  },
  "seq": 55,
  "streak": 55,
@@ -582,14 +591,6 @@
    "at": 1794375841358,
    "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
    "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "19b07494",
-   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
-   "at": 1794454592064,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
    "why": "later"
   },
   {
