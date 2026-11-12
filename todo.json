@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "1a9ecdee",
+   "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
+   "at": 1794485083386,
+   "from": "daea81e0-2547-4a04-a969-335bebf6c532",
+   "name": "Memory Fix Agent Skill"
+  }
+ ],
  "removed": {
   "60191406": 1793870136284,
   "88264666": 1793822810406,
