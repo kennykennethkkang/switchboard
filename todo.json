@@ -395,10 +395,20 @@
   "c2163362": 1794472843198,
   "479d6249": 1794479088250,
   "1a9ecdee": 1794485290627,
-  "28c58a49": 1794485583219
+  "28c58a49": 1794485583219,
+  "5a6de9aa": 1794485618664
  },
  "seq": 50,
  "ticked": [
+  {
+   "id": "5a6de9aa",
+   "text": "Other chat finished continue.",
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "why": "missed",
+   "at": 1794485618664,
+   "by": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd"
+  },
   {
    "id": "28c58a49",
    "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
@@ -487,16 +497,6 @@
    "name": "Model Benchmarking And Switchboard Settings v2",
    "run": 43,
    "auto": true
-  },
-  {
-   "id": "afd3ecc5",
-   "text": "model-bench: rerun growth g1 (and d1, o1) for all models now that TASK.md no longer points at ws/; growth-haiku-g1-1 scored 0% because ws/BRIEF.md did not exist in the run dir",
-   "at": 1794445711775,
-   "by": "84b2da19-6a6c-4683-af91-e27990511cdc",
-   "from": "d34d6a42-43cb-45fd-a45a-f76271428c28",
-   "name": "To-do 41: Model-bench rescore API stall fix",
-   "run": 42,
-   "auto": true
   }
  ],
  "suggested": [
@@ -539,14 +539,6 @@
    "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
    "name": "To-do 43: Chat map and flow stage",
    "why": "later"
-  },
-  {
-   "id": "5a6de9aa",
-   "text": "Other chat finished continue.",
-   "at": 1794454878312,
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "why": "missed"
   },
   {
    "id": "d83cd26f",
@@ -593,6 +585,14 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "name": "To-do 50: Sleep-time memory consolidation proposals",
    "why": "missed"
+  },
+  {
+   "id": "b46dbe93",
+   "text": "the first real run happens at the next improve-system slot. Its proposals have only been tested with a stand-in runner, not a real model run.",
+   "at": 1794485618664,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "name": "To-do 50: Sleep-time memory consolidation proposals",
+   "why": "later"
   }
  ]
 }
