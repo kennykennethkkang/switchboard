@@ -4,9 +4,13 @@
   {
    "id": "28c58a49",
    "text": "Learn run: add a sleep-time consolidation pass (Letta) that proposes concise rewrites and merges of memory notes, proposals only",
-   "at": 1794485084019,
+   "at": 1794485291586,
    "from": "daea81e0-2547-4a04-a969-335bebf6c532",
-   "name": "Memory Fix Agent Skill"
+   "name": "Memory Fix Agent Skill",
+   "chat": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "host": "62903adf5e340f87",
+   "run": 50,
+   "auto": true
   }
  ],
  "removed": {
@@ -404,106 +408,18 @@
   "479d6249": 1794479088250,
   "1a9ecdee": 1794485290627
  },
- "seq": 49,
+ "seq": 50,
  "streak": 49,
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "6befc914",
-   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "2194ab17",
-   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "310588c4",
-   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
-   "at": 1794454585734,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "missed"
-  },
-  {
-   "id": "19b07494",
-   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
-   "at": 1794454592064,
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "later"
-  },
-  {
-   "id": "5a6de9aa",
-   "text": "Other chat finished continue.",
-   "at": 1794454878312,
-   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
-   "name": "Switchboard map agent realm rework",
-   "why": "missed"
-  },
-  {
-   "id": "d83cd26f",
-   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
-   "at": 1794465087354,
-   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
-   "why": "later"
-  },
-  {
-   "id": "1d2d4fff",
-   "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
-   "at": 1794468343973,
-   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
-   "why": "later"
-  },
-  {
-   "id": "fb269eb8",
-   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "17474366",
-   "text": "The map page and its flow view weren't updated for this fix.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "dc2fbcf8",
-   "text": "Also are all the updates that were created for switchboard showing here? It seems like some of the stuff is missing please check and make sure it is all in.",
-   "at": 1794482622177,
-   "from": "47abf55f-e55a-461f-93fd-9d34dc17e82a",
-   "name": "Verify Switchboard updates missing",
-   "why": "missed"
-  }
- ],
  "ticked": [
   {
    "id": "1a9ecdee",
    "text": "Memory gold set: ~30 hub_recall queries with expected note slugs, run before and after memory-fix changes to catch recall regressions",
+   "at": 1794485290627,
+   "by": "daea81e0-2547-4a04-a969-335bebf6c532",
    "from": "daea81e0-2547-4a04-a969-335bebf6c532",
    "name": "Memory Fix Agent Skill",
    "run": 49,
-   "auto": true,
-   "at": 1794485290627,
-   "by": "daea81e0-2547-4a04-a969-335bebf6c532"
+   "auto": true
   },
   {
    "id": "479d6249",
@@ -593,6 +509,94 @@
    "name": "Model Benchmarking And Switchboard Settings v2",
    "run": 41,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "6befc914",
+   "text": "Re-judge the designer and growth runs: `node scripts/bench.mjs --roles designer,growth,ops --tasks d1,o1,g1 --rescore`.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "2194ab17",
+   "text": "Bring you the per-role statistics and a recommendation, apply your picks to `~/.claude/agents` and `claude-mods/kit/agents`, sync the skill copies, then the aar",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "310588c4",
+   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
+   "at": 1794454585734,
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "missed"
+  },
+  {
+   "id": "19b07494",
+   "text": "I didn't do a version bump or release. Other chats' unfinished Advanced-mode work is in the same files and would ship with it, so the next release should carry",
+   "at": 1794454592064,
+   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
+   "name": "To-do 43: Chat map and flow stage",
+   "why": "later"
+  },
+  {
+   "id": "5a6de9aa",
+   "text": "Other chat finished continue.",
+   "at": 1794454878312,
+   "from": "d876f0bf-78b1-48d6-a911-1354c72c6866",
+   "name": "Switchboard map agent realm rework",
+   "why": "missed"
+  },
+  {
+   "id": "d83cd26f",
+   "text": "the Switchboard copy of the rules only reaches other installs with the next release. Another chat (b7c5aa4d) still has a lot of uncommitted work in this repo, s",
+   "at": 1794465087354,
+   "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
+   "why": "later"
+  },
+  {
+   "id": "1d2d4fff",
+   "text": "The 0.2 threshold for \"Related\" was set on 28 days of past chats. Check that it fires about right once you're using it.",
+   "at": 1794468343973,
+   "from": "b7c5aa4d-d9c9-4919-a65a-f9badcc7e1f3",
+   "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "17474366",
+   "text": "The map page and its flow view weren't updated for this fix.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "dc2fbcf8",
+   "text": "Also are all the updates that were created for switchboard showing here? It seems like some of the stuff is missing please check and make sure it is all in.",
+   "at": 1794482622177,
+   "from": "47abf55f-e55a-461f-93fd-9d34dc17e82a",
+   "name": "Verify Switchboard updates missing",
+   "why": "missed"
   }
  ]
 }
