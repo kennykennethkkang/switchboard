@@ -4,8 +4,12 @@
   {
    "id": "c19cdecf",
    "text": "AAR fix plan (chat d354fc0f): in claude-mods/kit/rules.md Finishing, after \"use that wording for no other question.\", add: \"When Kenneth types \"approve\" (for example \"approve this chat\"), call that Approve question in the same turn; a text \"Approved\" closes nothing.\" Then bump and sync the kit.",
-   "at": 1794603444397,
-   "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187"
+   "at": 1794603451150,
+   "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187",
+   "chat": "31d8dc20-aca3-49a6-ae9e-8cbcd8416677",
+   "host": "62903adf5e340f87",
+   "run": 64,
+   "auto": true
   },
   {
    "id": "01cae3f9",
@@ -437,7 +441,7 @@
   "2194ab17-ok": 1794513085154,
   "258bdd03": 1794513749422
  },
- "seq": 63,
+ "seq": 64,
  "ticked": [
   {
    "id": "258bdd03",
@@ -568,5 +572,6 @@
    "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
    "why": "later"
   }
- ]
+ ],
+ "streak": 64
 }
