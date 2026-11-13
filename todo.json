@@ -1,17 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "01cae3f9",
-   "text": "AAR fix plan (chat d354fc0f): done-check edits() in claude-mods/done-check/hooks/register.ts counts node -e \"fs.writeFileSync(process.argv[2],...)\" \"$TMPDIR/x\" as a repo edit and held a read-only chat twice. When the write path is process.argv[N] or sys.argv[N], judge it by the Nth trailing argument (outside the repo = not an edit). Add a test next to done-check.test.ts:306, bump plugin.json.",
-   "at": 1794603496167,
-   "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187",
-   "chat": "44e19d58-aacd-4966-b0e7-21a62de01982",
-   "host": "62903adf5e340f87",
-   "run": 65,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -434,11 +423,45 @@
   "d83cd26f": 1794513031467,
   "2194ab17-ok": 1794513085154,
   "258bdd03": 1794513749422,
-  "c19cdecf": 1794603492859
+  "c19cdecf": 1794603492859,
+  "01cae3f9": 1794603575419
  },
  "seq": 65,
- "streak": 64,
+ "suggested": [
+  {
+   "id": "f92819f4",
+   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
+   "at": 1794375841358,
+   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
+   "name": "Model Benchmarking And Switchboard Settings",
+   "why": "later"
+  },
+  {
+   "id": "fb269eb8",
+   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
+   "at": 1794472322516,
+   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
+   "name": "Terminal approval reload fix",
+   "why": "later"
+  },
+  {
+   "id": "0a4a36e6",
+   "text": "reviewing to-do b6447aa8.",
+   "at": 1794486816517,
+   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "01cae3f9",
+   "text": "AAR fix plan (chat d354fc0f): done-check edits() in claude-mods/done-check/hooks/register.ts counts node -e \"fs.writeFileSync(process.argv[2],...)\" \"$TMPDIR/x\" as a repo edit and held a read-only chat twice. When the write path is process.argv[N] or sys.argv[N], judge it by the Nth trailing argument (outside the repo = not an edit). Add a test next to done-check.test.ts:306, bump plugin.json.",
+   "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187",
+   "run": 65,
+   "auto": true,
+   "at": 1794603575419,
+   "by": "44e19d58-aacd-4966-b0e7-21a62de01982"
+  },
   {
    "id": "c19cdecf",
    "text": "AAR fix plan (chat d354fc0f): in claude-mods/kit/rules.md Finishing, after \"use that wording for no other question.\", add: \"When Kenneth types \"approve\" (for example \"approve this chat\"), call that Approve question in the same turn; a text \"Approved\" closes nothing.\" Then bump and sync the kit.",
@@ -529,42 +552,6 @@
    "why": "missed",
    "run": 58,
    "auto": true
-  },
-  {
-   "id": "dc2fbcf8-ok",
-   "text": "Also are all the updates that were created for switchboard showing here? It seems like some of the stuff is missing please check and make sure it is all in.",
-   "at": 1794510227273,
-   "by": "7b134777-c97a-454b-9243-ba4b5de39d78",
-   "from": "47abf55f-e55a-461f-93fd-9d34dc17e82a",
-   "name": "Verify Switchboard updates missing",
-   "why": "missed",
-   "run": 57,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "f92819f4",
-   "text": "Re-run the chain. It picks up where it left off: Explore and researcher r1/r2, then p1 and p2 on all models, then opus@xhigh on the projects.",
-   "at": 1794375841358,
-   "from": "f21306c2-cb66-4868-8302-40dbc3ddb031",
-   "name": "Model Benchmarking And Switchboard Settings",
-   "why": "later"
-  },
-  {
-   "id": "fb269eb8",
-   "text": "The saved list could mismatch a terminal if process ids get reused after a full VS Code restart. The chance is low because the first save rewrites the list.",
-   "at": 1794472322516,
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later"
-  },
-  {
-   "id": "0a4a36e6",
-   "text": "reviewing to-do b6447aa8.",
-   "at": 1794486816517,
-   "from": "6bfbe6bc-8647-4852-bd12-735a0a15d7fd",
-   "why": "later"
   }
  ]
 }
