@@ -6,6 +6,12 @@
    "text": "AAR fix plan (chat d354fc0f): in claude-mods/kit/rules.md Finishing, after \"use that wording for no other question.\", add: \"When Kenneth types \"approve\" (for example \"approve this chat\"), call that Approve question in the same turn; a text \"Approved\" closes nothing.\" Then bump and sync the kit.",
    "at": 1794603444397,
    "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187"
+  },
+  {
+   "id": "01cae3f9",
+   "text": "AAR fix plan (chat d354fc0f): done-check edits() in claude-mods/done-check/hooks/register.ts counts node -e \"fs.writeFileSync(process.argv[2],...)\" \"$TMPDIR/x\" as a repo edit and held a read-only chat twice. When the write path is process.argv[N] or sys.argv[N], judge it by the Nth trailing argument (outside the repo = not an edit). Add a test next to done-check.test.ts:306, bump plugin.json.",
+   "at": 1794603446285,
+   "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187"
   }
  ],
  "removed": {
