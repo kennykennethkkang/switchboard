@@ -90,3 +90,27 @@ test('pauseLine and countdown', () => {
   assert.equal(countdown(now + 30_000, now), 'under 1m')
   assert.equal(countdown(now + 12 * 60_000, now), '12m')
 })
+
+test('limitMeters: codex windows are their own meters, only when fed', () => {
+  assert.deepEqual(limitMeters([chat([{ kind: 'five_hour', percentUsed: 10 }])], now).map(m => m.kind), ['five_hour', 'seven_day'])
+  const r = new Date(2026, 10, 7, 15, 40).getTime()
+  const m = limitMeters([chat([{ kind: 'five_hour', percentUsed: 10, resetsAt: String(r / 1000) }, { kind: 'codex_five_hour', percentUsed: 90, resetsAt: String(r / 1000) }])], now)
+  assert.deepEqual(m.map(x => [x.label, x.percent]), [['5h', 10], ['Week', undefined], ['Codex 5h', 90]])
+})
+
+test('limitMeters: kept codex windows show with no live chat until their reset', () => {
+  const r = new Date(2026, 10, 7, 15, 40).getTime()
+  const codexKept = [{ kind: 'codex_five_hour', percentUsed: 40, resetsAt: String(r / 1000) }]
+  const m = limitMeters([], now, undefined, codexKept)
+  assert.deepEqual(m.map(x => [x.label, x.percent]), [['5h', undefined], ['Week', undefined], ['Codex 5h', 40]])
+  const past = limitMeters([], r + 1, undefined, codexKept)
+  assert.equal(past.length, 2)
+})
+
+test('limitMeters: a full codex window does not become the Claude limit hit', () => {
+  const kept = { at: now, windows: [{ kind: 'seven_day', percentUsed: 100 }], out: { resetsAt: now + 3_600_000 } }
+  const m = limitMeters([chat([{ kind: 'codex_five_hour', percentUsed: 100 }])], now, kept)
+  assert.equal(m.find(x => x.kind === 'seven_day')?.level, 'out')
+  assert.notEqual(m.find(x => x.kind === 'five_hour')?.reset?.slice(0, 5), 'Limit')
+  assert.ok(!m.find(x => x.kind === 'codex_five_hour')?.reset?.startsWith('Limit reached'))
+})

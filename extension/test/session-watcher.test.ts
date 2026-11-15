@@ -65,4 +65,21 @@ describe('session watcher', () => {
       fs.rmSync(home, { recursive: true, force: true })
     }
   })
+  it('a line that throws does not drop the rest of the batch', async () => {
+    const { SessionWatcher } = await import('../src/session-watcher')
+    const dir = path.join(home, '.claude', 'projects', '-q')
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, 'b1.jsonl')
+    fs.writeFileSync(file, line('user', 'first'))
+    const w = new SessionWatcher() as unknown as { watchSession(id: string, f: string): void; readNewLines(id: string): void; parser: { processTranscriptLine: (l: string, ...r: unknown[]) => void }; dispose(): void }
+    try {
+      w.watchSession('b1', file)
+      const real = w.parser.processTranscriptLine.bind(w.parser)
+      const seen: string[] = []
+      w.parser.processTranscriptLine = (l, ...r) => { seen.push(l); if (l.includes('boom')) throw new Error('boom'); real(l, ...r) }
+      fs.appendFileSync(file, line('user', 'boom') + line('user', 'after'))
+      w.readNewLines('b1')
+      assert.equal(seen.length, 2)
+    } finally { w.dispose() }
+  })
 })

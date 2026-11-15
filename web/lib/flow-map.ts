@@ -1,12 +1,15 @@
 /**
- * The Flow map's data: the map extension/src/hub/flowmap.ts builds (same shapes), how to get it
- * (the panel's flowmap-get, else the app's /hub/flowmap proxy), the folded view the canvas draws, and the side card's words.
+ * The Code view's data: the map extension/src/hub/flowmap.ts builds (same shapes), how to get it
+ * (the panel's flowmap-get, else the app's /hub/flowmap proxy), the app's parts and how their links are drawn.
  */
 import { vscodeBridge } from './vscode-bridge'
 import { downReason } from './hub-remote'
+import type { GraphNode, MemoryGraph } from './memory-graph'
+import type { CheckBack, IndefiniteBudget } from './hub-types'
 
 export type FlowKind = 'folder' | 'file' | 'chat' | 'skill' | 'plugin' | 'mod' | 'role'
-export type FlowNode = { id: string; kind: FlowKind; label: string; folder?: string; about?: string; first?: number; at?: number }
+/** group: a chat node's split id; chats started from one message share it (groupTies). budget, checkBack, costUsd, elapsedMs: a live chat's Run indefinitely limits (budget-ui limitText). */
+export type FlowNode = { id: string; kind: FlowKind; label: string; folder?: string; about?: string; first?: number; at?: number; group?: string; budget?: IndefiniteBudget; checkBack?: CheckBack; costUsd?: number; elapsedMs?: number }
 export type FlowEdge = { from: string; to: string; kind: 'import' | 'used' | 'touched'; n: number; at?: number }
 export type FlowMap = { project: string; nodes: FlowNode[]; edges: FlowEdge[]; cut?: boolean; builtAt: number }
 
@@ -23,229 +26,27 @@ export async function loadFlowMap(cwd: string, f: typeof fetch = fetch): Promise
   }
 }
 
-export const KIND_NAME: Record<FlowKind, string> = { folder: 'Folder', file: 'File', chat: 'Chat', skill: 'Skill', plugin: 'Plugin', mod: 'Mod', role: 'Role' }
-const CODE = new Set<FlowKind>(['folder', 'file'])
-
-const parentPath = (p: string) => { const k = p.lastIndexOf('/'); return k < 0 ? undefined : p.slice(0, k) }
-const trees = new WeakMap<FlowMap, FlowMap>()
-/** The map with every folder's parent set and missing ancestors added, so old data (cut at 3 levels, no parents) folds as a tree too. */
-export function withTree(map: FlowMap): FlowMap {
-  const done = trees.get(map)
-  if (done) return done
-  const nodes = map.nodes.map(n => (n.kind === 'folder' && !n.folder && n.id !== 'd:.' && parentPath(n.id.slice(2)) ? { ...n, folder: `d:${parentPath(n.id.slice(2))}` } : n))
-  const have = new Set(nodes.map(n => n.id))
-  for (const n of [...nodes]) {
-    for (let p = n.kind === 'folder' ? n.folder?.slice(2) : undefined; p && !have.has(`d:${p}`); p = parentPath(p)) {
-      have.add(`d:${p}`)
-      const up = parentPath(p)
-      nodes.push({ id: `d:${p}`, kind: 'folder', label: p, ...(up ? { folder: `d:${up}` } : {}) })
-    }
+/** Chat nodes of one group, chained in map order, for a group edge. */
+export function groupTies(map: FlowMap): { from: string; to: string; group: string }[] {
+  const last = new Map<string, string>(), out: { from: string; to: string; group: string }[] = []
+  for (const n of map.nodes) {
+    if (n.kind !== 'chat' || !n.group) continue
+    const prev = last.get(n.group)
+    if (prev) out.push({ from: prev, to: n.id, group: n.group })
+    last.set(n.group, n.id)
   }
-  const out = { ...map, nodes }
-  trees.set(map, out).set(out, out)
   return out
 }
 
-/** Opens a folder one level, or folds it and everything under it. */
-export function toggleOpen(open: ReadonlySet<string>, id: string): Set<string> {
-  if (!open.has(id)) return new Set([...open, id])
-  return new Set([...open].filter(x => x !== id && !x.startsWith(`${id}/`)))
-}
-
-/** files/subs: a folder's direct files and subfolders; open: they are drawn; chats: how many drawn chats used a tool. */
-export type ViewNode = FlowNode & { files?: number; subs?: number; open?: boolean; hit?: boolean; chats?: number }
-export type ViewEdge = { from: string; to: string; kind: FlowEdge['kind']; n: number }
-
-/** What the canvas draws: a node shows when every folder above it is open, else its topmost shut folder stands in;
- * edges follow, merged. A search looks through every node, opens the folders its hits sit in, and keeps hits and their neighbours. */
-export function foldView(raw: FlowMap, opened: ReadonlySet<string>, q = '', hide: ReadonlySet<FlowKind> = new Set()): { nodes: ViewNode[]; edges: ViewEdge[] } {
-  const map = withTree(raw)
-  const byId = new Map(map.nodes.map(n => [n.id, n]))
-  const up = (id: string) => { const out: string[] = []; for (let p = byId.get(id)?.folder; p && byId.has(p); p = byId.get(p)!.folder) out.unshift(p); return out }
-  const needle = q.trim().toLowerCase()
-  const hits = new Set(needle ? map.nodes.filter(n => !hide.has(n.kind) && `${n.label} ${n.about ?? ''}`.toLowerCase().includes(needle)).map(n => n.id) : [])
-  const open = new Set(opened)
-  for (const h of hits) for (const a of up(h)) open.add(a)
-  const files = new Map<string, number>(), subs = new Map<string, number>()
-  for (const n of map.nodes) if (n.folder && (n.kind === 'file' || n.kind === 'folder')) { const m = n.kind === 'file' ? files : subs; m.set(n.folder, (m.get(n.folder) ?? 0) + 1) }
-  const stand = (id: string): string | undefined => {
-    if (!byId.has(id) || hide.has(byId.get(id)!.kind)) return undefined
-    return up(id).find(a => !open.has(a)) ?? id
-  }
-  const merged = new Map<string, ViewEdge>()
-  for (const e of map.edges) {
-    const a = stand(e.from), b = stand(e.to)
-    if (!a || !b || a === b) continue
-    const k = `${a}\n${b}\n${e.kind}`
-    const m = merged.get(k)
-    if (m) m.n += e.n
-    else merged.set(k, { from: a, to: b, kind: e.kind, n: e.n })
-  }
-  let nodes: ViewNode[] = map.nodes.filter(n => !hide.has(n.kind) && stand(n.id) === n.id)
-    .map(n => (n.kind === 'folder' ? { ...n, files: files.get(n.id) ?? 0, subs: subs.get(n.id) ?? 0, open: open.has(n.id) } : { ...n }))
-  nodes = nodes.filter(n => n.kind !== 'folder' || n.files || n.subs)
-  let edges = [...merged.values()]
-  if (needle) {
-    const keep = new Set(hits)
-    for (const e of edges) { if (hits.has(e.from)) keep.add(e.to); if (hits.has(e.to)) keep.add(e.from) }
-    nodes = nodes.filter(n => keep.has(n.id)).map(n => ({ ...n, hit: hits.has(n.id) }))
-  }
-  const ids = new Set(nodes.map(n => n.id))
-  edges = edges.filter(e => ids.has(e.from) && ids.has(e.to))
-  const chats = new Map<string, number>()
-  for (const e of edges) if (e.kind === 'used') chats.set(e.to, (chats.get(e.to) ?? 0) + 1)
-  return { nodes: nodes.map(n => (chats.has(n.id) ? { ...n, chats: chats.get(n.id) } : n)), edges }
-}
-
-const laneOf = (k: FlowKind) => LANES.findIndex(l => l.kinds.includes(k))
-/** Import lines inside one lane that rest hidden: past 40 they are a grey wall. Hover or a pick shows a box's own. */
-export function quietEdges(nodes: ViewNode[], edges: ViewEdge[], most = 40): Set<ViewEdge> {
-  const kind = new Map(nodes.map(n => [n.id, n.kind]))
-  const same = edges.filter(e => e.kind === 'import' && laneOf(kind.get(e.from) ?? 'file') === laneOf(kind.get(e.to) ?? 'file'))
-  return new Set(edges.filter(e => e.kind === 'import').length > most ? same : [])
-}
-
-const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
-/** A box's two lines. Skills lose their plugin prefix, which moves to the small line. */
-export function boxText(n: ViewNode): { name: string; meta: string } {
-  const tail = n.label.split('/').filter(Boolean).pop() ?? n.label
-  if (n.kind === 'folder') {
-    const parts = [n.subs ? plural(n.subs, 'folder') : '', n.files || !n.subs ? plural(n.files ?? 0, 'file') : '', n.open ? 'open' : ''].filter(Boolean)
-    return { name: n.id === 'd:.' ? n.label : tail, meta: parts.join(', ') }
-  }
-  if (n.kind === 'file') {
-    // its folder, so 23 route.ts boxes tell apart; long paths keep their deep end
-    const dir = n.label.includes('/') ? n.label.slice(0, n.label.lastIndexOf('/')) : ''
-    return { name: tail, meta: !dir ? KIND_NAME.file : dir.length > 30 ? `...${dir.slice(-27)}` : dir }
-  }
-  if (n.kind === 'chat') return { name: n.label, meta: when(n.at) }
-  const k = n.kind === 'skill' ? n.label.indexOf(':') : -1
-  const from = k > 0 ? n.label.slice(0, k) : ''
-  const used = n.chats ? plural(n.chats, 'chat') : ''
-  return { name: k > 0 ? n.label.slice(k + 1) : n.label, meta: [from, used].filter(Boolean).join(', ') || KIND_NAME[n.kind] }
-}
+export const KIND_NAME: Record<FlowKind, string> = { folder: 'Folder', file: 'File', chat: 'Chat', skill: 'Skill', plugin: 'Plugin', mod: 'Mod', role: 'Role' }
 
 /** Which project the map opens on: this window's, else the last one picked in the map (if still registered), else the chat's. */
 export function startProject(cwds: string[], here?: string, saved?: string, chat?: string): string | undefined {
   return here ?? (saved && cwds.includes(saved) ? saved : undefined) ?? chat ?? cwds[0]
 }
 
-export const NODE_W = 216, NODE_H = 56
-// chat names get a third line
-export const boxH = (k: FlowKind) => (k === 'chat' ? 72 : NODE_H)
-const GX = 16, GY = 10, LANE_GAP = 140
-const LANES: { name: string; kinds: FlowKind[] }[] = [
-  { name: 'Folders', kinds: ['folder', 'file'] },
-  { name: 'Chats', kinds: ['chat'] },
-  { name: 'Skills, plugins, mods and roles', kinds: ['skill', 'plugin', 'mod', 'role'] },
-]
-const TOOL_ORDER: FlowKind[] = ['skill', 'plugin', 'mod', 'role']
-export type Lane = { name: string; x: number; count: number }
-export type Layout = { at: Map<string, { x: number; y: number }>; lanes: Lane[]; width: number; height: number }
-
-/** Lanes left to right (code, chats, tools), each wrapped into columns so the whole map comes out near `aspect` (width / height).
- * maxW: no wider than this, so a big map scrolls down at a readable zoom instead of running off the right edge. */
-export function layoutView(nodes: ViewNode[], edges: ViewEdge[], aspect = 1.6, maxW = Infinity): Layout {
-  const uses = new Map<string, number>()
-  for (const e of edges) uses.set(e.to, (uses.get(e.to) ?? 0) + e.n)
-  // Folders sit above their own files; chats newest first; tools by kind, then most used.
-  const codeKey = (n: ViewNode) => (n.kind === 'folder' ? `${n.id.slice(2)}\u0000` : `${(n.folder ?? '').slice(2)}\u0000${n.label}`)
-  const sorts: ((a: ViewNode, b: ViewNode) => number)[] = [
-    (a, b) => { const x = codeKey(a), y = codeKey(b); return x < y ? -1 : x > y ? 1 : 0 },
-    (a, b) => (b.at ?? 0) - (a.at ?? 0),
-    (a, b) => TOOL_ORDER.indexOf(a.kind) - TOOL_ORDER.indexOf(b.kind) || (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0) || a.label.localeCompare(b.label),
-  ]
-  const lanes = LANES.map((l, i) => ({ name: l.name, of: nodes.filter(n => l.kinds.includes(n.kind)).sort(sorts[i]) })).filter(l => l.of.length)
-  const most = Math.max(1, ...lanes.map(l => l.of.length))
-  const pitch = (l: { of: ViewNode[] }) => Math.max(...l.of.map(n => boxH(n.kind))) + GY
-  const size = (rows: number) => {
-    const width = lanes.reduce((w, l) => w + Math.ceil(l.of.length / rows) * (NODE_W + GX) - GX, 0) + LANE_GAP * Math.max(0, lanes.length - 1)
-    return { width: Math.max(width, NODE_W), height: Math.max(NODE_H + GY, ...lanes.map(l => Math.min(rows, l.of.length) * pitch(l))) - GY }
-  }
-  let rows = most, best = Infinity
-  for (let r = 1; r <= most; r++) {
-    const s = size(r), off = Math.abs(Math.log(s.width / s.height / aspect))
-    if (off < best - 1e-9) { best = off; rows = r }
-  }
-  while (rows < most && size(rows).width > maxW) rows++
-  const at = new Map<string, { x: number; y: number }>()
-  const out: Lane[] = []
-  let x = 0
-  for (const l of lanes) {
-    out.push({ name: l.name, x, count: l.of.filter(n => n.kind !== 'file').length })
-    l.of.forEach((n, i) => at.set(n.id, { x: x + Math.floor(i / rows) * (NODE_W + GX), y: (i % rows) * pitch(l) }))
-    x += Math.ceil(l.of.length / rows) * (NODE_W + GX) - GX + LANE_GAP
-  }
-  return { at, lanes: out, ...size(rows) }
-}
-
-/** Smallest zoom the map opens at: below it the 13px names drop under 11px. */
-export const READ = 0.85
-// Room the canvas keeps clear for the lane titles and zoom buttons, in screen px.
-export const PAD = { top: 48, right: 72, bottom: 24, left: 32 }
-/** How the map opens in a w by h canvas: the whole map when that stays readable, else READ zoom from the top left (the fit button still shows all). */
-export function openView(lay: Pick<Layout, 'width' | 'height'>, w: number, h: number): 'fit' | { x: number; y: number; zoom: number } {
-  const across = (w - PAD.left - PAD.right) / lay.width, z = Math.min(1, across, (h - PAD.top - PAD.bottom) / (lay.height + 40))
-  // a narrow canvas can't hold the lanes at READ, so shrink to its width and scroll down
-  const zoom = Math.min(READ, across)
-  return z >= READ ? 'fit' : { x: PAD.left, y: PAD.top + 40 * zoom, zoom }
-}
-
-/** Which sides an edge leaves and enters by: toward the other node, or both on the right when they share a column. */
-export function sidesOf(a?: { x: number }, b?: { x: number }): { from: 'l' | 'r'; to: 'l' | 'r' } {
-  if (!a || !b || a.x === b.x) return { from: 'r', to: 'r' }
-  return a.x < b.x ? { from: 'r', to: 'l' } : { from: 'l', to: 'r' }
-}
-
-/** Who lights up with whom: edge ends, plus an open folder and what it shows. */
-export function neighbours(edges: ViewEdge[], nodes: ViewNode[] = []): Map<string, Set<string>> {
-  const m = new Map<string, Set<string>>()
-  const add = (a: string, b: string) => { let s = m.get(a); if (!s) m.set(a, (s = new Set())); s.add(b) }
-  for (const e of edges) { add(e.from, e.to); add(e.to, e.from) }
-  const drawn = new Set(nodes.map(n => n.id))
-  for (const n of nodes) if ((n.kind === 'file' || n.kind === 'folder') && n.folder && drawn.has(n.folder)) { add(n.folder, n.id); add(n.id, n.folder) }
-  return m
-}
-
-export type Card = { title: string; kind: string; about: string; uses: string[]; usedBy: string[]; history: { who: string; at?: number; with: string[] }[] }
-
 const day = (ms?: number) => (ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '')
 export const when = day
-
-/** The side card for one node, in plain words. */
-export function cardOf(raw: FlowMap, id: string): Card | undefined {
-  const map = withTree(raw)
-  const n = map.nodes.find(x => x.id === id)
-  if (!n) return undefined
-  const byId = new Map(map.nodes.map(x => [x.id, x]))
-  const label = (i: string) => byId.get(i)?.label ?? i
-  const mine = (i: string) => i === id || byId.get(i)?.folder === id || (n.kind === 'folder' && id !== 'd:.' && i.slice(2).startsWith(`${id.slice(2)}/`))
-  const outside = (i: string) => !mine(i)
-  const uses = new Set<string>(), usedBy = new Set<string>()
-  for (const e of map.edges) {
-    if (e.kind === 'touched') continue
-    if (mine(e.from) && outside(e.to)) uses.add(label(byId.get(e.to)?.folder && n.kind === 'folder' ? byId.get(e.to)!.folder! : e.to))
-    if (mine(e.to) && outside(e.from)) usedBy.add(label(byId.get(e.from)?.folder && n.kind === 'folder' ? byId.get(e.from)!.folder! : e.from))
-  }
-  const tools = (chat: string) => map.edges.filter(e => e.from === chat && e.kind === 'used').map(e => label(e.to))
-  const history: Card['history'] = []
-  if (CODE.has(n.kind)) {
-    const last = new Map<string, number>()
-    for (const e of map.edges) if (e.kind === 'touched' && mine(e.to)) last.set(e.from, Math.max(last.get(e.from) ?? 0, e.at ?? 0))
-    for (const [chat, at] of last) history.push({ who: label(chat), at: at || byId.get(chat)?.at, with: tools(chat) })
-  } else if (n.kind === 'chat') {
-    const files = map.edges.filter(e => e.from === id && e.kind === 'touched').map(e => label(e.to))
-    history.push({ who: files.length ? `Changed ${files.length} file${files.length === 1 ? '' : 's'}: ${files.slice(0, 6).join(', ')}${files.length > 6 ? ', ...' : ''}` : 'Changed no files here', at: n.at, with: [] })
-  } else {
-    for (const e of map.edges) if (e.to === id && e.kind === 'used') history.push({ who: label(e.from), at: byId.get(e.from)?.at, with: [] })
-  }
-  history.sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
-  const about = n.about ?? (n.kind === 'chat' ? `A chat that ran in ${map.project}${n.first ? ` from ${day(n.first)}` : ''}${n.at ? ` to ${day(n.at)}` : ''}.`
-    : n.kind === 'folder' ? 'A folder of code. No README or header comment says what it is for yet.'
-    : n.kind === 'file' ? 'A code file. It has no header comment saying what it does.'
-    : `A ${KIND_NAME[n.kind].toLowerCase()} the chats here called on.`)
-  return { title: n.label, kind: KIND_NAME[n.kind], about, uses: [...uses], usedBy: [...usedBy], history }
-}
 
 export function demoFlowMap(): FlowMap {
   const t = Date.parse('2026-11-05T15:00:00Z')
@@ -259,8 +60,8 @@ export function demoFlowMap(): FlowMap {
     { id: 'f:web/lib/todo.ts', kind: 'file', label: 'web/lib/todo.ts', folder: 'd:web/lib' },
     { id: 'f:extension/src/hub/routes.ts', kind: 'file', label: 'extension/src/hub/routes.ts', folder: 'd:extension/src/hub', about: 'The /hub routes every view reads.' },
     { id: 'f:extension/src/hub/graph.ts', kind: 'file', label: 'extension/src/hub/graph.ts', folder: 'd:extension/src/hub', about: 'Builds the memory graph.' },
-    { id: 'chat:a', kind: 'chat', label: 'Today card v2', first: t - 86_400_000 * 2, at: t - 86_400_000 },
-    { id: 'chat:b', kind: 'chat', label: 'Hub state cleanup', first: t - 3_600_000 * 5, at: t },
+    { id: 'chat:a', kind: 'chat', label: 'Today card v2', first: t - 86_400_000 * 2, at: t - 86_400_000, group: 'g-demo', budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' }, checkBack: { everyMin: 30, count: 3 } },
+    { id: 'chat:b', kind: 'chat', label: 'Hub state cleanup', first: t - 3_600_000 * 5, at: t, group: 'g-demo' },
     { id: 'skill:superpowers:test-driven-development', kind: 'skill', label: 'superpowers:test-driven-development' },
     { id: 'plugin:playwright', kind: 'plugin', label: 'playwright' },
     { id: 'mod:repo-rules', kind: 'mod', label: 'repo-rules' },
@@ -280,4 +81,189 @@ export function demoFlowMap(): FlowMap {
     { from: 'chat:b', to: 'f:extension/src/hub/routes.ts', kind: 'touched', n: 1, at: t },
   ]
   return { project: 'switchboard', nodes, edges, builtAt: t }
+}
+
+/** One part of the app for the Code view: a top folder, or one level down when a top folder holds over a third of the files. */
+export type Part = {
+  id: string; path: string; name: string; about?: string; files: string[]
+  chats: { id: string; label: string; at?: number; n: number }[]
+  tools: { id: string; kind: FlowKind; label: string; n: number }[]
+  notes: GraphNode[]
+  /** columns from the entry: longest import chain reaching it; alone: no imports either way, parked after the rest */
+  depth: number; alone?: boolean
+}
+export type PartLink = { from: string; to: string; n: number }
+export type Parts = { parts: Part[]; links: PartLink[]; order: string[]; notes: GraphNode[] }
+
+const NOTE_KINDS = new Set<GraphNode['kind']>(['memory', 'wiki', 'raw'])
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** The app as parts: files, imports between parts (summed), chats that changed them, what those chats used, and memory notes
+ * that name the part's path or one of its files. cwd picks the project's notes; without it the project's name does. */
+export function components(map: FlowMap, mem?: MemoryGraph, cwd?: string): Parts {
+  const files = map.nodes.filter(n => n.kind === 'file')
+  const seg = (f: FlowNode) => f.label.split('/')
+  const tops = new Map<string, FlowNode[]>()
+  for (const f of files) { const s = seg(f); const k = s.length > 1 ? s[0] : '.'; tops.set(k, [...(tops.get(k) ?? []), f]) }
+  const split = new Set([...tops].filter(([k, of]) => k !== '.' && of.length * 3 > files.length && new Set(of.map(f => seg(f).length > 2 ? seg(f)[1] : '')).size > 1).map(([k]) => k))
+  const keyOf = (f: FlowNode) => { const s = seg(f); if (s.length < 2) return '.'; return split.has(s[0]) && s.length > 2 ? `${s[0]}/${s[1]}` : s[0] }
+  const partOf = new Map(files.map(f => [f.id, `c:${keyOf(f)}`]))
+  const byId = new Map(map.nodes.map(n => [n.id, n]))
+  const parts = new Map<string, Part>()
+  for (const f of files) {
+    const id = partOf.get(f.id)!, path = id.slice(2)
+    const p = parts.get(id) ?? { id, path, name: path === '.' ? map.project : path.split('/').pop()!, files: [], chats: [], tools: [], notes: [], depth: 0 }
+    p.files.push(f.label)
+    parts.set(id, p)
+  }
+  for (const p of parts.values()) {
+    p.files.sort()
+    p.about = byId.get(`d:${p.path}`)?.about ?? map.nodes.filter(n => n.kind === 'folder' && n.about && n.id.startsWith(`d:${p.path}/`)).sort((x, y) => x.id.length - y.id.length)[0]?.about ?? files.filter(f => partOf.get(f.id) === p.id && f.about).sort((a, b) => a.label.length - b.label.length)[0]?.about
+  }
+  const linkMap = new Map<string, PartLink>()
+  const touched = new Map<string, Map<string, number>>()
+  for (const e of map.edges) {
+    const a = partOf.get(e.from), b = partOf.get(e.to)
+    if (e.kind === 'import' && a && b && a !== b) { const k = `${a}\n${b}`; const l = linkMap.get(k); if (l) l.n += e.n; else linkMap.set(k, { from: a, to: b, n: e.n }) }
+    if (e.kind === 'touched' && b) { const m = touched.get(b) ?? new Map(); m.set(e.from, (m.get(e.from) ?? 0) + e.n); touched.set(b, m) }
+  }
+  for (const p of parts.values()) {
+    const by = touched.get(p.id) ?? new Map<string, number>()
+    p.chats = [...by].map(([id, n]) => ({ id, label: byId.get(id)?.label ?? id, at: byId.get(id)?.at, n })).sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+    const tools = new Map<string, number>()
+    for (const e of map.edges) if (e.kind === 'used' && by.has(e.from)) tools.set(e.to, (tools.get(e.to) ?? 0) + 1)
+    p.tools = [...tools].map(([id, n]) => ({ id, kind: byId.get(id)?.kind ?? 'skill', label: byId.get(id)?.label ?? id, n })).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+  }
+  const links = [...linkMap.values()]
+
+  // depth: DFS from the parts nothing imports, skipping edges back into the current chain, then longest path
+  const outs = new Map<string, string[]>()
+  for (const l of links) outs.set(l.from, [...(outs.get(l.from) ?? []), l.to])
+  const hasIn = new Set(links.map(l => l.to))
+  const all = [...parts.keys()].sort()
+  const starts = [...all.filter(id => !hasIn.has(id)), ...all.filter(id => hasIn.has(id))]
+  const state = new Map<string, 1 | 2>(), post: string[] = [], back = new Set<string>()
+  const walk = (id: string) => {
+    state.set(id, 1)
+    for (const to of outs.get(id) ?? []) { if (state.get(to) === 1) back.add(`${id}\n${to}`); else if (!state.has(to)) walk(to) }
+    state.set(id, 2); post.push(id)
+  }
+  for (const id of starts) if (!state.has(id)) walk(id)
+  for (const id of post.reverse()) for (const to of outs.get(id) ?? []) if (!back.has(`${id}\n${to}`)) parts.get(to)!.depth = Math.max(parts.get(to)!.depth, parts.get(id)!.depth + 1)
+  const linked = new Set(links.flatMap(l => [l.from, l.to]))
+  const deepest = Math.max(0, ...[...parts.values()].filter(p => linked.has(p.id)).map(p => p.depth))
+  for (const p of parts.values()) if (!linked.has(p.id) && parts.size > 1 && linked.size) { p.alone = true; p.depth = deepest + 1 }
+  const order = [...parts.values()].sort((a, b) => a.depth - b.depth || b.files.length - a.files.length || a.path.localeCompare(b.path)).map(p => p.id)
+
+  let notes: GraphNode[] = []
+  if (mem) {
+    const home = new Set(mem.nodes.filter(n => n.kind === 'project' && (cwd ? n.id === `project:${cwd}` : n.label === map.project)).map(n => n.id))
+    const mine = new Set(mem.edges.filter(e => e.kind === 'in' && home.has(e.target)).map(e => e.source))
+    notes = mem.nodes.filter(n => NOTE_KINDS.has(n.kind) && mine.has(n.id))
+    for (const p of parts.values()) {
+      // paths and file names, not bare folder names: "lib" or "src" would match half the notes
+      const words = new Set<string>()
+      if (p.path.includes('/')) words.add(p.path)
+      for (const f of p.files) { const b = f.split('/').pop()!; words.add(b); const stem = b.replace(/\.[^.]+$/, ''); if (stem.length >= 6) words.add(stem) }
+      const re = new RegExp(`(^|[^\\w./-])(${[...words].map(esc).join('|')})(?![\\w-])`, 'i')
+      p.notes = notes.filter(n => re.test(`${n.label}\n${n.description ?? ''}\n${n.text ?? ''}`))
+    }
+  }
+  return { parts: order.map(id => parts.get(id)!), links, order, notes }
+}
+
+export const PART_W = 232, PART_H = 88
+
+/** Layout A: one column per flow depth, entry on the left, each column centred on the tallest. */
+export function layers(parts: Part[], links: PartLink[] = []): { at: Map<string, { x: number; y: number }>; cols: number } {
+  const cols = new Map<number, Part[]>()
+  for (const p of parts) cols.set(p.depth, [...(cols.get(p.depth) ?? []), p])
+  const keys = [...cols.keys()].sort((a, b) => a - b), tall = Math.max(1, ...[...cols.values()].map(c => c.length))
+  const at = new Map<string, { x: number; y: number }>()
+  keys.forEach((k, ci) => {
+    // each column sorted by where its importers sit, so lines cross less
+    const pull = (p: Part) => { const ys = links.filter(l => l.to === p.id && at.has(l.from)).map(l => at.get(l.from)!.y); return ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : Infinity }
+    const c = [...cols.get(k)!].sort((a, b) => pull(a) - pull(b))
+    const top = ((tall - c.length) * (PART_H + 32)) / 2
+    c.forEach((p, i) => at.set(p.id, { x: ci * (PART_W + 120), y: top + i * (PART_H + 32) }))
+  })
+  return { at, cols: keys.length }
+}
+
+/** The demo map with enough of an app around it for the Code view to show a flow. */
+export function demoAppMap(): FlowMap {
+  const m = demoFlowMap()
+  const f = (label: string, about?: string): FlowNode => ({ id: `f:${label}`, kind: 'file', label, folder: `d:${label.slice(0, label.lastIndexOf('/'))}`, ...(about ? { about } : {}) })
+  const imp = (a: string, b: string, n = 1): FlowEdge => ({ from: `f:${a}`, to: `f:${b}`, kind: 'import', n })
+  m.nodes.push(
+    f('web/app/page.tsx', 'The page the hub app serves.'), f('web/components/switchboard/flow-map.tsx', 'The Code view.'), f('web/lib/flow-map.ts'), f('web/lib/hub-remote.ts', 'Talks to the hub over HTTP.'),
+    f('extension/src/extension.ts', 'Where VS Code starts the extension.'), f('extension/src/hub/hub-service.ts', 'Keeps the hub state.'), f('extension/src/hub/flowmap.ts', 'Builds the flow map.'),
+    f('extension/test/graph.test.ts'), f('app/src/server.ts', 'Serves the hub outside VS Code.'),
+  )
+  m.edges.push(
+    imp('web/app/page.tsx', 'web/components/switchboard/switchboard.tsx'), imp('web/components/switchboard/switchboard.tsx', 'web/components/switchboard/flow-map.tsx'),
+    imp('web/components/switchboard/flow-map.tsx', 'web/lib/flow-map.ts'), imp('web/lib/flow-map.ts', 'web/lib/hub-remote.ts'), imp('web/lib/today.ts', 'web/lib/hub-remote.ts'),
+    imp('extension/src/extension.ts', 'extension/src/hub/hub-service.ts'), imp('extension/src/hub/hub-service.ts', 'extension/src/hub/routes.ts', 2), imp('extension/src/hub/hub-service.ts', 'extension/src/hub/flowmap.ts'),
+    imp('extension/test/graph.test.ts', 'extension/src/hub/graph.ts'), imp('app/src/server.ts', 'web/lib/hub-remote.ts'),
+    { from: 'chat:b', to: 'f:extension/src/hub/hub-service.ts', kind: 'touched', n: 2, at: m.builtAt },
+  )
+  return m
+}
+
+type Pt = { x: number; y: number }
+const GAP = 120
+/** Right-angle lines for layout A. A line leaves its part's right side into the column gap, runs across at a height no box
+ * in its way sits at (a row gap, or above or below everything), and drops into the target's left side from the gap before it.
+ * Lines sharing a gap or a corridor are spread a few px apart. Key: `from>to`. */
+export function routeLinks(parts: Part[], links: PartLink[], at: Map<string, Pt>): Map<string, Pt[]> {
+  const boxes = parts.map(p => ({ id: p.id, ...at.get(p.id)! }))
+  const top = Math.min(...boxes.map(b => b.y)), bottom = Math.max(...boxes.map(b => b.y + PART_H))
+  const plan = links.map(l => {
+    const a = at.get(l.from)!, b = at.get(l.to)!
+    const y1 = a.y + PART_H / 2, y2 = b.y + PART_H / 2, g1 = a.x + PART_W + GAP / 2, g2 = b.x - GAP / 2
+    if (g1 === g2) return { l, y1, y2, g1, g2, yc: undefined as number | undefined }
+    const lo = Math.min(g1, g2), hi = Math.max(g1, g2)
+    const block = boxes.filter(x => x.x < hi && x.x + PART_W > lo)
+    const free = (y: number) => !block.some(x => y > x.y - 4 && y < x.y + PART_H + 4)
+    const cands = [y1, y2, top - 24, bottom + 24, ...block.flatMap(x => [x.y - 16, x.y + PART_H + 16])].filter(free)
+    const yc = cands.sort((p, q) => Math.abs(p - y1) + Math.abs(p - y2) - Math.abs(q - y1) - Math.abs(q - y2) || p - q)[0]
+    return { l, y1, y2, g1, g2, yc }
+  })
+  // lane offsets: by gap x for the drops, by height for the corridors
+  const spreadOut = (keyOf: (i: number) => number[], step: number, most: number) => {
+    const groups = new Map<number, number[]>()
+    plan.forEach((_, i) => { for (const k of new Set(keyOf(i))) groups.set(k, [...(groups.get(k) ?? []), i]) })
+    const off = new Map<string, number>()
+    for (const [k, ids] of groups) ids.forEach((i, j) => off.set(`${k}\n${i}`, Math.max(-most, Math.min(most, (j - (ids.length - 1) / 2) * step))))
+    return (k: number, i: number) => off.get(`${k}\n${i}`) ?? 0
+  }
+  const gapOff = spreadOut(i => [plan[i].g1, plan[i].g2], 8, 48)
+  const rowOff = spreadOut(i => (plan[i].yc === undefined ? [] : [plan[i].yc!]), 6, 12)
+  const out = new Map<string, Pt[]>()
+  plan.forEach(({ l, y1, y2, g1, g2, yc }, i) => {
+    const a = at.get(l.from)!, b = at.get(l.to)!
+    const x1 = a.x + PART_W, x2 = b.x, h1 = g1 + gapOff(g1, i), h2 = g2 + gapOff(g2, i)
+    const pts = yc === undefined ? [{ x: x1, y: y1 }, { x: h1, y: y1 }, { x: h1, y: y2 }, { x: x2, y: y2 }]
+      : [{ x: x1, y: y1 }, { x: h1, y: y1 }, { x: h1, y: yc + rowOff(yc, i) }, { x: h2, y: yc + rowOff(yc, i) }, { x: h2, y: y2 }, { x: x2, y: y2 }]
+    out.set(`${l.from}>${l.to}`, pts.filter((p, k) => k === 0 || p.x !== pts[k - 1].x || p.y !== pts[k - 1].y))
+  })
+  return out
+}
+
+/** Lines that pass through a part they neither start nor end at, as "link | part". Empty is the goal. */
+export function crossings(parts: Part[], links: PartLink[], at: Map<string, Pt>, paths: Map<string, Pt[]>): string[] {
+  const bad: string[] = []
+  for (const l of links) {
+    const pts = paths.get(`${l.from}>${l.to}`) ?? []
+    for (const p of parts) {
+      if (p.id === l.from || p.id === l.to) continue
+      const b = at.get(p.id)!
+      const hit = pts.slice(1).some((q, k) => {
+        const s = pts[k], x0 = Math.min(s.x, q.x), x1 = Math.max(s.x, q.x), y0 = Math.min(s.y, q.y), y1 = Math.max(s.y, q.y)
+        return x0 < b.x + PART_W && x1 > b.x && y0 < b.y + PART_H && y1 > b.y
+      })
+      if (hit) bad.push(`${l.from}>${l.to} | ${p.id}`)
+    }
+  }
+  return bad
 }

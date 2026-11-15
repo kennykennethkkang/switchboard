@@ -80,7 +80,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
   useEffect(() => {
     let stop = false
     if (isDemo) { setGraph(demoGraph()); return }
-    void loadGraph().then(g => { if (stop) return; if (typeof g === 'string') setProblem(g); else setGraph(g) })
+    loadGraph().then(g => { if (stop) return; if (typeof g === 'string') setProblem(g); else setGraph(g) }, (e: unknown) => { if (!stop) setProblem(String((e as Error)?.message ?? e)) })
     return () => { stop = true }
   }, [isDemo])
 

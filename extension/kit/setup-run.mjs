@@ -96,11 +96,21 @@ const sweep = () => import('./sweep.mjs')
 /** Codex reads ~/.agents/skills: a skill on in ~/.claude/skills (not held in skills-archive) is copied there when missing. One already there stays. */
 export function mirrorSkill(n, home = homedir()) {
   const from = join(home, '.claude', 'skills', n), to = join(home, '.agents', 'skills', n)
-  if (!existsSync(join(from, 'SKILL.md')) || lstatSync(to, { throwIfNoEntry: false })) return false
+  const codexHome = process.env.CODEX_HOME || join(home, '.codex')
+  if (!existsSync(join(from, 'SKILL.md')) || lstatSync(to, { throwIfNoEntry: false }) || lstatSync(join(codexHome, 'skills', n), { throwIfNoEntry: false })) return false
   mkdirSync(dirname(to), { recursive: true })
   // dereference: a claude-mods link lands as a copy.
   cpSync(from, to, { recursive: true, dereference: true })
   return true
+}
+
+/** Every folder in ~/.claude/skills with a SKILL.md, mirrored for Codex by the same rules; the names added. Plugin skills live under plugins/, so they never show here. */
+export function mirrorAllSkills(home = homedir(), log = () => {}) {
+  const root = join(home, '.claude', 'skills')
+  if (!existsSync(root)) return []
+  const added = readdirSync(root).filter(n => !n.startsWith('.') && mirrorSkill(n, home))
+  for (const n of added) log(`Added skill ${n} for Codex`)
+  return added
 }
 
 /** Clones the repo shallow and sweeps each named skill (by its SKILL.md name, under k.path, default skills) before copying it into ~/.claude/skills.
@@ -235,6 +245,7 @@ async function main(planFile, dry) {
       if (s.run[0] === 'claude' && s.run[1] === 'plugin' && s.run[2] === 'install') await sweepPlugin(s.run[3])
     } else failed.push(s.label)
   }
+  if (!dry) mirrorAllSkills(homedir(), console.log)
   if (failed.length) console.log(`\nDid not finish, run Set up again or try by hand:\n  ${failed.join('\n  ')}`)
 }
 

@@ -28,9 +28,8 @@ export function waitsOn(links: ChatLink[], from: string, to: string): boolean {
   return false
 }
 
-/** The Wait for picker: the other live chats in this chat's project that it does not wait on yet and that do not wait on it. None for Codex: it has no chats_wait. */
+/** The Wait for picker: the other live chats in this chat's project that it does not wait on yet and that do not wait on it. A Codex chat waits through the switchboard MCP's chats_wait. */
 export const waitTargets = (chats: ChatRow[], chat: ChatRow, links: ChatLink[] = []) => {
-  if (chat.ai === 'codex') return []
   const on = new Set(links.filter(l => l.from === chat.sessionId).flatMap(l => l.to))
   return chats.filter(c => c.live && c.sessionId !== chat.sessionId && c.cwd === chat.cwd && !on.has(c.sessionId) && !waitsOn(links, c.sessionId, chat.sessionId))
 }

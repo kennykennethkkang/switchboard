@@ -3,26 +3,26 @@
  *
  * Codex writes five top-level record types. This parser handles all of them:
  *
- *   session_meta  — first line; carries cwd, cli_version, session id, base
+ *   session_meta : first line; carries cwd, cli_version, session id, base
  *                   instructions (system prompt)
- *   turn_context  — per turn; carries the authoritative model id for that turn
+ *   turn_context : per turn; carries the authoritative model id for that turn
  *                   plus approval/sandbox policy. May change mid-session.
- *   response_item — OpenAI Responses API-shaped turn data: messages, function
+ *   response_item: OpenAI Responses API-shaped turn data: messages, function
  *                   calls, function call outputs, custom tool calls, reasoning
- *   event_msg     — Codex lifecycle events: task_started/complete, token_count,
+ *   event_msg    : Codex lifecycle events: task_started/complete, token_count,
  *                   agent_reasoning (plaintext thinking), exec_command_end, etc.
- *   compacted     — auto-compaction marker with replacement_history
+ *   compacted    : auto-compaction marker with replacement_history
  *
  * Dedup strategy:
- *   Messages     — emitted from response_item.message only. event_msg's
+ *   Messages    : emitted from response_item.message only. event_msg's
  *                   agent_message / user_message are mirrors of the response_item
  *                   content (sometimes imperfect for user messages) and are
  *                   skipped. System-injected user content (IDE context,
  *                   subagent notifications) is filtered.
- *   Reasoning    — emitted from event_msg.agent_reasoning only. response_item's
+ *   Reasoning   : emitted from event_msg.agent_reasoning only. response_item's
  *                   reasoning payload carries encrypted_content + summary[] and
  *                   isn't useful for display.
- *   Tool results — emitted from function_call_output / custom_tool_call_output
+ *   Tool results: emitted from function_call_output / custom_tool_call_output
  *                   only. event_msg.exec_command_end / patch_apply_end are
  *                   parallel signals and are skipped.
  *
@@ -59,6 +59,10 @@ export interface PendingCodexToolCall {
   args: string
   startTime: number
   filePath?: string
+  /** request_user_input only: its parsed arguments, paired with the answer later. */
+  input?: Record<string, unknown>
+  /** The call is a code mode exec that asks the closing question; input is then empty. */
+  code?: boolean
 }
 
 export interface CodexRolloutState {
@@ -114,6 +118,10 @@ export interface CodexParserDelegate {
   elapsed(): number
   /** Called when a session label is derived from the first user message. */
   setLabel?(label: string): void
+  /** Called on a token_count that carries rate_limits: the 5h and week windows as codex_ limits. */
+  /** A request_user_input call and its answers (codex 0.167 sends no PostToolUse for it; the rollout is the only record). */
+  answered?(input: Record<string, unknown>, response: unknown, callId?: string): void
+  limits?(limits: { kind: string; percentUsed: number; resetsAt?: string }[]): void
 }
 
 // ─── Record shapes (structural typing, all fields optional) ────────────────
@@ -220,13 +228,13 @@ function extractCodexUserText(raw: string): string | null {
   if (CODEX_PURE_INJECTION_PREFIXES.some(p => text.startsWith(p))) return null
   if (text.startsWith('# Context from my IDE setup:')) {
     const idx = text.indexOf(CODEX_REQUEST_MARKER)
-    if (idx < 0) return null // IDE context with no request — skip
+    if (idx < 0) return null // IDE context with no request: skip
     return text.slice(idx + CODEX_REQUEST_MARKER.length).trim() || null
   }
   return text
 }
 
-/** Parse tool-call arguments — Codex encodes them as a JSON string. */
+/** Parse tool-call arguments: Codex encodes them as a JSON string. */
 function parseArgsJson(raw: string | undefined): Record<string, unknown> | undefined {
   if (!raw) return undefined
   try {
@@ -247,7 +255,21 @@ function extractOutputString(raw: FunctionCallOutputPayload['output']): string {
     return raw
   }
   if (isRecord(raw) && typeof raw.output === 'string') return raw.output
+  // Code mode's custom_tool_call_output is a list of input_text parts.
+  if (Array.isArray(raw)) return raw.map(c => (isRecord(c) && typeof c.text === 'string' ? c.text : '')).join('')
   return ''
+}
+
+const CLOSING = 'Approve this chat as finished'
+
+/** The first {"answers": ...} object printed in a tool's output text. */
+function answersIn(text: string): unknown {
+  const at = text.indexOf('{"answers"')
+  if (at < 0) return undefined
+  for (let end = text.lastIndexOf('}'); end > at; end = text.lastIndexOf('}', end - 1)) {
+    try { return JSON.parse(text.slice(at, end + 1)) } catch { /* try a shorter cut */ }
+  }
+  return undefined
 }
 
 /** Pull the first "*** Update File: /path" line out of an apply_patch body. */
@@ -422,6 +444,7 @@ export class CodexRolloutParser {
 
     state.pendingToolCalls.set(callId, {
       name, args: argsSummary, startTime: Date.now(), filePath,
+      ...(name === 'request_user_input' && args ? { input: args as Record<string, unknown> } : {}),
     })
 
     this.delegate.emit({
@@ -445,6 +468,18 @@ export class CodexRolloutParser {
     state.pendingToolCalls.delete(callId)
 
     const output = extractOutputString(payload.output)
+    if (pending.input) {
+      let response: unknown
+      if (pending.code) {
+        // The JS only names the closing question; its id is whichever key the printed answers carry.
+        response = answersIn(output)
+        const ids = isRecord(response) && isRecord(response.answers) ? Object.keys(response.answers) : []
+        if (ids.length) this.delegate.answered?.({ questions: ids.map(id => ({ id, question: `${CLOSING}?`, options: [{ label: 'Approve' }, { label: 'Send back' }] })) }, response, callId)
+      } else {
+        try { response = JSON.parse(output) } catch { /* not answers */ }
+        if (response !== undefined) this.delegate.answered?.(pending.input, response, callId)
+      }
+    }
     const resultSummary = summarizeResult(output).slice(0, RESULT_MAX)
     const tokenCost = estimateTokenCost(pending.name, output)
     state.contextBreakdown.toolResults += tokenCost
@@ -479,6 +514,7 @@ export class CodexRolloutParser {
 
     state.pendingToolCalls.set(callId, {
       name, args: argsSummary, startTime: Date.now(), filePath,
+      ...(name === 'exec' && rawInput.includes('request_user_input') && rawInput.includes(CLOSING) ? { input: {}, code: true } : {}),
     })
 
     this.delegate.emit({
@@ -502,7 +538,7 @@ export class CodexRolloutParser {
   private handleWebSearchCall(payload: WebSearchCallPayload): void {
     const query = String(payload.action?.query || '')
     if (!query) return
-    // Web search is self-contained — emit start + end together.
+    // Web search is self-contained: emit start + end together.
     this.delegate.emit({
       time: this.delegate.elapsed(),
       type: 'tool_call_start',
@@ -538,7 +574,7 @@ export class CodexRolloutParser {
       // Other event_msg types are either mirrors of response_item content
       // (agent_message, user_message, exec_command_end, patch_apply_end) or
       // metadata we don't currently surface (task_started, task_complete,
-      // turn_aborted, context_compacted — the latter paired with the
+      // turn_aborted, context_compacted: the latter paired with the
       // top-level `compacted` record which we handle authoritatively).
     }
   }
@@ -548,10 +584,11 @@ export class CodexRolloutParser {
    *
    *  - `last_token_usage.input_tokens` = size of this turn's prompt = current
    *    context fill (what the gauge should show).
-   *  - `total_token_usage.input_tokens` = cumulative across the session — used
+   *  - `total_token_usage.input_tokens` = cumulative across the session: used
    *    for billing, not context fill.
    *  - `model_context_window` = authoritative tokensMax for this model. */
   private handleTokenCount(payload: Record<string, unknown>, state: CodexRolloutState): void {
+    this.emitLimits(payload.rate_limits)
     const info = payload.info
     if (!isRecord(info)) return
 
@@ -577,6 +614,18 @@ export class CodexRolloutParser {
     }
 
     this.emitContextUpdate(state, { authoritative: true })
+  }
+
+  /** The window is told by window_minutes (300 = 5h, 10080 = week), else by primary/secondary. */
+  private emitLimits(rl: unknown): void {
+    if (!this.delegate.limits || !isRecord(rl)) return
+    const out: { kind: string; percentUsed: number; resetsAt?: string }[] = []
+    for (const [name, w] of [['primary', rl.primary], ['secondary', rl.secondary]] as const) {
+      if (!isRecord(w) || typeof w.used_percent !== 'number') continue
+      const week = typeof w.window_minutes === 'number' ? w.window_minutes > 1440 : name === 'secondary'
+      out.push({ kind: week ? 'codex_seven_day' : 'codex_five_hour', percentUsed: w.used_percent, ...(typeof w.resets_at === 'number' ? { resetsAt: String(w.resets_at) } : {}) })
+    }
+    if (out.length) this.delegate.limits(out)
   }
 
   private handleAgentReasoning(payload: Record<string, unknown>, state: CodexRolloutState): void {
@@ -620,9 +669,9 @@ export class CodexRolloutParser {
     state.contextBreakdown.toolResults = toolResultTokens
     state.contextBreakdown.reasoning = 0
     state.contextBreakdown.subagentResults = 0
-    // systemPrompt stays — it's the base instructions, still counted.
+    // systemPrompt stays: it's the base instructions, still counted.
     this.emitContextUpdate(state)
-    log.info('Context compacted — token breakdown reset from replacement_history')
+    log.info('Context compacted: token breakdown reset from replacement_history')
   }
 
   // ─── Shared helpers ──────────────────────────────────────────────────────

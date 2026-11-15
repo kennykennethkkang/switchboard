@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { boxNote, sendFailure, withKeywords } from './message-box'
+import { boxNote, replyBox, sendFailure, withKeywords } from './message-box'
 import type { ChatRow } from './hub-types'
 
 const row = (extra: Partial<ChatRow>): ChatRow => ({ pid: 1, sessionId: 's1', cwd: '/w', link: '', live: true, why: [], ...extra })
@@ -44,5 +44,16 @@ describe('thinking keywords', () => {
   it('leaves an empty message empty, and a typed keyword as typed', () => {
     assert.equal(withKeywords('', { ultrathink: true, ultracode: true }), '')
     assert.equal(withKeywords('ultrathink this', { ultrathink: false, ultracode: false }), 'ultrathink this')
+  })
+})
+
+describe('map reply box', () => {
+  it('targets a live chat, with the note when it cannot take messages', () => {
+    const chats = [row({ sessionId: 'a', takes: true }), row({ sessionId: 'b' }), row({ sessionId: 'c', live: false })]
+    assert.deepEqual(replyBox(chats, 'a'), { sessionId: 'a', note: undefined })
+    assert.match(replyBox(chats, 'b')!.note!, /usage-meter/)
+    assert.equal(replyBox(chats, 'c'), undefined)
+    assert.equal(replyBox(chats, 'x'), undefined)
+    assert.equal(replyBox(chats, undefined), undefined)
   })
 })

@@ -2,12 +2,19 @@
 import * as vscode from 'vscode'
 import { hub } from './hub-service'
 import { chatTerminal } from './ais'
-import { ANSI, restoredOurs, TerminalTags } from './terminal-tags'
+import { ANSI, restoredOurs, TerminalTags, type TermMemo } from './terminal-tags'
 import type { ChatRow } from './types'
 import { editor } from '../editor'
 
 const ICON = 'radio-tower'
 export const tags = new TerminalTags<vscode.Terminal>()
+// Chat terminals by shell pid, so a reload keeps their chat and age and Approve still closes them.
+const MEMO = 'switchboard.terminalMemo'
+let store: vscode.Memento | undefined
+let restored: Record<string, TermMemo> = {}
+let saved = ''
+// Saves wait for the revived terminals, or an early sync would write a memo without them.
+let ready: Promise<unknown> = Promise.resolve()
 
 // Restored chat terminals stay ours; instanceof ThemeIcon failed for them, so Approve left them open.
 const ours = (t: vscode.Terminal) => restoredOurs((t.creationOptions as vscode.TerminalOptions).iconPath, t.name, ICON)
@@ -29,11 +36,28 @@ function post(): void {
   })
 }
 
-export function watchTerminals(): vscode.Disposable {
-  for (const t of vscode.window.terminals) tags.seen(t, ours(t))
-  post()
+async function see(t: vscode.Terminal): Promise<void> {
+  const mine = ours(t)
+  const pid = mine ? await t.processId : undefined
+  tags.seen(t, mine, pid ? restored[pid] : undefined)
+}
+
+async function saveMemo(): Promise<void> {
+  if (!store) return
+  await ready
+  const all = await Promise.all(tags.memo().map(async ([t, m]) => [await t.processId, m] as const))
+  const json = JSON.stringify(Object.fromEntries(all.filter(([pid]) => pid)))
+  if (json === saved) return
+  saved = json
+  await store.update(MEMO, JSON.parse(json))
+}
+
+export function watchTerminals(state?: vscode.Memento): vscode.Disposable {
+  store = state
+  restored = state?.get<Record<string, TermMemo>>(MEMO) ?? {}
+  ready = Promise.all(vscode.window.terminals.map(see)).then(post)
   return vscode.Disposable.from(
-    vscode.window.onDidOpenTerminal(t => { tags.seen(t, ours(t)); post() }),
+    vscode.window.onDidOpenTerminal(t => { void see(t).then(post) }),
     vscode.window.onDidCloseTerminal(t => { tags.gone(t); post() }),
     vscode.window.onDidChangeActiveTerminal(t => { void renameActive(t).then(post) }),
   )
@@ -51,10 +75,15 @@ async function renameActive(t: vscode.Terminal | undefined, chats: ChatRow[] = h
 /** With each fresh chat list: tie live chats to terminals by pid, follow renames, post the rows. */
 export async function syncTerminals(chats: ChatRow[]): Promise<void> {
   // ponytail: a ps per unbound live chat per refresh; cache misses if it ever shows up.
+  await Promise.all(vscode.window.terminals.filter(t => tags.ownerOf(t) === 'user' && ours(t)).map(async t => {
+    const pid = await t.processId
+    tags.claim(t, pid ? restored[pid] : undefined)
+  }))
   await tags.bindLive(chats, pid => chatTerminal(pid, vscode.window.terminals))
   tags.closeEnded(chats, new Map(hub.get().archive.flatMap(a => a.approvedAt ? [[a.sessionId, a.approvedAt] as const] : [])))
   await renameActive(vscode.window.activeTerminal, chats)
   post()
+  await saveMemo().catch(() => {})
 }
 
 /** A row's terminal, shown with focus (only a click lands here). close: ours only, never the user's. */

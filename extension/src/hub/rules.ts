@@ -6,7 +6,7 @@
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
-import { ROLE_MODELS, modelOf, withModel } from './roles'
+import { ROLE_MODELS, codexOf, modelOf, withCodex, withModel } from './roles'
 import type { AiId } from './types'
 
 // Same header and version line as claude-mods/kit/kit.mjs, so neither downgrades the other.
@@ -20,7 +20,21 @@ export const GENERIC = '<!-- switchboard generic copy -->'
 /** kit/shipped.json: sha256 of the trimmed LF text of each copy 0.17.x shipped, before GENERIC; such a file is ours to update. */
 export const shippedSha = (text: string) => crypto.createHash('sha256').update(text.replace(/\r\n/g, '\n').trim()).digest('hex')
 export const rulesSha = (text: string) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 12)
-export const rulesFile = (rules: string, version: string) => `${HEADER}<!-- rules-version: ${version} sha256:${rulesSha(rules)} -->\n\n${rules}`
+export const rulesFile = (rules: string, version: string, tail = '') => `${HEADER}<!-- rules-version: ${version} sha256:${rulesSha(rules)} -->\n\n${rules}${tail}`
+
+/** Appended to the Codex copy only, after the rules: they name Claude tools. Same text in claude-mods/kit/kit.mjs. */
+export const CODEX_MAP = `
+## Codex tool map
+
+The rules above name Claude Code tools. In Codex use these instead:
+
+- AskUserQuestion: \`mcp__switchboard__ask\` (\`request_user_input\` is a fallback only and takes title and options, not question), same question and options. "Approve this chat as finished?" keeps its exact wording and options "Approve" and "Send back".
+- Agent and role subagents: \`spawn_agent\` (roles live in ~/.codex/agents), then \`wait_agent\`.
+- Skill tool: read the SKILL.md under ~/.agents/skills/<name>/.
+- Task tools: \`update_plan\` when listed, else keep the task list in your replies. ToolSearch: not needed, tools are already loaded.
+- Phone push at the end: skip it, Switchboard sends it when the chat is done.
+- \`mcp__switchboard__*\` tools keep their names (the switchboard MCP is in ~/.codex/config.toml).
+`
 
 /** A generated file's rules, without its header, version line and the blank line after them. */
 const bodyOf = (text: string) => text.slice(HEADER.length).replace(/^<!-- rules-version: .* -->\n/, '').replace(/^\n/, '')
@@ -36,19 +50,19 @@ export function upsertBlock(text: string, rules: string): string | undefined {
 
 export type RulesDecision = { action: 'write' | 'skip'; text?: string; why: string }
 
-export function decideRules(existing: string | undefined, rules: string, version: string, generic = false, shipped: string[] = []): RulesDecision {
-  if (existing === undefined) return { action: 'write', text: rulesFile(rules, version), why: 'missing' }
+export function decideRules(existing: string | undefined, rules: string, version: string, generic = false, shipped: string[] = [], tail = ''): RulesDecision {
+  if (existing === undefined) return { action: 'write', text: rulesFile(rules, version, tail), why: 'missing' }
   // A Windows editor may have saved it with CRLF.
   const lf = existing.replace(/\r\n/g, '\n')
   if (lf.startsWith(HEADER)) {
-    if (bodyOf(lf) === rules) return { action: 'skip', why: 'current' }
+    if (bodyOf(lf) === rules + tail) return { action: 'skip', why: 'current' }
     if (generic && !lf.includes(GENERIC) && !shipped.includes(shippedSha(bodyOf(lf)))) return { action: 'skip', why: 'personal copy' }
     const theirs = VERSION.exec(lf)?.[1]
     // ISO times in UTC compare as strings.
     if (theirs && theirs >= version) return { action: 'skip', why: 'kit newer' }
-    return { action: 'write', text: rulesFile(rules, version), why: 'older' }
+    return { action: 'write', text: rulesFile(rules, version, tail), why: 'older' }
   }
-  const text = upsertBlock(existing, rules)
+  const text = upsertBlock(existing, rules + tail)
   if (text === undefined) return { action: 'skip', why: 'block broken' }
   return text === existing ? { action: 'skip', why: 'block current' } : { action: 'write', text, why: 'block' }
 }
@@ -62,14 +76,24 @@ export function decideAgent(existing: string | undefined, bundled: string, older
   if (existing === undefined) return 'install'
   if (existing === bundled) return 'skip'
   const kitModel = modelOf(bundled)
-  const asKit = [...ROLE_MODELS, kitModel].flatMap(m => (m ? [withModel(existing, m)] : []))
+  // A Codex pick in the gear is not an edit either: put the kit's own flags back before comparing.
+  const kc = codexOf(bundled)
+  const kit = (t: string | undefined) => (t !== undefined && kc ? withCodex(t, kc.model ?? 'default', kc.effort ?? 'default') ?? t : t)
+  const asKit = [...ROLE_MODELS, kitModel].flatMap(m => (m ? [kit(withModel(existing, m))] : []))
   if (generic && !existing.includes(GENERIC)) {
     if (shipped.includes(shippedSha(existing))) return 'update'
     return asKit.some(t => t !== undefined && shipped.includes(shippedSha(t))) ? 'retune' : 'personal'
   }
   if (older.includes(rulesSha(existing))) return 'update'
-  if (kitModel && withModel(existing, kitModel) === bundled) return 'skip'
+  if (kitModel && kit(withModel(existing, kitModel)) === bundled) return 'skip'
   return asKit.some(t => t !== undefined && older.includes(rulesSha(t))) ? 'retune' : 'edited'
+}
+
+/** The bundled role with the user's gear picks (model, Codex model and effort) carried over. */
+function retuned(bundled: string, mine: string): string {
+  const cx = codexOf(mine)
+  const next = withModel(bundled, modelOf(mine)!) ?? bundled
+  return (cx ? withCodex(next, cx.model ?? 'default', cx.effort ?? 'default') : undefined) ?? next
 }
 
 export type SyncResult = { note: string; ready: Record<AiId, boolean>; changed: string[] }
@@ -89,7 +113,7 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
   const targets = [['claude', path.join(o.home, '.claude', 'CLAUDE.md')], ['codex', path.join(o.home, '.codex', 'AGENTS.md')]] as const
   for (const [tool, file] of targets) {
     if (!fs.existsSync(path.dirname(file))) continue
-    const d = decideRules(read(file), rules, bundle.rulesVersion, bundle.generic, shipped)
+    const d = decideRules(read(file), rules, bundle.rulesVersion, bundle.generic, shipped, tool === 'codex' ? CODEX_MAP : '')
     if (d.why === 'personal copy') personal.push(path.basename(file))
     if (d.why === 'block broken') { broken.push(path.basename(file)); continue }
     try {
@@ -109,7 +133,7 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
         const act = decideAgent(mine, bundled, bundle.history?.[name] ?? [], bundle.generic, shipped)
         if (act === 'personal') personal.push(name)
         if (act === 'install' || act === 'update') { put(dest, bundled); changed.push(`${name} (${act === 'install' ? 'added' : 'updated'})`) }
-        else if (act === 'retune') { put(dest, withModel(bundled, modelOf(mine!)!) ?? bundled); changed.push(`${name} (updated, your model kept)`) }
+        else if (act === 'retune') { put(dest, retuned(bundled, mine!)); changed.push(`${name} (updated, your model kept)`) }
         else if (act === 'edited') {
           edited.push(name)
           // Claude Code reads only *.md, so the new copy sits beside the edited one unused.

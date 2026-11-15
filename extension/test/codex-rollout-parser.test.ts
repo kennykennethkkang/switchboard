@@ -17,6 +17,7 @@ import {
   createCodexRolloutState,
   type CodexParserDelegate,
 } from '../src/codex-rollout-parser'
+import { closingApprove } from '../src/hub/approve'
 import type { AgentEvent } from '../src/protocol'
 
 /** Run the sample fixture through the parser, returning all emitted events
@@ -144,7 +145,7 @@ describe('CodexRolloutParser', () => {
     const { events } = runFixture()
     const updates = events.filter(e => e.type === 'context_update')
     const authoritative = updates.filter(e => e.payload.isAuthoritative === true)
-    // Exactly one context_update carries the flag — the one emitted directly
+    // Exactly one context_update carries the flag: the one emitted directly
     // from handleTokenCount. The UI uses this to smooth the estimate→authority
     // transition instead of jumping.
     assert.equal(authoritative.length, 1)
@@ -258,7 +259,7 @@ describe('CodexRolloutParser', () => {
         role: 'tool',
         content: [{ type: 'output_text', text: `tool result ${i} `.repeat(20) }],
       })
-      // Noise the handler should ignore — neither user nor tool.
+      // Noise the handler should ignore: neither user nor tool.
       replacement_history.push({ role: 'assistant', content: [{ type: 'output_text', text: 'ignored' }] })
     }
 
@@ -272,5 +273,65 @@ describe('CodexRolloutParser', () => {
     // Sanity: the bucketed counts are finite and not NaN.
     assert.ok(Number.isFinite(state.contextBreakdown.userMessages))
     assert.ok(Number.isFinite(state.contextBreakdown.toolResults))
+  })
+})
+
+describe('CodexRolloutParser rate limits', () => {
+  const line = (rl: unknown) => JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: null, rate_limits: rl } })
+  const run = (l: string) => {
+    const got: { kind: string; percentUsed: number; resetsAt?: string }[][] = []
+    const parser = new CodexRolloutParser({ emit: () => {}, elapsed: () => 0, limits: x => got.push(x) })
+    parser.processLine(l, createCodexRolloutState())
+    return got
+  }
+
+  it('maps windows by window_minutes to codex kinds', () => {
+    const got = run(line({ limit_id: 'codex', primary: { used_percent: 40, window_minutes: 300, resets_at: 1794494830 }, secondary: { used_percent: 6, window_minutes: 10080, resets_at: 1795081630 } }))
+    assert.deepEqual(got, [[
+      { kind: 'codex_five_hour', percentUsed: 40, resetsAt: '1794494830' },
+      { kind: 'codex_seven_day', percentUsed: 6, resetsAt: '1795081630' },
+    ]])
+  })
+
+  it('ignores token_count lines without rate_limits', () => {
+    assert.deepEqual(run(line(undefined)), [])
+  })
+
+  it('hands a request_user_input call and its answers to the delegate once the output arrives', () => {
+    const got: { input: Record<string, unknown>; response: unknown }[] = []
+    const parser = new CodexRolloutParser({ emit: () => {}, elapsed: () => 0, answered: (input, response) => got.push({ input, response }) })
+    const state = createCodexRolloutState()
+    const q = { id: 'q1', question: 'Approve this chat as finished?', options: [{ label: 'Approve' }, { label: 'Send back' }] }
+    const line = (payload: object) => JSON.stringify({ type: 'response_item', payload })
+    parser.processLine(line({ type: 'function_call', name: 'request_user_input', call_id: 'c1', arguments: JSON.stringify({ questions: [q] }) }), state)
+    assert.equal(got.length, 0)
+    parser.processLine(line({ type: 'function_call_output', call_id: 'c1', output: JSON.stringify({ answers: { q1: { answers: ['Approve'] } } }) }), state)
+    assert.equal(got.length, 1)
+    assert.deepEqual(got[0].input, { questions: [q] })
+    assert.deepEqual(got[0].response, { answers: { q1: { answers: ['Approve'] } } })
+    // a plain tool never reaches it
+    parser.processLine(line({ type: 'function_call', name: 'exec_command', call_id: 'c2', arguments: '{}' }), state)
+    parser.processLine(line({ type: 'function_call_output', call_id: 'c2', output: '{}' }), state)
+    assert.equal(got.length, 1)
+  })
+  it('reads the closing answer out of a code mode exec call and its printed output', () => {
+    const got: { input: Record<string, unknown>; response: unknown }[] = []
+    const parser = new CodexRolloutParser({ emit: () => {}, elapsed: () => 0, answered: (input, response) => got.push({ input, response }) })
+    const state = createCodexRolloutState()
+    const line = (payload: object) => JSON.stringify({ type: 'response_item', payload })
+    const js = 'const r = await tools.request_user_input({questions:[{id:"done",question:"Approve this chat as finished?"}]}); text(JSON.stringify(r))'
+    const out = (text: string) => ({ type: 'custom_tool_call_output', call_id: 'e1', output: [{ type: 'input_text', text: 'Script completed\nOutput:\n' }, { type: 'input_text', text }] })
+    parser.processLine(line({ type: 'custom_tool_call', name: 'exec', call_id: 'e1', input: js }), state)
+    parser.processLine(line(out('{"answers":{"done":{"answers":["Send back"]}}}')), state)
+    assert.equal(got.length, 1)
+    assert.equal(closingApprove({ hook_event_name: 'PostToolUse', tool_name: 'request_user_input', tool_input: got[0].input, tool_response: got[0].response }), false)
+    parser.processLine(line({ type: 'custom_tool_call', name: 'exec', call_id: 'e1', input: js }), state)
+    parser.processLine(line(out('{"answers":{"done":{"answers":["Approve"]}}}')), state)
+    assert.equal(got.length, 2)
+    assert.equal(closingApprove({ hook_event_name: 'PostToolUse', tool_name: 'request_user_input', tool_input: got[1].input, tool_response: got[1].response }), true)
+    // an unrelated exec stays quiet
+    parser.processLine(line({ type: 'custom_tool_call', name: 'exec', call_id: 'e2', input: 'text("hi")' }), state)
+    parser.processLine(line({ type: 'custom_tool_call_output', call_id: 'e2', output: [{ type: 'input_text', text: '{"answers":{"x":{"answers":["Approve"]}}}' }] }), state)
+    assert.equal(got.length, 2)
   })
 })

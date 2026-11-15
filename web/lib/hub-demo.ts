@@ -5,6 +5,7 @@
 import type { HubCommand } from './vscode-bridge'
 import { runIds } from './todo'
 import { projectName, splitVersion } from './archive'
+import { looksMulti } from './split-plan'
 import type { ChangedFile, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, TodoList, ToolCall } from './hub-types'
 import type { RunCall, RunDetail } from './runs'
 import type { ChatAnswer, ChatAsk, ChatMessage, ChatOutputs } from './chat-view'
@@ -76,7 +77,7 @@ function baseHub(now: number): HubState {
     ...emptyHub(),
     controls: {
       claude: { model: 'opus', tui: 'fullscreen', statusLine: false, push: true, needInput: true },
-      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '' },
+      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '', advancedMode: { '/Users/k/Documents/GitHub/Armasu': true } },
       statusLineReady: true,
     },
     uploads: {
@@ -86,6 +87,27 @@ function baseHub(now: number): HubState {
       ] },
       switchboard: { count: 1, last: [{ name: 'court-sketch.jpg', at: now - 26 * 3600e3, size: '1.2 MB', chat: 'Hub AIs and starred' }] },
     },
+    snapshots: [
+      { id: 's2', label: 'before undo', at: now - 12 * 60e3, paths: ['rules.md'] },
+      { id: 's1', label: 'aar: rules and memory', at: now - 3 * 3600e3, paths: ['rules.md', 'agents/qa.md', 'memory/MEMORY.md'], chat: 'd-work' },
+    ],
+    health: { busy: false, at: now - 5 * 60e3, results: [
+      { id: 'hook', label: 'Hook server answers', status: 'ok', fixable: false },
+      { id: 'kit', label: 'Kit version matches', status: 'warn', detail: '0.21.4 installed, 0.21.5 shipped', fixable: true },
+      { id: 'codex', label: 'Codex CLI on PATH', status: 'fail', detail: 'not found', fixable: false },
+    ] },
+    pipelines: [{ slug: 'research-build-qa', name: 'Research, build, QA', stages: 3, savedAt: now - DAY }],
+    trend: { day: '2026-11-13', chats: { value: 6, vsDay: 2, vsWeek: -1 }, costUsd: { value: 12.4, vsDay: -3.1, vsWeek: 0 }, approved: { value: 5, vsDay: 1, vsWeek: 2 }, sentBack: { value: 1, vsDay: 0, vsWeek: -1 } },
+    // Advanced mode in Armasu: one run running, one sent back, one waiting on review.
+    stages: { '/Users/k/Documents/GitHub/Armasu': [
+      { run: 'login-fix', sessionId: 'd-work', at: now - 20 * 60e3, stages: [{ n: 1, name: 'Find the redirect loop', role: 'researcher', status: 'done' }, { n: 2, name: 'Fix the cookie check', role: 'engineer', status: 'doing' }, { n: 3, name: 'Run tests and review', role: 'qa', status: 'todo' }, { n: 4, name: 'Polish the sign-in screen copy and spacing', role: 'designer', status: 'todo' }] },
+      { run: 'picker-copy', sessionId: 'd-ask', at: now - 4 * 60e3, stages: [{ n: 1, name: 'Plan', role: 'researcher', status: 'done' }, { n: 2, name: 'Picker screens', role: 'designer', status: 'redo' }, { n: 3, name: 'Wire up', role: 'engineer', status: 'todo' }] },
+      { run: 'filters', sessionId: 'd-close', at: now - 30 * 60e3, stages: [{ n: 1, name: 'Research', role: 'researcher', status: 'done' }, { n: 2, name: 'Build the size filter', role: 'engineer', status: 'done' }, { n: 3, name: 'Review', role: 'qa', status: 'todo' }] },
+    ] },
+    escalations: { '/Users/k/Documents/GitHub/Armasu': [
+      { project: '/Users/k/Documents/GitHub/Armasu', role: 'qa', from: 'sonnet', to: 'opus', files: ['web/components/switchboard/board.tsx'], reason: 'after 3 redesign rounds', at: now - DAY },
+      { project: '/Users/k/Documents/GitHub/Armasu', role: 'designer', from: 'opus', to: 'fable', files: ['app/closet/picker.css', 'app/closet/picker.tsx'], reason: 'after 3 redesign rounds', at: now - 2 * DAY },
+    ] },
     projects: [
       { name: 'Armasu', path: '/Users/k/Documents/GitHub/Armasu', kind: 'repo', isOpen: true },
       { name: 'Gemini-Test', path: '/Users/k/Documents/GitHub/Gemini-Test', kind: 'repo', isOpen: false },
@@ -99,12 +121,13 @@ function baseHub(now: number): HubState {
     ],
     doneChecks: { 'd-close': { verified: false, missing: ['tests after last edit', 'standup'] } },
     chats: [
-      { pid: 1, sessionId: 'd-work', ai: 'codex', takes: true, name: 'Fix login redirect v4', chain: 'Fix login redirect', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
+      { pid: 1, sessionId: 'd-work', ai: 'codex', takes: true, name: 'Fix login redirect v4', chain: 'Fix login redirect', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [], elapsedMs: 95 * 60e3, costUsd: 3.4, budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' }, checkBack: { everyMin: 30, count: 3 } },
       { pid: 2, sessionId: 'd-done', takes: true, name: 'Hub AIs and Starred', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
       { pid: 3, sessionId: 'd-ask', takes: true, name: 'Outfit picker copy', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
       { pid: 7, sessionId: 'd-close', takes: true, name: 'Search filters', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
-      { pid: 6, sessionId: 'd-almost', takes: true, name: 'Finished receipt', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
-      { pid: 5, sessionId: 'd-wrap', takes: true, name: 'Accurate Done state', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
+      // Started from one split message; d-wrap also waits on d-almost (links).
+      { pid: 6, sessionId: 'd-almost', takes: true, name: 'Finished receipt', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [], group: 'g-demo' },
+      { pid: 5, sessionId: 'd-wrap', takes: true, name: 'Accurate Done state', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [], group: 'g-demo' },
       { pid: 4, sessionId: 'd-idle', name: 'Kit cleanup', cwd: '/Users/k/GitHub/claude-mods', link: '', live: true, why: [] },
     ],
     // Armasu has Jev set up with the AI-tell check off; switchboard has none, so its card offers Set up Jev.
@@ -272,6 +295,7 @@ function baseHub(now: number): HubState {
       { kind: 'skill', name: 'claude-x-jev', enabled: true, description: 'Sorts and scores many items cheaply with Jev.' }, { kind: 'skill', name: 'phone', enabled: true, description: 'Sends a push notification to your phone.' }, { kind: 'skill', name: 'drei', enabled: false },
       { kind: 'role', name: 'researcher', enabled: true, model: 'haiku' }, { kind: 'role', name: 'engineer', enabled: true, model: 'opus' }, { kind: 'role', name: 'qa', enabled: true, model: 'opus' },
       { kind: 'role', name: 'designer', enabled: true, model: 'opus' }, { kind: 'role', name: 'ops', enabled: true, model: 'haiku' }, { kind: 'role', name: 'growth', enabled: true, model: 'sonnet' },
+      { kind: 'role', name: 'qa-codex', enabled: true, model: 'sonnet', codex: true, codexModel: 'gpt-6-luna', codexEffort: 'high' },
       { kind: 'preset', name: 'armasu-copy-check', enabled: true }, { kind: 'preset', name: 'armasu-route-release', enabled: true },
     ],
     connections: [
@@ -490,13 +514,19 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const sessionId = `d-new-${h.chats.length + 1}`, now = Date.now()
       return {
         ...h,
-        chats: [{ pid: 0, sessionId, name, cwd: c.path, link: '', live: true, why: [] }, ...h.chats],
+        chats: [{ pid: 0, sessionId, name, cwd: c.path, link: '', live: true, why: [], takes: true, ...(c.group ? { group: c.group } : {}) }, ...h.chats],
+        ...(c.waitOn?.length ? { links: [...h.links ?? [], { from: sessionId, to: c.waitOn, reason: 'Kenneth picked these in New chat', auto: false, since: now }] } : {}),
         progress: [{ sessionId, cwd: c.path, state: 'working', roles: [], tasks: [], startedAt: now, at: now }, ...h.progress],
         ...(h.tools ? { tools: { ...h.tools, pick: null, chats: { ...h.tools.chats, [sessionId]: c.tools ?? demoPick(h, c.text ?? '') } } } : {}),
       }
     }
     case 'hub-pick-tools': return h.tools ? { ...h, tools: { ...h.tools, pick: { goal: c.text, folder: c.path, profile: demoPick(h, c.text) } } } : h
     case 'hub-chat-tools': return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.tools } } } : h
+    case 'hub-indefinite': {
+      const cur = h.tools?.chats[c.sessionId] ?? { plugins: {}, skills: {} }
+      const { indefinite: _, ...rest } = cur
+      return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.on ? { ...rest, indefinite: Date.now() } : rest } } } : h
+    }
     case 'hub-focus-chat': return h
     case 'hub-terminal': return h
     case 'hub-summary': {
@@ -572,7 +602,19 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const { [w]: _was, ...rest } = h.signIns.projects
       return { ...h, signIns: { ...h.signIns, projects: c.profile === null ? rest : { ...rest, [w]: c.profile } } }
     }
+    case 'hub-advanced': return { ...h, controls: { ...h.controls, switchboard: { ...h.controls.switchboard, advancedMode: { ...h.controls.switchboard.advancedMode, [c.path]: c.on } } } }
+    case 'hub-stage': return { ...h, stages: { ...h.stages, [c.path]: (h.stages?.[c.path] ?? []).map(r => r.run !== c.run ? r : { ...r, stages: r.stages.map(st => {
+      if (st.n === c.n) return { ...st, status: c.status }
+      // Looks good starts the next stage.
+      return c.status === 'done' && st.n === c.n + 1 && st.status === 'todo' ? { ...st, status: 'doing' as const } : st
+    }) }) } }
+    case 'hub-escalation-reset': return { ...h, escalations: { ...h.escalations, [c.project]: (h.escalations?.[c.project] ?? []).filter(e => e.role !== c.role || e.files.join() !== c.files.join()) } }
     case 'hub-role-model': return { ...h, installed: h.installed.map(i => (i.kind === 'role' && i.name === c.role ? { ...i, model: c.model } : i)) }
+    case 'hub-role-codex': return { ...h, installed: h.installed.map(i => {
+      if (i.kind !== 'role' || i.name !== c.role) return i
+      const { codexModel: _m, codexEffort: _e, ...rest } = i
+      return { ...rest, ...(c.model !== 'default' ? { codexModel: c.model } : {}), ...(c.effort !== 'default' ? { codexEffort: c.effort } : {}) }
+    }) }
     case 'hub-aws-delete':
       return { ...h, aws: h.aws.filter(a => a.name !== c.profile) }
     case 'hub-login-app-add': {
@@ -687,6 +729,15 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
 }
 
 /** Where a demo upload says it went, laid out like the real uploads folder. */
+/** The demo's hub-split-result: a multi message comes back as three asks, list items or sentences first. */
+export function demoSplit(text: string): string[] {
+  const t = text.trim()
+  if (!looksMulti(t)) return [t]
+  const items = t.split(/\n+/).map(l => l.replace(/^\s*(?:\d+[.)]|[-*\u2022])\s+/, '').trim()).filter(Boolean)
+  const parts = items.length >= 2 ? items : t.split(/(?<=[.!?])\s+/).map(s => s.replace(/^(?:also|plus|another thing:?|and then)[\s,]*/i, '').trim()).filter(Boolean)
+  return [...parts, 'Check it on a phone', 'Write the tests for it'].slice(0, 3)
+}
+
 export function demoUpload(name: string, cwd: string, now = new Date()): string {
   const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   return `~/.claude/switchboard/uploads/${cwd.split('/').filter(Boolean).pop() ?? 'misc'}/${day}/${name.split(/[/\\]/).pop()}`

@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Tests and reviews the engineer's change: runs the suite, checks the diff for bugs against the task, and reports only verified problems.
-model: opus
+model: sonnet
 disallowedTools: Edit, Write, NotebookEdit, Agent
 maxTurns: 40
 ---

@@ -19,6 +19,8 @@ const link = { font: 'inherit', padding: 0, border: 0, background: 'none', color
  *  tips: what each one does, by name, for the hover title. */
 export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: ChatProfile; flagged: string[]; tips?: Record<string, string>; onChange: (p: ChatProfile) => void }) {
   const [find, setFind] = useState('')
+  // Title tips are hover only; this line shows the focused or tapped chip's tip (layouts b and c).
+  const [tip, setTip] = useState<{ kind: string; text: string }>()
   const order = useRef<LibraryOrder>(undefined)
   const group = (kind: 'plugins' | 'skills' | 'assets', label: string) => {
     const map = profile[kind] ?? {}
@@ -40,9 +42,10 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
           {names.map(n => {
             const on = map[n], warn = kind !== 'assets' && flagged.includes(n)
             const fixed = locked(n)
+            const why = [warn ? `${n}: duplicate, off unless you turn it on` : fixed ? `${n.split('@')[0]}: always on in every chat` : n, tips[n]].filter(Boolean).join('\n')
             return (
               <button key={n} type="button" aria-pressed={on} aria-disabled={fixed || undefined} style={{ ...chip(on, warn), ...(fixed ? { cursor: 'default' } : {}) }}
-                title={[warn ? `${n}: duplicate, off unless you turn it on` : fixed ? `${n.split('@')[0]}: always on in every chat` : n, tips[n]].filter(Boolean).join('\n')}
+                title={why} onFocus={() => setTip({ kind, text: why })} onPointerDown={() => setTip({ kind, text: why })}
                 onClick={() => { if (!fixed) onChange({ ...profile, [kind]: { ...map, [n]: !on } }) }}>
                 {warn && <span aria-label="flagged" style={{ color: 'var(--hub-yellow)' }}>!</span>}
                 {kind === 'plugins' ? n.split('@')[0] : n}
@@ -50,6 +53,7 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
             )
           })}
         </div>
+        <p className="tool-tip-line" aria-live="polite">{tip?.kind === kind ? tip.text : ''}</p>
       </div>
     )
   }

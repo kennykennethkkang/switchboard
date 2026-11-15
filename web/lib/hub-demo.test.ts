@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { demoApply, demoChat, demoFx, demoHub, demoRunDetails, demoTick, demoUpload } from './hub-demo'
+import { demoApply, demoChat, demoFx, demoHub, demoRunDetails, demoSplit, demoTick, demoUpload } from './hub-demo'
 
 test('a demo New chat puts a working chat on top, named from the goal', () => {
   const h = demoApply(demoHub(), { type: 'hub-new-chat', path: '/Users/k/Documents/GitHub/Armasu', text: 'fix the closet door animation on settings page', remote: false })
@@ -104,6 +104,18 @@ test('a demo role model pick changes only that role', () => {
   const h = demoApply(demoHub(0), { type: 'hub-role-model', role: 'ops', model: 'haiku' })
   assert.equal(h.installed.find(i => i.name === 'ops')?.model, 'haiku')
   assert.equal(h.installed.find(i => i.name === 'qa')?.model, 'opus')
+})
+
+test('a demo Codex pick sets model and effort, default clears them', () => {
+  let h = demoHub(0)
+  assert.equal(h.installed.find(i => i.name === 'qa-codex')?.kind, 'role')
+  h = demoApply(h, { type: 'hub-role-codex', role: 'qa-codex', model: 'gpt-5.6-terra', effort: 'xhigh' })
+  const r = h.installed.find(i => i.name === 'qa-codex')
+  assert.equal(r?.codexModel, 'gpt-5.6-terra')
+  assert.equal(r?.codexEffort, 'xhigh')
+  assert.equal(r?.model, 'sonnet')
+  h = demoApply(h, { type: 'hub-role-codex', role: 'qa-codex', model: 'default', effort: 'default' })
+  assert.equal(h.installed.find(i => i.name === 'qa-codex')?.codexModel, undefined)
 })
 
 test('the demo shows a dev row per project, and Dev, Stop and Keep awake change it', () => {
@@ -309,4 +321,20 @@ test('demo Write commit message is busy, then fills a draft; a commit moves HEAD
   assert.equal(c.repo!.draft, undefined)
   assert.notEqual(c.repo!.log[0].hash, h.repo!.log[0].hash)
   assert.equal(c.repo!.log[0].subject, summary)
+})
+
+test('demo: split answers three asks for a multi message, one for a single', () => {
+  assert.equal(demoSplit('1. fix the login loop\n2. add dark mode\n3. new footer').length, 3)
+  assert.equal(demoSplit('Fix the login loop. Also add dark mode.').length, 3)
+  assert.deepEqual(demoSplit('fix the login loop'), ['fix the login loop'])
+})
+
+test('demo: two chats share a group, one waits on another, new chats keep group and waits', () => {
+  const h = demoHub()
+  const grouped = h.chats.filter(c => c.group)
+  assert.ok(grouped.length >= 2 && grouped.every(c => c.group === grouped[0].group))
+  assert.ok(h.links?.some(l => grouped.some(c => c.sessionId === l.from) && l.to.some(t => grouped.some(c => c.sessionId === t))))
+  const n = demoApply(h, { type: 'hub-new-chat', path: '/g/app', text: 'add dark mode', remote: false, group: 'g-x', waitOn: ['d-work'] } as Parameters<typeof demoApply>[1])
+  assert.equal(n.chats[0].group, 'g-x')
+  assert.ok(n.links?.some(l => l.from === n.chats[0].sessionId && l.to.includes('d-work')))
 })

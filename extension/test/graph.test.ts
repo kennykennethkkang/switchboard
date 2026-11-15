@@ -171,6 +171,21 @@ describe('readGraph skips what is not a plain memory note', () => {
     fs.rmSync(h, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true })
   })
 
+  it('reads memory/archive as archived notes, but not a symlinked archive folder', async () => {
+    const { h, mem } = home()
+    fs.mkdirSync(path.join(mem, 'archive'))
+    fs.writeFileSync(path.join(mem, 'archive', 'old.md'), '---\nname: old\n---\nhistory')
+    const g = await readGraph(state(), h)
+    assert.equal(g.nodes.find(n => n.label === 'old')!.superseded, true)
+    assert.deepEqual(g.health.orphans, [g.nodes.find(n => n.label === 'armasu-logo')!.id])
+    fs.rmSync(path.join(mem, 'archive'), { recursive: true })
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-'))
+    fs.writeFileSync(path.join(outside, 'secret.md'), '---\nname: secret\n---\nnot a memory')
+    fs.symlinkSync(outside, path.join(mem, 'archive'))
+    assert.deepEqual(await memories(h), ['armasu-logo'])
+    fs.rmSync(h, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true })
+  })
+
   it('cuts a long description to 300 characters', () => {
     const g = buildGraph(state(), [{ dir: 'd', file: 'a.md', text: `---\nname: a\ndescription: ${'y'.repeat(900)}\n---\nx` }], [])
     assert.ok(g.nodes.find(n => n.label === 'a')!.description!.length <= 303)
@@ -396,6 +411,29 @@ describe('the knowledge graph', () => {
     assert.deepEqual(h.dangling, [])
     assert.deepEqual(buildGraph(state(), [note('a', 'part-of: nowhere\n')], []).health.dangling, [`memory:${dir}/a`])
     assert.deepEqual(buildGraph(state(), [note('a', 'part-of: nowhere\n')], []).nodes[0].missing, ['nowhere'])
+  })
+
+  it('reports supersede loops as id groups', () => {
+    const loop = buildGraph(state(), [note('a', 'supersedes: b\n'), note('b', 'supersedes: c\n'), note('c', 'supersedes: a\n'), note('d', 'supersedes: a\n')], [])
+    assert.deepEqual(loop.health.loops, [['a', 'b', 'c'].map(x => `memory:${dir}/${x}`)])
+    assert.deepEqual(buildGraph(state(), [note('a', 'supersedes: b\n'), note('b', '')], []).health.loops, [])
+  })
+
+  it('keeps an archived note linkable and superseded, but out of every health list', () => {
+    const old = { ...note('old', 'type: project\n'), archived: true, mtime: 0 }
+    const b = buildGraph(state(), [note('new', 'supersedes: old\n'), old, note('b', '', 'see [[old]] and [[new]]')], [])
+    assert.equal(b.nodes.find(x => x.label === 'old')!.superseded, true)
+    assert.ok(b.edges.some(e => e.target === `memory:${dir}/archive/old` && e.kind === 'link'))
+    assert.deepEqual([b.health.superseded, b.health.dangling, b.health.orphans, b.health.stale], [[], [], [], []])
+    // History says nothing about live notes: an archived note's supersedes and contradicts are dropped.
+    const said = buildGraph(state(), [{ ...note('gone', 'supersedes: live\ncontradicts: live\n'), archived: true }, note('live', '', '[[gone]]')], [])
+    assert.equal(said.nodes.find(x => x.label === 'live')!.superseded, undefined)
+    assert.deepEqual([said.health.superseded, said.health.contradictions], [[], []])
+    // An archived note sharing a live note's name loses to it and is no clash.
+    const twin = buildGraph(state(), [{ ...note('new', '', 'old text'), archived: true }, note('new', '', 'live'), note('c', '', '[[new]]')], [])
+    assert.deepEqual(twin.health.duplicates, [])
+    assert.match(twin.nodes.find(x => x.id === `memory:${dir}/new`)!.text!, /live/)
+    assert.ok(twin.edges.some(e => e.source === `memory:${dir}/c` && e.target === `memory:${dir}/new`))
   })
 
   it('recalls the best seeds, their relations within the hops, and skips superseded notes', () => {

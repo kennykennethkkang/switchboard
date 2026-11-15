@@ -62,7 +62,9 @@ function usePhoneMic(want: boolean, heard: (text: string) => void) {
     let stream: MediaStream
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }) } catch (err) { setNote(`Could not open the mic (${(err as Error).message}).`); return }
     const mimeType = pickMime(m => MediaRecorder.isTypeSupported(m))
-    const r = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+    let r: MediaRecorder
+    // A throw here would leave the mic on.
+    try { r = new MediaRecorder(stream, mimeType ? { mimeType } : undefined) } catch (err) { stream.getTracks().forEach(t => t.stop()); setNote(`Could not record (${(err as Error).message}).`); return }
     const parts: Blob[] = []
     const cap = setTimeout(() => r.state !== 'inactive' && r.stop(), PHONE_MAX_MS)
     r.ondataavailable = e => { if (e.data.size) parts.push(e.data) }
@@ -77,8 +79,8 @@ function usePhoneMic(want: boolean, heard: (text: string) => void) {
       if ('text' in out) heard(out.text)
       else setNote(out.problem)
     }
+    try { r.start() } catch (err) { clearTimeout(cap); stream.getTracks().forEach(t => t.stop()); setNote(`Could not record (${(err as Error).message}).`); return }
     rec.current = r
-    r.start()
     setState('listening')
   }
   return { can: kind !== 'none', state, note, tap: () => void tap() }

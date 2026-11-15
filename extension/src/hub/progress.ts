@@ -7,7 +7,7 @@ import { createHash } from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 import { foldPathCase } from '../fs-utils'
-import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, Helper, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall } from './types'
+import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, DailyTrend, Helper, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall, TrendValue } from './types'
 
 type Payload = Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -635,6 +635,10 @@ export const almostDone = (p: ChatProgress) => p.state === 'done' && missed(p).l
 /** What a notification says; the same key twice in a row for one chat is shown once. Almost done and finished differ, so finishing notifies again. */
 export const notifyKey = (p: ChatProgress) => `${almostDone(p) ? `almost ${missed(p).length}` : p.state}\n${(p.state === 'done' ? p.commit : p.question) ?? ''}`
 /** A done chat's notification line. */
+/** Toast text when Run indefinitely ends: usage and reason from the mod, when it sent them. */
+export const indefiniteText = (title: string, usage?: string, reason?: string) =>
+  `Switchboard: ${title}: Run indefinitely finished${reason ? `: ${reason}` : ''}.${usage ? ` ${usage[0].toUpperCase()}${usage.slice(1)}.` : ''}`
+
 export const doneText = (p: ChatProgress) => missed(p).length
   ? `almost done, ${missed(p).length} of your requests not covered: ${missed(p)[0]}`
   : `finished${p.tasks.length ? `, all ${p.tasks.length} task${p.tasks.length === 1 ? '' : 's'} done` : ''}${p.report?.left.length ? `, ${p.report.left.length} suggested for the to-do` : ''}${p.report?.you?.length ? `, ${p.report.you.length} for you` : ''}`
@@ -652,11 +656,12 @@ export const canPrefill = (current: string, lastWritten: string | undefined) => 
 /** A Source Control box Switchboard filled: its text, and each chat's message in it, oldest first. */
 export type Box = { text: string; by: [string, string][] }
 
-/** The box after session's message: undefined over Kenneth's text, fresh when a commit emptied it, else every chat's message
- * merged, newest summary on top; a chat that finishes again swaps out its own earlier message. */
-export function fillBox(current: string, box: Box | undefined, session: string, message: string): Box | undefined {
-  if (!canPrefill(current, box?.text)) return undefined
-  const by: [string, string][] = [...(current.trim() ? box?.by ?? [] : []).filter(([s]) => s !== session), [session, message]]
+/** The box after session's message: fresh when a commit emptied it, else every chat's message merged, newest summary on top;
+ * a chat that finishes again swaps out its own earlier message. Text Switchboard did not write (Kenneth's, or a box from
+ * before a reload) stays as the oldest part. */
+export function fillBox(current: string, box: Box | undefined, session: string, message: string): Box {
+  const before: [string, string][] = !current.trim() ? [] : canPrefill(current, box?.text) ? box?.by ?? [] : [['box', current]]
+  const by: [string, string][] = [...before.filter(([s]) => s !== session), [session, message]]
   return { text: by.map(([, m]) => m).reduce((acc, m) => mergeCommit(acc, m)), by }
 }
 
@@ -729,7 +734,6 @@ export function fillRepos(repos: { rootUri: { fsPath: string }; inputBox: { valu
     addPending(root, p.sessionId, message)
     const repo = repos.find(r => r.rootUri.fsPath === root)!
     const box = fillBox(repo.inputBox.value, boxes.get(root), p.sessionId, message)
-    if (!box) continue
     repo.inputBox.value = box.text
     boxes.set(root, box)
   }
@@ -747,6 +751,18 @@ export function todayText(all: ChatProgress[], name: (p: ChatProgress) => string
   if (!almost.length && !done.length && !you.length) return undefined
   const names = (ps: ChatProgress[]) => ps.length ? `: ${ps.slice(0, 3).map(name).join(', ')}${ps.length > 3 ? ` and ${ps.length - 3} more` : ''}` : ''
   return [`${done.length} finished`, `${almost.length} almost done${names(almost)}`, `${you.length} need you${names(you)}`].join('; ')
+}
+
+const arrow = (n: number | undefined, vs: string) => (n === undefined ? '' : `${n > 0 ? '\u2191' : n < 0 ? '\u2193' : '='}${n ? Math.abs(Math.round(n * 100) / 100) : ''} vs ${vs}`)
+const trendPart = (label: string, v: TrendValue, fmt: (n: number) => string = String) => {
+  const d = [arrow(v.vsDay, 'day before'), arrow(v.vsWeek, 'last week')].filter(Boolean).join(', ')
+  return `${fmt(v.value)} ${label}${d ? ` (${d})` : ''}`
+}
+/** Yesterday's numbers with an arrow against the day before and the same weekday last week; empty when nothing ran. */
+export function trendText(t: DailyTrend): string {
+  if (!t.chats.value && !t.approved.value && !t.sentBack.value) return ''
+  const parts = [trendPart('chats', t.chats), t.costUsd.value ? trendPart('spent', t.costUsd, n => `$${n.toFixed(2)}`) : '', trendPart('approved', t.approved), trendPart('sent back', t.sentBack)]
+  return `Yesterday: ${parts.filter(Boolean).join('; ')}`
 }
 
 /** Whether version a (x.y.z) is past b; claude-runtime.ts reloads a window for it. */export const newerVersion = (a: string, b: string) => {

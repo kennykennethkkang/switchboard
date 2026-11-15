@@ -191,6 +191,7 @@ describe('ask install', () => {
     fs.mkdirSync(from); fs.mkdirSync(home)
     fs.writeFileSync(path.join(from, 'ask-core.mjs'), 'core')
     fs.writeFileSync(path.join(from, 'ask-server.mjs'), 'server')
+    fs.writeFileSync(path.join(from, 'chats.mjs'), 'chats')
     const added: string[] = []
     const server = installAsk(from, home, s => added.push(s))
     assert.equal(server, path.join(home, '.claude', 'switchboard', 'ask', 'ask-server.mjs'))

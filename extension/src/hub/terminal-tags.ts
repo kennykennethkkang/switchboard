@@ -11,6 +11,8 @@ type Term = { name: string; exitStatus?: unknown; dispose(): void }
 // prefix: the AI's name in front of the chat's ("Claude"); named: the last name we gave it, VS Code may lag.
 // at: when this window first saw it, so a chat resumed after its approval keeps the new terminal.
 type Tag = { id: number; owner: 'switchboard' | 'user'; sessionId?: string; prefix?: string; named?: string; at: number }
+/** What a chat terminal needs to survive a window reload, saved by its shell pid (the pty outlives the extension host). */
+export type TermMemo = { sessionId: string; at: number }
 
 // Chat terminals are named `<AI>: <chat>` (actions.ts); AIS names include "Claude Code".
 export const CHAT_PREFIX = /^(Claude Code|Claude|Codex|Hermes): /
@@ -25,15 +27,26 @@ export class TerminalTags<T extends Term> {
   private next = 1
   constructor(private now: () => number = Date.now) {}
 
-  own(t: T, prefix?: string, sessionId?: string): void {
-    this.tags.set(t, { id: this.next++, owner: 'switchboard', prefix, sessionId, named: t.name, at: this.now() })
+  own(t: T, prefix?: string, sessionId?: string, at = this.now()): void {
+    this.tags.set(t, { id: this.next++, owner: 'switchboard', prefix, sessionId, named: t.name, at })
   }
 
-  /** onDidOpenTerminal or a terminal there at startup; ours: it carries our icon (restored after a reload). */
-  seen(t: T, ours = false): void {
+  /** onDidOpenTerminal or a terminal there at startup; ours: it carries our icon (restored after a reload).
+   * memo: its chat and first-seen time from before the reload, else Approve skips it as opened after the approval. */
+  seen(t: T, ours = false, memo?: TermMemo): void {
     if (this.tags.has(t)) return
-    if (ours) this.own(t, CHAT_PREFIX.exec(t.name)?.[1])
+    if (ours) this.own(t, CHAT_PREFIX.exec(t.name)?.[1], memo?.sessionId, memo?.at)
     else this.tags.set(t, { id: this.next++, owner: 'user', at: this.now() })
+  }
+
+  /** A revived terminal tagged user because its name and icon came back after the open event (the warning-icon ones). */
+  claim(t: T, memo?: TermMemo): void {
+    const tag = this.tags.get(t)
+    if (tag?.owner !== 'user') return
+    tag.owner = 'switchboard'
+    tag.prefix = CHAT_PREFIX.exec(t.name)?.[1]
+    tag.named = t.name
+    if (memo && (!tag.sessionId || tag.sessionId === memo.sessionId)) { tag.sessionId = memo.sessionId; tag.at = memo.at }
   }
 
   gone(t: T): void {
@@ -42,12 +55,22 @@ export class TerminalTags<T extends Term> {
     this.tags.delete(t)
   }
 
+  /** Our terminals tied to a chat, to save across a reload. */
+  memo(): [T, TermMemo][] {
+    return [...this.tags].flatMap(([t, tag]) => tag.owner === 'switchboard' && tag.sessionId ? [[t, { sessionId: tag.sessionId, at: tag.at }] as [T, TermMemo]] : [])
+  }
+
   ownerOf(t: T) { return this.tags.get(t)?.owner }
   find(id: number) { return [...this.tags].find(([, tag]) => tag.id === id)?.[0] }
   /** The chat's terminal, ours first. */
   of(sessionId: string) {
     const all = [...this.tags].filter(([, tag]) => tag.sessionId === sessionId)
     return (all.find(([, tag]) => tag.owner === 'switchboard') ?? all[0])?.[0]
+  }
+
+  /** The chat's Switchboard terminal only; after a reload the memo is all that ties a Codex chat to one. */
+  ourOf(sessionId: string) {
+    return [...this.tags].find(([, tag]) => tag.owner === 'switchboard' && tag.sessionId === sessionId)?.[0]
   }
 
   /** Ties an unbound terminal to its chat. A user terminal only shows which chat runs in it; it stays the user's. */
@@ -60,9 +83,14 @@ export class TerminalTags<T extends Term> {
   /** Live chats found in a terminal by pid (ais.chatTerminal). */
   async bindLive(chats: ChatRow[], locate: (pid: number) => Promise<T | undefined>): Promise<void> {
     const bound = new Set([...this.tags.values()].map(t => t.sessionId))
+    const live = new Set(chats.filter(c => c.live).map(c => c.sessionId))
     for (const c of chats.filter(c => c.live && c.pid && !bound.has(c.sessionId))) {
       const t = await locate(c.pid)
-      if (t) this.host(t, c.sessionId)
+      if (!t) continue
+      // A new chat started in a terminal whose old one ended (a reload memo keeps the old tie): it is the new chat's now.
+      const tag = this.tags.get(t)
+      if (tag?.sessionId && !live.has(tag.sessionId)) { tag.sessionId = undefined; tag.at = this.now() }
+      this.host(t, c.sessionId)
     }
   }
 

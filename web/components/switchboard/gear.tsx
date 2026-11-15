@@ -8,13 +8,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
 import { editorName } from '@/lib/editor'
-import { gearRows, keywordHit, sweepBadge } from '@/lib/gear-rows'
+import { benchPrompt, gearRows, keywordHit, sweepBadge, sweptNow } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
 import { Credits } from './credits'
+import { Health } from './health'
 import { SpendLimits } from './spend-limits'
 import { PhoneAlerts, phoneAlertsShown } from './phone-alerts'
 import { label } from './look'
+import { ADVANCED_HINT } from './stages'
+import { advancedRows, raiseLine, raisesFor } from '@/lib/stages-ui'
 import './gear.css'
 
 export function Switch({ on, onChange, label, text }: { on: boolean; onChange: (next: boolean) => void; label: string; text?: string }) {
@@ -37,12 +40,17 @@ export function Pick({ options, value, onChange, label, muted }: { options: Arra
 const MODELS: Array<[string, string]> = [['default', 'Default'], ['fable', 'Fable'], ['opus', 'Opus'], ['sonnet', 'Sonnet'], ['haiku', 'Haiku']]
 const ROLE_MODELS: Array<[RoleModel, string]> = [['fable', 'Fable'], ['opus', 'Opus'], ['sonnet', 'Sonnet'], ['haiku', 'Haiku']]
 type RoleModel = Extract<HubCommand, { type: 'hub-role-model' }>['model']
+type CodexModel = Extract<HubCommand, { type: 'hub-role-codex' }>['model']
+type CodexEffort = Extract<HubCommand, { type: 'hub-role-codex' }>['effort']
+const CODEX_MODELS: Array<[string, string]> = [['default', 'Default (config.toml)'], ['gpt-6-luna', 'gpt-6-luna'], ['gpt-5.6-terra', 'gpt-5.6-terra'], ['gpt-5.6-luna', 'gpt-5.6-luna']]
+const CODEX_EFFORTS: Array<[string, string]> = [['default', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const EFFORTS: Array<[string, string]> = [['default', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const IDLE: Array<[string, string]> = [['5', 'After 5 min'], ['15', 'After 15 min'], ['30', 'After 30 min'], ['60', 'After 1 h'], ['never', 'Never']]
 
 const SECTIONS = ['Chats', 'Models', 'Accounts', 'Integrations', 'Installed'] as const
 export type Section = typeof SECTIONS[number]
-type Row = { label: string; control: ReactNode; hint?: string; section: Section }
+// group: rows the panel sets apart under their own heading.
+type Row = { label: string; control: ReactNode; hint?: string; section: Section; group?: 'advanced' }
 
 function Line({ row }: { row: Row }) {
   // A switch or a pick saves at once, so the row says so for a moment.
@@ -74,8 +82,9 @@ function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) 
   const s = hub.sweep
   const busy = !!s?.busy
   const ok = REPO.test(repo.trim())
-  const flagged = Object.entries(s?.tools ?? {}).filter(([, r]) => sweepBadge(r) === 'Review').sort(([a], [b]) => a.localeCompare(b))
-  const count = (b: string) => Object.values(s?.tools ?? {}).filter(r => sweepBadge(r) === b).length
+  const now = sweptNow(hub)
+  const flagged = now.filter(([, r]) => sweepBadge(r) === 'Review').sort(([a], [b]) => a.localeCompare(b))
+  const count = (b: string) => now.filter(([, r]) => sweepBadge(r) === b).length
   const add = () => { if (ok && !busy) { send({ type: 'hub-tool-add', repo: repo.trim() }); setRepo('') } }
   return (
     <>
@@ -107,7 +116,7 @@ function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) 
   )
 }
 
-export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number } | null; start?: Section }) {
+export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: HubState; send: (c: HubCommand) => void; problem?: { text: string; at: number; for?: HubCommand } | null; start?: Section; folder?: string }) {
   const ed = editorName(hub)
   const [q, setQ] = useState('')
   const [at, setAt] = useState<Section>(start)
@@ -118,6 +127,14 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
   const query = q.trim().toLowerCase()
   const lead = c.model ?? 'default'
   const alerts = phoneAlertsShown()
+  const smart = sb.smartModelSwitch !== false
+  const raises = smart ? raisesFor(hub, folder) : {}
+  const adv = advancedRows(hub, folder)
+  const advSwitch = (r: typeof adv[number]) => <Switch label={`Advanced mode in ${r.name}`} on={r.on} onChange={on => send({ type: 'hub-advanced', path: r.path, on })} />
+  // One project: a single row. Several: a heading and a switch each.
+  const advanced: Row[] = adv.length === 1
+    ? [{ section: 'Chats', label: `Advanced mode in ${adv[0].name}`, hint: ADVANCED_HINT, control: advSwitch(adv[0]) }]
+    : adv.map(r => ({ section: 'Chats' as const, group: 'advanced' as const, label: r.name, control: advSwitch(r) }))
 
   const rows: Row[] = [
     { section: 'Chats', label: 'Your name', hint: 'Chats call you by this name. Leave it empty to skip it.',
@@ -173,20 +190,44 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
       control: alerts === 'switch' ? <PhoneAlerts /> : null }] : []),
     { section: 'Chats', label: 'Keep phone access in Apple Notes', hint: 'One private note, "Switchboard access", with the code and links; updated when they change. Off stops updates.',
       control: <Switch label="Keep phone access in Apple Notes" on={sb.accessNote} onChange={next => own('accessNote', next)} /> },
+    ...advanced,
     { section: 'Chats', label: 'Notify when a chat needs input', hint: 'When a chat stops to ask you something.', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
 
     { section: 'Models', label: 'Lead model', hint: 'The main chat, and every role set to Inherit.',
       control: <Pick label="Lead model" options={MODELS} value={lead} onChange={v => set('model', v === 'default' ? null : v)} /> },
     { section: 'Models', label: 'Lead effort', hint: 'The main chat, and every role set to Inherit.',
       control: <Pick label="Lead effort" options={EFFORTS} value={c.effortLevel ?? 'default'} onChange={v => set('effortLevel', v === 'default' ? null : v)} /> },
+    { section: 'Models', label: 'Codex chat model', hint: 'New and resumed Codex chats. Default leaves it to ~/.codex/config.toml.',
+      control: <Pick label="Codex chat model" options={CODEX_MODELS} value={sb.codexModel ?? 'default'} muted={!sb.codexModel} onChange={v => own('codexModel', v === 'default' ? null : v)} /> },
+    { section: 'Models', label: 'Codex chat effort', hint: 'New and resumed Codex chats. Default leaves it to ~/.codex/config.toml.',
+      control: <Pick label="Codex chat effort" options={CODEX_EFFORTS} value={sb.codexEffort ?? 'default'} muted={!sb.codexEffort} onChange={v => own('codexEffort', v === 'default' ? null : v)} /> },
+    { section: 'Models', label: 'Smart model switch', hint: 'When a role keeps redoing the same part, its next run there gets the next model up. Debugging never counts. Off keeps each role on its own model.',
+      control: <Switch label="Smart model switch" on={smart} onChange={next => own('smartModelSwitch', next)} /> },
     ...hub.installed.filter(i => i.kind === 'role').map((r): Row => {
+      if (r.codex) {
+        const model = r.codexModel ?? 'default'
+        const effort = r.codexEffort ?? 'default'
+        const options = CODEX_MODELS.some(o => o[0] === model) ? CODEX_MODELS : [...CODEX_MODELS, [model, model] as [string, string]]
+        const pick = (m: string, e: string) => send({ type: 'hub-role-codex', role: r.name, model: m as CodexModel, effort: e as CodexEffort })
+        return { section: 'Models', label: r.name, hint: 'Runs on Codex; the Claude relay stays on Sonnet.',
+          control: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Pick label={`${r.name} Codex model`} options={options} value={model} muted={model === 'default'} onChange={v => { if (v !== model) pick(v, effort) }} />
+            <Pick label={`${r.name} Codex effort`} options={CODEX_EFFORTS} value={effort} muted={effort === 'default'} onChange={v => { if (v !== effort) pick(model, v) }} />
+          </span> }
+      }
       const value = r.model && r.model !== 'inherit' ? r.model : 'inherit'
       const options: Array<[string, string]> = [['inherit', `Inherit (${lead})`], ...ROLE_MODELS]
       // A full model id in the file shows as its own option.
       if (!options.some(o => o[0] === value)) options.push([value, value])
-      return { section: 'Models', label: r.name,
-        control: <Pick label={`${r.name} model`} options={options} value={value} muted={value === 'inherit'} onChange={v => { if (v !== value) send({ type: 'hub-role-model', role: r.name, model: v as RoleModel }) }} /> }
+      const pick = <Pick label={`${r.name} model`} options={options} value={value} muted={value === 'inherit'} onChange={v => { if (v !== value) send({ type: 'hub-role-model', role: r.name, model: v as RoleModel }) }} />
+      // A raise rides in the role's own row, with Reset beside the pick.
+      const up = raises[r.name]
+      return { section: 'Models', label: r.name, hint: up && `R${raiseLine(up).slice(r.name.length + 2)}, from ${up.from}.`,
+        control: up ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><button type="button" className="hub-link hub-reset" aria-label={`Reset ${r.name} to its own model`} onClick={() => send({ type: 'hub-escalation-reset', project: up.project, role: up.role, files: up.files })}>Reset</button>{pick}</span> : pick }
     }),
+    // folder: the project the To-do and Jev card follow; no project, no button.
+    ...(folder ? [{ section: 'Models', label: 'Test models', hint: 'Runs each role on every model and suggests the best value.',
+      control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-new-chat', path: folder, text: benchPrompt, remote: false })}>Test models</button> }] satisfies Row[] : []),
 
     { section: 'Integrations', label: 'Hooks', hint: 'Claude Code reports each chat\'s progress to Switchboard. Off removes the hooks from ~/.claude/settings.json.',
       control: <Switch label="Hooks" on={sb.hooks} onChange={next => own('hooks', next)} /> },
@@ -242,13 +283,22 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
         {installed()}
       </>
     )
-    const mine = rows.filter(r => r.section === s)
-    if (s !== 'Models') return mine.map(r => <Line key={r.label} row={r} />)
+    const all = rows.filter(r => r.section === s), mine = all.filter(r => !r.group), grouped = all.filter(r => r.group)
+    if (s !== 'Models') return (
+      <>
+        {mine.map(r => <Line key={r.label} row={r} />)}
+        {grouped.length > 0 && <>
+          <h4 style={sub}>Advanced mode</h4>
+          <p style={{ margin: '0 0 4px', fontSize: 12, lineHeight: 1.45, color: 'var(--hub-ash)' }}>{ADVANCED_HINT} Per project.</p>
+          {grouped.map(r => <Line key={r.label} row={r} />)}
+        </>}
+      </>
+    )
     return (
       <>
-        {mine.slice(0, 2).map(r => <Line key={r.label} row={r} />)}
-        {mine.length > 2 && <h4 style={sub}>Roles</h4>}
-        {mine.slice(2).map(r => <Line key={r.label} row={r} />)}
+        {mine.slice(0, 3).map(r => <Line key={r.label} row={r} />)}
+        {mine.length > 3 && <h4 style={sub}>Roles</h4>}
+        {mine.slice(3).map(r => <Line key={r.label} row={r} />)}
       </>
     )
   }
@@ -274,6 +324,7 @@ export function Gear({ hub, send, problem, start = 'Chats' }: { hub: HubState; s
             </>
           : body(at)}
         {!query && at === 'Integrations' && <SpendLimits hub={hub} send={send} />}
+        {!query && at === 'Chats' && <Health hub={hub} send={send} />}
         <details className="hub-fold-list" style={{ marginTop: 16 }}
           onToggle={e => { const d = e.currentTarget; if (d.open) requestAnimationFrame(() => d.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })) }}>
           <summary>

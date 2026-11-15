@@ -7,7 +7,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { spawn } from 'child_process'
-import { archiveRow, backAgain, dueForHandoff, idleHandedOff, matchCodexStarts, readArchive, readChains, recordArchive, recordChain, removeArchive, withChains } from '../src/hub/chains'
+import { archiveRow, backAgain, dueForHandoff, goneRow, idleHandedOff, matchCodexStarts, readArchive, readChains, recordArchive, recordChain, removeArchive, withChains } from '../src/hub/chains'
 
 /** Another window: holds file's lock until go() is called, then writes body and lets go. Resolves once it holds the lock.
  * Not on a timer: withLock gives up after 100 ms, and a 50 ms hold left a stalled child too little room under the full suite. */
@@ -120,15 +120,126 @@ describe('chains', () => {
     assert.deepEqual([...matchCodexStarts(starts, chats, new Set(['s1']))], [])
   })
 
+  it('ties by the first-message name even when the row shows a title', () => {
+    const starts = [{ key: 't1', cwd: '/u/a', name: 'Fix login', at: 100 }]
+    const chats = [{ pid: 0, sessionId: 's1', cwd: '/u/a', name: 'Ask for Switchboard details', link: '', live: true, why: [], ai: 'codex' as const, updatedAt: 150 }]
+    assert.deepEqual([...matchCodexStarts(starts, chats, new Set())], [])
+    assert.deepEqual([...matchCodexStarts(starts, chats, new Set(), () => 'Fix login')], [['t1', 's1']])
+  })
+
   it('makes an archive row from a chat, and brings an ended one back once it runs again', () => {
     const a = archiveRow({ sessionId: 's1', name: 'Fix login v3', cwd: '/u/switchboard' }, 5, true, 1000)
     assert.deepEqual(a, { sessionId: 's1', ai: 'claude', name: 'Fix login v3', origin: 'Fix login', version: 3, cwd: '/u/switchboard', project: 'switchboard', startedAt: 5, archivedAt: 1000, ended: true })
     assert.equal(archiveRow({ sessionId: 's2', cwd: '/u/x', ai: 'codex' }).name, 'x')
+    assert.equal(archiveRow({ sessionId: 's4', cwd: '/u/x', costUsd: 1.5 }).costUsd, 1.5)
+    assert.equal(archiveRow({ sessionId: 's6', cwd: '/u/x', costUsd: 0 }).costUsd, 0)
+    assert.equal('costUsd' in archiveRow({ sessionId: 's5', cwd: '/u/x' }), false)
     const mine = archiveRow({ sessionId: 's3', cwd: '/u/x' }, undefined, false, 1000)
     const chat = (id: string, updatedAt: number, live = true) => ({ pid: 1, sessionId: id, cwd: '/u/x', link: '', live, why: [], updatedAt })
     // Exit writes just after SessionEnd do not count; Kenneth's own archive rows stay until he brings them back.
     assert.deepEqual(backAgain([a, mine], [chat('s1', 30_000), chat('s3', 900_000)]), [])
     assert.deepEqual(backAgain([a, mine], [chat('s1', 900_000, false)]), [])
     assert.deepEqual(backAgain([a, mine], [chat('s1', 900_000)]), ['s1'])
+  })
+})
+
+describe('goneRow', () => {
+  const chat = (live: boolean) => ({ pid: 9, sessionId: 's1', name: 'Fix it', cwd: '/r/app', link: '', live, why: [] })
+  const progress = [{ sessionId: 's1', cwd: '/r/app', startedAt: 5 }]
+  it('archives a chat whose process is gone as ended', () => {
+    const r = goneRow({ chats: [chat(false)], progress, archive: [] }, 's1', 100)
+    assert.deepEqual([r?.sessionId, r?.ended, r?.startedAt, r?.archivedAt, r?.name], ['s1', true, 5, 100, 'Fix it'])
+  })
+  it('archives a progress-only chat with no session row', () => {
+    assert.equal(goneRow({ chats: [], progress, archive: [] }, 's1')?.cwd, '/r/app')
+  })
+  it('leaves a live chat, one with a dead twin row, and an archived one', () => {
+    assert.equal(goneRow({ chats: [chat(true)], progress, archive: [] }, 's1'), undefined)
+    assert.equal(goneRow({ chats: [chat(false), chat(true)], progress, archive: [] }, 's1'), undefined)
+    assert.equal(goneRow({ chats: [chat(false)], progress, archive: [archiveRow(chat(false))] }, 's1'), undefined)
+  })
+  it('has nothing for an unknown id', () => {
+    assert.equal(goneRow({ chats: [], progress: [], archive: [] }, 'nope'), undefined)
+  })
+})
+
+it('trendOf counts yesterday against the day before and the same weekday last week', async () => {
+  const { trendOf } = await import('../src/hub/chains')
+  const now = new Date(2026, 10, 14, 9).getTime()
+  const at = (daysAgo: number, h = 12) => new Date(2026, 10, 14 - daysAgo, h).getTime()
+  const row = (daysAgo: number, extra: object = {}) => ({ sessionId: `s${Math.random()}`, ai: 'claude', name: 'n', origin: 'n', version: 1, cwd: '/x', project: 'x', archivedAt: at(daysAgo), ...extra })
+  const rows = [
+    row(1, { approvedAt: at(1), costUsd: 2 }), row(1, { approvedAt: at(1), costUsd: 1 }), row(1), row(1, { ended: true }),
+    row(2, { approvedAt: at(2) }),
+    row(8, { approvedAt: at(8) }), row(8), row(8),
+  ] as never
+  const t = trendOf(rows, now)
+  assert.equal(t.day, '2026-11-13')
+  assert.deepEqual(t.chats, { value: 4, vsDay: 3, vsWeek: 1 })
+  assert.deepEqual(t.approved, { value: 2, vsDay: 1, vsWeek: 1 })
+  assert.deepEqual(t.sentBack, { value: 1, vsDay: 1, vsWeek: -1 })
+  assert.equal(t.costUsd.value, 3)
+  const none = trendOf([], now)
+  assert.deepEqual(none.chats, { value: 0 })
+})
+
+describe('sent back', () => {
+  const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sentback-'))
+  const base = { sessionId: 's1', ai: 'claude' as const, name: 'n', origin: 'n', version: 1, cwd: '/x', project: 'x', archivedAt: 5 }
+  it('a recorded send back lands on the archive row; rows without one get a count of 0', async () => {
+    const { recordSentBack } = await import('../src/hub/chains')
+    const file = path.join(dir(), 'archive.json')
+    recordSentBack('s1', 100, file)
+    recordSentBack('s1', 200, file)
+    recordArchive(base, file)
+    recordArchive({ ...base, sessionId: 's2' }, file)
+    const [a, b] = readArchive(file)
+    assert.equal(a.sentBack, 2)
+    assert.equal(a.sentBackAt, 200)
+    assert.equal(b.sentBack, 0)
+    assert.equal(b.sentBackAt, undefined)
+  })
+  it('skips an event key it already holds for the session', async () => {
+    const { recordSentBack } = await import('../src/hub/chains')
+    const file = path.join(dir(), 'archive.json')
+    recordSentBack('s1', 100, file, 'call-1')
+    recordSentBack('s1', 110, file, 'call-1')
+    recordSentBack('s1', 200, file, 'call-2')
+    recordSentBack('s1', 300, file)
+    recordSentBack('s1', 310, file)
+    recordArchive(base, file)
+    assert.equal(readArchive(file)[0].sentBack, 4)
+  })
+  it('drops the pending entry once the row holds it, and keeps a later re-archive total', async () => {
+    const { recordSentBack } = await import('../src/hub/chains')
+    const file = path.join(dir(), 'archive.json')
+    recordSentBack('s1', 100, file, 'a')
+    recordArchive(base, file)
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'sent-back.json'), 'utf8')), {})
+    recordSentBack('s1', 200, file, 'b')
+    recordArchive(base, file)
+    assert.equal(readArchive(file)[0].sentBack, 2)
+  })
+  it('forgets entries older than 90 days', async () => {
+    const { recordSentBack } = await import('../src/hub/chains')
+    const file = path.join(dir(), 'archive.json')
+    recordSentBack('old', 1, file, 'a')
+    recordSentBack('new', 100 * 86_400_000, file, 'b')
+    const all = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'sent-back.json'), 'utf8'))
+    assert.deepEqual(Object.keys(all), ['new'])
+  })
+  it('trendOf counts by sentBackAt; rows with no sentBack field keep the old inference', async () => {
+    const { trendOf } = await import('../src/hub/chains')
+    const now = new Date(2026, 10, 14, 9).getTime()
+    const at = (d: number) => new Date(2026, 10, 14 - d, 12).getTime()
+    const row = (extra: object) => ({ ...base, sessionId: `s${Math.random()}`, archivedAt: at(1), ...extra })
+    const t = trendOf([
+      row({ sentBack: 1, sentBackAt: at(1) }),
+      row({ sentBack: 0 }),
+      row({ sentBack: 0, ended: true }),
+      row({}),
+      row({ approvedAt: at(1), sentBack: 1, sentBackAt: at(1) }),
+    ] as never, now)
+    assert.equal(t.sentBack.value, 3)
   })
 })

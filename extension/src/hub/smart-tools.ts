@@ -25,9 +25,9 @@ const DESIGN = /\b(ui|ux|(re)?design(er|ing)?|css|(re)?styl(e|es|ing)|layout|fro
 const PIXEL = /\b(pixel[- ]?art|sprites?|game juice)\b/i
 // Keyword rules for the rest: regex, then the short names (plugin before the @, or skill) it turns on.
 const RULES: Array<[RegExp, string, string[]]> = [
-  [/\b(aws|lambda|s3|cloudformation|cdk|bedrock|dynamodb)\b/i, 'AWS words', ['aws-core']],
-  [/\b(bland|voice agent|phone call)\b/i, 'Bland words', ['bland']],
-  [/\b(seo|marketing|copywriting|ad copy|pricing page)\b/i, 'marketing words', ['marketing-skills']],
+  [/\b(aws|lambda|s3|ec2|cloudformation|cdk|bedrock|dynamodb|cloudwatch|aws amplify)\b/i, 'AWS words', ['aws-core']],
+  [/\b(bland|voice agents?|phone calls?|bland pathways?|conversational pathways?)\b/i, 'Bland words', ['bland']],
+  [/\b(seo|marketing|copywriting|ad copy|ad creative|pricing page|cold email|email sequence|launch post|conversion rate|growth (hacking|marketing|loops?)|competitor (analysis|profiling|research)|onboarding emails?)\b/i, 'marketing words', ['marketing-skills']],
   [/\b(playwright|e2e|end-to-end)\b/i, 'browser test words', ['e2e-testing', 'playwright']],
   [/\b(charts?|graphs?|plots?|dataviz)\b/i, 'chart words', ['dataviz']],
   [/\bjev\b/i, 'Jev words', ['claude-x-jev']],
@@ -70,6 +70,16 @@ export function pickTools(text: string, role: string | undefined, inv: Installed
     for (const i of usable(inv).filter(i => names.includes(short(i.name)))) if (!out.has(i.name)) out.set(i.name, asPick(i, rule))
   }
   return [...out.values()]
+}
+
+/** A new chat's profile with what its first message or goal picks turned on, so a gated bundle is there from the start. */
+export function withGoal(p: ChatProfile, text: string, inv: Installed[]): ChatProfile {
+  const plugins = { ...p.plugins }, skills = { ...p.skills }
+  for (const k of pickTools(text, undefined, inv)) {
+    const m = k.kind === 'plugin' ? plugins : k.kind === 'skill' ? skills : undefined
+    if (m && k.name in m && !k.held) m[k.name] = true
+  }
+  return { ...p, plugins, skills }
 }
 
 /**

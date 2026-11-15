@@ -10,8 +10,10 @@ import * as path from 'path'
 import * as crypto from 'crypto'
 import { execFile, spawn } from 'child_process'
 import { hub, type Handoff } from './hub-service'
-import type { AiId, ChatProfile, ChatRow } from './types'
-import { AIS, chatTerminal, cliPath, codexPaste, codexReady, shareKitWithHermes } from './ais'
+import type { AiId, ChatProfile, ChatRow, NewChatAi } from './types'
+import { autoPick } from './picker'
+import { presetFor } from './jev-project'
+import { AIS, chatTerminal, cliPath, codexFirst, codexPaste, codexReady, saveCodexOwn, shareKitWithHermes } from './ais'
 import { quickAsk, withBrief } from './brain'
 import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
@@ -19,6 +21,7 @@ import { CLI_APPS, cliBinary, cliBusy, deviceUrl, endCli, startCli } from './cli
 import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
 import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
+import { saveGroup } from './split'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
 import { titleFor } from './title'
@@ -26,7 +29,8 @@ import { heldLabel, moveTodoChat, projectOf, todoEnv, type RunLabel } from './to
 import { trustFolder, trustedWindowRoots } from './trust'
 import { openChatTerminal, tags } from './terminals'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
-import { FLAGGED, chatSettings, cleanProfile, defaultProfile, handoffSettings, nameNote, saveProfile, savedProfile, startProfile, toolsNote } from './tools'
+import { FLAGGED, chatSettings, cleanProfile, clearIndefinite, defaultProfile, handoffSettings, indefiniteOn, nameNote, saveProfile, savedProfile, startProfile, syncIndefinite, toolsNote } from './tools'
+import { withGoal } from './smart-tools'
 import { editor } from '../editor'
 
 // A window opened by `code` from inside a chat inherits Claude's child marker, and a chat started
@@ -46,35 +50,58 @@ const trustHere = (dir: string) => trustFolder(dir, { ask: ask.claude, trusted: 
 // bindCodexTerminals ties it to exactly one new rollout. Lost on reload: such a chat is then never closed by Switchboard.
 const codexTerminals = new Map<string, vscode.Terminal>()
 const codexBorn = new WeakMap<vscode.Terminal, number>()
-let codexStarts: (CodexStart & { terminal: vscode.Terminal })[] = []
+let codexStarts: (CodexStart & { terminal: vscode.Terminal; group?: string; title?: string; waitOn?: string[] })[] = []
 const START_TTL_MS = 60 * 60 * 1000
+const TEMP = /^switchboard-[0-9a-f-]{36}\.(txt|sh|ps1)$/
+/** Launch files left over a day: a first message is read by its chat's shell at start, a script never ran. */
+export function sweepTemp(dir = os.tmpdir(), now = Date.now()): void {
+  let names: string[] = []
+  try { names = fs.readdirSync(dir) } catch { return }
+  for (const n of names) {
+    if (!TEMP.test(n)) continue
+    const f = path.join(dir, n)
+    try { if (now - fs.statSync(f).mtimeMs > 86_400_000) fs.rmSync(f, { force: true }) } catch { /* gone already */ }
+  }
+}
+let swept = false
+const tempFile = (ext: string) => {
+  if (!swept) { swept = true; sweepTemp() }
+  return path.join(os.tmpdir(), `switchboard-${crypto.randomUUID()}.${ext}`)
+}
 /** The first message in a temp file for newChatCommand's textFile; nothing for an empty one. */
 const messageFile = (text: string) => {
   if (!text.trim()) return undefined
-  const file = path.join(os.tmpdir(), `switchboard-${crypto.randomUUID()}.txt`)
+  const file = tempFile('txt')
   fs.writeFileSync(file, text.trim())
   return file
 }
-// The full command goes in a file; only a short line is typed (scriptLine).
+// The full command goes in a file that removes itself; only a short line is typed (scriptLine).
 const typed = (command: string) => {
-  const file = path.join(os.tmpdir(), `switchboard-${crypto.randomUUID()}.${SHELL === 'posix' ? 'sh' : 'ps1'}`)
+  const file = tempFile(SHELL === 'posix' ? 'sh' : 'ps1')
   fs.writeFileSync(file, scriptBody(file, command, SHELL))
   return scriptLine(file, SHELL)
 }
 const rowName = (first: string) => first.replace(/\s+/g, ' ').trim().slice(0, 60)
-const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | undefined) => {
-  if (name) codexStarts.push({ key: Math.random().toString(36).slice(2), cwd, name, at: Date.now(), terminal })
+const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | undefined, group?: string, title?: string, waitOn?: string[]) => {
+  if (name) codexStarts.push({ key: Math.random().toString(36).slice(2), cwd, name, at: Date.now(), terminal, group, title, waitOn })
 }
 
 // A resumed or handed-off to-do chat keeps its todo-band; a handoff opens before moveTodoChat, so the old id holds it.
 const heldEnv = (cwd: string, chats: string[]) => { const f = projectOf(cwd); return todoEnv(heldLabel(hub.get().todos?.[f]?.todo, f, chats)) }
 
+/** Codex chats whose Switchboard terminal exited this run; hub-panel.ts archives them once their rollout stops moving. */
+export const codexExited = new Set<string>()
+
 /** Ties started Codex terminals to their sessions; hub-panel.ts calls it with each fresh chat list. */
-export function bindCodexTerminals(chats: ChatRow[], now = Date.now()): void {
+export function bindCodexTerminals(chats: ChatRow[], now = Date.now(), onTied?: (sessionId: string, waitOn: string[]) => void): void {
+  for (const [id, t] of codexTerminals) if (t.exitStatus !== undefined) { codexTerminals.delete(id); codexExited.add(id) }
   codexStarts = codexStarts.filter(s => now - s.at < START_TTL_MS && s.terminal.exitStatus === undefined)
-  const tied = matchCodexStarts(codexStarts, chats, new Set(codexTerminals.keys()))
+  const tied = matchCodexStarts(codexStarts, chats, new Set(codexTerminals.keys()), c => codexFirst.get(c.sessionId) ?? c.name)
   for (const [key, sessionId] of tied) {
-    const t = codexStarts.find(s => s.key === key)!.terminal
+    const { terminal: t, group, title, waitOn } = codexStarts.find(s => s.key === key)!
+    if (group) saveGroup(sessionId, group)
+    if (title) saveCodexOwn(sessionId, title)
+    if (waitOn?.length) onTied?.(sessionId, waitOn)
     codexTerminals.set(sessionId, t)
     tags.host(t, sessionId)
   }
@@ -85,10 +112,10 @@ export function bindCodexTerminals(chats: ChatRow[], now = Date.now()): void {
  * A Codex chat runs as its terminal's own process, with no shell around it: when Codex quits the terminal ends,
  * so a message typed into it can never land at a shell prompt. Answers why it could not start.
  */
-async function codexTerminal(name: string, cwd: string, args: string[], sessionId?: string): Promise<vscode.Terminal | string> {
+async function codexTerminal(name: string, cwd: string, args: string[], sessionId?: string, env?: Record<string, string>): Promise<vscode.Terminal | string> {
   const bin = await cliPath('codex')
   if (!bin) return 'codex is not on PATH'
-  const t = openChatTerminal({ name, cwd, env: chatEnv(cwd), shellPath: bin, shellArgs: codexArgs(args) }, AIS.codex.name, sessionId)
+  const t = openChatTerminal({ name, cwd, env: { ...chatEnv(cwd), ...env }, shellPath: bin, shellArgs: codexArgs(args) }, AIS.codex.name, sessionId)
   codexBorn.set(t, Date.now())
   return t
 }
@@ -102,31 +129,47 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
   return t
 }
 
+/** Auto becomes claude or codex with the reason; a named AI stays as it is. */
+export async function resolveAi(ai: NewChatAi, text: string | undefined, folder: string): Promise<{ ai: AiId; reason?: string }> {
+  if (ai !== 'auto') return { ai }
+  const p = await autoPick(text ?? '', hub.get().ais, presetFor(folder, 'route'))
+  return { ai: p.ai, reason: `Auto: ${p.ai === 'codex' ? 'Codex' : 'Claude'}, because ${p.reason}` }
+}
+
 /**
  * A chat in its own terminal, named by a short title made from the goal (the project's name
  * with no goal). Remote Control gets the same title: its name outranks --name. Answers why it could not start.
+ * ai: 'auto' picks claude or codex from the task (picker.ts) and says why in a notice.
  * id: the Claude chat's session id, when the caller tracks it (a To-do item).
  * noRemote: Remote Control stays off even when it is on at startup, so a To-do run stays in VS Code.
  * todo: a To-do run's label (runLabel): the chat is named `To-do N: <title>` and gets it as SWITCHBOARD_TODO.
+ * group: a split's group id (split.ts), saved once the session id is known.
  */
-export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, ai: AiId = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel): Promise<string | undefined> {
+export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[]): Promise<string | undefined> {
   const project = hub.get().projects.find(p => p.path === folder)
   if (!project) return `${folder} is not in the project list yet; open Switchboard once and try again`
+  const { ai, reason } = await resolveAi(want, text, folder)
+  if (reason) void vscode.window.showInformationMessage(`Switchboard: ${reason}`)
   const goal = text?.trim()
   const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(folder) : []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
   const named = goal ? await titleFor(goal, quickAsk) : project.name
   // Prefix, not suffix: a handoff's version number has to stay at the end (projects.ts CHAIN).
   const title = todo ? `To-do ${todo.n}: ${named}` : named
-  const profile = startProfile(inv, tools)
+  // A profile the panel sent is Kenneth's pick; the default one takes what the first message names.
+  const start = startProfile(inv, tools)
+  const profile = start && !tools ? withGoal(start, text ?? '', inv) : start
   // Codex has no hook to read the brief from, so it rides in front of the first message.
-  const first = withPointer(ai === 'claude' ? '' : withBrief(hub.get(), folder, text), rulesState.ready[ai], rulesState.kit)
+  // Codex has no --append-system-prompt: Claude's system notes ride in the brief's block, which the row name skips (ais.ts withoutBrief).
+  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
+  const lead = [withBrief(hub.get(), folder, undefined), notes && `Switchboard notes: ${notes}`].filter(Boolean).join('\n')
+  const first = withPointer(ai === 'claude' ? '' : [lead, text].filter(Boolean).join('\n\n'), rulesState.ready[ai], rulesState.kit)
   if (ai === 'codex') {
-    const t = await codexTerminal(`${AIS.codex.name}: ${title}`, folder, first.trim() ? [first] : [])
+    const t = await codexTerminal(`${AIS.codex.name}: ${title}`, folder, first.trim() ? [first] : [], undefined, todoEnv(todo))
     if (typeof t === 'string') return t
     t.show(true)
-    // The row is named by the message, never the brief in front of it (ais.ts).
-    waitForCodex(t, folder, rowName(text ?? '') || undefined)
+    // The row is tied by the message, never the brief in front of it (ais.ts); the title is what it then shows.
+    waitForCodex(t, folder, rowName(text ?? '') || undefined, group, title, waitOn)
     return undefined
   }
   if (ai === 'hermes') {
@@ -140,11 +183,12 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
   trustHere(folder)
+  if (group && sessionId) saveGroup(sessionId, group)
   const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: { ...chatEnv(folder), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
   t.show(true)
   t.sendText(typed(command))
@@ -188,7 +232,8 @@ export const setChatProfile = (sessionId: string, p: ChatProfile) => hub.set({ t
 
 /** The New chat form's Pick tools: the all-on defaults as chips to toggle before Start; with the folder, its project skills and design references too. */
 export async function pickTools(goal: string, folder?: string): Promise<void> {
-  const profile = defaultProfile(await chatInventory(folder))
+  const inv = await chatInventory(folder)
+  const profile = withGoal(defaultProfile(inv), goal, inv)
   hub.set({ tools: { ...toolsState(), pick: { goal, folder, profile } } })
 }
 
@@ -197,27 +242,108 @@ export async function saveChatTools(sessionId: string, p: ChatProfile): Promise<
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return 'Not a chat id'
   // The chat's own folder, so its project skills and design references survive the save.
   const profile = cleanProfile(p, await chatInventory(hub.get().chats.find(c => c.sessionId === sessionId)?.cwd))
+  // Run indefinitely is set by its own command; an edit of the tools keeps it as saved.
+  const was = savedProfile(sessionId)
+  delete profile.indefinite
+  if (was?.indefinite) profile.indefinite = was.indefinite
+  if (was?.budget) profile.budget = was.budget
+  if (was?.checkBack) profile.checkBack = was.checkBack
   saveProfile(sessionId, profile)
   setChatProfile(sessionId, profile)
   return undefined
 }
 
+/** Sent to a chat when Run indefinitely goes on; the mod's Stop block and question denials do the rest. */
+export const INDEFINITE_TEXT = 'Run indefinitely is on for this chat. Ask every question you need now, in one AskUserQuestion round; after that you will not be able to ask. Then keep building and checking on your own: audit for bugs, errors, user problems and hard-to-use parts, fix them, add components that would help, run the checks, repeat. Never commit. When nothing is left you can improve, end with the line `Run indefinitely: done`.'
+
+/** Run indefinitely on or off for one chat: the flag lives in its saved profile and in indefinite.json. True when it just went on. */
+export async function setIndefinite(sessionId: string, on: boolean): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error('Not a chat id')
+  if (!on) {
+    const rest = clearIndefinite(sessionId)
+    if (rest) setChatProfile(sessionId, rest)
+    return false
+  }
+  if (indefiniteOn(sessionId)) return false
+  const base = savedProfile(sessionId) ?? (hub.get().installed.length ? defaultProfile(await chatInventory(hub.get().chats.find(c => c.sessionId === sessionId)?.cwd)) : { plugins: {}, skills: {} })
+  const profile = { ...base, indefinite: Date.now() }
+  saveProfile(sessionId, profile)
+  setChatProfile(sessionId, profile)
+  syncIndefinite()
+  return true
+}
+
+/** Sent to a chat by Refine now. */
+export const REFINE_TEXT = 'Run the aar skill now on this chat so far, then carry on.'
+
+/** A chat's saved profile, else the all-on defaults. */
+async function baseProfile(sessionId: string): Promise<ChatProfile> {
+  return savedProfile(sessionId) ?? (hub.get().installed.length ? defaultProfile(await chatInventory(hub.get().chats.find(c => c.sessionId === sessionId)?.cwd)) : { plugins: {}, skills: {} })
+}
+
+/** Saves a changed profile: the file, the chat's state and, for a budget, indefinite.json. */
+function commit(sessionId: string, profile: ChatProfile): void {
+  saveProfile(sessionId, profile)
+  setChatProfile(sessionId, profile)
+  syncIndefinite()
+}
+
+const limit = (v: number | null | undefined, max: number) => (typeof v === 'number' && v > 0 ? Math.min(v, max) : undefined)
+
+/** Run indefinitely limits for one chat: a field null clears it, one left out keeps it. maxHours up to a week, maxCostUsd up to 10000. */
+export async function setBudget(sessionId: string, b: { maxHours?: number | null; maxCostUsd?: number | null; gate?: string | null }): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error('Not a chat id')
+  const base = await baseProfile(sessionId)
+  const next = { ...base.budget }
+  if (b.maxHours !== undefined) { const v = limit(b.maxHours, 168); if (v) next.maxHours = v; else delete next.maxHours }
+  if (b.maxCostUsd !== undefined) { const v = limit(b.maxCostUsd, 10_000); if (v) next.maxCostUsd = v; else delete next.maxCostUsd }
+  if (b.gate !== undefined) { const v = b.gate?.trim().slice(0, 500); if (v) next.gate = v; else delete next.gate }
+  // Codex reports no cost, so a cost cap could never apply.
+  if (hub.get().chats.find(c => c.sessionId === sessionId)?.ai === 'codex') delete next.maxCostUsd
+  const { budget: _, ...rest } = base
+  commit(sessionId, Object.keys(next).length ? { ...rest, budget: next } : rest)
+}
+
+/** Check-back on at everyMin (the count starts over) or off. */
+export async function setCheckBack(sessionId: string, everyMin: 10 | 30 | 60 | null): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error('Not a chat id')
+  if (everyMin !== null && ![10, 30, 60].includes(everyMin)) throw new Error('Check back is every 10, 30 or 60 minutes')
+  const { checkBack: _, ...rest } = await baseProfile(sessionId)
+  commit(sessionId, everyMin ? { ...rest, checkBack: { everyMin, count: 0 } } : rest)
+}
+
+/** One check-back went out (step 1), or its send failed (step -1: count back, lastAt kept so it waits a full interval). */
+export function noteCheckBack(sessionId: string, now = Date.now(), step: 1 | -1 = 1): void {
+  const p = savedProfile(sessionId)
+  if (p?.checkBack) commit(sessionId, { ...p, checkBack: { ...p.checkBack, count: Math.max(0, p.checkBack.count + step), lastAt: step > 0 ? now : p.checkBack.lastAt } })
+}
+
+/** The mod saw the closing line: the flag goes, here and in the file. */
+export function indefiniteDone(sessionId: string): void {
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return
+  const rest = clearIndefinite(sessionId)
+  if (rest) setChatProfile(sessionId, rest)
+}
+
 /** Ends a Codex chat Switchboard started, by closing the terminal tied to its session; false when none is. Called only once the chat is idle. */
 export function closeCodexChat(sessionId: string): boolean {
-  const t = codexTerminals.get(sessionId)
+  const t = codexTerm(sessionId)
   codexTerminals.delete(sessionId)
   t?.dispose()
   return !!t
 }
 
+// After a window reload the map is empty; the pid memo in terminals.ts still knows the chat's terminal.
+const codexTerm = (sessionId: string) => codexTerminals.get(sessionId) ?? tags.ourOf(sessionId)
+
 /** Whether a live terminal is tied to this Codex chat, so the message box can type into it. */
-export const codexTied = (sessionId: string) => { const t = codexTerminals.get(sessionId); return !!t && t.exitStatus === undefined }
+export const codexTied = (sessionId: string) => { const t = codexTerm(sessionId); return !!t && t.exitStatus === undefined }
 
 /** Types a message into a Codex chat's terminal as Kenneth would; Enter goes a beat later so Codex reads the paste first. */
 export async function sendToCodex(chat: ChatRow, text: string): Promise<string | undefined> {
   const paste = codexPaste(text)
   if (!paste) return 'the message has control characters in it, so it was not typed into Codex'
-  const t = codexTerminals.get(chat.sessionId)
+  const t = codexTerm(chat.sessionId)
   const problem = await codexReady({ terminal: t, live: chat.live, startedAt: (t && codexBorn.get(t)) ?? 0, now: Date.now() })
   if (problem || !t) return problem
   t.show(true)
@@ -352,6 +478,10 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
   // A To-do chat stays off Remote Control in every version of it.
   let settings: string | undefined, off = false
   try { if (freshId) ({ settings, off } = handoffSettings(h.sessionId, freshId, carried)) } catch { /* starts with the user's defaults */ }
+  // Run indefinitely moves to the fresh chat: its profile holds the flag now, the old one lets go.
+  if (carried?.indefinite && freshId) {
+    try { setChatProfile(freshId, carried); indefiniteDone(h.sessionId) } catch { /* the flag stays with the old chat */ }
+  }
   const system = [settings && carried ? toolsNote(carried) : '', myName()].filter(Boolean).join(' ') || undefined
   const tools = { ...(settings ? { settings } : {}), system }
   const claude = (branch?: string) => newChatCommand({ textFile: messageFile(text), name: fresh, remote: hub.get().rc.atStartup && !off ? fresh : undefined, branch, sessionId: freshId, ...tools }, SHELL)
@@ -485,8 +615,14 @@ export function awsLogin(profile: string, chrome: string | undefined, done: () =
   const keep = (b: Buffer) => { out = (out + b.toString()).slice(-4000) }
   child.stdout.on('data', keep); child.stderr.on('data', keep)
   const timer = setTimeout(() => child.kill(), LOGIN_MS)
-  child.on('error', err => { clearTimeout(timer); signInError(key, `aws login could not start: ${err.message}`); done() })
+  let ended = false
+  child.on('error', err => {
+    if (ended) return
+    ended = true; clearTimeout(timer); signInError(key, `aws login could not start: ${err.message}`); done()
+  })
   child.on('close', code => {
+    if (ended) return
+    ended = true
     clearTimeout(timer)
     if (code === 0) {
       // A just-added profile that signed in as a user already there folds into that one; a re-sign-in only refreshes.

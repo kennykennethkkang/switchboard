@@ -116,3 +116,47 @@ test('a role run edit counts as its parent chat\'s, from a mirror too, and Codex
     hub.set({ progress: [] })
   }
 })
+
+test('a rebound Host is refused; loopback hosts and multibyte bodies split across chunks pass', async () => {
+  const http = await import('node:http')
+  const { HookServer } = await import('../src/hook-server')
+  const { hub } = await import('../src/hub/hub-service')
+  const server = new HookServer()
+  const port = await server.start()
+  const seen: string[] = []
+  server.onRaw(({ payload }) => seen.push(String(payload.cwd)))
+  const send = (host: string | undefined, chunks: Buffer[]) => new Promise<number>((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, method: 'POST', headers: { ...(host ? { Host: host } : {}), 'x-switchboard-token': hub.token, 'Content-Type': 'application/json' } }, r => { r.resume(); resolve(r.statusCode ?? 0) })
+    req.on('error', reject)
+    for (const c of chunks) req.write(c)
+    req.end()
+  })
+  const body = Buffer.from(JSON.stringify({ session_id: 'u', hook_event_name: 'SessionEnd', cwd: '/w/ééé' }))
+  const cut = body.indexOf(0xc3) + 1
+  try {
+    assert.equal(await send('evil.test', [body]), 403)
+    assert.equal(await send(`localhost:${port}`, [body.subarray(0, cut), body.subarray(cut)]), 200)
+    assert.equal(await send(`127.0.0.1:${port}`, [body]), 200)
+    await new Promise(r => setTimeout(r, 50))
+    assert.deepEqual(seen, ['/w/ééé', '/w/ééé'])
+  } finally {
+    server.dispose()
+  }
+})
+
+test('POST /hub/discuss runs the discussion with the token, checks its shape, and never spawns on a bad one', async () => {
+  const { handleHub } = await import('../src/hub/routes')
+  const { hub } = await import('../src/hub/hub-service')
+  const seen: string[] = []
+  const cli = async (ai: string, prompt: string, cwd: string) => { seen.push(`${ai}@${cwd}`); return 'ok\nAgreed on: all\nDisagreed on: none' }
+  const post = (body: unknown, token: string | undefined = hub.token) => handleHub(hub, 'POST', '/hub/discuss', JSON.stringify(body), undefined, undefined, undefined, undefined, undefined, token, undefined, cli as never)
+  const good = { question: 'Q', cwd: '/p', from: 'claude' }
+  assert.equal(((await post(good, 'nope')) as { status: number }).status, 403)
+  assert.equal(((await post({ ...good, from: 'gpt' })) as { status: number }).status, 400)
+  assert.equal(((await post({ ...good, question: ' ' })) as { status: number }).status, 400)
+  assert.deepEqual(seen, [])
+  const r = (await post(good)) as { status: number; body: string }
+  assert.equal(r.status, 200)
+  assert.match(JSON.parse(r.body).text, /Agreed on: all/)
+  assert.deepEqual(seen, ['codex@/p'])
+})

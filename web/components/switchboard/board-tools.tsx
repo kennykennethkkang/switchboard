@@ -50,7 +50,7 @@ function Sprite({ id, skin }: { id: BeltId | 'moon'; skin: Skin }) {
 
 /** needs and the fullest usage window, from hub state; to-do and file counts live in Switchboard. */
 export function beltCounts(hub: HubState, now = Date.now()): BeltCounts {
-  const meters = limitMeters(hub.live, now, hub.limitsKept), pct = Math.max(-1, ...meters.map(m => m.percent ?? -1))
+  const meters = limitMeters(hub.live, now, hub.limitsKept, hub.codexKept), pct = Math.max(-1, ...meters.map(m => m.percent ?? -1))
   const usage = meters.filter(m => m.percent !== undefined).map(m => `${m.label.toLowerCase()} ${m.level === 'out' ? 'out' : `${m.percent}%`}`).join(', ')
   return { next: hub.progress.filter(p => p.state === 'needs-you').length, ...(pct >= 0 && { limits: `${Math.round(pct)}%` }), ...(usage && { usage: `Usage: ${usage}` }) }
 }

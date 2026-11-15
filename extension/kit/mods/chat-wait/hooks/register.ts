@@ -10,13 +10,15 @@ type Progress = {
   sessionId: string; cwd?: string; state: 'working' | 'done' | 'needs-you' | 'idle'; tasks: Task[]
   question?: string; report?: { done: string[]; left: string[]; you?: string[] }; tests?: { ok: boolean; command?: string; failed?: number }
   limited?: unknown
+  running?: string[]; waiting?: boolean; jobs?: unknown[]
 }
 type Live = { sessionId: string; file?: string; fileAt?: number }
-type Link = { from: string; to: string[] }
+type Link = { from: string; to: string[]; auto?: boolean }
 type Unlink = { from: string; to: string }
 export type HubState = {
   chats: ChatRow[]; progress: Progress[]; live: Live[]; links?: Link[]
   // The user's unlinks, kept five minutes by the hub; a link merely gone is a reload or an ended target.
+  archive?: { sessionId: string; approvedAt?: number }[]
   unlinks?: Unlink[]; pause?: { chats?: { sessionId: string }[] }; waits?: { sessionId: string }[]
 }
 
@@ -35,14 +37,17 @@ const RETRY_MS = 2 * 60_000
 const STEP_MS = 4 * 60_000
 // A missing-progress mark not polled this long is from a wait the chat dropped.
 const MARK_STALE_MS = 15 * 60_000
+// Each block runs one chats_wait step (about 4 min), so 45 holds a wait about three hours; past that the chat stops.
+export const MAX_BLOCKS = 45
+const APPROVE = 'Approve this chat as finished'
 const REMOVED = 'The user removed this wait in Switchboard; continue on your own.'
 
 export const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
 const inside = (p: string, dir: string) => p === dir || p.startsWith(`${dir}/`)
 
-const cache = { targets: [] as Target[], foundAt: -Infinity, state: undefined as HubState | undefined, stateAt: -Infinity, tried: new Map<string, number>(), mine: new Map<string, number>(), missing: new Map<string, { at: number; seen: number }>() }
+const cache = { targets: [] as Target[], foundAt: -Infinity, state: undefined as HubState | undefined, stateAt: -Infinity, tried: new Map<string, number>(), blocks: 0, mine: new Map<string, number>(), missing: new Map<string, { at: number; seen: number }>() }
 export function resetCache() {
-  Object.assign(cache, { targets: [], foundAt: -Infinity, state: undefined, stateAt: -Infinity, tried: new Map(), mine: new Map(), missing: new Map() })
+  Object.assign(cache, { targets: [], foundAt: -Infinity, state: undefined, stateAt: -Infinity, tried: new Map(), blocks: 0, mine: new Map(), missing: new Map() })
 }
 
 /** This project's other live chats: same repo name when both rows have one, else one folder holds the other. */
@@ -78,10 +83,13 @@ export function waitsOn(links: Link[] = [], from: string, to: string): boolean {
   return false
 }
 
-/** Finished: done, needs-you, idle after work, or gone. Clean: done or idle with no failing tests. A usage limit is not finished. */
+/** Finished: done, needs-you, idle after work, or gone. Clean: done, idle or at the Approve question, with no failing tests. A usage limit, running subagents or shells, are not finished. */
 export function outcomeOf(p: Progress | undefined) {
   if (!p) return { finished: true, clean: false }
   if (p.limited) return { finished: false, clean: false }
+  if (p.state === 'needs-you' && p.question?.includes(APPROVE) && !p.running?.length) return { finished: true, clean: p.tests?.ok !== false }
+  // Subagents and the lead's shells hold it; subJobs go stale once their subagent stops, so they do not.
+  if ((p.running?.length || p.waiting || p.jobs?.length) && p.state !== 'done') return { finished: false, clean: false }
   const worked = p.tasks.length > 0 || !!p.report
   const finished = p.state === 'done' || p.state === 'needs-you' || (p.state === 'idle' && worked)
   return { finished, clean: finished && p.state !== 'needs-you' && p.tests?.ok !== false }
@@ -103,6 +111,7 @@ export function editClash(s: HubState, self: string, cwd: string, file: string, 
 function outcomeIn(s: HubState, id: string, now: number) {
   const p = s.progress.find(x => x.sessionId === id)
   if (s.pause?.chats?.some(c => c.sessionId === id) || s.waits?.some(w => w.sessionId === id)) return { finished: false, clean: false }
+  if (!p && s.archive?.some(a => a.sessionId === id && a.approvedAt)) return { finished: true, clean: true }
   if (!p && s.chats.find(c => c.sessionId === id)?.live && now - (cache.missing.get(id)?.at ?? now) < GRACE_MS) return { finished: false, clean: false }
   return outcomeOf(p)
 }
@@ -303,6 +312,12 @@ export const register: Register = on => {
     return started
   })
 
+  // turn.complete cannot block; classic.Stop can, as done-check does. The lead only: subagents stop through SubagentStop.
+  on('classic.Stop', async ($, e, next) => {
+    const why = await stopReason($, e.stop_hook_active).catch(() => undefined)
+    return why ? { block: why } : next(e)
+  }).catch(($, e, next) => next(e))
+
   on('tool.call', { tool: `mcp__chat-wait__${CHECK}` }, async $ => ({ result: await checkText($) }))
   on('tool.call', { tool: `mcp__chat-wait__${WAIT}` }, async ($, e) => ({ result: await waitStep($, e as { chats?: unknown; reason?: unknown }) }))
 
@@ -318,4 +333,27 @@ export const register: Register = on => {
     if (ran.deny === undefined && !ran.isError) cache.mine.set(file, await $.clock.now())
     return ran
   })
+}
+
+/** Why this chat's stop should hold: a wait of its own (not an auto link) that it has not read the end of. */
+export async function stopReason($: EngineInterface, active: boolean) {
+  if (!active) cache.blocks = 0
+  if (cache.blocks >= MAX_BLOCKS) return undefined
+  const s = await readState($)
+  if (!s) return undefined
+  const self = await $.session.id()
+  if (s.pause?.chats?.some(c => c.sessionId === self) || s.progress.find(p => p.sessionId === self)?.limited) return undefined
+  const links = (s.links ?? []).filter(l => l.from === self && !l.auto)
+  if (!links.length) return undefined
+  const now = await $.clock.now()
+  const idsOf = (l: Link) => [...new Set(l.to.map(id => follow(s, id)))]
+  const open = [...new Set(links.flatMap(idsOf).filter(id => !outcomeIn(s, id, now).finished))]
+  cache.blocks++
+  if (open.length) {
+    const names = open.map(id => label(s.chats.find(c => c.sessionId === id) ?? { sessionId: id, cwd: '', live: true }))
+    return `You are waiting on ${names.join(', ')} (still working). Call chats_wait with chats ${JSON.stringify(open)} to keep waiting, or ask the user to remove the wait.`
+  }
+  // All done: end each link by its stored ids (the hub matches them exactly) and hand over the reports; chats_wait refuses ended chats.
+  for (const l of links) await post($, { kind: 'link-end', from: self, to: l.to })
+  return finishText(s, [...new Set(links.flatMap(idsOf))])
 }

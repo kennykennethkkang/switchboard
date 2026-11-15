@@ -5,7 +5,7 @@ import * as os from 'os'
 import * as path from 'path'
 import type { Installed } from '../src/hub/types'
 import { ask } from '../src/hub/projects'
-import { FLAGGED, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, startProfile, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE } from '../src/hub/tools'
+import { FLAGGED, clearIndefinite, indefiniteOn, syncIndefinite, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, startProfile, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE } from '../src/hub/tools'
 
 const inv: Installed[] = [
   { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, description: 'TDD and plans' },
@@ -20,11 +20,12 @@ const inv: Installed[] = [
   { kind: 'role', name: 'engineer', enabled: true },
 ]
 
-const BY = { permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
+const LB = { skillListingBudgetFraction: 0.02 }
+const BY = { ...LB, permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
 
-test('defaultProfile: every plugin on, mods and archived skills left out', () => {
+test('defaultProfile: every plugin on but the gated bundles, mods and archived skills left out', () => {
   assert.deepEqual(defaultProfile(inv), {
-    plugins: { 'superpowers@superpowers-dev': true, 'bland@bland': true, 'marketing-skills@marketingskills': true, 'auth0@claude-plugins-official': true, 'aws-core@claude-plugins-official': true },
+    plugins: { 'superpowers@superpowers-dev': true, 'bland@bland': false, 'marketing-skills@marketingskills': false, 'auth0@claude-plugins-official': true, 'aws-core@claude-plugins-official': false },
     skills: { phone: true, 'taste-design': true },
   })
 })
@@ -55,7 +56,8 @@ test('cleanProfile: unknown names dropped, missing ones from defaults, a flagged
   const p = cleanProfile({ plugins: { 'auth0@claude-plugins-official': true, 'evil@x': true }, skills: { phone: false, nope: true } }, inv)
   assert.equal(p.plugins['auth0@claude-plugins-official'], true)
   assert.equal(p.plugins['evil@x'], undefined)
-  assert.equal(p.plugins['bland@bland'], true)
+  // A gap takes the default, and bland is gated.
+  assert.equal(p.plugins['bland@bland'], false)
   assert.deepEqual(p.skills, { phone: false, 'taste-design': true })
 })
 
@@ -116,12 +118,12 @@ test('no remote on resume: with a profile its file, without one the switch inlin
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
   const bare = '2f8fad5b-d9cb-469f-a165-70867728950e'
   chatSettings(bare, undefined, true, dir)
-  assert.equal(resumeSettingsArg(bare, dir, '', 'posix'), ` --settings '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}'`)
+  assert.equal(resumeSettingsArg(bare, dir, '', 'posix'), ` --settings '{"remoteControlAtStartup":false,"skillListingBudgetFraction":0.02,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}'`)
   const withTools = '3f8fad5b-d9cb-469f-a165-70867728950e'
   const file = chatSettings(withTools, { plugins: {}, skills: {} }, true, dir)!
   assert.equal(resumeSettingsArg(withTools, dir, '', 'posix'), ` --settings '${file}'`)
   assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).remoteControlAtStartup, false)
-  assert.equal(resumeSettingsArg('4f8fad5b-d9cb-469f-a165-70867728950e', dir, '', 'posix'), ` --settings '{"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}'`)
+  assert.equal(resumeSettingsArg('4f8fad5b-d9cb-469f-a165-70867728950e', dir, '', 'posix'), ` --settings '{"skillListingBudgetFraction":0.02,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}'`)
 })
 
 test('no remote follows a handoff to the fresh chat, with or without tools; a normal chat hands off as before', () => {
@@ -133,7 +135,7 @@ test('no remote follows a handoff to the fresh chat, with or without tools; a no
   assert.equal(a.off, true)
   assert.equal(isNoRemote(fresh, dir), true)
   assert.equal(JSON.parse(fs.readFileSync(a.settings!, 'utf8')).remoteControlAtStartup, false)
-  assert.deepEqual(handoffSettings(old, fresh2, undefined, dir), { settings: '{"remoteControlAtStartup":false,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}', off: true })
+  assert.deepEqual(handoffSettings(old, fresh2, undefined, dir), { settings: '{"remoteControlAtStartup":false,"skillListingBudgetFraction":0.02,"permissions":{"defaultMode":"bypassPermissions"},"skipDangerousModePermissionPrompt":true,"enableAllProjectMcpServers":true}', off: true })
   const normal = '8f8fad5b-d9cb-469f-a165-70867728950e', next = '9f8fad5b-d9cb-469f-a165-70867728950e'
   const b = handoffSettings(normal, next, p, dir)
   assert.equal(b.off, false)
@@ -341,7 +343,7 @@ test('Ask before actions on: new and resumed chats start in default mode, and ba
     assert.deepEqual(profileSettings(p).permissions, { defaultMode: 'default' })
     assert.equal('skipDangerousModePermissionPrompt' in profileSettings(p), false)
     assert.equal('enableAllProjectMcpServers' in profileSettings(p), false)
-    assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, false, dir)!), { permissions: { defaultMode: 'default' } })
+    assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, false, dir)!), { ...LB, permissions: { defaultMode: 'default' } })
     assert.deepEqual(JSON.parse(chatSettings(undefined, undefined, false, dir)!).permissions, { defaultMode: 'default' })
     // A chat saved in bypass resumes asking: its settings file is rewritten.
     assert.equal(resumeSettingsArg(id, dir, '', 'posix'), ` --settings '${file}'`)
@@ -354,9 +356,69 @@ test('Ask before actions on: new and resumed chats start in default mode, and ba
   ask.claude = true
   try {
     resumeSettingsArg(id, dir, '', 'posix')
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { enabledPlugins: {}, skillOverrides: {}, permissions: { defaultMode: 'default' } })
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { enabledPlugins: {}, skillOverrides: {}, ...LB, permissions: { defaultMode: 'default' } })
   } finally { ask.claude = false }
   resumeSettingsArg(id, dir, '', 'posix')
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { enabledPlugins: {}, skillOverrides: {}, ...BY })
   assert.deepEqual(profileSettings(p), { enabledPlugins: {}, skillOverrides: {}, ...BY })
+})
+
+test('handoffSettings: a settings write that fails still keeps a to-do chat off Remote Control', { skip: process.getuid?.() === 0 }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
+  const from = '0f8fad5b-d9cb-469f-a165-70867728950e', to = '1f8fad5b-d9cb-469f-a165-70867728950e'
+  chatSettings(from, undefined, true, dir)
+  fs.chmodSync(dir, 0o500)
+  try { assert.equal(handoffSettings(from, to, { plugins: {}, skills: {} }, dir).off, true) } finally { fs.chmodSync(dir, 0o700) }
+})
+
+test('toolsNote: names the gated bundles that are off, with what each is for', () => {
+  const n = toolsNote(defaultProfile(inv))
+  assert.match(n, /Off until needed, turn on with tool_on[^.]*: marketing-skills \(SEO[^)]*\), aws-core \(AWS services\)|bland \(voice agents/)
+  for (const g of ['marketing-skills', 'aws-core', 'bland']) assert.ok(n.includes(`${g} (`), g)
+  assert.ok(!toolsNote({ plugins: { 'bland@bland': true }, skills: {} }).includes('Off until needed'))
+})
+
+test('toolsNote: a held gated bundle is left out, it needs Approve, not tool_on', () => {
+  const n = toolsNote({ plugins: { 'bland@bland': false, 'aws-core@claude-plugins-official': false }, skills: {} }, new Set(['bland@bland']))
+  assert.ok(n.includes('aws-core ('))
+  assert.ok(!n.includes('bland ('))
+})
+
+test('indefinite: the flag file lists every profile that has it, and survives clean and handoff', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
+  const file = path.join(dir, 'indefinite.json')
+  const a = '5f8fad5b-d9cb-469f-a165-70867728950e', b = '6f8fad5b-d9cb-469f-a165-70867728950e', c = '7f8fad5b-d9cb-469f-a165-70867728950e'
+  saveProfile(a, { plugins: {}, skills: {}, indefinite: 111 }, dir)
+  saveProfile(b, { plugins: {}, skills: {} }, dir)
+  assert.deepEqual(syncIndefinite(dir, file), { [a]: 111 })
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { [a]: 111 })
+  assert.equal(cleanProfile({ plugins: {}, skills: {}, indefinite: 111 }, inv).indefinite, 111)
+  assert.equal(indefiniteOn(a, dir), 111)
+  // handoff: the fresh id gets it, the old id drops it
+  const carried = readProfiles([a], dir)[a]
+  handoffSettings(a, c, carried, dir)
+  clearIndefinite(a, dir, file)
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { [c]: 111 })
+  assert.equal(readProfiles([a], dir)[a].indefinite, undefined)
+  // done: cleared everywhere
+  assert.equal(clearIndefinite(c, dir, file)?.indefinite, undefined)
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {})
+  assert.deepEqual(clearIndefinite(b, dir, file), { plugins: {}, skills: {} })
+  assert.equal(clearIndefinite('8f8fad5b-d9cb-469f-a165-70867728950e', dir, file), undefined)
+})
+
+test('indefinite: a budget widens the file entry, a plain number still reads as onAt', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
+  const file = path.join(dir, 'indefinite.json')
+  const a = '5f8fad5b-d9cb-469f-a165-70867728950e', b = '6f8fad5b-d9cb-469f-a165-70867728950e'
+  saveProfile(a, { plugins: {}, skills: {}, indefinite: 111, budget: { maxHours: 2, gate: 'pnpm test' } }, dir)
+  saveProfile(b, { plugins: {}, skills: {}, indefinite: 222, budget: {} }, dir)
+  assert.deepEqual(syncIndefinite(dir, file), { [a]: { onAt: 111, maxHours: 2, gate: 'pnpm test' }, [b]: 222 })
+  assert.equal(indefiniteOn(a, dir), 111)
+  const kept = cleanProfile({ plugins: {}, skills: {}, indefinite: 1, budget: { maxCostUsd: 5 }, checkBack: { everyMin: 30, count: 2 } }, inv)
+  assert.deepEqual([kept.budget, kept.checkBack], [{ maxCostUsd: 5 }, { everyMin: 30, count: 2 }])
+  // done drops the budget with the flag, the check-back stays
+  saveProfile(a, { plugins: {}, skills: {}, indefinite: 111, budget: { maxHours: 2 }, checkBack: { everyMin: 10, count: 0 } }, dir)
+  const rest = clearIndefinite(a, dir, file)
+  assert.deepEqual([rest?.budget, rest?.checkBack], [undefined, { everyMin: 10, count: 0 }])
 })

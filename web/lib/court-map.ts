@@ -4,19 +4,24 @@ import type { ChatProgress, HubState, WindowColor } from './hub-types'
 import { byWindow } from './windows'
 import { ORDER, almostDone, missedCount } from '../components/switchboard/look'
 import type { MemoryGraph } from './memory-graph'
+import { limitTag } from './budget-ui'
+import { chatRun, raiseLine, raisesFor, stageView } from './stages-ui'
 import { armoryList, gardenList, keyList, mapList, memoryTally, studyList, todoList, towerList, uploadList, uploadSummary, type Item } from './court-places'
 
 export type CourtState = 'working' | 'waiting' | 'done' | 'needs' | 'idle'
-/** x, y: top left corner in world px; the council's center sits on 0,0. */
-export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Done with this many requests Jev found not covered (look.ts almostDone). */ missed?: number; /** Problems a place flags (memory health, missing keys). */ warn?: number }
+/** x, y: top left corner in world px; the council's center sits on 0,0.
+ * Yards: group is the split id its chat was started from (siblings share it, Court.ties joins them); waitsOn names the chats it waits on, for a "Waiting on X" line. The wait rope itself comes from board-fx ropesOf. */
+export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Done with this many requests Jev found not covered (look.ts almostDone). */ missed?: number; /** Problems a place flags (memory health, missing keys). */ warn?: number; /** A desk's role raised to this model (stages-ui raiseLine says why). */ model?: string; raise?: string; group?: string; /** Run indefinitely limits and check-back, one quiet line (budget-ui limitTag). */ limits?: string; waitsOn?: string[] }
 /** Ring places after the AIs, in ring order. */
 export const PLACES = ['garden', 'armory', 'library', 'notice', 'tower', 'study', 'treasury', 'maps', 'uploads'] as const
 export type Place = typeof PLACES[number]
 const PLACE_NAME: Record<Place, string> = { garden: 'Tea garden', armory: 'Armory', library: 'Memory library', notice: 'Notice board', tower: 'Signal tower', study: 'Study hall', treasury: 'Treasury', maps: 'Map room', uploads: 'Uploads' }
 /** points: world px, from's center first. */
 export type CourtLink = { from: string; to: string; points: [number, number][] }
-/** bounds: size of the box around every node. */
-export type Court = { nodes: CourtNode[]; links: CourtLink[]; bounds: { w: number; h: number }; petition?: { deskId: string; path: [number, number][] } }
+/** A tether between sibling yards of one split, chained in chat order; points: yard centers. */
+export type CourtTie = { from: string; to: string; group: string; points: [number, number][] }
+/** bounds: size of the box around every node. ties: group tethers, apart from links so placement ignores them. */
+export type Court = { nodes: CourtNode[]; links: CourtLink[]; ties: CourtTie[]; bounds: { w: number; h: number }; petition?: { deskId: string; path: [number, number][] } }
 export type Lod = 'card' | 'plate' | 'dot'
 /** The desk plate board.tsx draws under a desk, in CSS px. */
 export const PLATE = { minW: 100, maxW: 150, h: 46 }
@@ -139,15 +144,15 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const all = [...new Set(runs.map(r => r.role))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
     // engineer-codex / qa-codex desks go in the Codex realm, not the yard; a Codex chat has no Codex realm.
     const codexRoles = ai === 'codex' ? [] : all.filter(isCodex), roles = all.filter(r => !codexRoles.includes(r))
-    // A Claude chat's own subagents live in a Claude realm like any other AI's; the yard keeps the lead. A Codex chat's own stay in its yard.
-    const claudeRoles = ai === 'claude' ? roles : [], yardRoles = ai === 'claude' ? [] : roles
-    const deskRoles = (x: string) => x === 'codex' ? codexRoles : x === 'claude' ? claudeRoles : []
-    const runsIn = (x: string) => x === 'codex' ? runs.filter(s => isCodex(s.role)) : x === 'claude' ? runs.filter(s => claudeRoles.includes(s.role)) : []
+    // The yard is the chat's own AI realm: lead and own subagents sit in it.
+    const deskRoles = (x: string) => x === 'codex' ? codexRoles : []
+    const runsIn = (x: string) => x === 'codex' ? runs.filter(s => isCodex(s.role)) : []
     const grid = (n: number) => { const cols = Math.min(COLS, n), rows = Math.ceil(n / COLS); return { w: 2 * PAD + cols * DESK.w + (cols - 1) * DGAP, h: TOP + PAD + rows * (DESK.h + ROOM) } }
-    const size = grid(yardRoles.length + 1)
+    // One slot past the desks stays free for the yard's landmark (markSpot).
+    const size = grid(roles.length + 2)
     // Realms: one per other AI this chat handed work to, never the chat's own AI.
     const helpers = p?.helpers ?? []
-    const realmAis = [...new Set([...(claudeRoles.length ? ['claude'] : []), ...(codexRoles.length ? ['codex'] : []), ...helpers.map(x => x.ai)])].filter(x => x !== ai || deskRoles(x).length)
+    const realmAis = [...new Set([...(codexRoles.length ? ['codex'] : []), ...helpers.map(x => x.ai)])].filter(x => x !== ai)
     const realmSize = (x: string) => deskRoles(x).length ? grid(deskRoles(x).length) : REALM
     const rgap = Math.round(RGAP + 0.4 * Math.max(0, ...realmAis.map(x => realmSize(x).h)))
     const rim = realmAis.length ? { w: Math.max(...realmAis.map(x => realmSize(x).w)), h: realmAis.reduce((s, x) => s + realmSize(x).h + rgap, -rgap) } : { w: 0, h: 0 }
@@ -178,8 +183,12 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const yard = { ...spotFor, x: spotFor.x + (left ? side : 0), y: spotFor.y + Math.round((whole.h - size.h) / 2), w: size.w, h: size.h }
     const missed = almostDone(p) ? missedCount(p) : undefined
     const ask = state === 'needs' ? p?.question ?? p?.ask?.preview ?? p?.asks?.[0]?.preview : undefined
-    const leadTask = tasks.find(t => t.status === 'in_progress' && (!t.role || t.role === 'lead'))?.subject
-    Object.assign(yard, { id: `yard:${c.sessionId}`, kind: 'courtyard', label: c.name ?? c.project ?? 'chat', ai, chatId: c.sessionId, state, task: leadTask, since: p?.startedAt, ask, parent: hub.id, from, missed })
+    // Advanced mode: the stage line stands in for the lead's task.
+    const run = chatRun(h, c.sessionId), raised = raisesFor(h, c.cwd)
+    const leadTask = (run && stageView(run.run.stages).line) || tasks.find(t => t.status === 'in_progress' && (!t.role || t.role === 'lead'))?.subject
+    const group = c.group, on = (h.links ?? []).filter(l => l.from === c.sessionId).flatMap(l => l.to)
+    const waitsOn = on.length ? on.map(id => h.chats.find(x => x.sessionId === id)?.name ?? id.slice(0, 8)) : undefined
+    Object.assign(yard, { id: `yard:${c.sessionId}`, kind: 'courtyard', label: c.name ?? c.project ?? 'chat', ai, chatId: c.sessionId, state, task: leadTask, since: p?.startedAt, ask, parent: hub.id, from, missed, group, waitsOn, limits: limitTag(c) || undefined })
     nodes.push(yard); link(hub, yard); yardsOf.set(key, [...yardsOf.get(key) ?? [], yard])
 
     // Docked off the yard's rim, stacked top down, the stack centered on the yard.
@@ -190,7 +199,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
       const working = mine.some(h => h.state === 'working') || codexRuns.some(s => s.state === 'active')
       const latest = [...mine].sort((a, b) => b.last - a.last)[0]
       const n: CourtNode = { id: `realm:${c.sessionId}:${x}`, kind: 'realm', x: left ? spotFor.x + PLQ + (rim.w - r.w) : yard.x + yard.w + DOCK, y: rimY, ...r, label: `${(NAMES[x] ?? x).toUpperCase()} REALM`,
-        sub: `${x === ai ? '' : `from ${NAMES[ai] ?? ai} · `}${c.name ?? c.project ?? 'chat'}`, ai: x, chatId: c.sessionId, parent: yard.id,
+        sub: `from ${NAMES[ai] ?? ai} · ${c.name ?? c.project ?? 'chat'}`, ai: x, chatId: c.sessionId, parent: yard.id,
         state: working ? 'working' : mine.some(h => h.state === 'done') || codexRuns.length ? 'done' : 'idle',
         task: latest?.label ?? (deskRoles(x).length ? tasks.find(t => t.status === 'in_progress' && t.role && deskRoles(x).includes(t.role))?.subject : undefined), since: working ? Math.max(...mine.filter(h => h.state === 'working').map(h => h.since), ...codexRuns.filter(s => s.state === 'active').map(s => s.startedAt)) : undefined,
         runs: mine.length ? mine.reduce((t, h) => t + h.count, 0) : codexRuns.length }
@@ -208,16 +217,17 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const roleDesk = (k: number, role: string, box = yard) => {
       const mine = runs.filter(r => r.role === role), active = mine.filter(r => r.state === 'active')
       // engineer-codex / qa-codex: a Claude lead's job handed to Codex; the normal desk with a Codex badge, in the Codex realm.
-      const codex = /^(.+)-codex$/.exec(role.split(':').pop()!)
+      const codex = /^(.+)-codex$/.exec(role.split(':').pop()!), up = raised[codex?.[1] ?? role.split(':').pop()!]
       desk(k, role, {
         ...(codex ? { role: codex[1], label: codex[1], ai: 'codex' } : {}),
         state: active.length ? 'working' : 'done', runs: mine.length, shipped: mine.filter(r => r.state === 'done').length,
         since: active.length ? Math.max(...active.map(r => r.startedAt)) : undefined,
         task: tasks.find(t => t.status === 'in_progress' && t.role === role)?.subject,
+        ...(up ? { model: up.to, raise: raiseLine(up) } : {}),
       }, box)
     }
-    yardRoles.forEach((role, i) => roleDesk(i + 1, role))
-    for (const x of ['claude', 'codex']) { const home = realms.get(x); if (home) deskRoles(x).forEach((role, i) => roleDesk(i, role, home)) }
+    roles.forEach((role, i) => roleDesk(i + 1, role))
+    const cx = realms.get('codex'); if (cx) codexRoles.forEach((role, i) => roleDesk(i, role, cx))
   }
   // The other places go last, fanned out from the armory and garden like courtyards from a pavilion, so they never crowd a chat's fan.
   const shelf: Record<string, Place[]> = { armory: ['library', 'treasury', 'study', ...(files.length ? ['uploads' as const] : [])], garden: ['notice', 'tower', 'maps'] }
@@ -239,8 +249,14 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const desks = nodes.filter(d => d.kind === 'desk' && d.ai === n.ai && d.runs !== undefined)
     if (desks.length) { n.runs = desks.reduce((s, d) => s + d.runs!, 0); n.shipped = desks.reduce((s, d) => s + d.shipped!, 0) }
   }
+  const ties: CourtTie[] = [], last = new Map<string, CourtNode>()
+  for (const y of nodes.filter(n => n.kind === 'courtyard' && n.group)) {
+    const prev = last.get(y.group!)
+    if (prev) ties.push({ from: prev.id, to: y.id, group: y.group!, points: [mid(prev), mid(y)] })
+    last.set(y.group!, y)
+  }
   const xs = nodes.flatMap(n => [n.x, n.x + n.w]), ys = nodes.flatMap(n => [n.y, n.y + n.h])
-  return { nodes, links, bounds: { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }, petition }
+  return { nodes, links, ties, bounds: { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }, petition }
 }
 
 // Walks outward from the pavilion, fanning side to side within its sector, until the island and its bridge clear everything placed so far.
@@ -265,6 +281,10 @@ function place(nodes: CourtNode[], links: CourtLink[], home: CourtNode, a0: numb
   }
   return { n, fit: false }
 }
+
+/** Base of a yard's landmark in world px: low in the free slot after its k desks, so it clears the plate above. */
+export const markSpot = (yard: CourtNode, k: number): [number, number] =>
+  [yard.x + PAD + (k % COLS) * (DESK.w + DGAP) + DESK.w / 2, yard.y + TOP + PAD + Math.floor(k / COLS) * (DESK.h + ROOM) + 80]
 
 /** Roughly where board.tsx hangs a realm's plaque, in world px at zoom z: beside it, away from its courtyard. */
 export function realmPlaque(r: CourtNode, yard: CourtNode, z = 0.5) {

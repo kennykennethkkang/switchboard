@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { armoryList, gardenList, keepGraph, keyList, memoryTally, studyList, todoList, towerList, uploadList, uploadSummary, withDemoLearn } from './court-places'
+import { armoryList, gardenList, keepGraph, keyList, memoryTally, studyList, todoList, todoRef, towerList, uploadList, uploadSummary, withDemoLearn } from './court-places'
 import { demoGraph } from './memory-graph'
 import { emptyHub } from './hub-demo'
 import type { HubState } from './hub-types'
@@ -92,4 +92,10 @@ test('uploads: none, or an older extension with no field, gives nothing', () => 
   assert.deepEqual(uploadList(hub({})), [])
   assert.deepEqual(uploadList(hub({ uploads: {} })), [])
   assert.equal(uploadSummary(hub({})), undefined)
+})
+
+test('todoRef splits a notice row id back into project and item', () => {
+  assert.deepEqual(todoRef('/w/a\n1'), { path: '/w/a', id: '1' })
+  assert.equal(todoRef('rc'), undefined)
+  assert.equal(todoRef(undefined), undefined)
 })

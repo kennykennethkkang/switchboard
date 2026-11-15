@@ -35,7 +35,7 @@ function exec(file: string, args: string[], timeoutMs: number, cwd?: string, inp
   return new Promise(resolve => {
     const c = execFile(file, args, { cwd, timeout: timeoutMs, maxBuffer: 8 << 20, windowsHide: true, env: ENV }, (err, out, e) =>
       resolve({ ok: !err, out: String(out), err: err?.killed ? `${path.basename(file)} timed out` : String(e) || err?.message || '' }))
-    if (input !== undefined) c.stdin?.end(input)
+    if (input !== undefined) { c.stdin?.on('error', () => {}); c.stdin?.end(input) }
   })
 }
 
@@ -113,7 +113,11 @@ export function pickFiles(listed: RepoFile[], asked: string[]): RepoFile[] | str
   return got
 }
 
-const status = async (root: string) => parseRepoStatus((await git(root, ['status', '--porcelain=v2', '--branch', '-z', '-uall'])).out)
+const status = async (root: string) => {
+  const r = await git(root, ['status', '--porcelain=v2', '--branch', '-z', '-uall'])
+  if (!r.ok) throw new Error(why(r))
+  return parseRepoStatus(r.out)
+}
 const config = async (root: string, key: string) => (await git(root, ['config', '--get', key])).out.trim()
 const branches = async (root: string) => (await git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])).out.split('\n').filter(Boolean)
 
@@ -325,6 +329,24 @@ async function stage(root: string, paths: string[]): Promise<Ran> {
   return real.length ? git(root, [LIT, 'add', '-A', '--', ...real]) : { ok: true, out: '', err: '' }
 }
 
+/** Unstages everything but keep, so a commit with no pathspec records just those and hooks write the real index. */
+async function stageOnly(root: string, keep: string[]): Promise<Ran & { extra: string[] }> {
+  const d = await git(root, [LIT, 'diff', '--cached', '--no-renames', '--name-only', '-z'])
+  if (!d.ok) return { ...d, extra: [] }
+  const k = new Set(keep), extra = d.out.split('\0').filter(p => p && !k.has(p))
+  return { ...(extra.length ? await git(root, [LIT, 'reset', '-q', '--', ...extra]) : d), extra }
+}
+
+/** After a commit: puts the unstaged paths back as tree had them, skipping any the commit or a hook touched. */
+async function restage(root: string, tree: string | undefined, paths: string[]): Promise<void> {
+  if (!tree || !paths.length) return
+  const names = async (args: string[]) => (await git(root, [LIT, ...args])).out.split('\0')
+  const [made, now] = await Promise.all([names(['diff-tree', '--root', '--no-commit-id', '--no-renames', '-r', '--name-only', '-z', 'HEAD']), names(['diff', '--cached', '--no-renames', '--name-only', '-z'])])
+  const touched = new Set([...made, ...now])
+  const back = paths.filter(p => !touched.has(p))
+  if (back.length) await git(root, [LIT, 'reset', '-q', tree, '--', ...back])
+}
+
 /** The message without attribution trailers. */
 export const cleanMessage = (text: string) => text.split('\n').filter(l => !/^\s*(co-authored-by|claude-session):/i.test(l)).join('\n').trim()
 
@@ -421,6 +443,29 @@ async function removeUntracked(root: string, files: RepoFile[]): Promise<string 
   return undefined
 }
 
+type Parked = { file: string; temp: string; dir: string }
+async function parkFiles(root: string, files: RepoFile[]): Promise<Parked[]> {
+  const moved: Parked[] = []
+  try {
+    for (const f of files) {
+      const file = path.join(root, f.path), dir = await fs.promises.mkdtemp(path.join(path.dirname(file), '.switchboard-'))
+      const temp = path.join(dir, path.basename(file))
+      try { await fs.promises.rename(file, temp) } catch (err) { await fs.promises.rmdir(dir); throw err }
+      moved.push({ file, temp, dir })
+    }
+    return moved
+  } catch (err) {
+    await unparkFiles(moved)
+    throw err
+  }
+}
+async function unparkFiles(moved: Parked[]): Promise<void> {
+  for (const { file, temp, dir } of moved.reverse()) {
+    await fs.promises.rename(temp, file)
+    await fs.promises.rmdir(dir)
+  }
+}
+
 /** One button press. Refuses rather than guesses; confirmed comes from the in-page confirm. */
 /** Holds off an update reload while the op runs. */
 export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
@@ -450,11 +495,21 @@ async function runOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
       // Agent files the user checked still go in, untouched.
       const sc = await scrub(root, shipFiles(files).take)
       const gone = sum.count + desc.count + sc.n
+      // Anything else already staged stays out, and goes back after. No pathspec: a pathspec commit uses a temp index that hooks' git add never leaves.
+      const tree = (await git(root, ['write-tree'])).out.trim() || undefined
+      const only = await stageOnly(root, paths)
+      if (!only.ok) return putBack(root, sc, paths, why(only))
       const add = await stage(root, paths)
       if (!add.ok) return putBack(root, sc, paths, why(add))
-      // The paths again so anything else already staged stays out of this commit. Hooks may run, hence the long timeout.
-      const made = await git(root, [LIT, ...args, '--', ...paths], SLOW)
-      if (!made.ok) return putBack(root, sc, paths, why(made))
+      // Hooks may run, hence the long timeout.
+      const made = await git(root, [LIT, ...args], SLOW)
+      if (!made.ok) {
+        const out = await putBack(root, sc, paths, why(made))
+        // Nothing was recorded, so the index goes back exactly as the user had it.
+        if (tree) await git(root, [LIT, 'read-tree', tree])
+        return out
+      }
+      await restage(root, tree, only.extra)
       dropPending(root)
       const done = `Committed ${plural(files.length, 'file')} to ${s.branch}`
       if (c.op === 'commit') return { ok: true, text: done + removed(gone) }
@@ -484,20 +539,24 @@ async function runOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
         const sum = cleanInvisible(c.summary ?? '', false), desc = cleanInvisible(cleanMessage(c.description ?? ''), false)
         const args = commitArgs(sum.text, desc.text)
         if (typeof args === 'string') return no(args)
-        // Agent files out of the index, the rest in, then commit the index as it stands. --no-renames: a rename lists both sides.
-        const out = kept.flatMap(f => (f.from ? [f.from, f.path] : [f.path]))
-        const staged = out.length ? (await git(root, [LIT, 'diff', '--cached', '--no-renames', '--name-only', '-z', '--', ...out])).out.split('\0').filter(Boolean) : []
-        if (staged.length) {
-          const r = await git(root, [LIT, 'reset', '-q', '--', ...staged])
-          if (!r.ok) return no(why(r))
-        }
+        // Index holds only the confirmed paths (agent files and anything staged since out), then commit it with no pathspec.
+        const commitPaths = take.flatMap(f => f.from ? [f.from, f.path] : [f.path])
+        const tree = (await git(root, ['write-tree'])).out.trim() || undefined
+        const only = await stageOnly(root, commitPaths)
+        if (!only.ok) return no(why(only))
         const ship = take.filter(f => !held.has(f.path))
-        const sc = await scrub(root, ship), shipPaths = ship.map(f => f.path)
+        const sc = await scrub(root, ship), shipPaths = ship.flatMap(f => f.from ? [f.from, f.path] : [f.path])
+        const parked = await parkFiles(root, take.filter(f => held.has(f.path)))
         gone = sum.count + desc.count + sc.n
         const add = await stage(root, shipPaths)
-        if (!add.ok) return putBack(root, sc, shipPaths, why(add))
-        const made = await git(root, args, SLOW)
-        if (!made.ok) return putBack(root, sc, shipPaths, why(made))
+        if (!add.ok) { await unparkFiles(parked); return putBack(root, sc, shipPaths, why(add)) }
+        const made = await git(root, [LIT, ...args], SLOW)
+        await unparkFiles(parked)
+        if (!made.ok) {
+          const out = await putBack(root, sc, shipPaths, why(made))
+          if (tree) await git(root, [LIT, 'read-tree', tree])
+          return out
+        }
         dropPending(root)
         done = `Committed ${plural(take.length, 'file')} to ${s.branch}`
       }
@@ -551,8 +610,14 @@ async function runOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
       const files = pickFiles(s.files, c.files ?? [])
       if (typeof files === 'string') return no(files)
       const tracked = files.filter(f => f.status !== 'untracked').flatMap(f => (f.from ? [f.from, f.path] : [f.path]))
-      if (tracked.length) {
-        const r = await git(root, [LIT, 'restore', '--source=HEAD', '--staged', '--worktree', '--', ...tracked])
+      const added = files.filter(f => f.status === 'added').map(f => f.path)
+      if (added.length) {
+        const r = await git(root, [LIT, 'rm', '--force', '--', ...added])
+        if (!r.ok) return no(why(r))
+      }
+      const restore = tracked.filter(p => !added.includes(p))
+      if (restore.length) {
+        const r = await git(root, [LIT, 'restore', '--source=HEAD', '--staged', '--worktree', '--', ...restore])
         if (!r.ok) return no(why(r))
       }
       const problem = await removeUntracked(root, files.filter(f => f.status === 'untracked'))

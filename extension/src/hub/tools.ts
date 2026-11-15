@@ -13,16 +13,24 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { SHELL, ask, shellQuote, type Shell } from './projects'
-import type { ChatProfile, Installed } from './types'
+import type { ChatProfile, IndefiniteEntry, Installed } from './types'
 import type { HubService } from './hub-service'
+import { writeJsonAtomic } from '../fs-utils'
 import { LIBRARY, libraryCopies, libraryInventory, projectInventory } from './local'
 
 export const PROFILES = path.join(os.homedir(), '.claude', 'switchboard', 'chat-profiles')
+/** Run indefinitely flags, { session id: IndefiniteEntry }: onAt alone as a number, or an object with the budget; owned here, read by the usage-meter mod. */
+export const INDEFINITE = path.join(os.homedir(), '.claude', 'switchboard', 'indefinite.json')
 // Off in a new chat; Kenneth can turn one on per chat, and tool_on can. Only real conflicts:
 // the second security-guidance runs the same hooks twice.
 export const FLAGGED: string[] = ['security-guidance@claude-code-plugins']
 // Plugins every chat keeps, by the name before the @.
 export const ALWAYS = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
+// Big niche bundles, off in a new chat so the rest of the skill listing keeps its descriptions.
+// Smart turns one on from its keywords (smart-tools.ts RULES), tool_on any time. Short name -> what it is for.
+export const GATED: Record<string, string> = { 'marketing-skills': 'SEO, copy, ads, pricing, launches', 'aws-core': 'AWS services', bland: 'voice agents and phone calls' }
+// Claude Code drops skill descriptions past this share of context (default 0.01).
+export const LISTING = { skillListingBudgetFraction: 0.02 }
 /** Appended to a profiled chat's system prompt, so it never asks for a tool. */
 export const TOOLS_NOTE = 'Every installed plugin and skill is yours to use without asking; if one is off, call the switchboard tool_on tool and use it at once from the file it points to.'
 
@@ -42,11 +50,11 @@ const fix = (id: string, on: boolean) => (ALWAYS.includes(short(id)) ? true : FL
 // Held by the sweep until Kenneth approves it: off in every chat, whatever the profile says.
 const heldNames = (inv: Installed[]) => new Set(inv.filter(i => i.held).map(i => i.name))
 
-/** A new chat's tools: everything on but FLAGGED, the library and what the sweep holds. */
+/** A new chat's tools: everything on but FLAGGED, GATED, the library and what the sweep holds. */
 export function defaultProfile(inv: Installed[]): ChatProfile {
   const held = heldNames(inv)
   return {
-    plugins: Object.fromEntries(plugins(inv).map(p => [p.name, !held.has(p.name) && fix(p.name, true)])),
+    plugins: Object.fromEntries(plugins(inv).map(p => [p.name, !held.has(p.name) && fix(p.name, !Object.hasOwn(GATED, short(p.name)))])),
     skills: Object.fromEntries(skills(inv).map(s => [s.name, !held.has(s.name) && !FLAGGED.includes(s.name)])),
     ...assetMap(inv, a => !isLib(a)),
   }
@@ -57,8 +65,11 @@ export function cleanProfile(p: ChatProfile, inv: Installed[]): ChatProfile {
   const d = defaultProfile(inv), held = heldNames(inv)
   const pick = (from: Record<string, boolean>, base: Record<string, boolean>) =>
     Object.fromEntries(Object.entries(base).map(([k, v]) => [k, held.has(k) ? false : typeof from[k] === 'boolean' && !ALWAYS.includes(short(k)) ? from[k] : v]))
-  return { plugins: pick(p.plugins ?? {}, d.plugins), skills: pick(p.skills ?? {}, d.skills), ...(d.assets ? { assets: pick(p.assets ?? {}, d.assets) } : {}) }
+  return { plugins: pick(p.plugins ?? {}, d.plugins), skills: pick(p.skills ?? {}, d.skills), ...(d.assets ? { assets: pick(p.assets ?? {}, d.assets) } : {}), ...keep(p) }
 }
+
+/** The Run indefinitely flag, its budget and the check-back ride every profile rewrite. */
+const keep = (p: ChatProfile) => ({ ...(p.indefinite ? { indefinite: p.indefinite } : {}), ...(p.budget ? { budget: p.budget } : {}), ...(p.checkBack ? { checkBack: p.checkBack } : {}) })
 
 /** Library looks a saved profile lacks (saved before the library shipped), added off so the panel can list them. */
 export function withLibrary(p: ChatProfile, lib: Installed[]): ChatProfile {
@@ -82,16 +93,21 @@ export function nameNote(name: string): string | undefined {
 }
 
 /** TOOLS_NOTE plus the design references left on, for --append-system-prompt. */
-export function toolsNote(p: ChatProfile): string {
+export function toolsNote(p: ChatProfile, held?: Set<string>): string {
   const refs = Object.entries(p.assets ?? {}).filter(([, on]) => on).map(([k]) => k)
-  return refs.length ? `${TOOLS_NOTE} Before any UI, styling or web design work, read these design references first: ${refs.join(', ')}.` : TOOLS_NOTE
+  // Held ones need Approve, not tool_on, so they stay out of the line.
+  const off = Object.entries(p.plugins).filter(([k, on]) => !on && Object.hasOwn(GATED, short(k)) && !held?.has(k)).map(([k]) => `${short(k)} (${GATED[short(k)]})`)
+  return [TOOLS_NOTE,
+    off.length ? `Off until needed, turn on with tool_on when the task calls for it: ${off.join(', ')}.` : '',
+    refs.length ? `Before any UI, styling or web design work, read these design references first: ${refs.join(', ')}.` : ''].filter(Boolean).join(' ')
 }
 
 // Read per write, so the Ask before actions switch reaches the next start or resume.
 // Asking also drops the .mcp.json auto-trust: a cloned repo's server runs its own commands.
+// LISTING rides here so a resume rewrites old settings files with it too.
 const mode = () => ask.claude
-  ? { permissions: { defaultMode: 'default' } }
-  : { permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
+  ? { ...LISTING, permissions: { defaultMode: 'default' } }
+  : { ...LISTING, permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
 
 export const profileSettings = (p: ChatProfile) => ({
   enabledPlugins: { ...p.plugins },
@@ -135,7 +151,8 @@ export function chatSettings(id: string | undefined, p: ChatProfile | undefined,
 /** A handoff's fresh chat takes the old one's tools and its Remote Control switch. off: start it without --remote-control too. */
 export function handoffSettings(from: string, to: string, p: ChatProfile | undefined, dir = PROFILES): { settings?: string; off: boolean } {
   const off = isNoRemote(from, dir)
-  return { settings: chatSettings(to, p, off, dir), off }
+  // A failed write still keeps off, so a To-do chat never starts on Remote Control.
+  try { return { settings: chatSettings(to, p, off, dir), off } } catch { return { off } }
 }
 
 /** Saved profiles by session id; ids without one are left out. */
@@ -190,7 +207,7 @@ function allOn(p: ChatProfile, lib: string): ChatProfile {
   const on = (m: Record<string, boolean>) => Object.fromEntries(Object.keys(m).map(k => [k, !FLAGGED.includes(k)]))
   const brand = (k: string) => /^design-md\/([^/]+)\//.exec(k)?.[1] ?? ''
   const copies = libraryCopies(Object.keys(p.assets ?? {}).map(brand).filter(Boolean), lib)
-  return { plugins: on(p.plugins), skills: on(p.skills), ...(p.assets ? { assets: Object.fromEntries(Object.entries(p.assets).map(([k, v]) => [k, v && !copies.has(brand(k))])) } : {}) }
+  return { plugins: on(p.plugins), skills: on(p.skills), ...(p.assets ? { assets: Object.fromEntries(Object.entries(p.assets).map(([k, v]) => [k, v && !copies.has(brand(k))])) } : {}), ...keep(p) }
 }
 
 /** A plugin (id or short name, either with :skill or :command) or a skill by name, on in the profile, and the file to read to use it now. */
@@ -230,4 +247,33 @@ export async function toolOn(hub: HubService, session: string, name: string): Pr
   const tools = hub.get().tools
   if (tools) hub.set({ tools: { ...tools, chats: { ...tools.chats, [session]: profile } } })
   return `${name} is on for this chat. Use it now from ${on.use}. Its slash commands and MCP tools load when the chat next starts.`
+}
+
+/** When Run indefinitely went on for a chat, from its saved profile. */
+export const indefiniteOn = (id: string, dir = PROFILES): number | undefined => readProfiles([id], dir)[id]?.indefinite
+
+/** Rewrites the flag file from every saved profile, so a profile and the file never disagree. */
+export function syncIndefinite(dir = PROFILES, file = INDEFINITE): Record<string, IndefiniteEntry> {
+  let ids: string[] = []
+  try { ids = fs.readdirSync(dir).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)) } catch { /* no profiles yet */ }
+  const out: Record<string, IndefiniteEntry> = {}
+  for (const [id, p] of Object.entries(readProfiles(ids, dir))) {
+    if (!p.indefinite) continue
+    out[id] = p.budget && Object.keys(p.budget).length ? { onAt: p.indefinite, ...p.budget } : p.indefinite
+  }
+  writeJsonAtomic(file, out)
+  return out
+}
+
+/** Turns the flag off for a chat (done, switched off, handed off) and rewrites the file; the profile it leaves, if it had one. */
+export function clearIndefinite(id: string, dir = PROFILES, file = INDEFINITE): ChatProfile | undefined {
+  const p = readProfiles([id], dir)[id]
+  let rest: ChatProfile | undefined
+  if (p?.indefinite) {
+    const { indefinite: _, budget: __, ...r } = p
+    rest = r
+    saveProfile(id, rest, dir)
+  } else rest = p
+  syncIndefinite(dir, file)
+  return rest
 }

@@ -16,7 +16,7 @@ import { Pick } from './gear'
 import './sign-ins.css'
 
 type Send = (c: HubCommand) => void
-type Problem = { text: string; at: number } | null
+type Problem = { text: string; at: number; for?: HubCommand } | null
 
 const NAME = /^[A-Za-z0-9._@+-]{1,64}$/
 const REGION = /^[a-z]{2}(-[a-z]+)+-\d{1,2}$/
@@ -321,7 +321,7 @@ function Profile({ p, hub, send, users, askedAt, onDelete, problem }: { p: AwsPr
     const t = setTimeout(() => setLate(true), 2500)
     return () => clearTimeout(t)
   }, [askedAt])
-  const why = askedAt && problem && problem.at >= askedAt && problem.text.startsWith('aws-delete failed') && problem.text.includes(p.name)
+  const why = askedAt && problem && problem.at >= askedAt && problem.for?.type === 'hub-aws-delete' && problem.for.profile === p.name
     ? problem.text.replace(/^aws-delete failed: /, '') : undefined
   const refused = why ?? (late ? `Not deleted. ${editorName(hub)} shows why in its notifications.` : undefined)
   const err = hub.signIns?.errors?.[`aws:${p.name}`]
@@ -456,6 +456,7 @@ function App({ app, hub, send }: { app: WebApp; hub: HubState; send: Send }) {
   const [url, setUrl] = useState(app.url)
   const [chrome, setChrome] = useState('')
   const [asking, setAsking] = useState(false)
+  // Only the first sign-in picks; once tenants show, the picker is gone and the project browser is used.
   const [newChrome, setNewChrome] = useState('')
   const bad = !!url && !URL_OK.test(url)
   const n = app.logins.length
@@ -464,7 +465,7 @@ function App({ app, hub, send }: { app: WebApp; hub: HubState; send: Send }) {
       <header>
         <h4 title={app.name}>{app.name}<small>{n}</small></h4>
         <span className="si-acts">
-          {app.cli && <button type="button" className="hub-btn" disabled={waiting(hub, app)} onClick={() => send({ type: 'hub-login-open', app: app.id, chrome: newChrome })}>{waiting(hub, app) ? 'Waiting for Chrome' : n ? 'Add tenants' : 'Sign in'}</button>}
+          {app.cli && <button type="button" className="hub-btn" disabled={waiting(hub, app)} onClick={() => send({ type: 'hub-login-open', app: app.id, chrome: n ? '' : newChrome })}>{waiting(hub, app) ? 'Waiting for Chrome' : n ? 'Add tenants' : 'Sign in'}</button>}
           <More name={app.name} items={[{ label: 'Delete app', danger: true, run: () => setAsking(true) }]} />
         </span>
       </header>

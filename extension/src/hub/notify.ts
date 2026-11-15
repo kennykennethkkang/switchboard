@@ -1,7 +1,7 @@
 /**
  * What Kenneth sees when a chat finishes or asks something: a VS Code notification,
  * a macOS one with a sound (a toast on Windows), and on Done the commit message in Source Control. Best effort:
- * a failure here never touches the chat. The phone push comes from the chat itself (rules.md); AWS sign-in also goes out as Web Push.
+ * a failure here never touches the chat. The phone push comes from the chat itself (rules.md), except Codex, which has no push tool: Switchboard sends it on Done. AWS sign-in also goes out as Web Push.
  */
 import * as vscode from 'vscode'
 import { execFile } from 'child_process'
@@ -9,12 +9,13 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { hub } from './hub-service'
+import { readArchive, trendOf } from './chains'
 import { focusChat } from './actions'
 import { noticeKind } from './background'
 import { phoneChange } from './phone'
 import { sendPush } from './web-push'
-import { desktopNotice, doneText, fillDraftBox, fillRepos, notifyStep, todayText, type Box } from './progress'
-import type { ChatProgress, ChatState, StuckItem } from './types'
+import { desktopNotice, doneText, fillDraftBox, fillRepos, notifyStep, indefiniteText, todayText, trendText, type Box } from './progress'
+import type { ChatProgress, ChatState, DailyTrend, StuckItem } from './types'
 
 const titleOf = (p: ChatProgress) => hub.get().chats.find(c => c.sessionId === p.sessionId)?.name ?? p.cwd.split(/[\\/]/).pop() ?? 'A chat'
 
@@ -39,7 +40,7 @@ const notified = new Map<string, string>()
 
 /** A Done chat's commit messages into the Source Control boxes of this window's open repos: the plain one to the repo holding
  * its folder, each "Commit message (<folder>)" one to that repo. Every window runs it for every chat, mirrored ones too,
- * so a repo open in another window still gets its message. Merged into Switchboard's uncommitted text, never over Kenneth's. */
+ * so a repo open in another window still gets its message. Merged on top of whatever the box holds. */
 const gitRepos = () => vscode.extensions.getExtension<{ getAPI(v: 1): { repositories: { rootUri: vscode.Uri; inputBox: { value: string } }[] } }>('vscode.git')?.exports?.getAPI(1)?.repositories ?? []
 
 export function fillBoxes(p: ChatProgress | undefined): void {
@@ -64,6 +65,7 @@ export function notify(change: { from?: ChatState; to: ChatProgress }): void {
     fillBoxes(p)
     const what = doneText(p)
     mac(title, what)
+    if (hub.get().chats.find(c => c.sessionId === p.sessionId)?.ai === 'codex') void sendPush(title, what)
     toast(false, `Switchboard: ${title}: ${what.replace(/[.!?]$/, '')}.`, 'Show', () => focusChat(p.sessionId))
   } else if (p.state === 'needs-you') {
     mac(title, p.question ?? 'Needs you')
@@ -87,6 +89,12 @@ export function notifyPaused(sessionId: string, why: string): void {
   toast(true, `Switchboard: ${title}: paused, waiting on you for ${why}.`, 'Show', () => focusChat(sessionId))
 }
 
+/** Run indefinitely ended; the mod's usage and reason ride along. */
+export function notifyIndefiniteDone(sessionId: string, usage?: string, reason?: string): void {
+  const title = hub.get().chats.find(c => c.sessionId === sessionId)?.name ?? 'A chat'
+  toast(false, indefiniteText(title, usage, reason), 'Show', () => focusChat(sessionId))
+}
+
 /** An AWS session about to end, with one tap to sign in again in its Chrome profile. */
 export function notifyAwsExpiry(profile: string, leftMs: number, signIn: () => void): void {
   const label = hub.get().aws.find(a => a.name === profile)?.label
@@ -106,8 +114,14 @@ export function dailySummary(now = Date.now()): void {
   const day = d.toDateString()
   try { if (fs.readFileSync(SENT, 'utf8') === day) return } catch { /* never sent */ }
   try { fs.writeFileSync(SENT, day) } catch { return }
-  const text = todayText(hub.get().progress, titleOf, now)
+  const text = [todayText(hub.get().progress, titleOf, now), trendText(dailyTrend(now))].filter(Boolean).join('. ')
   if (!text) return
   mac('Switchboard today', text)
   toast(false, `Switchboard today: ${text}.`)
 }
+
+/** Yesterday's chats run, cost, approved and sent back, each against the day before and the same weekday last week (local hub archive). */
+export function dailyTrend(now = Date.now()): DailyTrend {
+  return trendOf(readArchive(), now)
+}
+

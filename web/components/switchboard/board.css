@@ -28,13 +28,22 @@
 .board-cast dt { font-weight: 600; color: #f4f1ea; }
 .board-cast dd { margin: 0; color: #a29cae; }
 @media (pointer: coarse) { .board-cast summary { min-height: 44px; min-width: 44px; justify-content: center; margin: -14px -6px; } }
-.board-need { color: #fff; border-color: var(--b-hot); background: color-mix(in srgb, var(--b-hot) 22%, transparent); }
+.board-need { order: -1; color: #fff; border-color: var(--b-hot); background: color-mix(in srgb, var(--b-hot) 22%, transparent); }
 .board-need i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--b-hot); }
 @media (prefers-reduced-motion: no-preference) { .board-need i { animation: board-blink 1.2s steps(2) infinite; } }
 @keyframes board-blink { 50% { opacity: 0.25; } }
 .board-z { min-width: 36px; justify-content: center; }
+/* Zoom stack on the canvas corner, same spot and shape as the Code map's controls. */
+.board-zoom { position: absolute; right: 16px; bottom: 56px; z-index: 3; display: flex; flex-direction: column; border: 1px solid var(--hub-hair-strong); border-radius: 10px; background: var(--hub-card); box-shadow: var(--hub-shadow-pop); overflow: hidden; }
+.board-zoom .hub-btn { display: inline-flex; min-width: 44px; min-height: 40px; justify-content: center; border: 0; border-radius: 0; background: none; }
+.board-zoom .hub-btn + .hub-btn { border-top: 1px solid var(--hub-hair); }
+.board:has(.bp) .board-zoom { right: 408px; }
+.board-keys { display: inline-flex; gap: 3px; align-items: center; justify-content: center; padding: 6px 4px; border-top: 1px solid var(--hub-hair); color: var(--hub-ash); }
+.board-keys kbd { min-width: 16px; padding: 2px 4px; box-sizing: border-box; border: 1px solid var(--hub-hair); border-radius: 4px; font: 400 11px/1 var(--hub-mono); text-align: center; }
+@media (pointer: coarse) { .board-keys { display: none; } }
 @media (pointer: coarse) { .board-head .hub-btn, .board-skin select { min-height: 44px; min-width: 44px; } }
-@media (max-width: 600px) { .board-sub, .board-skin, .board-head .board-z { display: none; } .board-head { gap: 4px 8px; flex-wrap: wrap; } .board-meta { order: 9; flex: 1 0 100%; flex-wrap: nowrap; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 11px; } .board-head h2 { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; letter-spacing: 0; } .board-head .hub-btn { white-space: nowrap; } .board-need-word { display: none; } }
+@media (max-width: 760px) { .board-zoom { bottom: 150px; right: 10px; } .board:has(.bp) .board-zoom { display: none; } }
+@media (max-width: 600px) { .board-sub, .board-skin { display: none; } .board-head { gap: 4px 8px; flex-wrap: wrap; } .board-meta { order: 9; flex: 1 0 100%; flex-wrap: nowrap; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 11px; } .board-head h2 { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; letter-spacing: 0; } .board-head .hub-btn { white-space: nowrap; } .board-need-word { display: none; } }
 
 /* Side panel: hub panel chrome; a bottom sheet on a phone. */
 .bp { position: absolute; top: 12px; right: 12px; bottom: 12px; width: min(380px, calc(100% - 24px)); overflow-y: auto; overscroll-behavior: contain; padding: 18px 18px 24px; background: var(--hub-card); color: var(--hub-body); border: 1px solid var(--hub-hair-strong); border-radius: 12px; box-shadow: var(--hub-shadow-pop); font: 14px/1.5 var(--hub-sans); z-index: 2; }
@@ -47,6 +56,9 @@
 .bp-eye { margin: 0 0 4px; color: var(--hub-mute); font: 400 10px/1.4 Silkscreen, ui-monospace, monospace; letter-spacing: 0.06em; text-transform: uppercase; }
 .bp-pad { margin-top: 18px; }
 .bp-sub { margin: 4px 0 0; color: var(--hub-mute); font-size: 13px; }
+.bp-tie { display: flex; align-items: center; gap: 6px; color: var(--hub-teal); }
+.bp-tie::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.bp-tie[data-wait] { color: var(--hub-yellow); }
 .bp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 16px 0; background: var(--hub-hair); border: 1px solid var(--hub-hair); border-radius: 8px; overflow: hidden; }
 .bp-stats div { display: flex; flex-direction: column; padding: 10px 12px; background: var(--hub-canvas); }
 .bp-stats dd { order: -1; margin: 0; color: var(--hub-ink); font: 400 12px/1.4 Silkscreen, ui-monospace, monospace; font-variant-numeric: tabular-nums; }
@@ -97,3 +109,13 @@
 .bp-list li .hub-btn { flex: none; }
 .bp-acts { display: flex; gap: 6px; flex: none; }
 .bp-warn { color: var(--b-hot); }
+/* send row stays in reach at the bottom of a long panel */
+.bp-form { display: grid; gap: 8px; position: sticky; bottom: -24px; padding: 10px 0 24px; margin-bottom: -24px; background: var(--hub-card); border-top: 1px solid var(--hub-hair); }
+.bp-form .hub-btn { justify-self: start; min-height: 44px; }
+.bp-text { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--hub-hair); border-radius: 8px; background: var(--hub-canvas); color: var(--hub-ink); font: inherit; resize: vertical; }
+.bp-said { margin: 0; color: var(--hub-mute); font-size: 13px; overflow-wrap: anywhere; }
+.bp-said:empty { display: none; }
+@media (prefers-reduced-motion: no-preference) { .bp-said:not(:empty) { animation: bp-said 180ms var(--hub-ease-out); } }
+@keyframes bp-said { from { transform: translateY(4px); opacity: 0; } }
+.bp-link { min-height: 32px; padding: 0; border: 0; background: none; color: var(--hub-mute); font: 13px var(--hub-sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.bp-link:hover { color: var(--hub-ink); }

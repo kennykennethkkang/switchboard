@@ -7,9 +7,9 @@ import { execFileSync } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { claudeBinary, claudeCall, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
+import { claudeBinary, claudeCall, codexState, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
 // @ts-expect-error plain .mjs, no types
-import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, mirrorSkill, readKey, storeKey } from '../kit/setup-run.mjs'
+import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, mirrorAllSkills, mirrorSkill, readKey, storeKey } from '../kit/setup-run.mjs'
 
 const KIT: SetupKit = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'kit', 'setup.json'), 'utf8'))
 const fresh = { plugins: [], marketplaces: [], mcps: [], plain: [] as string[], skills: [] as string[], agentsSkills: [] as string[], codex: { plugins: [] as string[], marketplaces: [] as string[], mcps: [] as string[] }, key21st: false, modsDir: '/ext/kit/mods', skillsDir: '/ext/kit/skills' }
@@ -29,6 +29,10 @@ describe('setup steps', () => {
       assert.ok(fs.existsSync(path.join(dir, m, '.claude-plugin', 'plugin.json')), m)
       assert.ok(market.plugins.some((p: { name: string }) => p.name === m), m)
     }
+  })
+
+  it('ships done-check and bash-approve, which the generic rules promise', () => {
+    for (const m of ['done-check', 'bash-approve']) assert.ok(KIT.mods.includes(m), m)
   })
 
   it('ships the reel picks: pixelfx, humanizer, last30days and find-skills', () => {
@@ -105,23 +109,44 @@ describe('setup steps', () => {
   })
 
   it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
-    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain'])
-    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'self-improve', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain'] } }])
+    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal'] } }])
     assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
+  })
+
+  it('re-registers an old Codex ask entry that lacks --codex, which is what gives Codex chats_wait', () => {
+    const old = steps({ codex: { ...fresh.codex, mcps: ['switchboard'], askOld: true } }).filter(s => s.run?.[0] === 'codex' && s.run.includes('switchboard'))
+    assert.deepEqual(old.map(s => s.run!.slice(0, 4).join(' ')), ['codex mcp remove switchboard', 'codex mcp add switchboard'])
+    assert.ok(old[1].run!.includes('--codex'))
+    assert.deepEqual(steps({ codex: { ...fresh.codex, mcps: ['switchboard'] } }).filter(s => s.run?.[0] === 'codex' && s.run.includes('switchboard')), [])
+  })
+
+  it('reads whether the Codex switchboard entry has --codex', () => {
+    const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cx-')), 'config.toml')
+    const read = (t: string) => { fs.writeFileSync(f, t); return codexState(f) }
+    assert.equal(read('[mcp_servers.switchboard]\ncommand = "node"\nargs = ["/a/ask-server.mjs"]\n\n[mcp_servers.x]\nargs = ["--codex"]\n').askOld, true)
+    assert.equal(read('[mcp_servers.switchboard]\ncommand = "node"\nargs = ["/a/ask-server.mjs", "--codex"]\n').askOld, undefined)
+  })
+
+  it('ships the Codex plugin to Claude only', () => {
+    assert.equal(KIT.marketplaces['openai-codex'], 'openai/codex-plugin-cc')
+    const r = steps().map(s => s.run?.join(' '))
+    assert.ok(r.includes('claude plugin install codex@openai-codex'))
+    assert.ok(!r.some(l => l?.startsWith('codex') && l.includes('codex-plugin-cc')))
   })
 
   it('gives Codex the same marketplaces, plugins, mcps and ask tool, each needing codex', () => {
     const cx = steps().filter(s => s.run?.[0] === 'codex')
     const r = cx.map(s => s.run!.join(' '))
-    for (const [name, repo] of Object.entries(KIT.marketplaces)) assert.ok(r.includes(`codex plugin marketplace add ${repo}`), name)
-    for (const id of KIT.plugins) assert.ok(r.includes(`codex plugin add ${id}`), id)
+    for (const [name, repo] of Object.entries(KIT.marketplaces)) assert.equal(r.includes(`codex plugin marketplace add ${repo}`), name !== 'openai-codex', name)
+    for (const id of KIT.plugins) assert.equal(r.includes(`codex plugin add ${id}`), !id.endsWith('@openai-codex'), id)
     for (const m of KIT.mcps.filter(x => x.url && !x.keyHeader)) assert.ok(r.includes(`codex mcp add ${m.name} --url ${m.url}`), m.name)
     assert.ok(!r.some(l => l.includes('kenneth-mods')))
     // codex mcp add --url writes the entry, then waits on a browser login; the runner stops waiting after wait seconds.
     for (const m of KIT.mcps.filter(x => x.url && !x.keyHeader)) assert.deepEqual(cx.find(s => s.run!.includes(m.url!))?.wait, 20, m.name)
     assert.ok(steps().some(s => s.say?.includes('codex mcp login slack')))
-    assert.deepEqual(cx.find(s => s.run!.includes('switchboard')), { label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK] })
+    assert.deepEqual(cx.find(s => s.run!.includes('switchboard')), { label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK, '--codex'] })
     for (const s of cx) assert.ok(s.needs?.includes('codex'), s.label)
     const all = { plugins: KIT.plugins, marketplaces: Object.keys(KIT.marketplaces), mcps: [...KIT.mcps.map(m => m.name), 'switchboard', ...(KIT.tools ?? []).flatMap(t => t.mcp ? [t.mcp.name] : [])] }
     assert.deepEqual(steps({ codex: all }).filter(s => s.run?.[0] === 'codex'), [])
@@ -319,6 +344,27 @@ describe('setup runner', () => {
     fs.rmSync(home, { recursive: true, force: true })
   })
 
+  it('mirrors every skill folder Claude has into ~/.agents/skills, leaving any Codex already has', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mirror-'))
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    put(path.join(home, '.claude', 'skills', 'a', 'SKILL.md'), 'a')
+    put(path.join(home, '.claude', 'skills', 'a', 'refs', 'x.md'), 'x')
+    put(path.join(home, '.claude', 'skills', 'same', 'SKILL.md'), 'claude')
+    put(path.join(home, '.claude', 'skills', 'old', 'SKILL.md'), 'claude')
+    put(path.join(home, '.claude', 'skills', 'nomd', 'README.md'), 'no skill file')
+    put(path.join(home, '.claude', 'skills', '.hidden', 'SKILL.md'), 'h')
+    put(path.join(home, '.agents', 'skills', 'same', 'SKILL.md'), 'codex')
+    put(path.join(home, '.codex', 'skills', 'old', 'SKILL.md'), 'codex legacy')
+    const added = mirrorAllSkills(home)
+    assert.deepEqual(added, ['a'])
+    const agents = path.join(home, '.agents', 'skills')
+    assert.equal(fs.readFileSync(path.join(agents, 'a', 'refs', 'x.md'), 'utf8'), 'x')
+    assert.equal(fs.readFileSync(path.join(agents, 'same', 'SKILL.md'), 'utf8'), 'codex')
+    for (const n of ['old', 'nomd', '.hidden']) assert.ok(!fs.existsSync(path.join(agents, n)))
+    assert.deepEqual(mirrorAllSkills(home), [])
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
   it('copies own skills into ~/.agents/skills too, by the same rules', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-')), from = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-kit-'))
     fs.mkdirSync(path.join(from, 'aar'), { recursive: true })
@@ -405,7 +451,7 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
-    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab self-improve gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
+    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain memory-fix goal from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
     assert.match(out, /codex plugin add superpowers@superpowers-dev/)

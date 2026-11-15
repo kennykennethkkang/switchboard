@@ -80,7 +80,7 @@ test('finds and lists by alias too', () => {
 })
 
 test('words the health line in singular or plural, leaving out what is zero', () => {
-  const h = { dangling: ['a'], orphans: ['a', 'b'], duplicates: [], contradictions: [['a', 'b']] as [string, string][], superseded: [], invalid: ['a'], stale: ['a', 'b'] }
+  const h = { dangling: ['a'], orphans: ['a', 'b'], duplicates: [], contradictions: [['a', 'b']] as [string, string][], superseded: [], invalid: ['a'], stale: ['a', 'b'], loops: [] }
   assert.equal(healthLine(h), '1 note with broken links, 2 unlinked notes, 1 contradiction, 1 invalid note, 2 stale notes')
   assert.equal(healthLine({ ...h, dangling: [], orphans: [], contradictions: [], invalid: [], stale: [], duplicates: ['x', 'y'], superseded: ['s'] }), '2 shared names, 1 superseded note')
 })

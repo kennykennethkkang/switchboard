@@ -1,4 +1,4 @@
-// Switchboard's ask tool, plus todo_add, todo_done, tool_on and sweep: an MCP stdio server, no dependencies. The question goes to the terminal
+// Switchboard's ask tool, plus todo_add, todo_done, tool_on, sweep and discuss (and, under Codex, chats_check, chats_wait, hub_ask, hub_recall): an MCP stdio server, no dependencies. The question goes to the terminal
 // (an elicitation dialog) and to the Switchboard window at once; the first answer wins, the other is closed.
 import { createInterface } from 'node:readline'
 import { randomBytes } from 'node:crypto'
@@ -6,6 +6,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { checkInput, toSchema, fromContent, fromChoice, pickWindow } from './ask-core.mjs'
+import { checkText, waitStep, NO_HUB } from './chats.mjs'
 
 const DECLINED = 'The user declined to answer. Decide yourself and say what you decided.'
 const TOOL = {
@@ -75,6 +76,66 @@ function findWindow(workspace) {
   return pickWindow(workspace ? files.filter(d => d?.workspace === workspace) : files, cwd, alive)
 }
 
+// Codex has no hook mods, so it gets the chat-wait tools and the hub_ask and hub_recall brain tools here. Claude chats have the mods: registered with --codex or SWITCHBOARD_AI=codex only.
+const CODEX = process.argv.includes('--codex') || process.env.SWITCHBOARD_AI === 'codex'
+const SELF = CODEX ? 'codex' : 'claude'
+// Codex's MCP server has no thread id in its env, but every tools/call carries it in _meta.
+const sessionId = msg => process.env.CLAUDE_CODE_SESSION_ID || msg?.params?._meta?.threadId || process.env.CODEX_THREAD_ID || ''
+const cwdOf = () => process.env.CLAUDE_PROJECT_DIR || process.cwd()
+const DISCUSS_TOOL = {
+  name: 'discuss',
+  description: 'Hold a discussion with the other AI (Claude asks Codex, Codex asks Claude), headless and read-only in this folder. Returns the transcript and an Agreed on / Disagreed on summary. A turn can take minutes.',
+  inputSchema: { type: 'object', properties: { question: { type: 'string' }, with: { type: 'string', enum: ['claude', 'codex'], description: 'Defaults to the other AI' }, rounds: { type: 'integer', minimum: 1, maximum: 3 }, context: { type: 'string', description: 'Facts the other AI needs; no secrets' } }, required: ['question'] },
+}
+const CODEX_TOOLS = [
+  { name: 'chats_check', description: "This project's other live chats: name, AI, state, current task, the file each is editing, and its last report line.", inputSchema: { type: 'object', properties: {} } },
+  { name: 'chats_wait', description: 'Wait for other live chats in this project to finish (names or session ids from chats_check). Returns their reports when done, or after about four minutes with "still waiting"; then call it again. Continue on your own when the result says so; otherwise stop and ask the user.', inputSchema: { type: 'object', properties: { chats: { type: 'array', items: { type: 'string' } }, reason: { type: 'string' } }, required: ['chats', 'reason'] } },
+  { name: 'hub_ask', description: "Ask Switchboard's brain about this project's other live chats: who is on what, which files they are editing, what to pick up next. One short paid Haiku call per question; it knows nothing outside this project.", inputSchema: { type: 'object', properties: { question: { type: 'string' } }, required: ['question'] } },
+  { name: 'hub_recall', description: 'Search Switchboard memory, the knowledge graph of memory notes and the vault, before researching a topic. Answers the best matching notes and how they relate (supersedes, depends-on, part-of, contradicts, related). Free and local.', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+]
+const hubUrl = (win, p, more = '') => `http://127.0.0.1:${win.port}/hub${p}?token=${encodeURIComponent(win.hubToken)}${more}`
+const stateOf = win => fetch(hubUrl(win, '/state'), { signal: AbortSignal.timeout(3000) }).then(r => (r.ok ? r.json() : undefined), () => undefined)
+
+async function chats(msg) {
+  const win = findWindow()
+  if (!win) return reply(msg.id, NO_HUB)
+  if (msg.params.name === 'chats_check') return reply(msg.id, checkText(await stateOf(win), sessionId(msg), cwdOf()))
+  const a = msg.params.arguments ?? {}
+  // ponytail: links post to the home window only; the mod posts to every window.
+  const io = {
+    state: () => stateOf(win), now: () => Date.now(), sleep,
+    post: body => fetch(`http://127.0.0.1:${win.port}/hub`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: win.hubToken, ...body }), signal: AbortSignal.timeout(3000) }).catch(() => {}),
+  }
+  return reply(msg.id, await waitStep(io, { self: sessionId(msg), cwd: cwdOf(), chats: a.chats, reason: a.reason }))
+}
+
+/** hub_ask or hub_recall, through the window's /hub/ask and /hub/recall. */
+async function brain(msg) {
+  const ask = msg.params.name === 'hub_ask'
+  const q = ask ? msg.params.arguments?.question : msg.params.arguments?.query
+  if (typeof q !== 'string' || !q.trim()) return reply(msg.id, ask ? 'Give a question.' : 'Give a query.', true)
+  const win = findWindow()
+  if (!win) return reply(msg.id, ask ? 'No Switchboard window holds this folder, so the brain cannot answer.' : 'No Switchboard window holds this folder, so memory cannot be searched.')
+  const more = `&cwd=${encodeURIComponent(cwdOf())}&session=${encodeURIComponent(sessionId(msg))}&q=${encodeURIComponent(q.slice(0, 500))}`
+  const r = await fetch(hubUrl(win, ask ? '/ask' : '/recall', more), { signal: AbortSignal.timeout(60_000) })
+  const text = await r.text()
+  return r.ok ? reply(msg.id, text) : reply(msg.id, `${msg.params.name} failed: ${text || `status ${r.status}`}`, true)
+}
+
+/** discuss, through the window's /hub/discuss: up to five turns of five minutes. */
+async function discuss(msg) {
+  const a = msg.params?.arguments ?? {}
+  if (typeof a.question !== 'string' || !a.question.trim()) return reply(msg.id, 'Not asked: give a question.', true)
+  const win = findWindow()
+  if (!win) return reply(msg.id, 'Switchboard is not running here, so the other AI cannot be reached.', true)
+  const body = { question: a.question, cwd: cwdOf(), from: SELF, with: a.with, rounds: a.rounds, context: a.context }
+  const r = await fetch(hubUrl(win, '/discuss'), { method: 'POST', body: JSON.stringify(body), signal: AbortSignal.timeout(27 * 60_000) })
+  const text = await r.text()
+  if (!r.ok) return reply(msg.id, `Not discussed: ${text || `status ${r.status}`}`, true)
+  const res = JSON.parse(text)
+  return reply(msg.id, res.text, !!res.error)
+}
+
 let canElicit = false
 let nextId = 1
 const pending = new Map() // our request id -> resolve
@@ -86,10 +147,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 /** Posts the question, then polls until the window answers. On a failure (network, 404, 410) it finds the window again
  * and posts again, backing off, for RETRY_MS since the last good reply; answer is null after that. */
-function askHub(first, id, questions, signal) {
+function askHub(first, id, questions, signal, session) {
   let win = first
   const url = (p, more = '') => `http://127.0.0.1:${win.port}/hub/question${p}?token=${encodeURIComponent(win.hubToken)}${more}`
-  const body = JSON.stringify({ sessionId: process.env.CLAUDE_CODE_SESSION_ID ?? '', id, questions })
+  const body = JSON.stringify({ sessionId: session, id, questions })
   const post = () => fetch(url(''), { method: 'POST', body }).then(r => r.ok, () => false)
   let posted = post()
   const poll = async () => {
@@ -124,17 +185,19 @@ async function call(msg) {
   const { questions } = input
   const id = randomBytes(16).toString('hex')
   const ctl = new AbortController()
+  // Codex's own dialog comes back declined under bypass flags and would beat the hub; there the hub is the only path.
+  const elicit = canElicit && !CODEX
   const win = findWindow()
-  if (!canElicit && !win) return reply(msg.id, 'No way to reach the user here. Decide yourself and say what you decided.', true)
+  if (!elicit && !win) return reply(msg.id, 'No way to reach the user here. Decide yourself and say what you decided.', true)
 
   const eid = `sb-${nextId++}`
-  const dialog = canElicit ? new Promise(resolve => pending.set(eid, resolve)) : Promise.resolve({ error: { message: 'no dialog in this client' } })
-  if (canElicit) {
+  const dialog = elicit ? new Promise(resolve => pending.set(eid, resolve)) : Promise.resolve({ error: { message: 'no dialog in this client' } })
+  if (elicit) {
     const more = questions.length > 1 ? ` (and ${questions.length - 1} more)` : ''
     out({ id: eid, method: 'elicitation/create', params: { message: questions[0].question + more, requestedSchema: toSchema(questions) } })
   }
   const stopped = new Promise(resolve => calls.set(msg.id, () => resolve({ stop: true })))
-  const h = win && askHub(win, id, questions, ctl.signal)
+  const h = win && askHub(win, id, questions, ctl.signal, sessionId(msg))
   const done = () => { ctl.abort(); h?.done() }
 
   // A side that fails drops out; the other may still answer. None left: say so, never hang.
@@ -175,7 +238,7 @@ async function toolOn(msg) {
   if (!name) return reply(msg.id, 'Not changed: give the plugin or skill name.', true)
   const win = findWindow()
   if (!win) return reply(msg.id, 'Switchboard is not running here; use the plugin or skill anyway, from its files under ~/.claude.', true)
-  const r = await fetch(`http://127.0.0.1:${win.port}/hub/tool-on?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ session: process.env.CLAUDE_CODE_SESSION_ID ?? '', name }), signal: AbortSignal.timeout(5000) })
+  const r = await fetch(`http://127.0.0.1:${win.port}/hub/tool-on?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ session: sessionId(msg), name }), signal: AbortSignal.timeout(5000) })
   const text = await r.text()
   return r.ok ? reply(msg.id, text) : reply(msg.id, `Not changed: ${text || `status ${r.status}`}`, true)
 }
@@ -199,7 +262,7 @@ async function todo(msg) {
   if (add ? !s(a.text) : !s(a.id) && !s(a.text)) return reply(msg.id, add ? 'Not added: text is empty.' : 'Not changed: give the id or text of the item.', true)
   const win = findWindow()
   if (!win) return reply(msg.id, 'Switchboard is not running here, so the to-do was not changed.', true)
-  const body = { op: add ? 'add' : 'done', cwd: s(a.project) ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), text: s(a.text), id: add ? undefined : s(a.id), before: add ? s(a.before_id) ?? s(a.before_text) : undefined, session: process.env.CLAUDE_CODE_SESSION_ID || undefined }
+  const body = { op: add ? 'add' : 'done', cwd: s(a.project) ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), text: s(a.text), id: add ? undefined : s(a.id), before: add ? s(a.before_id) ?? s(a.before_text) : undefined, session: sessionId(msg) || undefined }
   const r = await fetch(`http://127.0.0.1:${win.port}/hub/todo?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify(body), signal: AbortSignal.timeout(5000) })
   const text = await r.text()
   return r.ok ? reply(msg.id, text) : reply(msg.id, `Not changed: ${text || `status ${r.status}`}`, true)
@@ -219,11 +282,15 @@ rl.on('line', l => {
     canElicit = !!m.params?.capabilities?.elicitation
     return out({ id: m.id, result: { protocolVersion: m.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'switchboard', version: '1' } } })
   }
-  if (m.method === 'tools/list') return out({ id: m.id, result: { tools: [TOOL, ...TODO_TOOLS] } })
+  if (m.method === 'tools/list') return out({ id: m.id, result: { tools: [TOOL, ...TODO_TOOLS, DISCUSS_TOOL, ...(CODEX ? CODEX_TOOLS : [])] } })
   if (m.method === 'tools/call') {
     if (m.params?.name === 'todo_add' || m.params?.name === 'todo_done') return void todo(m).catch(err => reply(m.id, `${m.params.name} failed: ${err.message}`, true))
     if (m.params?.name === 'tool_on') return void toolOn(m).catch(err => reply(m.id, `tool_on failed: ${err.message}`, true))
     if (m.params?.name === 'sweep') return void sweep(m).catch(err => reply(m.id, `sweep failed: ${err.message}`, true))
+    const n = m.params?.name
+    if (n === 'discuss') return void discuss(m).catch(err => reply(m.id, `discuss failed: ${err.message}`, true))
+    if (CODEX && (n === 'chats_check' || n === 'chats_wait')) return void chats(m).catch(err => reply(m.id, `${n} failed: ${err.message}`, true))
+    if (CODEX && (n === 'hub_ask' || n === 'hub_recall')) return void brain(m).catch(err => reply(m.id, `${n} failed: ${err.message}`, true))
     if (m.params?.name !== 'ask') return out({ id: m.id, error: { code: -32602, message: `Unknown tool ${m.params?.name}` } })
     return void call(m).catch(err => reply(m.id, `ask failed: ${err.message}`, true))
   }

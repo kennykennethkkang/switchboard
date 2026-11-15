@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { step, settle, finishedJobs, RUNNING_CAP_MS, commitMessage, commitMessages, commitTargets, fillBox, fillRepos, leftovers, mergeCommit, pendingAt, shouldNotify, notifyKey, notifyStep, canPrefill, plainText, askKeys, otherText, OTHER_MAX, dropAsk, askedQuestion, standup, doneText, almostDone, missed, todayText, newerVersion, desktopNotice, workText } from '../src/hub/progress'
+import { step, settle, finishedJobs, RUNNING_CAP_MS, commitMessage, commitMessages, commitTargets, fillBox, fillRepos, leftovers, mergeCommit, pendingAt, shouldNotify, notifyKey, notifyStep, canPrefill, plainText, askKeys, otherText, OTHER_MAX, dropAsk, askedQuestion, standup, doneText, almostDone, missed, todayText, newerVersion, trendText, desktopNotice, workText, indefiniteText } from '../src/hub/progress'
 import { coverageItems, parseScores } from '../src/hub/coverage'
 import { commandProblem } from '../src/hub/routes'
 import { HubService } from '../src/hub/hub-service'
@@ -226,15 +226,18 @@ test('mergeCommit: the new summary, the new lines, the old summary as a bullet, 
   assert.equal(mergeCommit('Same', 'Same\n\n- x'), 'Same\n\n- x')
 })
 
-test('fillBox: fresh into an empty box, never over Kenneth\'s text, and a chat finishing again swaps its own part', () => {
+test('fillBox: fresh into an empty box, merged on top of any text already there, and a chat finishing again swaps its own part', () => {
   const a1 = fillBox('', undefined, 'A', 'A one\n\n- a1')!
   assert.equal(a1.text, 'A one\n\n- a1')
   const b = fillBox(a1.text, a1, 'B', 'B one\n\n- b1')!
   assert.equal(b.text, 'B one\n\n- b1\n- A one\n- a1')
   const a2 = fillBox(b.text, b, 'A', 'A two\n\n- a2')!
   assert.equal(a2.text, 'A two\n\n- a2\n- B one\n- b1')
-  assert.equal(fillBox('my own words', a2, 'C', 'C'), undefined)
-  assert.equal(fillBox(`${a2.text} edited`, a2, 'C', 'C'), undefined)
+  // Kenneth's words, or a box from before a reload, stay under the new message.
+  const c = fillBox('my own words', a2, 'C', 'C one\n\n- c1')
+  assert.equal(c.text, 'C one\n\n- c1\n- my own words')
+  assert.equal(fillBox(c.text, c, 'D', 'D').text, 'D\n\n- C one\n- c1\n- my own words')
+  assert.equal(fillBox(`${a2.text} edited`, a2, 'C', 'C').text, 'C\n\n- A two\n- a2\n- B one\n- b1 edited')
   // A commit emptied it: only the new message.
   assert.deepEqual(fillBox('', a2, 'B', 'B two'), { text: 'B two', by: [['B', 'B two']] })
 })
@@ -258,7 +261,7 @@ test('fillRepos: each Done chat into this window\'s boxes, once each, merged acr
   fillRepos(repos, done('A', '/g/switchboard', 'A two\n\n- a2'), boxes, filled)
   assert.equal(own.inputBox.value, 'A two\n\n- a2\n- B one\n- b1')
   fillRepos(repos, done('C', '/g/mine', 'C'), boxes, filled)
-  assert.equal(mine.inputBox.value, 'Kenneth typed this')
+  assert.equal(mine.inputBox.value, 'C\n\n- Kenneth typed this')
   // Not done yet: nothing.
   fillRepos(repos, { ...done('D', '/g/switchboard', 'D'), state: 'working' as const }, boxes, filled)
   assert.equal(own.inputBox.value, 'A two\n\n- a2\n- B one\n- b1')
@@ -1119,13 +1122,13 @@ test('workText: anything else nudges with trailing words are not tasks', () => {
   assert.equal(workText('anything else to do with the receipts page, add CSV export', true), 'anything else to do with the receipts page, add CSV export')
 })
 
-test('pendingAt: every finished chat merged per repo, past Kenneth\'s typing, dropped once HEAD moves', () => {
+test('pendingAt: every finished chat merged per repo, dropped once HEAD moves', () => {
   const typed = { rootUri: { fsPath: '/p/pend' }, inputBox: { value: 'Kenneth typed this' } }
   const done = (sessionId: string, commit: string) => ({ sessionId, cwd: '/p/pend', state: 'done' as const, commit })
   const boxes = new Map(), filled = new Set<string>()
   fillRepos([typed], done('A', 'A one\n\n- a1'), boxes, filled)
   fillRepos([typed], done('B', 'B one\n\n- b1'), boxes, filled)
-  assert.equal(typed.inputBox.value, 'Kenneth typed this')
+  assert.equal(typed.inputBox.value, 'B one\n\n- b1\n- A one\n- a1\n- Kenneth typed this')
   const p = pendingAt('/p/pend', 'h1')!
   assert.equal(p.text, 'B one\n\n- b1\n- A one\n- a1')
   assert.equal(p.last, 'B one')
@@ -1156,4 +1159,17 @@ test('pendingAt: a commit made elsewhere drops only the parts from before it, ne
   const p = pendingAt('/p/moved', 'H2')!
   assert.equal(p.text, 'B one\n\n- b1')
   assert.equal(p.last, 'B one')
+})
+
+test('trendText shows arrows against day and week, empty with no chats', () => {
+  const v = (value: number, vsDay?: number, vsWeek?: number) => ({ value, ...(vsDay === undefined ? {} : { vsDay }), ...(vsWeek === undefined ? {} : { vsWeek }) })
+  const t = { day: '2026-11-13', chats: v(4, 3, -1), costUsd: v(0), approved: v(2, 0), sentBack: v(1) }
+  assert.equal(trendText(t), 'Yesterday: 4 chats (↑3 vs day before, ↓1 vs last week); 2 approved (= vs day before); 1 sent back')
+  assert.equal(trendText({ ...t, chats: v(0), approved: v(0), sentBack: v(0) }), '')
+})
+
+test('indefiniteText adds usage and reason when sent', () => {
+  assert.equal(indefiniteText('Fix', undefined, undefined), 'Switchboard: Fix: Run indefinitely finished.')
+  assert.equal(indefiniteText('Fix', 'used $1.20 over 2h', 'gate passed: pnpm test'), 'Switchboard: Fix: Run indefinitely finished: gate passed: pnpm test. Used $1.20 over 2h.')
+  assert.equal(indefiniteText('Fix', 'used $3 over 4h', 'budget reached (not a success)'), 'Switchboard: Fix: Run indefinitely finished: budget reached (not a success). Used $3 over 4h.')
 })

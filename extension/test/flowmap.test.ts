@@ -293,3 +293,36 @@ describe('qa fixes', () => {
     fs.rmSync(repo, { recursive: true, force: true })
   })
 })
+
+describe('flow limits', () => {
+  it('copies a live chat\'s limits and spend onto its node, leaves the rest', async () => {
+    const { withLimits } = await import('../src/hub/flowmap')
+    const map: import('../src/hub/flowmap').FlowMap = { project: 'p', builtAt: 1, edges: [], nodes: [{ id: 'chat:s1', kind: 'chat' as const, label: 'a' }, { id: 'chat:s2', kind: 'chat' as const, label: 'b' }] }
+    const row = (sessionId: string, x: object) => ({ sessionId, ...x }) as import('../src/hub/types').ChatRow
+    assert.equal(withLimits(map, [row('s2', {})]), map)
+    const out = withLimits(map, [row('s1', { budget: { maxHours: 4, gate: 'x' }, checkBack: { everyMin: 30, count: 3 }, costUsd: 1.5, elapsedMs: 9 })])
+    assert.deepEqual(out.nodes[0], { id: 'chat:s1', kind: 'chat', label: 'a', budget: { maxHours: 4, gate: 'x' }, checkBack: { everyMin: 30, count: 3 }, costUsd: 1.5, elapsedMs: 9 })
+    assert.equal(out.nodes[1], map.nodes[1])
+  })
+})
+
+describe('withLimits partial', () => {
+  it('copies a node that has only cost or elapsed time', async () => {
+    const { withLimits } = await import('../src/hub/flowmap')
+    const map: import('../src/hub/flowmap').FlowMap = { project: 'p', builtAt: 1, edges: [], nodes: [{ id: 'chat:s1', kind: 'chat' as const, label: 'a' }, { id: 'chat:s2', kind: 'chat' as const, label: 'b' }] }
+    const row = (sessionId: string, x: object) => ({ sessionId, ...x }) as import('../src/hub/types').ChatRow
+    const out = withLimits(map, [row('s1', { costUsd: 2 }), row('s2', { elapsedMs: 5 })])
+    assert.equal(out.nodes[0].costUsd, 2)
+    assert.equal(out.nodes[1].elapsedMs, 5)
+  })
+})
+
+describe('flow groups', () => {
+  it('tags chat nodes with their split group, nothing else', async () => {
+    const { withGroups } = await import('../src/hub/flowmap')
+    const map: import('../src/hub/flowmap').FlowMap = { project: 'p', builtAt: 1, edges: [], nodes: [{ id: 'chat:s1', kind: 'chat' as const, label: 'a' }, { id: 'chat:s2', kind: 'chat' as const, label: 'b' }, { id: 'f:s1', kind: 'file' as const, label: 's1' }] }
+    const out = withGroups(map, { s1: 'g-1' })
+    assert.deepEqual(out.nodes.map(n => n.group), ['g-1', undefined, undefined])
+    assert.equal(map.nodes[0]!.group, undefined)
+  })
+})

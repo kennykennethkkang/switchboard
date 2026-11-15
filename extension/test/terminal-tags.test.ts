@@ -68,6 +68,56 @@ describe('terminal tags', () => {
     assert.deepEqual([a.disposed, b.disposed, c.disposed, mine.disposed], [true, true, false, false])
   })
 
+  it('a terminal revived after a reload keeps its chat and first-seen time, so Approve still closes it', () => {
+    let now = 100
+    const before = new TerminalTags<Fake>(() => now)
+    const a = term('Claude Code: a', 41), b = term('Claude Code: b', 42)
+    before.own(a, 'Claude Code', 's1'); before.own(b, 'Claude Code', 's2')
+    const memo = new Map(before.memo().map(([t, m]) => [t.pid, m]))
+    // reload: approved at 200 while s1 ran its last turn, then the window came back at 300
+    now = 300
+    const after = new TerminalTags<Fake>(() => now)
+    const a2 = term('Claude Code: a', 41), b2 = term('Claude Code: b', 42), fresh = term('Claude Code: c', 43)
+    after.seen(a2, true, memo.get(41)); after.seen(b2, true, memo.get(42)); after.seen(fresh, true, memo.get(43))
+    const approved = new Map([['s1', 200]])
+    // s1 ended before the reload: not live, so bindLive never ties it; the memo does
+    assert.equal(after.closeEnded([chat('s1', 'a', { live: false }), chat('s2', 'b', { live: false })], approved), 1)
+    assert.deepEqual([a2.disposed, b2.disposed, fresh.disposed], [true, false, false])
+  })
+
+  it('a revived terminal seen before its name came back is claimed later, so Approve still closes it', () => {
+    let now = 300
+    const tags = new TerminalTags<Fake>(() => now)
+    const a = term('zsh', 41), user = term('zsh', 42)
+    // the open event fires before VS Code restores the name and icon
+    tags.seen(a, false); tags.seen(user, false)
+    a.name = 'Claude Code: a'
+    now = 400
+    tags.claim(a, { sessionId: 's1', at: 100 })
+    assert.equal(tags.ownerOf(a), 'switchboard')
+    assert.equal(tags.ownerOf(user), 'user')
+    assert.equal(tags.closeEnded([chat('s1', 'a', { live: false })], new Map([['s1', 200]])), 1)
+    assert.equal(a.disposed, true)
+    // a live chat bound by pid, no memo: keeps that chat and its first-seen time
+    const b = term('zsh', 43)
+    tags.seen(b, false); tags.host(b, 's2'); b.name = 'Claude: b'
+    tags.claim(b)
+    assert.deepEqual(tags.memo().find(([t]) => t === b)?.[1], { sessionId: 's2', at: 400 })
+  })
+
+  it('a revived terminal whose old chat ended moves to the live chat now in it', async () => {
+    let now = 300
+    const tags = new TerminalTags<Fake>(() => now)
+    const a = term('Claude Code: a', 41)
+    tags.seen(a, true, { sessionId: 's1', at: 100 })
+    now = 400
+    await tags.bindLive([chat('s1', 'a', { live: false }), chat('s3', 'b', { pid: 7 })], async pid => pid === 7 ? a : undefined)
+    assert.equal(tags.of('s3'), a)
+    // Approving the ended s1 must not close the terminal s3 runs in
+    assert.equal(tags.closeEnded([chat('s1', 'a', { live: false }), chat('s3', 'b', { pid: 7 })], new Map([['s1', 350]])), 0)
+    assert.equal(a.disposed, false)
+  })
+
   it('renames only the active terminal; the others wait until they are active', () => {
     const tags = new TerminalTags<Fake>()
     const a = term('Claude: one'), b = term('Claude: two')
@@ -126,6 +176,15 @@ describe('terminal tags', () => {
     tags.seen(restored, true); tags.host(restored, 's1')
     assert.equal(tags.of('s1'), restored)
     assert.deepEqual(tags.renames([chat('s1', 'new')]), [[restored, 'Codex: new']])
+  })
+
+  it('ourOf finds a reload-revived Codex terminal by its memo, never a user one', () => {
+    const tags = new TerminalTags<Fake>()
+    const user = term('zsh'), revived = term('Codex: fix')
+    tags.seen(user); tags.host(user, 's1')
+    assert.equal(tags.ourOf('s1'), undefined)
+    tags.seen(revived, true, { sessionId: 's1', at: 1 })
+    assert.equal(tags.ourOf('s1'), revived)
   })
 
   it('maps every window color to an ansi color', () => {

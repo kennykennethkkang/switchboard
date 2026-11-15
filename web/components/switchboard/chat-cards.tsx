@@ -120,11 +120,11 @@ export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (tex
 /** all: every chat's progress (hub.progress), the history behind the estimates, so the cards and the chat page agree. */
 /** stuck: hub.stuck, for the Stuck note in the meta line. cache: hub.cache, for the warm/cold chip. */
 /** held: chats the usage pause holds. links: a chat's wait chips; onUnlink: the x on a Waiting on chip. */
-export function ChatCards({ cards, all = [], waits = [], held = [], links, onUnlink, stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, extra, onSelect, tabs, onTab, summaries, onSummary, onCopy, send, editor = 'VS Code' }: { send?: (c: HubCommand) => void; editor?: string; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; held?: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; menu?: (chat: ChatRow) => ReactNode; /** Under a card, outside its button: the Approve bar. */ extra?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; tabs?: WindowTabs; onTab?: (op: TabOp, workspace?: string) => void }) {
+export function ChatCards({ looping = [], cards, all = [], waits = [], held = [], links, onUnlink, stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, extra, top, onSelect, tabs, onTab, summaries, onSummary, onCopy, send, editor = 'VS Code' }: { looping?: string[]; send?: (c: HubCommand) => void; editor?: string; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; held?: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; menu?: (chat: ChatRow) => ReactNode; /** Under a card, outside its button: the Approve bar. */ extra?: (card: Card) => ReactNode; /** Right under the card, above Summary: the stage line. */ top?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; tabs?: WindowTabs; onTab?: (op: TabOp, workspace?: string) => void }) {
   if (!cards.length) return <p style={{ color: 'var(--hub-ash)', margin: 0, padding: 4 }}>{empty}</p>
   const groups = byWindow(cards, windows, here)
   const now = Date.now()
-  const more = { waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, onSelect, all, now, summaries, onSummary, onCopy }
+  const more = { looping, waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, top, onSelect, all, now, summaries, onSummary, onCopy }
   if (!groups.some(g => g.window)) return <CardList cards={cards} label="Chats" {...more} />
   // Native tabs only work on a Mac with One window on since VS Code started.
   const tabOff = !tabs?.mac ? 'Windows as tabs need macOS' : !tabs.live ? `Turn on One window in Settings, then quit and reopen ${editor}` : undefined
@@ -164,7 +164,7 @@ export function ChatCards({ cards, all = [], waits = [], held = [], links, onUnl
 
 /** stripe: the window color down each card's left edge. grouped: the group heading names the project, so the card does not. */
 /** all: every chat's progress, the history behind each estimate. */
-function CardList({ cards, label, stripe, grouped, waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, onSelect, all, now, summaries, onSummary, onCopy }: { cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; held: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; extra?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
+function CardList({ looping, cards, label, stripe, grouped, waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, top, onSelect, all, now, summaries, onSummary, onCopy }: { looping: string[]; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; held: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; extra?: (card: Card) => ReactNode; top?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
   return (
     <ul role="list" aria-label={label} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
       {cards.map(({ chat, progress }) => {
@@ -198,6 +198,7 @@ function CardList({ cards, label, stripe, grouped, waits, held, links, onUnlink,
               {/* Stuck and cache warm ride in the meta line, so the name keeps the room beside the one chip. */}
               <span style={{ font: '400 12px/1.5 var(--hub-mono)', color: 'var(--hub-ash)' }}>
                 {tone && <span title="Something in this chat looks stuck: see Needs attention" style={{ color: `var(--hub-${tone})`, fontWeight: 500 }}>Stuck{meta ? ' · ' : ''}</span>}
+                {looping.includes(chat.sessionId) && <span title="Run indefinitely is on: it keeps working until nothing is left" style={{ color: 'var(--hub-blue)', fontWeight: 500 }}>Run indefinitely{meta ? ' · ' : ''}</span>}
                 {meta}
                 {warm && <span title={warm.title}>{meta ? ' · ' : ''}<span style={{ whiteSpace: 'nowrap' }}>{warm.label}</span></span>}
               </span>
@@ -227,6 +228,7 @@ function CardList({ cards, label, stripe, grouped, waits, held, links, onUnlink,
             </div>
             {tasks.length > 0 && !finished && <div className="sr-only"><TaskBar done={done} total={tasks.length} label={`Tasks done in ${origin || projectName(chat)}`} /></div>}
             {menu && <span className="hub-more-at">{menu(chat)}</span>}
+            {top?.({ chat, progress })}
             {onSummary && <SummaryFold id={chat.sessionId} name={origin || projectName(chat)} summary={summaries?.[chat.sessionId]} onAsk={refresh => onSummary(chat.sessionId, refresh)} onCopy={onCopy} />}
             {extra?.({ chat, progress })}
           </li>

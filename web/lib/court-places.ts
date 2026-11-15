@@ -33,6 +33,12 @@ export const gardenList = (h: Pick<HubState, 'installed'>, busy: Set<string>): I
 export const todoList = (h: Pick<HubState, 'todos'>): Item[] =>
   Object.entries(h.todos ?? {}).flatMap(([path, l]) => l.todo.map(t => ({ id: `${path}\n${t.id}`, name: t.text, note: t.why === 'you' ? `${base(path)}, needs you` : base(path) })))
 
+/** A notice row's id back to the project and item it came from. */
+export function todoRef(id: string | undefined): { path: string; id: string } | undefined {
+  const i = id?.lastIndexOf('\n') ?? -1
+  return id && i > 0 ? { path: id.slice(0, i), id: id.slice(i + 1) } : undefined
+}
+
 export function towerList(h: Pick<HubState, 'rc' | 'rcServers' | 'webUrl' | 'tailscale'>): Item[] {
   const l: Item[] = [{ id: 'rc', name: 'Remote Control at startup', ok: h.rc.atStartup }]
   for (const r of h.rcServers) l.push({ id: `rc:${r.folder}`, name: `Remote Control: ${r.name}`, ok: r.on })

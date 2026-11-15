@@ -25,6 +25,7 @@ test('clockDur and count stay short', () => {
   assert.equal(count(950), '950')
   assert.equal(count(412_300), '412k')
   assert.equal(count(12_600_000), '12.6M')
+  assert.equal(count(999_500), '1.0M')
 })
 
 const p = (over: Partial<ChatProgress>): ChatProgress => ({ sessionId: 's', cwd: '/r', state: 'working', roles: [], tasks: [], startedAt: 0, at: 0, ...over })

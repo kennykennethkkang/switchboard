@@ -164,7 +164,7 @@ const VAR_RE = /\$\{?\w*(KEY|TOKEN|SECRET|PASS|CRED|AUTH)|\$\{?\w*_PAT\b/i
 /** The forwarder script's text; exported for the test that runs it. */
 export function getHookScriptContent(): string {
   return `#!/usr/bin/env node
-// Switchboard hook forwarder v11, installed by the Switchboard VS Code extension.
+// Switchboard hook forwarder v12, installed by the Switchboard VS Code extension.
 // Claude Code invokes this as a command hook. It reads a discovery directory to
 // find live extension instances, checks their PIDs, and forwards the event via
 // HTTP POST. Dead instances are cleaned up automatically.
@@ -179,6 +179,7 @@ export function getHookScriptContent(): string {
 // v9: the owning window's reply body, when JSON, is printed as the hook output (the edit guard's deny).
 // v10: SWITCHBOARD_ROLE_RUN in the env tags the event role_run.
 // v11: a role run also carries role_parent, the Claude chat that started it.
+// v12: no Bash allow in default or plan mode, or with Ask before actions on.
 //
 // Discovery dir: ~/.claude/switchboard/
 // Discovery file: {workspace-hash}-{pid}.json  →  { port, pid, workspace }
@@ -239,6 +240,7 @@ process.stdin.on('end', () => {
   if (process.env.SWITCHBOARD_HEADLESS) { ev.headless = true; input = JSON.stringify(ev); }
   // Bash never asks, unless it looks like exfiltration; deny rules in settings still win over a hook's allow.
   // writeSync: an async pipe write can be cut off by exit.
+  const askOn = () => { try { return JSON.parse(fs.readFileSync(path.join(DIR, 'ask-mode.json'), 'utf8')).claude === true } catch { return false } };
   if (ev.hook_event_name === 'PreToolUse' && ev.tool_name === 'Bash') {
     const cmd = String((ev.tool_input && ev.tool_input.command) || '');
     const net = ${NET_RE}, secret = ${SECRET_RE};
@@ -248,6 +250,8 @@ process.stdin.on('end', () => {
       : net.test(cmd) && (secret.test(cmd) || ${VAR_RE}.test(cmd)) ? undefined
       // Codex (its payload has turn_id) reports an allow as a failed hook, and runs Bash without asking anyway.
       : ev.turn_id !== undefined ? undefined
+      // A chat run with prompts on (default or plan mode, or Ask before actions) keeps them.
+      : ev.permission_mode === 'default' || ev.permission_mode === 'plan' || askOn() ? undefined
       : { hookEventName: 'PreToolUse', permissionDecision: 'allow' };
     if (out) fs.writeSync(1, JSON.stringify({ hookSpecificOutput: out }));
   }

@@ -1,7 +1,7 @@
 /** The finished chat's git card: the button it offers, the message it sends, the lane rows it draws. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checks, laneRows, shipAction, splitMessage } from './ship-card'
+import { checks, laneRows, mergeMessage, shipAction, splitMessage } from './ship-card'
 import type { RepoView } from './hub-types'
 
 const repo = (p: Partial<RepoView>): RepoView => ({ sessionId: 's', name: 'r', branch: 'main', upstream: 'origin/main', ahead: 0, behind: 0, files: [], branches: [], sync: { kind: 'fetch', label: 'Fetch' }, log: [], stashes: 0, at: 0, ...p })
@@ -45,4 +45,10 @@ test('laneRows: newest first, head on lane 0, base on lane 1, the fork last on l
   const rows = laneRows({ against: 'origin/main', fork: { hash: 'f', author: 'You', at: 0, side: 'fork' }, commits: [c('b1', 'base'), c('h1', 'head'), c('h2', 'head')] })
   assert.deepEqual(rows.map(r => [r.commit.hash, r.lane]), [['b1', 1], ['h1', 0], ['h2', 0], ['f', 0]])
   assert.deepEqual(laneRows(undefined), [])
+})
+
+test('mergeMessage: the new summary on top, then its lines, the old summary as a bullet and the old lines it lacks', () => {
+  assert.equal(mergeMessage('My words\n\n- mine\n- b1', 'B one\n\n- b1\n- A one'), 'B one\n\n- b1\n- A one\n- My words\n- mine')
+  assert.equal(mergeMessage('', 'B one\n\n- b1'), 'B one\n\n- b1')
+  assert.equal(mergeMessage('B one\n\n- b1', 'B one\n\n- b1'), 'B one\n\n- b1')
 })

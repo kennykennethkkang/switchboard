@@ -15,11 +15,12 @@ export type Pred = 'supersedes' | 'depends-on' | 'part-of' | 'contradicts' | 're
 export type GraphNode = { id: string; kind: 'memory' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'; label: string; type?: MemoryType; description?: string; text?: string; missing?: string[]; aliases?: string[]; modified?: string; origin?: string; superseded?: boolean }
 export type GraphEdge = { source: string; target: string; kind: 'link' | 'in' | 'todo' | 'from' | Pred }
 /** Lint: duplicates are names or aliases two notes claim, contradictions id pairs, the rest node ids.
- * invalid: a memory note with no description or no valid type; stale: a project note not modified in 90 days. */
-export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[] }
+ * invalid: a memory note with no description or no valid type; stale: a project note not modified in 90 days;
+ * loops: groups of live notes whose supersedes edges run in a circle. */
+export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][] }
 export type MemoryGraph = { nodes: GraphNode[]; edges: GraphEdge[]; health: GraphHealth }
-/** mtime: when modified is not in the frontmatter, stale goes by it. */
-export type MemoryFile = { dir: string; file: string; text: string; mtime?: number }
+/** mtime: when modified is not in the frontmatter, stale goes by it. archived: from memory/archive/, a superseded note kept as history. */
+export type MemoryFile = { dir: string; file: string; text: string; mtime?: number; archived?: boolean }
 /** A vault note: wiki/ topic page or raw/ source, file relative to that folder. */
 export type VaultFile = { kind: 'wiki' | 'raw'; file: string; text: string }
 /** label: the path as shown, ~ for the home folder. */
@@ -127,14 +128,14 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
     for (const k of new Set([m.name, ...m.aliases].map(x => `${scope}\n${x.toLowerCase()}`))) claims.set(k, (claims.get(k) ?? new Set()).add(id))
   }
   const inDir = new Map<string, string>()
-  const parsed = memories.map(f => {
+  const parsed = [...memories.filter(f => !f.archived), ...memories.filter(f => f.archived)].map(f => {
     const m = parseMemory(f.file, f.text)
     // A secret name redacts to the same [removed] for every note; '#' + a file hash keeps them apart and can't clash with a real name.
-    const id = `memory:${f.dir}/${redact(m.name) === m.name ? m.name : `#${createHash('sha1').update(f.file).digest('hex').slice(0, 8)}`}`
+    const id = `memory:${f.dir}/${f.archived ? 'archive/' : ''}${redact(m.name) === m.name ? m.name : `#${createHash('sha1').update(f.file).digest('hex').slice(0, 8)}`}`
     const low = m.name.toLowerCase()
     if (!byName.has(low)) byName.set(low, id)
     if (!inDir.has(`${f.dir}/${low}`)) inDir.set(`${f.dir}/${low}`, id)
-    claim(m, id, f.dir)
+    if (!f.archived) claim(m, id, f.dir)
     return { f, m, id }
   })
   const fields = (m: ReturnType<typeof parseMemory>) => ({
@@ -171,11 +172,14 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
       if (to && to !== id && !(kind === 'link' && typed.has(to))) { edges.push({ source: id, target: to, kind }); typed.add(to) }
       else if (!to) missing.push(redact(l))
     }
-    for (const p of PREDS) for (const l of m.rel[p]) link(l, p)
+    // An archived note is history: what it superseded or contradicted no longer says anything about live notes.
+    for (const p of PREDS) if (!(f?.archived && (p === 'supersedes' || p === 'contradicts'))) for (const l of m.rel[p]) link(l, p)
     for (const l of m.links) link(l, 'link')
     if (missing.length) nodes.get(id)!.missing = [...new Set(missing)]
   }
+  const archived = new Set(parsed.filter(p => p.f.archived).map(p => p.id))
   for (const e of edges) if (e.kind === 'supersedes') nodes.get(e.target)!.superseded = true
+  for (const a of archived) nodes.get(a)!.superseded = true
 
   for (const c of [...state.chats, ...archive]) {
     const id = `chat:${c.sessionId}`
@@ -198,24 +202,38 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
     // ~/.claude/CLAUDE.md holds for every project; this also keeps the projects from drifting apart.
     else for (const n of [...nodes.values()]) if (n.kind === 'project') edges.push({ source: id, target: n.id, kind: 'in' })
   }
-  const invalid = parsed.filter(({ m }) => !m.description || !m.typed).map(p => p.id)
-  const stale = parsed.filter(({ f, m }) => m.type === 'project' && now - (m.modified ? Date.parse(m.modified) : f.mtime ?? NaN) > STALE_MS).map(p => p.id)
+  const live = parsed.filter(p => !p.f.archived)
+  const invalid = live.filter(({ m }) => !m.description || !m.typed).map(p => p.id)
+  const stale = live.filter(({ f, m }) => m.type === 'project' && now - (m.modified ? Date.parse(m.modified) : f.mtime ?? NaN) > STALE_MS).map(p => p.id)
   const once = [...new Map(edges.map(e => [`${e.source}\n${e.kind}\n${e.target}`, e])).values()]
-  return { nodes: [...nodes.values()], edges: once, health: { ...lint(nodes, once, claims), invalid, stale } }
+  return { nodes: [...nodes.values()], edges: once, health: { ...lint(nodes, once, claims, archived), invalid, stale } }
 }
 
-function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<string, Set<string>>): Omit<GraphHealth, 'invalid' | 'stale'> {
+/** Groups of notes that supersede each other in a circle, ids sorted, groups by first id. */
+function loops(edges: GraphEdge[], archived: Set<string>): string[][] {
+  const next = new Map<string, string[]>()
+  for (const e of edges) if (e.kind === 'supersedes' && !archived.has(e.source) && !archived.has(e.target)) next.set(e.source, [...(next.get(e.source) ?? []), e.target])
+  const reach = (from: string) => { const seen = new Set<string>(); const todo = [...(next.get(from) ?? [])]; for (let x; (x = todo.pop()) !== undefined;) if (!seen.has(x)) { seen.add(x); todo.push(...(next.get(x) ?? [])) } return seen }
+  const r = new Map([...next.keys()].map(k => [k, reach(k)]))
+  const done = new Set<string>(), out: string[][] = []
+  for (const [k, rs] of r) if (rs.has(k) && !done.has(k)) { const g = [...rs].filter(x => r.get(x)?.has(k)).sort(); g.forEach(x => done.add(x)); out.push(g) }
+  return out.sort((a, b) => a[0].localeCompare(b[0]))
+}
+
+function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<string, Set<string>>, archived: Set<string>): Omit<GraphHealth, 'invalid' | 'stale'> {
   const linked = new Set(edges.filter(e => KNOWS.has(e.kind)).flatMap(e => [e.source, e.target]))
   // A pair once, whichever side says it.
   const pairs = new Map<string, [string, string]>()
   for (const e of edges) if (e.kind === 'contradicts') { const p = [e.source, e.target].sort() as [string, string]; pairs.set(p.join('\n'), p) }
-  const ns = [...nodes.values()]
+  // Archived notes are history: never a health problem.
+  const ns = [...nodes.values()].filter(n => !archived.has(n.id))
   return {
     dangling: ns.filter(n => n.missing).map(n => n.id),
     orphans: ns.filter(n => (n.kind === 'memory' || n.kind === 'wiki') && !linked.has(n.id)).map(n => n.id),
     duplicates: [...claims].filter(([, ids]) => ids.size > 1).map(([k]) => redact(k.slice(k.indexOf('\n') + 1))),
     contradictions: [...pairs.values()],
     superseded: ns.filter(n => n.superseded).map(n => n.id),
+    loops: loops(edges, archived),
   }
 }
 
@@ -307,7 +325,7 @@ async function vaultNotes(dir: string, rel = '', out: string[] = []): Promise<st
   return out
 }
 
-/** Every ~/.claude/projects/<slug>/memory/*.md but MEMORY.md (an index), ~/.claude/CLAUDE.md, each project's CLAUDE.md,
+/** Every ~/.claude/projects/<slug>/memory/*.md but MEMORY.md (an index) and memory/archive/*.md, ~/.claude/CLAUDE.md, each project's CLAUDE.md,
  * and ~/Documents/vault/{wiki,raw}/**.md (no vault, no notes).
  * A memory note must be a plain file; a symlinked memory folder must still lead inside ~/.claude/projects. */
 export async function readGraph(state: HubState, home = os.homedir()): Promise<MemoryGraph> {
@@ -321,6 +339,11 @@ export async function readGraph(state: HubState, home = os.homedir()): Promise<M
       if (!file.endsWith('.md') || file === 'MEMORY.md') continue
       const got = await readText(path.join(mem, file))
       if (got) memories.push({ dir, file, ...got })
+    }
+    const arch = await fs.promises.realpath(path.join(mem, 'archive')).catch(() => undefined)
+    for (const file of arch?.startsWith(mem + path.sep) ? await fs.promises.readdir(arch).catch(() => [] as string[]) : []) {
+      const got = file.endsWith('.md') ? await readText(path.join(arch!, file)) : undefined
+      if (got) memories.push({ dir, file, ...got, archived: true })
     }
   }
   const rules: RuleFile[] = []

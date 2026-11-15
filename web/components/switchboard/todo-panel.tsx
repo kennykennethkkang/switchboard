@@ -80,6 +80,7 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
   }
   // A sent one lets its row go once the list no longer has it, or after 15 s if the change never lands.
   useEffect(() => {
+    if (!pend.current.length) return
     const has = (id: string) => [...list.todo, ...list.suggested ?? []].some(t => t.id === id)
     const keep = pend.current.filter(p => !p.sent || (Date.now() - p.sent < 15_000 && p.ids.some(has)))
     if (keep.length !== pend.current.length) { pend.current = keep; bump() }

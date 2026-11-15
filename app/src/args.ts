@@ -9,9 +9,13 @@ export function parseArgs(argv: string[]) {
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
-    if (arg.startsWith('--port=') || ((arg === '--port' || arg === '-p') && argv[i + 1])) {
-      const n = parseInt(arg.startsWith('--port=') ? arg.slice(7) : argv[++i], 10)
-      if (!isNaN(n) && n > 0 && n < 65536) port = n
+    if (arg.startsWith('--port=') || arg === '--port' || arg === '-p') {
+      // A missing value or the next flag is not a port; the flag still gets read.
+      const next = argv[i + 1]
+      const raw = arg.startsWith('--port=') ? arg.slice(7) : next !== undefined && !next.startsWith('-') ? argv[++i] : ''
+      const n = Number(raw)
+      if (Number.isInteger(n) && n > 0 && n < 65536) port = n
+      else console.error(`Ignoring port "${raw}", using ${port}`)
     } else if (arg === '--no-open') {
       open = false
     } else if (arg === '--lan') {

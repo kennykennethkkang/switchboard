@@ -108,6 +108,9 @@ let askClaude = false
 /** Settings, Ask before actions: on brings the CLI's own approval prompts back for new and resumed chats. hub-panel sets it at start and on change. */
 export const ask = {
   codex: false,
+  /** Codex chat model and effort from the gear; undefined leaves them to config.toml. */
+  codexModel: undefined as string | undefined,
+  codexEffort: undefined as string | undefined,
   get claude() { return askClaude },
   set claude(on: boolean) {
     askClaude = on
@@ -117,7 +120,7 @@ export const ask = {
 
 // Like Claude chats in bypassPermissions: no approval prompt and no sandbox; resume takes the flags after its name.
 // Codex runs a hooks.json hook only with a trust hash it computes itself, so ours (hooks-config.ts) need the trust bypass even when asking.
-const codexFlags = () => [...(ask.codex ? [] : ['--dangerously-bypass-approvals-and-sandbox']), '--dangerously-bypass-hook-trust']
+const codexFlags = () => [...(ask.codex ? [] : ['--dangerously-bypass-approvals-and-sandbox']), '--dangerously-bypass-hook-trust', ...(ask.codexModel ? ['-m', ask.codexModel] : []), ...(ask.codexEffort ? ['-c', `model_reasoning_effort=${ask.codexEffort}`] : [])]
 export const codexArgs = (args: string[]) => args[0] === 'resume' ? ['resume', ...codexFlags(), ...args.slice(1)] : [...codexFlags(), ...args]
 
 /**

@@ -573,17 +573,41 @@ export async function readDoc(s: TodoStore): Promise<TodoDoc> {
   return parseDoc(raw)
 }
 
-// Per-file queue in this process only, so two windows can still race a file list
+// Per-file queue in this process; withLock keeps other windows out.
 const fileQueue = new Map<string, Promise<unknown>>()
+const LOCK_STALE_MS = 5_000
+/** <file>.lock made with wx around fn; a lock older than staleMs is a crashed window's and is taken over.
+ * fn gets owned(): false once another window took the lock over, so it must not write. Release only removes our own lock. */
+export async function withLock<T>(file: string, fn: (owned: () => boolean) => Promise<T>, staleMs = LOCK_STALE_MS): Promise<T> {
+  const lock = `${file}.lock`, me = `${process.pid}-${crypto.randomUUID()}`
+  const read = () => { try { return fs.readFileSync(lock, 'utf8') } catch { return '' } }
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  for (let i = 0; ; i++) {
+    try { fs.writeFileSync(lock, me, { flag: 'wx' }); break } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+      // Rename first so only one waiter removes a stale lock, never a fresh one.
+      try { if (Date.now() - fs.statSync(lock).mtimeMs > staleMs) { const gone = `${lock}.${me}`; fs.renameSync(lock, gone); fs.rmSync(gone, { force: true }) } } catch { /* another waiter got it */ }
+      if (i > 400) throw new Error('the to-do list stayed locked')
+      await new Promise(r => setTimeout(r, 10 + Math.random() * 20))
+    }
+  }
+  try { return await fn(() => read() === me) } finally { if (read() === me) fs.rmSync(lock, { force: true }) }
+}
 
 /** Applies fn to the latest doc and writes it; with git, again on a lost race (another window wrote first). */
 export async function updateDoc(s: TodoStore, fn: (d: TodoDoc) => TodoDoc): Promise<TodoDoc> {
   if (!s.root) {
     const file = s.file!
-    const run = (fileQueue.get(file) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    const once = () => withLock(file, async owned => {
       const was = await readDoc(s), next = grown(was, fn)
+      // Lost the lock to a stall takeover: read again under a new lock.
+      if (!owned()) return undefined
       if (JSON.stringify(next) !== JSON.stringify(was)) writeJsonAtomic(file, next)
       return next
+    })
+    const run = (fileQueue.get(file) ?? Promise.resolve()).catch(() => {}).then(async () => {
+      for (let i = 0; i < 3; i++) { const r = await once(); if (r) return r }
+      throw new Error('the to-do list kept changing hands')
     })
     fileQueue.set(file, run)
     void run.finally(() => { if (fileQueue.get(file) === run) fileQueue.delete(file) }).catch(() => {})

@@ -7,6 +7,8 @@ import * as os from 'os'
 import * as path from 'path'
 import type { ApiKey } from './types'
 
+const CLAUDE_ONLY = 'openai-codex'
+
 export type SetupKit = {
   marketplaces: Record<string, string>
   plugins: string[]
@@ -26,7 +28,8 @@ export type SetupKit = {
 export type SkillRepo = { repo: string; names: string[]; path?: string; file?: string }
 export type Tool = { uv: string; skill?: { repo: string; path: string; name: string; file?: string }; mcp?: { name: string; command: string } }
 /** What Codex has, from its config.toml. */
-export type CodexState = { plugins: string[]; marketplaces: string[]; mcps: string[] }
+/** askOld: the switchboard entry was added without --codex, so Codex lacks chats_wait, chats_check, hub_ask and hub_recall. */
+export type CodexState = { plugins: string[]; marketplaces: string[]; mcps: string[]; askOld?: true }
 /** What the machine has: plugin ids, marketplace names, user-scope MCP server names, ~/.claude/skills and ~/.agents/skills folders; plain: those holding a literal header, left out of mcps. */
 export type SetupState = { plugins: string[]; marketplaces: string[]; mcps: string[]; plain: string[]; skills: string[]; agentsSkills: string[]; codex: CodexState }
 
@@ -93,8 +96,9 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
   // Codex gets the same kit; the mods are Claude hooks, so they stay out.
   const cx = o.codex
   const codex = (label: string, ...args: string[]) => out.push({ label: `${label} (Codex)`, needs: ['codex'], run: ['codex', ...args] })
-  for (const [name, repo] of Object.entries(kit.marketplaces)) if (!cx.marketplaces.includes(name)) codex(name, 'plugin', 'marketplace', 'add', repo)
-  for (const id of kit.plugins) if (!cx.plugins.includes(id)) codex(id, 'plugin', 'add', id)
+  // The Codex plugin drives Codex from Claude, so Codex itself never gets it.
+  for (const [name, repo] of Object.entries(kit.marketplaces)) if (name !== CLAUDE_ONLY && !cx.marketplaces.includes(name)) codex(name, 'plugin', 'marketplace', 'add', repo)
+  for (const id of kit.plugins) if (!id.endsWith(`@${CLAUDE_ONLY}`) && !cx.plugins.includes(id)) codex(id, 'plugin', 'add', id)
   for (const m of kit.mcps) {
     if (cx.mcps.includes(m.name)) continue
     if (keyed.has(m.name)) {
@@ -106,7 +110,9 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
     if (!m.keyHeader) out.push({ label: `${m.name} (Codex)`, needs: ['codex'], wait: 20, run: ['codex', 'mcp', 'add', m.name, '--url', m.url!] })
     else if (o.key21st) out.push({ say: `${m.name} for Codex: not added, its key goes in an x-api-key header that codex mcp add cannot set.` })
   }
-  if (!cx.mcps.includes('switchboard')) out.push({ label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK] })
+  // --codex is what turns on the chat-wait and hub tools, which Codex has no mods for.
+  if (cx.askOld) out.push({ label: 'Ask tool (Codex, old entry)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'remove', 'switchboard'] })
+  if (!cx.mcps.includes('switchboard') || cx.askOld) out.push({ label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK, '--codex'] })
   for (const t of kit.tools ?? []) {
     out.push({ label: t.uv, needs: ['uv'], quiet: true, run: ['uv', 'tool', 'install', t.uv] })
     const k = t.skill
@@ -141,7 +147,8 @@ export function codexState(file: string): CodexState {
   let toml = ''
   try { toml = fs.readFileSync(file, 'utf8') } catch { /* no Codex */ }
   const tables = (key: string) => [...toml.matchAll(new RegExp(`^\\[${key}\\.(?:"([^"]+)"|([^\\]."]+))\\]\\s*$`, 'gm'))].map(m => m[1] ?? m[2])
-  return { plugins: tables('plugins'), marketplaces: tables('marketplaces'), mcps: tables('mcp_servers') }
+  const ask = toml.match(/^\[mcp_servers\.switchboard\]\s*\n((?:(?!\[).*\n?)*)/m)?.[1]
+  return { plugins: tables('plugins'), marketplaces: tables('marketplaces'), mcps: tables('mcp_servers'), ...(ask && !/^args\s*=.*--codex/m.test(ask) ? { askOld: true as const } : {}) }
 }
 
 export function setupState(home: string): SetupState {

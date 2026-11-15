@@ -9,11 +9,11 @@ import * as os from 'os'
 import * as path from 'path'
 import * as readline from 'readline'
 import { redact } from './brain'
-import type { HubState } from './types'
+import type { CheckBack, ChatRow, HubState, IndefiniteBudget } from './types'
 
 export type FlowKind = 'folder' | 'file' | 'chat' | 'skill' | 'plugin' | 'mod' | 'role'
-/** folder: a file's folder id. about: its header comment or the folder's README line. first/at: a chat's first and last message. */
-export type FlowNode = { id: string; kind: FlowKind; label: string; folder?: string; about?: string; first?: number; at?: number }
+/** folder: a file's folder id. about: its header comment or the folder's README line. first/at: a chat's first and last message. group: a chat's split group. budget, checkBack, costUsd, elapsedMs: a live chat's Run indefinitely limits and spend (withLimits). */
+export type FlowNode = { id: string; kind: FlowKind; label: string; folder?: string; about?: string; first?: number; at?: number; group?: string; budget?: IndefiniteBudget; checkBack?: CheckBack; costUsd?: number; elapsedMs?: number }
 /** n: how many imports or uses. at: when a chat last touched that file. */
 export type FlowEdge = { from: string; to: string; kind: 'import' | 'used' | 'touched'; n: number; at?: number }
 /** cut: the scan stopped at FILE_MAX files. */
@@ -296,7 +296,7 @@ async function keyOf(cwd: string, subs: string[], home: string): Promise<string>
 }
 
 /** The map for cwd, from cache while nothing it reads has changed. cwd must be one of roots or inside one, after symlinks; anything else throws. Transcripts are found by cwd as given, the way Claude Code names their folder, plus those of chats folders inside cwd. */
-export async function buildFlowMap(cwd: string, labels: Record<string, string> = {}, roots: string[] = [], home = os.homedir(), chats: string[] = []): Promise<FlowMap> {
+export async function buildFlowMap(cwd: string, labels: Record<string, string> = {}, roots: string[] = [], home = os.homedir(), chats: string[] = [], groups: Record<string, string> = {}): Promise<FlowMap> {
   if (!path.isAbsolute(cwd)) throw new Error('not a project folder')
   const real = await fs.promises.realpath(cwd).catch(() => undefined)
   if (!real || !(await fs.promises.stat(real).catch(() => undefined))?.isDirectory()) throw new Error('not a project folder')
@@ -305,13 +305,27 @@ export async function buildFlowMap(cwd: string, labels: Record<string, string> =
   const subs = [...new Set([...roots, ...chats])].filter(r => path.isAbsolute(r) && r.startsWith(cwd.replace(/\/+$/, '') + path.sep))
   const key = await keyOf(cwd, subs, home)
   const hit = cache.get(real)
-  if (hit && hit.key === key && Date.now() - hit.at < TTL) { cache.delete(real); cache.set(real, hit); return hit.map }
+  if (hit && hit.key === key && Date.now() - hit.at < TTL) { cache.delete(real); cache.set(real, hit); return hit.map.then(m => withGroups(m, groups)) }
   const map = Promise.all([scanCode(real), readWork(cwd, home, CHATS_MAX, subs)]).then(([code, work]) => assemble(path.basename(real), code, work, labels))
   cache.delete(real)
   cache.set(real, { key, at: Date.now(), map })
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!)
   map.catch(() => cache.delete(real))
-  return map
+  return map.then(m => withGroups(m, groups))
+}
+
+/** After the cache, like withGroups: a live chat's limits and spend, copied from its hub row. Same object when no node has any. */
+export function withLimits(map: FlowMap, chats: ChatRow[]): FlowMap {
+  const by = new Map(chats.filter(c => c.budget || c.checkBack || c.costUsd !== undefined || c.elapsedMs !== undefined).map(c => [`chat:${c.sessionId}`, c]))
+  if (!map.nodes.some(n => by.has(n.id))) return map
+  return { ...map, nodes: map.nodes.map(n => { const c = by.get(n.id); return c ? { ...n, ...(c.budget ? { budget: c.budget } : {}), ...(c.checkBack ? { checkBack: c.checkBack } : {}), ...(c.costUsd !== undefined ? { costUsd: c.costUsd } : {}), ...(c.elapsedMs !== undefined ? { elapsedMs: c.elapsedMs } : {}) } : n }) }
+}
+
+// After the cache: a group is set when a chat starts, long before the map's key moves.
+export function withGroups(map: FlowMap, groups: Record<string, string>): FlowMap {
+  const of = (n: FlowNode) => (n.kind === 'chat' ? groups[n.id.slice(5)] : undefined)
+  // Same object when nothing is grouped, so a cache hit stays the same map.
+  return map.nodes.some(of) ? { ...map, nodes: map.nodes.map(n => { const g = of(n); return g ? { ...n, group: g } : n }) } : map
 }
 
 /** Chat names the hub already shows, by session id: live chats over archived ones. */

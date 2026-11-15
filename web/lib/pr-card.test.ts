@@ -1,7 +1,7 @@
 /** The PR card's words, built from the repo view with no model call. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pill, resolvePrompt, short, summary } from './pr-card'
+import { branchUrl, pill, resolvePrompt, short, summary } from './pr-card'
 import type { RepoView } from './hub-types'
 
 type R = Pick<RepoView, 'pr' | 'merge'>
@@ -33,4 +33,9 @@ test('pill and short age', () => {
   assert.equal(pill(conflicted), '#128 · 2 conflicts · +482 −37')
   assert.equal(pill({ merge: { base: 'main', behind: 0, files: 0, conflicts: [], commits: [] } }), 'No PR yet')
   assert.deepEqual([0, 30e3, 6 * 60e3, 2 * 3600e3, 3 * 86400e3].map(ms => short(1e9 - ms, 1e9)), ['now', 'now', '6m', '2h', '3d'])
+})
+
+test('branchUrl keeps # in a branch name', () => {
+  assert.equal(branchUrl('https://github.com/a/b', 'tree', 'feat#1'), 'https://github.com/a/b/tree/feat%231')
+  assert.equal(branchUrl('https://github.com/a/b', 'compare', 'fix/x y'), 'https://github.com/a/b/compare/fix/x%20y')
 })

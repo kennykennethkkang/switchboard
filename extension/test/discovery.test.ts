@@ -46,8 +46,12 @@ test('a chat no window contains goes to the live window with the lowest pid, not
   }
 })
 
-const run = (payload: object) => new Promise<string>(resolve => {
+const run = (payload: object, askMode?: object) => new Promise<string>(resolve => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-allow-'))
+  if (askMode) {
+    fs.mkdirSync(path.join(home, '.claude', 'switchboard'), { recursive: true })
+    fs.writeFileSync(path.join(home, '.claude', 'switchboard', 'ask-mode.json'), JSON.stringify(askMode))
+  }
   const script = path.join(home, 'hook.js')
   fs.writeFileSync(script, getHookScriptContent())
   const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
@@ -55,6 +59,16 @@ const run = (payload: object) => new Promise<string>(resolve => {
   child.stdout.on('data', c => { out += c })
   child.on('exit', () => { fs.rmSync(home, { recursive: true, force: true }); resolve(out) })
   child.stdin.end(JSON.stringify(payload))
+})
+
+test('Bash keeps its prompt in default and plan mode, and with Ask before actions on', async () => {
+  const bash = { cwd: os.tmpdir(), session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } }
+  assert.equal(await run({ ...bash, permission_mode: 'default' }), '')
+  assert.equal(await run({ ...bash, permission_mode: 'plan' }), '')
+  assert.match(await run({ ...bash, permission_mode: 'acceptEdits' }), /"allow"/)
+  assert.match(await run({ ...bash, permission_mode: 'bypassPermissions' }), /"allow"/)
+  assert.equal(await run(bash, { claude: true }), '')
+  assert.match(await run(bash, { claude: false }), /"allow"/)
 })
 
 test('Bash runs without a permission prompt; other tools and events print nothing', async () => {

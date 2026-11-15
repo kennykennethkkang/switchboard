@@ -27,6 +27,8 @@ import {
 import type { AgentSessionWatcher, SessionLifecycleEvent } from './session-runtime'
 import { TypedEventEmitter } from './typed-event-emitter'
 import { editor } from './editor'
+import { hub } from './hub/hub-service'
+import { closingPick } from './hub/approve'
 
 const log = createLogger('CodexSessionWatcher')
 
@@ -329,6 +331,17 @@ export class CodexSessionWatcher implements AgentSessionWatcher {
       elapsed: () => {
         const s = this.sessions.get(sessionId)
         return s ? (Date.now() - s.sessionStartTime) / 1000 : 0
+      },
+      limits: (limits) => {
+        const s = this.sessions.get(sessionId)
+        hub.ingest({ token: hub.token, kind: 'live', sessionId, cwd: s?.rolloutState.cwd ?? '', label: s?.label, limits })
+      },
+      // Same path as Claude's PostToolUse for the closing question; skipped while the file's history drains, so an old Approve never re-fires.
+      answered: (input, response, callId) => {
+        const s = this.sessions.get(sessionId)
+        if (!s?.sessionDetected) return
+        const payload = { hook_event_name: 'PostToolUse', session_id: sessionId, cwd: s.rolloutState.cwd ?? '', tool_name: 'request_user_input', tool_input: input, tool_response: response, ...(callId ? { tool_use_id: callId } : {}) }
+        if (closingPick(payload)) hub.hook(payload)
       },
       setLabel: (newLabel) => {
         const s = this.sessions.get(sessionId)

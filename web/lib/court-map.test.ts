@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PLACES, buildCourt, courtSummary, chatOf, courtEvents, fitCourt, forcedSpot, freeSpot, lod, movedFrom, PLATE, realmPlaque, type Box, type Court, type CourtNode } from './court-map'
+import { PLACES, buildCourt, markSpot, courtSummary, chatOf, courtEvents, fitCourt, forcedSpot, freeSpot, lod, movedFrom, PLATE, realmPlaque, type Box, type Court, type CourtNode } from './court-map'
 import { emptyHub } from './hub-demo'
 import type { ChatProgress, ChatRow, Helper, HubState, RoleStep } from './hub-types'
 
@@ -111,7 +111,7 @@ test('desks carry runs, shipped, since and task from the hub; unknowns stay unde
     ], tasks: [{ id: 't', subject: 'Desk plates', status: 'in_progress', role: 'engineer' }] })],
   }))
   const eng = c.nodes.find(n => n.id === 'desk:a:engineer')!
-  assert.deepEqual([eng.state, eng.runs, eng.shipped, eng.since, eng.task, eng.chatId, eng.parent], ['working', 2, 1, NOW - 5e3, 'Desk plates', 'a', 'realm:a:claude'])
+  assert.deepEqual([eng.state, eng.runs, eng.shipped, eng.since, eng.task, eng.chatId, eng.parent], ['working', 2, 1, NOW - 5e3, 'Desk plates', 'a', 'yard:a'])
   const lead = c.nodes.find(n => n.id === 'desk:a:lead')!
   assert.equal(lead.task, undefined); assert.equal(lead.runs, undefined)
   assert.equal(c.petition, undefined)
@@ -269,13 +269,11 @@ test('realms: a Claude lead\'s Codex desks and Jev calls dock on its courtyard a
   const codex = c.nodes.find(n => n.id === 'realm:a:codex')!, jev = c.nodes.find(n => n.id === 'realm:a:jev')!
   assert.deepEqual([codex.kind, codex.parent, codex.ai, codex.label, codex.sub, codex.state, codex.task, codex.runs], ['realm', 'yard:a', 'codex', 'CODEX REALM', 'from Claude · a', 'working', 'Fix parser', 2])
   assert.deepEqual([jev.parent, jev.label, jev.state, jev.task, jev.runs], ['yard:a', 'JEV REALM', 'done', 'ask web-route', 3])
-  // The Codex desk lives in the Codex realm, the Claude-run desks in the Claude realm; the yard keeps the lead.
+  // The Codex desk lives in the Codex realm; the yard is the Claude realm and keeps the lead and its Claude desks.
   const eng = c.nodes.find(n => n.id === 'desk:a:engineer-codex')!
   assert.deepEqual([eng.parent, eng.ai, eng.role], ['realm:a:codex', 'codex', 'engineer'])
-  const cl = c.nodes.find(n => n.id === 'realm:a:claude')!
-  assert.deepEqual([cl.parent, cl.ai, cl.label, cl.sub, cl.state, cl.runs], ['yard:a', 'claude', 'CLAUDE REALM', 'a', 'done', 1])
-  assert.equal(c.nodes.find(n => n.id === 'desk:a:qa')!.parent, 'realm:a:claude')
-  assert.deepEqual(c.nodes.filter(n => n.parent === 'yard:a' && n.kind === 'desk').map(n => n.role), ['lead'])
+  assert.equal(c.nodes.find(n => n.id === 'realm:a:claude'), undefined)
+  assert.deepEqual(c.nodes.filter(n => n.parent === 'yard:a' && n.kind === 'desk').map(n => n.role), ['lead', 'qa'])
   assert.ok(inside(eng.x + eng.w / 2, eng.y + eng.h / 2, codex))
   for (const r of [codex, jev]) assert.ok(!overlap(r, yard), `${r.id} sits on the rim, not over the yard`)
   // Docked with sky for the gate, stacked clear of each other, the stack centered on the yard.
@@ -346,6 +344,32 @@ test('realms: a Codex chat keeps its own desks in the yard and makes no Claude r
   assert.equal(c.nodes.find(n => n.id === 'realm:b:claude'), undefined)
 })
 
+const staff = (...roles: string[]): RoleStep[] => roles.map((role, k) => ({ id: `s${k}`, role, state: 'active', startedAt: NOW }))
+for (const ai of ['claude', 'codex'] as const) test(`the yard is the ${ai} realm: lead and own desks sit in it, no ${ai} realm island`, () => {
+  const c = buildCourt(hub({ chats: [chat('a', ai)], progress: [prog({ sessionId: 'a', roles: staff('engineer', 'qa') })] }))
+  assert.equal(c.nodes.filter(n => n.kind === 'realm').length, 0)
+  for (const r of ['lead', 'engineer', 'qa']) assert.equal(c.nodes.find(n => n.id === `desk:a:${r}`)!.parent, 'yard:a', r)
+  checkLayout(c)
+})
+
+test('a Claude chat\'s engineer-codex docks one Codex realm holding that desk', () => {
+  const c = buildCourt(hub({ chats: [chat('a')], progress: [prog({ sessionId: 'a', roles: staff('engineer', 'engineer-codex') })] }))
+  const realms = c.nodes.filter(n => n.kind === 'realm')
+  assert.deepEqual(realms.map(n => [n.id, n.ai, n.parent]), [['realm:a:codex', 'codex', 'yard:a']])
+  assert.equal(c.nodes.find(n => n.id === 'desk:a:engineer-codex')!.parent, 'realm:a:codex')
+  assert.equal(c.nodes.find(n => n.id === 'desk:a:engineer')!.parent, 'yard:a')
+  checkLayout(c)
+})
+
+for (const n of [0, 1, 2, 3, 5]) test(`a yard keeps a free slot for its landmark with ${n} subagents`, () => {
+  const c = buildCourt(hub({ chats: [chat('a')], progress: [prog({ sessionId: 'a', roles: staff(...ROLES.slice(0, n)) })] }))
+  const yard = c.nodes.find(n => n.id === 'yard:a')!, [x, y] = markSpot(yard, n + 1)
+  // The landmark: about 44 wide and 74 tall above its base.
+  const mark = { x: x - 22, y: y - 74, w: 44, h: 74 }
+  assert.ok(mark.x >= yard.x && mark.y >= yard.y && mark.x + mark.w <= yard.x + yard.w && y <= yard.y + yard.h, 'landmark inside the yard')
+  for (const d of c.nodes.filter(m => m.kind === 'desk' && m.parent === yard.id)) assert.ok(!overlap(mark, { ...d, h: d.h + 48 }), `landmark clear of ${d.id} and its plate`)
+})
+
 test('a lead-only Claude chat has no empty Claude realm', () => {
   const c = buildCourt(hub({ chats: [chat('a')], progress: [prog({ sessionId: 'a' })] }))
   assert.equal(c.nodes.filter(n => n.kind === 'realm').length, 0)
@@ -363,7 +387,7 @@ test('links: every node but the council hangs from its parent by exactly one lin
   }
 })
 
-test('meet fires for a new desk in a Claude realm, with the yard lead', () => {
+test('meet fires for a new desk in a Claude yard, with the yard lead', () => {
   const base = { chats: [chat('a')] }
   const one = buildCourt(hub({ ...base, progress: [prog({ sessionId: 'a', roles: [{ id: 'x', role: 'engineer', state: 'active', startedAt: NOW }] })] }))
   const two = buildCourt(hub({ ...base, progress: [prog({ sessionId: 'a', roles: [{ id: 'x', role: 'engineer', state: 'active', startedAt: NOW }, { id: 'y', role: 'qa', state: 'active', startedAt: NOW }] })] }))
@@ -377,7 +401,7 @@ for (const n of [30, 90]) test(`ring places stay clear of every island with ${n}
 
 for (const n of [1, 6, 13, 30, 90]) test(`realm plaques stay clear of every island and of each other with ${n} chats`, () => {
   const h = many(n)
-  // Every chat's subagents make a Claude realm; every third chat also calls Jev.
+  // Every third chat calls Jev.
   h.progress = h.progress.map((p, i) => i % 3 ? p : { ...p, helpers: [{ ai: 'jev', label: 'ask', state: 'done', since: NOW, last: NOW, count: 1 }] })
   const c = buildCourt(h), big = c.nodes.filter(x => x.kind !== 'desk'), by = new Map(c.nodes.map(x => [x.id, x]))
   for (const z of [0.5, 1]) {
@@ -463,7 +487,7 @@ test('a done chat with a request not covered carries missed on its yard and lead
 
 test('yards with realms sit near their window: no bridge runs far across the sky', () => {
   const chats = ['a', 'b', 'c', 'd'].map(id => ({ ...chat(id), cwd: '/w/a' }))
-  const progress = chats.map(c => prog({ sessionId: c.sessionId, roles: [{ id: `${c.sessionId}-r`, role: 'engineer', state: 'active', startedAt: NOW }] }))
+  const progress = chats.map(c => prog({ sessionId: c.sessionId, roles: [{ id: `${c.sessionId}-r`, role: 'engineer-codex', state: 'active', startedAt: NOW }] }))
   const c = buildCourt(hub({ chats, progress, windows: [{ workspace: '/w/a', name: 'Ay', color: 'violet' }] }), { w: 1600, h: 900 })
   assert.equal(c.nodes.filter(n => n.kind === 'realm').length, 4)
   for (const l of c.links.filter(l => l.from === 'win:/w/a')) {
@@ -497,4 +521,38 @@ test('Fit on a phone fills the stage instead of shrinking to fit 220px plaques',
 test('council summary counts only AIs that have chats, pluralized', () => {
   const h = hub({ chats: [chat('a')], progress: [prog({ sessionId: 'a', roles: [] })] })
   assert.equal(courtSummary(buildCourt(h)), '1 AI · 1 chat · 1 agent')
+})
+
+test('Advanced mode: the yard and lead show the stage line, a raised role desk its model', () => {
+  const h = hub({
+    chats: [chat('s1')],
+    progress: [prog({ sessionId: 's1', roles: [{ id: 'r1', role: 'qa', state: 'active', startedAt: NOW }, { id: 'r2', role: 'engineer', state: 'done', startedAt: NOW }] })],
+    stages: { '/x': [{ run: 'r', sessionId: 's1', at: NOW, stages: [{ n: 1, name: 'Fix it', role: 'engineer', status: 'doing' }] }] },
+    escalations: { '/x': [{ project: '/x', role: 'qa', files: ['a.ts'], from: 'sonnet', to: 'opus', reason: '', at: NOW }] },
+  })
+  h.controls.switchboard.advancedMode = { '/x': true }
+  const by = (id: string) => buildCourt(h).nodes.find(n => n.id === id)!
+  assert.equal(by('yard:s1').task, 'Stage 1 of 1 running: Fix it, engineer')
+  assert.equal(by('desk:s1:lead').task, 'Stage 1 of 1 running: Fix it, engineer')
+  assert.equal(by('desk:s1:qa').model, 'opus')
+  assert.equal(by('desk:s1:qa').raise, 'qa raised to opus on a.ts')
+  assert.equal(by('desk:s1:engineer').model, undefined)
+  h.controls.switchboard.advancedMode = {}
+  assert.equal(by('yard:s1').task, undefined)
+})
+
+test('yards carry group and waitsOn; one tie per group sibling', () => {
+  const g = (c: ChatRow, group?: string) => ({ ...c, group }) as ChatRow
+  const h = hub({
+    chats: [g(chat('a'), 'g-1'), g(chat('b'), 'g-1'), g(chat('c'), 'g-1'), chat('d')],
+    links: [{ from: 'b', to: ['a', 'gone'], reason: 'split', auto: false, since: NOW }],
+  })
+  const c = buildCourt(h)
+  const yard = (id: string) => c.nodes.find(n => n.id === `yard:${id}`)!
+  assert.equal(yard('a').group, 'g-1')
+  assert.equal(yard('d').group, undefined)
+  assert.deepEqual(yard('b').waitsOn, ['a', 'gone'.slice(0, 8)])
+  assert.equal(yard('a').waitsOn, undefined)
+  assert.deepEqual(c.ties.map(t => [t.from, t.to, t.group]), [['yard:a', 'yard:b', 'g-1'], ['yard:b', 'yard:c', 'g-1']])
+  for (const t of c.ties) assert.deepEqual(t.points, [[yard(t.from.slice(5)).x + yard(t.from.slice(5)).w / 2, yard(t.from.slice(5)).y + yard(t.from.slice(5)).h / 2], [yard(t.to.slice(5)).x + yard(t.to.slice(5)).w / 2, yard(t.to.slice(5)).y + yard(t.to.slice(5)).h / 2]])
 })

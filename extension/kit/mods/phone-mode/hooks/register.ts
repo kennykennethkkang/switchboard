@@ -17,6 +17,12 @@ async function phoneOn($: EngineInterface): Promise<boolean> {
   return cache.on
 }
 
+// Run indefinitely chats: usage-meter allows or denies their asks, so no call.
+async function indefinite($: EngineInterface): Promise<boolean> {
+  const home = ((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '').replace(/\\/g, '/')
+  try { return JSON.parse(String(await $.fs.read(`${home}/.claude/switchboard/indefinite.json`)))[await $.session.id()] !== undefined } catch { return false }
+}
+
 // The kit's closing question goes through: Switchboard approves from its answer and rings the phone for it once.
 const closing = (input: { questions?: unknown }) => Array.isArray(input.questions)
   && input.questions.some(q => String((q as Question)?.question ?? '').includes('Approve this chat as finished'))
@@ -43,7 +49,7 @@ export function denial(input: { questions?: unknown }): string {
 
 export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
-    if (String(e.tool) !== 'AskUserQuestion' || closing(e as { questions?: unknown }) || !(await phoneOn($))) return next(e)
+    if (String(e.tool) !== 'AskUserQuestion' || closing(e as { questions?: unknown }) || !(await phoneOn($)) || (await indefinite($))) return next(e)
     return { deny: denial(e as { questions?: unknown }) }
   })
 }

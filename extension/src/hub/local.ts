@@ -11,7 +11,7 @@ import * as path from 'path'
 import type { ChangedFile, Connection, GitState, Installed, PhoneUrls, PlanView, Server } from './types'
 import { DEFAULT_RELAY_PORT } from '../constants'
 import { tryLock } from '../fs-utils'
-import { modelOf } from './roles'
+import { codexOf, modelOf } from './roles'
 import { digest, needsApproval, readSweep } from '../../kit/sweep.mjs'
 import { newerVersion } from './self-update'
 import { macNames, phoneCode, type MacNames } from './lan'
@@ -580,8 +580,10 @@ export async function installed(claude = CLAUDE, sources = kitSources()): Promis
   }
   for (const f of await list('agents')) {
     if (!f.endsWith('.md')) continue
-    const model = modelOf(await fs.promises.readFile(path.join(claude, 'agents', f), 'utf8').catch(() => ''))
-    out.push({ kind: 'role', name: f.slice(0, -3), enabled: true, ...(model ? { model } : {}) })
+    const text = await fs.promises.readFile(path.join(claude, 'agents', f), 'utf8').catch(() => '')
+    const model = modelOf(text)
+    const cx = codexOf(text)
+    out.push({ kind: 'role', name: f.slice(0, -3), enabled: true, ...(model ? { model } : {}), ...(cx ? { codex: true } : {}), ...(cx?.model ? { codexModel: cx.model } : {}), ...(cx?.effort ? { codexEffort: cx.effort } : {}) })
   }
   for (const f of await list('jev-presets')) if (f.endsWith('.json')) out.push({ kind: 'preset', name: f.slice(0, -5), enabled: true })
   // Only tools held at intake are hashed, so this stays cheap.

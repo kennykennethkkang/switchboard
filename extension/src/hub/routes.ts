@@ -27,7 +27,8 @@
  * POST /hub/upload  ?cwd=&name=&session=: the body streamed to uploads/ (handleUpload, not handleHub); answers {path} (token in the x-switchboard-token header or the query)
  * Anything outside /hub answers undefined and stays with the hook handler.
  */
-import { askBrain, askContext, brief } from './brain'
+import { askBrain, askContext, brief, quickAsk } from './brain'
+import { discuss, runCli, type Ai, type Spawn } from './discuss'
 import { touch } from './idle'
 import type { HubService } from './hub-service'
 import type { WebviewToExtensionMessage } from '../protocol'
@@ -35,14 +36,15 @@ import type { GitOp, SettingKey, SwitchboardKey } from './types'
 import { isAi } from './ais'
 import { isRepoAsk } from './projects'
 import { isKeyName } from './keys'
-import { ROLE_MODELS } from './roles'
+import { CODEX_EFFORTS, CODEX_MODELS, ROLE_MODELS } from './roles'
 import { questionAsk } from './progress'
 import { answerQuestion, closeQuestion, openQuestion, questionOf, waitQuestion } from './questions'
 import { phoneAsk } from './phone'
 import { todoTool, type TodoCall } from './todo'
 import { toolOn } from './tools'
 import { projectId, readGraph, recall, recentGraph, type MemoryGraph } from './graph'
-import { buildFlowMap, flowChatDirs, flowLabels, flowRoots } from './flowmap'
+import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './flowmap'
+import { readGroups, splitAsks } from './split'
 import { readRuns, type RunDetail } from './runs'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs, type ChatOutputs, type ChatTranscript } from './chat-view'
 import { chatLabel, saveUpload, UploadRefused } from './uploads'
@@ -79,10 +81,11 @@ const SETTING_KEYS: SettingKey[] = ['autoCompactEnabled', 'autoCompactWindow', '
 const GIT_OPS: GitOp[] = ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship', 'push']
 // The request body has a size cap too, so the count stays modest; web/lib/ship-card.ts says the same before sending.
 const MAX_PATHS = 1000
+const SPLIT_MAX = 8000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'phone']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -98,9 +101,26 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-pause': { action: oneOf('resume', 'cancel') },
   'hub-hand-to': { sessionId: str },
   'hub-ai-login': { ai: isAi },
-  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk) },
+  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str) },
+  'hub-split': { reqId: str, path: str, text: v => typeof v === 'string' && v.length <= SPLIT_MAX },
   'hub-pick-tools': { text: str, path: opt(str) },
+  'hub-advanced': { path: str, on: bool },
+  'hub-stage': { path: str, run: str, n: num, status: oneOf('done', 'redo') },
+  'hub-escalation-reset': { project: str, role: str, files: paths },
   'hub-chat-tools': { sessionId: str, tools: profile },
+  'hub-indefinite': { sessionId: str, on: bool },
+  'hub-budget': { sessionId: str, maxHours: opt(any(num, oneOf(null))), maxCostUsd: opt(any(num, oneOf(null))), gate: opt(any(v => typeof v === 'string' && v.length <= 500, oneOf(null))) },
+  'hub-checkback': { sessionId: str, everyMin: oneOf(10, 30, 60) },
+  'hub-checkback-clear': { sessionId: str },
+  'hub-refine': { sessionId: str },
+  'hub-snapshots': {},
+  'hub-snapshot-restore': { id: str },
+  'hub-health': {},
+  'hub-health-fix': { ids: opt(v => Array.isArray(v) && v.length <= 50 && v.every(x => typeof x === 'string')) },
+  'hub-pipeline-save': { path: str, run: str, name: v => typeof v === 'string' && v.length <= 80 },
+  'hub-pipelines': {},
+  'hub-pipeline-seed': { slug: str, path: str, run: str },
+  'hub-trend': {},
   'hub-star': { sessionId: str, ai: isAi, on: bool },
   'hub-resume': { sessionId: str, ai: isAi },
   'hub-archive': { sessionId: str },
@@ -134,6 +154,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-setup': {},
   'hub-rules-sync': {},
   'hub-role-model': { role: str, model: oneOf(...ROLE_MODELS) },
+  'hub-role-codex': { role: str, model: oneOf('default', ...CODEX_MODELS), effort: oneOf('default', ...CODEX_EFFORTS) },
   'hub-rc-server': { folder: str, on: bool },
   'hub-handoff': { sessionId: str },
   'hub-sweep': { name: opt(str) },
@@ -196,7 +217,7 @@ export const handleHubRequest = (hub: HubService, req: { method?: string; url?: 
 export const ranReply = (r: boolean | string): HubReply => (typeof r === 'string' ? { status: 400, body: r } : { status: r ? 204 : 400, body: '' })
 
 /** Only /hub/ask, /hub/holds, /hub/graph, /hub/recall and /hub/runs answer later; `ask`, `todo`, `graph` and `runs` are swapped in tests so none spends, writes or reads ~/.claude. */
-export function handleHub(hub: HubService, method: string | undefined, url: string | undefined, body: string, ask = askBrain, todo: (c: TodoCall & { cwd: string }) => Promise<string> = todoTool, graph: (s: ReturnType<HubService['get']>) => Promise<MemoryGraph> = readGraph, runs: (session: string, role: string) => Promise<RunDetail[]> = readRuns, chat: ChatReads = CHAT, token?: string): HubReply | Promise<HubReply> | undefined {
+export function handleHub(hub: HubService, method: string | undefined, url: string | undefined, body: string, ask = askBrain, todo: (c: TodoCall & { cwd: string }) => Promise<string> = todoTool, graph: (s: ReturnType<HubService['get']>) => Promise<MemoryGraph> = readGraph, runs: (session: string, role: string) => Promise<RunDetail[]> = readRuns, chat: ChatReads = CHAT, token?: string, split: (text: string) => Promise<string[]> = t => splitAsks(t, quickAsk), cli: Spawn = runCli): HubReply | Promise<HubReply> | undefined {
   const u = new URL(url ?? '/', 'http://127.0.0.1')
   const sent = tokenOf(u, token)
   if (u.pathname !== '/hub' && !u.pathname.startsWith('/hub/')) return undefined
@@ -237,6 +258,16 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     return ask(q, askContext(hub.get(), cwd, hub.stopped())).then(text)
   }
 
+  // The browser and phone panel's hub-split: the asks come back in the reply.
+  if (method === 'POST' && u.pathname === '/hub/split') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    let c: unknown
+    try { c = JSON.parse(body) } catch { return { status: 400, body: '' } }
+    const t = obj(c) ? c.text : undefined
+    if (typeof t !== 'string' || !t.trim() || t.length > SPLIT_MAX) return { status: 400, body: '' }
+    return split(t).then(asks => ({ status: 200, body: JSON.stringify({ asks }), contentType: 'application/json' }), () => ({ status: 200, body: JSON.stringify({ asks: [t] }), contentType: 'application/json' }))
+  }
+
   if (method === 'GET' && u.pathname === '/hub/holds') {
     if (!hub.isToken(sent)) return { status: 403, body: '' }
     const id = u.searchParams.get('session') ?? ''
@@ -261,7 +292,7 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     if (!hub.isToken(sent)) return { status: 403, body: '' }
     const cwd = u.searchParams.get('cwd')
     if (!cwd) return { status: 400, body: 'cwd is needed' }
-    return buildFlowMap(cwd, flowLabels(hub.get()), flowRoots(hub.get()), undefined, flowChatDirs(hub.get())).then(m => ({ status: 200, body: JSON.stringify(m), contentType: 'application/json' }), err => ({ status: 400, body: (err as Error).message }))
+    return buildFlowMap(cwd, flowLabels(hub.get()), flowRoots(hub.get()), undefined, flowChatDirs(hub.get()), readGroups()).then(m => ({ status: 200, body: JSON.stringify(withLimits(m, hub.get().chats)), contentType: 'application/json' }), err => ({ status: 400, body: (err as Error).message }))
   }
 
   if (method === 'GET' && u.pathname === '/hub/runs') {
@@ -385,6 +416,19 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     if (!obj(b) || (b.op !== 'add' && b.op !== 'done') || typeof b.cwd !== 'string' || !b.cwd || !['text', 'id', 'before', 'session'].every(k => field(b[k]))) return { status: 400, body: 'op, cwd and string fields only' }
     const c = Object.fromEntries(['op', 'cwd', 'text', 'id', 'before', 'session'].filter(k => b[k] !== undefined).map(k => [k, b[k]])) as TodoCall & { cwd: string }
     return todo(c).then(text, err => ({ status: 400, body: (err as Error).message }))
+  }
+
+  // The discussion runs here so the ask server and the Discuss button share it.
+  if (method === 'POST' && u.pathname === '/hub/discuss') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    let b: unknown
+    try { b = JSON.parse(body) } catch { return { status: 400, body: '' } }
+    const ai = (v: unknown) => v === 'claude' || v === 'codex'
+    if (!obj(b) || typeof b.question !== 'string' || !b.question.trim() || b.question.length > 4000 || typeof b.cwd !== 'string' || !b.cwd
+      || !ai(b.from) || (b.with !== undefined && !ai(b.with)) || (b.rounds !== undefined && typeof b.rounds !== 'number')
+      || (b.context !== undefined && (typeof b.context !== 'string' || b.context.length > 8000))) return { status: 400, body: 'question, cwd, from (claude or codex), optional with, rounds, context' }
+    const input = { question: b.question, cwd: b.cwd, from: b.from as Ai, with: b.with as Ai | undefined, rounds: b.rounds as number | undefined, context: b.context as string | undefined }
+    return discuss(input, cli).then(r => ({ status: 200, body: JSON.stringify(r), contentType: 'application/json' }), err => ({ status: 500, body: (err as Error).message }))
   }
 
   if (method === 'POST' && u.pathname === '/hub/device') {

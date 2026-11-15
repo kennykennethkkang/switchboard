@@ -20,8 +20,9 @@ export type Target = { pid: number; command: string; port?: number }
 // Armasu and Switchboard's own app.
 const KEEP_PORTS = new Set([3000, 3131])
 const KEEP = /app-keeper\.mjs|[/\\]\.claude[/\\]switchboard[/\\]/
-// Playwright's Chromium, Chrome for Testing, headless shell; the user's Chrome is none of these.
-const BROWSER = /ms-playwright|Google Chrome for Testing|chrome-headless-shell|headless_shell/
+// Playwright's Chromium, Chrome for Testing, headless shell, or the real Chrome app run --headless
+// (macOS hands link clicks from other apps to a leftover one); the user's Chrome is none of these.
+const BROWSER = /ms-playwright|Google Chrome for Testing|chrome-headless-shell|headless_shell|Google Chrome.* --headless/
 
 export function parsePs(out: string): Proc[] {
   const procs: Proc[] = []

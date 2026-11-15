@@ -49,7 +49,7 @@ export function clockDur(ms: number): string {
 }
 
 /** "950", "412k", "12.6M". */
-export const count = (n: number) => n < 1000 ? `${n}` : n < 1e6 ? `${Math.round(n / 1000)}k` : `${(n / 1e6).toFixed(1)}M`
+export const count = (n: number) => n < 1000 ? `${n}` : n < 999_500 ? `${Math.round(n / 1000)}k` : `${(n / 1e6).toFixed(1)}M`
 
 /** A run is working while the chat's progress says so; without that, until its transcript says it finished. */
 export function runState(r: RunDetail, p?: ChatProgress): 'active' | 'done' {

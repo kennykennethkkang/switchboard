@@ -9,7 +9,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -1258,5 +1258,40 @@ describe('per-project autopilot and run numbers', () => {
     assert.deepEqual(p.held, [{ id: 'k', why: 'you' }, { id: 'x', why: 'you' }, { id: 'bl', why: 'blocked' }, { id: 's', why: 'stopped' }])
     // Waiting on a running chat's item is not held: that item leaves when its chat is done.
     assert.deepEqual(upcoming([item('q'), item('r', { chat: 'live', before: 'q' })], 2, new Set(['live'])), { runs: [{ n: 3, ids: ['q'] }], held: [] })
+  })
+})
+
+describe('file list across processes', () => {
+  it('two processes adding at once keep every item', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-race-'))
+    const file = path.join(dir, 'list.json')
+    const script = path.join(dir, 'add.ts')
+    fs.writeFileSync(script, `import { updateDoc } from ${JSON.stringify(path.resolve(__dirname, '../src/hub/todo'))}
+const tag = process.argv[2]
+;(async () => { for (let i = 0; i < 25; i++) await updateDoc({ file: ${JSON.stringify(file)} }, d => ({ ...d, todo: [...d.todo, { id: tag + i, text: 'x', at: 1 }] })) })()
+`)
+    const tsx = path.resolve(__dirname, '../node_modules/.bin/tsx')
+    const { execFile } = await import('child_process')
+    const run = (tag: string) => new Promise<void>((ok, bad) => execFile(tsx, [script, tag], { env: { ...process.env, HOME } }, e => (e ? bad(e) : ok())))
+    await Promise.all([run('a'), run('b')])
+    const doc = await readDoc({ file })
+    assert.equal(doc.todo.length, 50)
+    assert.ok(!fs.existsSync(`${file}.lock`))
+  })
+
+  it('a stalled holder that lost its lock neither writes nor removes the new lock', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-stall-'))
+    const file = path.join(dir, 'list.json')
+    let aOwned: boolean | undefined, bInside = false
+    const a = withLock(file, async owned => { await new Promise(r => setTimeout(r, 150)); aOwned = owned(); return 'a' }, 50)
+    await new Promise(r => setTimeout(r, 20))
+    const b = withLock(file, async owned => { bInside = owned(); await new Promise(r => setTimeout(r, 200)); return 'b' }, 50)
+    await a
+    assert.equal(aOwned, false)
+    assert.equal(bInside, true)
+    // A's release left B's lock in place.
+    assert.ok(fs.existsSync(`${file}.lock`))
+    await b
+    assert.ok(!fs.existsSync(`${file}.lock`))
   })
 })

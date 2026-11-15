@@ -1,0 +1,47 @@
+/* Status colors per stage; a quiet line drops to mute and ash. */
+.hub-stages [data-st='done'] { --st: var(--hub-green); }
+.hub-stages [data-st='doing'] { --st: var(--hub-blue); }
+.hub-stages [data-st='redo'] { --st: var(--hub-red); }
+.hub-stages [data-st='todo'] { --st: var(--hub-hair-strong); }
+
+.hub-stages { margin: 0 2px; border: 1px solid var(--hub-hair); border-radius: 8px; background: var(--hub-surface); min-width: 0; }
+.hub-stages-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: inherit; cursor: pointer; text-align: left; }
+.hub-stages-head > b { font-weight: 400; color: var(--hub-ash); transition: transform 160ms var(--hub-ease-out); }
+.hub-stages-head[aria-expanded='true'] > b { transform: rotate(90deg); }
+.hub-stages-segs { display: inline-flex; gap: 3px; }
+.hub-stages-segs > i { width: 12px; height: 4px; border-radius: 2px; background: var(--st); }
+.hub-stages-segs > i[data-st='doing'] { animation: hub-stage-pulse 1.6s ease-in-out infinite; }
+.hub-stages-line { font: 400 12px/1.4 var(--hub-mono); color: color-mix(in srgb, var(--st) 55%, var(--hub-body)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-stages-line[data-st='todo'] { color: var(--hub-body); }
+.hub-stages[data-quiet]:not([data-gate]) .hub-stages-line { color: var(--hub-ash); }
+.hub-stages[data-quiet] .hub-stages-segs > i[data-st='done'] { background: var(--hub-mute); }
+.hub-stages[data-gate] .hub-stages-line { color: var(--hub-yellow); }
+@keyframes hub-stage-pulse { 50% { opacity: 0.45; } }
+@media (hover: hover) and (pointer: fine) { .hub-stages-head:hover { background: var(--hub-elev); } }
+
+.hub-stages ol { list-style: none; margin: 0; padding: 2px 10px 10px; display: grid; gap: 2px; }
+.hub-stages li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-height: 32px; position: relative; }
+/* The rail between dots. */
+.hub-stages li:not(:last-child)::before { content: ''; position: absolute; left: 9.5px; top: 24px; bottom: -10px; width: 1px; background: var(--hub-hair); }
+.hub-stages-dot { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 500 11px/1 var(--hub-mono); color: var(--st); box-shadow: inset 0 0 0 1px var(--st); background: var(--hub-surface); position: relative; }
+.hub-stages li[data-st='todo'] .hub-stages-dot { color: var(--hub-ash); }
+.hub-stages li[data-st='doing'] .hub-stages-dot { background: color-mix(in srgb, var(--st) 18%, var(--hub-surface)); }
+.hub-stages-name { font-size: 13px; color: var(--hub-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-stages-name > span { margin-left: 8px; font: 400 12px/1 var(--hub-mono); color: var(--hub-ash); }
+.hub-stages li[data-st='todo'] .hub-stages-name { color: var(--hub-mute); }
+.hub-stages-st { font: 400 12px/1 var(--hub-mono); color: var(--st); }
+.hub-stages li[data-st='todo'] .hub-stages-st { color: var(--hub-ash); }
+.hub-stages-gate { grid-column: 2 / -1; display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; }
+
+@media (pointer: coarse), (max-width: 600px) {
+  .hub-stages-head { min-height: 44px; }
+  .hub-stages-gate > button { min-height: 44px; }
+  .hub-stages-gate > .hub-link { min-width: 44px; }
+  /* Reset beside a role's pick: a quiet link with a full tap area. */
+  .hub-link.hub-reset { min-height: 44px; min-width: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .hub-stages-segs > i[data-st='doing'] { animation: none; } .hub-stages-head > b { transition: none; } }
+
+.hub-stages-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 10px 10px; }
+.hub-stages-save input { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px; background: var(--hub-canvas); color: var(--hub-ink); border: 1px solid var(--hub-hair); }
+.hub-stages-save [role='status'] { font-size: 12px; color: var(--hub-green); }

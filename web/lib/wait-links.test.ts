@@ -28,8 +28,8 @@ test('waitTargets: leaves out chats that wait on this one, directly or through o
   assert.deepEqual(waitTargets(chats, chats[1], chain).map(c => c.sessionId), ['a'])
 })
 
-test('waitTargets: none for a Codex chat, which has no chats_wait', () => {
-  assert.deepEqual(waitTargets(chats, { ...chats[0], ai: 'codex' } as ChatRow, []), [])
+test('waitTargets: a Codex chat can wait too, through the switchboard MCP chats_wait', () => {
+  assert.deepEqual(waitTargets(chats, { ...chats[0], ai: 'codex' } as ChatRow, []).map(c => c.sessionId), ['b', 'c'])
 })
 
 test('baseName', () => assert.equal(baseName('C:\\x\\y.ts'), 'y.ts'))

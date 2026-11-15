@@ -58,6 +58,20 @@ describe('reap', () => {
     assert.deepEqual(got, [111, 120, 150])
   })
 
+  it('stops a headless run of the real Chrome app, not its helpers', () => {
+    const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    const extra: Proc[] = [
+      { pid: 160, ppid: 100, command: `${chrome} --headless=new --user-data-dir=/tmp/p --remote-debugging-port=9334 about:blank` },
+      { pid: 161, ppid: 160, command: '/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer) --type=renderer --headless=new' },
+    ]
+    const ran: Ran = new Map(); remember(ran, chats, [...live, ...extra])
+    const after = [...ended, ...extra.map(p => p.ppid === 100 ? { ...p, ppid: 1 } : p)]
+    const got = targets('A', ran, endedChats, after, servers).map(t => t.pid)
+    assert.ok(got.includes(160))
+    assert.ok(!got.includes(161))
+    assert.ok(!got.includes(300))
+  })
+
   it('never port 3000, 3131 or the keeper', () => {
     const got = targets('A', recorded(), endedChats, ended, servers).map(t => t.pid)
     for (const pid of [112, 130, 140]) assert.ok(!got.includes(pid), `stopped ${pid}`)

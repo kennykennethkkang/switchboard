@@ -14,15 +14,17 @@ import { readSpend, setSpend } from './spend'
 import { applyPatch, controlPatch, readControls } from './controls'
 import type { ChatRow, DeviceAsk, JarvisReply, RepoView, SwitchboardKey, TodoItem, WindowColor } from './types'
 import { SHADES, titleBar, titleBarColors, windowColors } from './colors'
-import { FLAGGED, PROFILES, cleanName, readProfiles, withLibrary } from './tools'
+import { FLAGGED, PROFILES, cleanName, indefiniteOn, readProfiles, withLibrary } from './tools'
 import { globalOff, readSmart, watchTools } from './smart-tools'
 import { connections, ensureWeb, gitState, keepWebRetrying, installed, libraryInventory, listServers, newestPlan, newestPlanFile, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
-import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools } from './actions'
+import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, codexExited, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, noteCheckBack } from './actions'
 import { approvedFields, closeApproved, readDoneCheck, stampedChats } from './approve'
 import { syncTerminals, tags, terminalAction, watchTerminals } from './terminals'
-import { AIS, chatTerminal, closeChatTerminal, forgetLogin, codexFiles, lastCodexPrompt, readAis, rolloutLines } from './ais'
+import { signInTerminal } from './codex-login'
+import { AIS, chatTerminal, closeChatTerminal, codexFiles, endedCodex, lastCodexPrompt, lastCodexTurn, readAis, rolloutLines } from './ais'
 import { touch } from './idle'
-import { archiveRow, backAgain, dueForHandoff, fullCodex, idleHandedOff, readArchive, readChains, recordArchive, removeArchive, searchNotes } from './chains'
+import { budgetEnd, codexRound, goalCheck, goalFor, goalHandoffLine, roundText, runGate, usageLine, type GateExec } from './indefinite'
+import { archiveRow, backAgain, dueForHandoff, fullCodex, goneRow, idleHandedOff, readArchive, readChains, recordArchive, removeArchive, searchNotes } from './chains'
 import { newestNotes, readStarred, starredRows, toggleStar, writeStarred } from './starred'
 import { rcTargets, readChats } from './sessions'
 import { ask, chainVersion, codexNote, crossNote, handoffFile, mergeProjects, planLabel, projectName, repoPlan, type RepoAsk } from './projects'
@@ -35,7 +37,10 @@ import { askKeys } from './progress'
 import { answerQuestion, choiceProblem, installAsk } from './questions'
 import { claudeBinary, claudeCall } from './setup'
 import { tryHarden } from './harden'
-import { waitsOn } from './brain'
+import { quickAsk, waitsOn } from './brain'
+import { MOVED, promptText, routeProject } from './route-project'
+import { readGroups, splitAsks } from './split'
+import { escalationsByProject, excludeSwitchboard, keepSwitchboardDir, readStages, resetEscalations, setStageStatus, writeCompany } from './advanced'
 import type { ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../protocol'
 import { createLogger } from '../logger'
 import { forgetAccessNote, syncAccessNote } from './access-note'
@@ -44,7 +49,7 @@ import { kitHash, rulesState, syncRules, type SyncResult } from './rules'
 import { applyAgentBrowsers } from './background'
 import { CLI_APPS, mergeTenants, readTenants } from './cli-logins'
 import { LOGINS, applyLink, applyLogin, loginFor, pruneLinks, readLinks, readLogins, writeLogins, type LinkCommand, type LoginCommand } from './logins'
-import { setRoleModel } from './roles'
+import { CODEX_EFFORTS, CODEX_MODELS, setRoleCodex, setRoleModel } from './roles'
 import { installGuard } from './git-guard'
 import { addRepo, confirmApprove, fixBrief, held, line, needsApprove, readSweep, rescan, sweepAll } from './sweep'
 import { keyStatus, keyStore, keyTest, reconcileKeys, removeKey, saveKey, testKey } from './keys'
@@ -60,7 +65,11 @@ import { installKeeper, keepApp } from './keeper'
 import { rememberChats } from './reap'
 import { acceptSuggestion, addTodo, chatApproved, autoStartPlan, changeTodo, claimTodo, START_GRACE_MS, clearGoneChats, dismissSuggestion, editTodo, finishItem, loadTodos, moveTodo, replaceRemoteTodo, restoreTicked, runLabel, runMessage, runOrder, projectOf, setPilot, setTodoSync, startTodo, todoFolders } from './todo'
 import { randomUUID } from 'crypto'
-import { fillDraft, notifyAwsExpiry, notifyPaused, notifyStuck } from './notify'
+import { dailyTrend, fillDraft, notifyIndefiniteDone, notifyAwsExpiry, notifyPaused, notifyStuck } from './notify'
+import { CHECK_BACK_TEXT, dueCheckBacks, hasOpenWork } from './checkback'
+import { listSnapshots, restoreSnapshot } from './snapshots'
+import { checkHealth, fixHealth } from './health'
+import { listPipelines, savePipeline, seedPipeline, takeSeeded } from './pipelines'
 import { sendPush } from './web-push'
 import { STUCK, fixText, loops, sampleDue } from './stuck'
 import { psCost, sampleStuck, stopStuck } from './stuck-sampler'
@@ -216,6 +225,7 @@ export function startHub(context: vscode.ExtensionContext): void {
   hub.set({ keep: { ...hub.get().keep, onFull: 'fresh', freshBranch: kept.freshBranch === true } })
   const controls = hub.get().controls
   hub.set({ controls: { ...controls, switchboard: { ...controls.switchboard, ...store.get(CONTROLS_KEY) } } })
+  saveCompany()
   applyAsk()
   applyStatusBar()
   try { const why = applyAgentBrowsers(hub.get().controls.switchboard.showBrowsers); if (why) log.warn(`Agent browsers: ${why}`) } catch (e) { log.warn(`Agent browsers: ${e}`) }
@@ -275,7 +285,7 @@ export function startHub(context: vscode.ExtensionContext): void {
     const { repos, claude } = await projectFolders(REPO_ROOTS)
     hub.set({ projects: mergeProjects(repos, claude, workspace()) })
     // Once per repo per window; a hook failure never touches the list.
-    for (const r of repos) if (!guarded.has(r)) { guarded.add(r); installGuard(r).catch(err => log.warn('Git guard failed:', r, err)) }
+    for (const r of repos) if (!guarded.has(r)) { guarded.add(r); try { excludeSwitchboard(r) } catch (err) { log.warn('Exclude failed:', r, err) } installGuard(r).catch(err => log.warn('Git guard failed:', r, err)) }
   }
   addRefresher(refreshProjects)
   // Once now as well, so New chat from the app or the phone works before the panel is ever opened.
@@ -324,6 +334,7 @@ export function startHub(context: vscode.ExtensionContext): void {
   context.subscriptions.push({ dispose: () => { sub.dispose(); if (pending) clearTimeout(pending) } })
   // Runs with or without a panel open: the hook server takes the feed either way.
   context.subscriptions.push(hub.onHandoff(h => { void continueInFreshChat(h, workspace()) }))
+  context.subscriptions.push(hub.onIndefiniteDone(d => { indefiniteDone(d.sessionId); notifyIndefiniteDone(d.sessionId, d.usage, d.reason) }))
   // A handed-off Claude chat runs exit; its terminal's shell would stay behind, so close that too.
   // A session can run in two processes at once (the Claude panel and a terminal), so every live one is tried.
   const livePids = (id: string) => hub.get().chats.filter(c => c.sessionId === id && c.live && c.pid).map(c => c.pid)
@@ -349,7 +360,7 @@ export function startHub(context: vscode.ExtensionContext): void {
     if (d.kind === 'start') runDev(row)
     else stopDev(row.project)
   }))
-  context.subscriptions.push(watchTerminals())
+  context.subscriptions.push(watchTerminals(context.workspaceState))
   context.subscriptions.push(vscode.window.onDidCloseTerminal(t => {
     const s = served.get(t.name)
     if (!s) return
@@ -666,11 +677,25 @@ function browserCommand(m: Extract<WebviewToExtensionMessage, { type: 'hub-brows
 /** The chats (every AI), and what follows from them: Codex terminals, closing handed-off Codex chats, Codex handoffs. */
 async function refreshChats(): Promise<void> {
   const { chats, ais } = await readAis()
-  bindCodexTerminals(chats)
+  bindCodexTerminals(chats, Date.now(), (id, on) => pendingWaits.set(id, { on, at: Date.now() }))
   void rememberChats(chats).catch(err => log.warn('Chat processes failed:', err))
   const doneChecks = Object.fromEntries(stampedChats(hub.get().progress).flatMap(id => { const d = readDoneCheck(id); return d ? [[id, d]] : [] }))
-  hub.set({ chats: chats.map(c => ({ ...c, project: projectName(c.cwd), takes: hub.takes(c, codexTied(c.sessionId)) })), ais, doneChecks })
+  const groups = readGroups()
+  const now = Date.now(), profiles = hub.get().tools?.chats ?? {}
+  hub.set({ chats: chats.map(c => {
+    const p = hub.get().progress.find(x => x.sessionId === c.sessionId), cost = hub.get().live.find(x => x.sessionId === c.sessionId)?.costUsd, prof = profiles[c.sessionId]
+    return { ...c, project: projectName(c.cwd), takes: hub.takes(c, codexTied(c.sessionId)), ...(groups[c.sessionId] ? { group: groups[c.sessionId] } : {}),
+      ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
+  }), ais, doneChecks })
+  startWaits()
+  refreshStages(chats)
   void syncTerminals(chats).catch(err => log.warn('Terminal list failed:', err))
+  const ended = endedCodex(chats, codexTied, codexExited).filter(c => !hub.get().archive.some(a => a.sessionId === c.sessionId))
+  for (const c of ended) {
+    try { recordArchive(archiveRow(c, undefined, true)) } catch (err) { log.warn('Archive failed:', err) }
+    codexExited.delete(c.sessionId)
+  }
+  if (ended.length) hub.set({ archive: readArchive() })
   const back = backAgain(hub.get().archive, chats)
   if (back.length) { for (const id of back) removeArchive(id); hub.set({ archive: readArchive() }) }
   void clearGoneChats([...hub.retryIds(), ...resumedIds()]).then(keepGoing).catch(err => log.warn('To-do lists failed:', err))
@@ -678,7 +703,86 @@ async function refreshChats(): Promise<void> {
     closingCodex.delete(c.sessionId)
     if (!closeCodexChat(c.sessionId)) log.info(`No terminal is tied to the handed-off Codex chat ${c.sessionId.slice(0, 8)}; it stays open`)
   }
+  void indefiniteRounds(chats).catch(err => log.warn('Run indefinitely failed:', err))
+  void checkBacks().catch(err => log.warn('Check-back failed:', err))
   await codexHandoffs(chats)
+}
+
+// Run indefinitely for Codex chats this window holds: the usage-meter mod does it for Claude (Stop block), Codex has no such hook.
+const roundSent = new Map<string, number>()
+async function indefiniteRounds(chats: ChatRow[]): Promise<void> {
+  for (const c of chats) {
+    if (c.ai !== 'codex' || c.status !== 'idle' || !codexTied(c.sessionId)) continue
+    const on = indefiniteOn(c.sessionId)
+    if (on === undefined) continue
+    const file = codexFiles.get(c.sessionId)
+    const turn = file && c.updatedAt !== undefined ? lastCodexTurn(await rolloutLines(file, c.updatedAt)) : { aborted: false, answer: undefined }
+    const held = closingCodex.has(c.sessionId) || !!hub.get().pause || hub.get().archive.some(a => a.sessionId === c.sessionId)
+    const act = codexRound(c, hub.get().progress.find(p => p.sessionId === c.sessionId), { on, held, ...turn }, roundSent)
+    // A goal Check must pass too: the done line alone sends it through the gate.
+    const goalGate = act === 'done' && !readProfiles([c.sessionId])[c.sessionId]?.budget?.gate && goalCheck(goalFor(c.cwd, c.sessionId)?.text ?? '')
+    if (act === 'done' && !goalGate) finishCodexRun(c, on)
+    else if (act === 'send' || goalGate) {
+      roundSent.set(c.sessionId, c.updatedAt!)
+      void codexNextRound(c, on)
+    }
+  }
+}
+
+// Ends a Codex run through the same path the mod's finish uses: the flag off, then the notice with the usage line.
+function finishCodexRun(c: ChatRow, on: number, reason?: string): void {
+  indefiniteDone(c.sessionId)
+  notifyIndefiniteDone(c.sessionId, usageLine(on, Date.now(), c.costUsd), reason)
+}
+
+const sh: GateExec = (cmd, cwd, timeout) => new Promise(resolve =>
+  execFile('/bin/sh', ['-c', cmd], { cwd, timeout, maxBuffer: 4_000_000, windowsHide: true }, (err, stdout, stderr) => {
+    const code = err ? (typeof (err as { code?: unknown }).code === 'number' ? (err as { code: number }).code : 1) : 0
+    resolve({ code, out: `${stdout}\n${stderr}${err && code === 1 && !stdout && !stderr ? err.message : ''}` })
+  }))
+
+// The gate runs async, one at a time per chat; a pass or a spent budget ends the run, a failure rides into the next round.
+const gating = new Set<string>()
+async function codexNextRound(c: ChatRow, on: number): Promise<void> {
+  // Mid-gate: forget the send so a later poll tries this turn again.
+  if (gating.has(c.sessionId)) { roundSent.delete(c.sessionId); return }
+  gating.add(c.sessionId)
+  try {
+    const budget = readProfiles([c.sessionId])[c.sessionId]?.budget
+    let failed = ''
+    const goal = goalFor(c.cwd, c.sessionId)
+    const check = budget?.gate ? undefined : goal && goalCheck(goal.text)
+    const gate = budget?.gate ?? check
+    if (gate) {
+      const g = await runGate(gate, check ? goal!.dir : c.cwd, sh)
+      if (g.ok) { finishCodexRun(c, on, `gate passed: ${gate}`); return }
+      failed = g.out
+    }
+    if (budget?.maxCostUsd !== undefined && c.costUsd === undefined) log.info(`Run indefinitely: no cost known for ${c.sessionId.slice(0, 8)}, cost cap skipped`)
+    const end = budgetEnd(budget, on, Date.now(), c.costUsd)
+    if (end) { finishCodexRun(c, on, end); return }
+    const problem = await sendToCodex(c, roundText(gate, failed, goal?.file))
+    if (problem) { roundSent.delete(c.sessionId); log.warn(`Run indefinitely round not sent to ${c.sessionId.slice(0, 8)}: ${problem}`) }
+  } catch (err) {
+    roundSent.delete(c.sessionId)
+    log.warn(`Run indefinitely round failed for ${c.sessionId.slice(0, 8)}: ${(err as Error).message}`)
+  } finally { gating.delete(c.sessionId) }
+}
+
+// Check-back: one owner per chat, the window whose hub takes its messages (hub.takes), so no two windows both send.
+// The profile on disk holds the setting and count; noteCheckBack writes before the send, so a slow send is not repeated.
+async function checkBacks(): Promise<void> {
+  const s = hub.get(), mine = s.chats.filter(c => c.takes)
+  const settings = readProfiles(mine.map(c => c.sessionId))
+  const cb = Object.fromEntries(Object.entries(settings).flatMap(([id, p]) => (p.checkBack ? [[id, p.checkBack]] : [])))
+  const view = mine.map(c => ({ sessionId: c.sessionId, status: c.status, updatedAt: c.updatedAt, takes: c.takes, open: hasOpenWork(s.progress.find(p => p.sessionId === c.sessionId)), stopped: s.archive.some(a => a.sessionId === c.sessionId) }))
+  for (const id of dueCheckBacks(Date.now(), view, cb)) {
+    noteCheckBack(id)
+    const sent = await sendToChat(id, CHECK_BACK_TEXT)
+    if (sent !== true) { noteCheckBack(id, Date.now(), -1); log.warn(`Check-back not sent to ${id.slice(0, 8)}: ${sent}`) }
+  }
+  // Approved or ended chats drop the setting.
+  for (const c of mine) if (cb[c.sessionId] && s.archive.some(a => a.sessionId === c.sessionId)) void setCheckBack(c.sessionId, null).catch(() => undefined)
 }
 
 // To-do items started in this window (auto or Run), never auto-started again: a chat that keeps failing to start would loop.
@@ -771,7 +875,8 @@ async function codexHandoffs(chats: ChatRow[]): Promise<void> {
     const note = path.join(os.homedir(), '.claude', 'handoffs', project, handoffFile(project, planLabel(plan), c.sessionId))
     try {
       await fs.promises.mkdir(path.dirname(note), { recursive: true })
-      await fs.promises.writeFile(note, codexNote({ project, cwd: c.cwd, branch: headBranch(c.cwd) ?? 'unknown', plan, prompt }))
+      const goal = goalFor(c.cwd, c.sessionId)
+      await fs.promises.writeFile(note, codexNote({ project, cwd: c.cwd, branch: headBranch(c.cwd) ?? 'unknown', plan, prompt }) + (goal ? `\n${goalHandoffLine(goal)}\n` : ''))
     } catch (err) {
       // Unmarked, so the next refresh tries again.
       handedOff.delete(c.sessionId)
@@ -789,11 +894,17 @@ let watched: string | undefined
 async function refreshChanges(onTick = false): Promise<void> {
   const id = watched
   const chat = id ? hub.get().chats.find(c => c.sessionId === id) : undefined
-  if (!id || !chat?.cwd || !fs.existsSync(chat.cwd)) { if (hub.get().changes) hub.set({ changes: null }); return }
+  if (!id || !chat) { if (hub.get().changes) hub.set({ changes: null }); return }
+  if (!chat.cwd || !fs.existsSync(chat.cwd)) {
+    const problem = chat.cwd ? 'The chat\'s folder is gone.' : 'This chat has no folder.'
+    if (hub.get().changes?.sessionId !== id || hub.get().changes?.problem !== problem) hub.set({ changes: { sessionId: id, cwd: chat.cwd ?? '', files: [], at: Date.now(), problem } })
+    return
+  }
   if (onTick && chat.status === 'idle' && hub.get().changes?.sessionId === id && Date.now() - changesAt < CHANGES_IDLE_MS) return
   changesAt = Date.now()
   const root = await repoRoot(chat.cwd)
-  const [files, repo] = await Promise.all([readChanges(chat.cwd), root ? readRepo(root, await ghPath()) : undefined])
+  let problem: string | undefined
+  const [files, repo] = await Promise.all([readChanges(chat.cwd).catch(err => { problem = `Git could not read the changes: ${err instanceof Error ? err.message : String(err)}`; return [] }), root ? readRepo(root, await ghPath()) : undefined])
   if (watched !== id) return
   const was = hub.get().repo
   const keep = was?.sessionId === id ? { busy: was.busy, result: was.result } : {}
@@ -801,7 +912,7 @@ async function refreshChanges(onTick = false): Promise<void> {
   // A commit made anywhere since the draft took its changes.
   if (root && repo && drafts.has(root) && !drafts.get(root)!.busy && draftHead.get(root) !== (repo.log[0]?.hash ?? '')) drafts.delete(root)
   const draft = root ? drafts.get(root) : undefined
-  hub.set({ changes: { sessionId: id, cwd: chat.cwd, files, at: Date.now() }, repo: repo ? { ...repo, sessionId: id, ...keep, ...(draft ? { draft } : {}) } : null })
+  hub.set({ changes: { sessionId: id, cwd: chat.cwd, files, at: Date.now(), ...(problem ? { problem } : {}) }, repo: repo ? { ...repo, sessionId: id, ...keep, ...(draft ? { draft } : {}) } : null })
 }
 
 // One git op per repo at a time.
@@ -963,11 +1074,42 @@ function applyStatusBar(): void {
 /** Ask before actions, for the command builders; keepApp lives in app.nokeep, which the keeper reads. */
 function applyAsk(): void {
   const sb = hub.get().controls.switchboard
-  Object.assign(ask, { claude: !!sb.askClaude, codex: !!sb.askCodex })
+  Object.assign(ask, { claude: !!sb.askClaude, codex: !!sb.askCodex, codexModel: sb.codexModel, codexEffort: sb.codexEffort })
+}
+
+const COMPANY_FILE = path.join(os.homedir(), '.claude', 'switchboard', 'company.json')
+const LEARN_FILE = path.join(path.dirname(COMPANY_FILE), 'model-learn.json')
+
+/** usage-meter reads smart model switch and Advanced mode from company.json. */
+function saveCompany(): void {
+  const sb = hub.get().controls.switchboard
+  try { writeCompany(COMPANY_FILE, { smartModelSwitch: sb.smartModelSwitch !== false, advancedMode: sb.advancedMode ?? {} }) } catch (err) { log.warn('company.json not written:', err) }
+}
+
+/** Advanced mode for one project: on makes its .switchboard folder, kept out of git. */
+function setAdvanced(folder: string, on: boolean): string | undefined {
+  if (!hub.get().projects.some(p => p.path === folder)) return `${folder} is not in the project list`
+  if (on) { try { keepSwitchboardDir(folder) } catch (err) { return `could not make ${folder}/.switchboard (${(err as Error).message})` } }
+  const controls = hub.get().controls
+  const { [folder]: _was, ...rest } = controls.switchboard.advancedMode ?? {}
+  const switchboard = { ...controls.switchboard, advancedMode: on ? { ...rest, [folder]: true } : rest }
+  const { hooks: _fromSettings, ...kept } = switchboard
+  void store?.update(CONTROLS_KEY, kept)
+  hub.set({ controls: { ...controls, switchboard } })
+  saveCompany()
+  refreshStages(hub.get().chats)
+  return undefined
+}
+
+/** Stage runs for Advanced mode projects, and model-learn escalations, into hub state. */
+function refreshStages(chats: ChatRow[]): void {
+  const on = Object.entries(hub.get().controls.switchboard.advancedMode ?? {}).filter(([, v]) => v).map(([p]) => p)
+  const stages = Object.fromEntries(on.map(p => [p, readStages(p, chats.filter(c => c.cwd === p || c.cwd.startsWith(p + path.sep)).map(c => c.sessionId))]))
+  hub.set({ stages, escalations: escalationsByProject(LEARN_FILE) })
 }
 
 /** Switchboard's own switches. Hooks live in Claude Code's settings; the rest in globalState. */
-async function setSwitchboard(key: SwitchboardKey, value: boolean | number | string | null): Promise<void> {
+async function setSwitchboard(key: SwitchboardKey, value: boolean | number | string | null | undefined): Promise<void> {
   if (key === 'hooks') {
     configureCodexHooks(value === true)
     if (value === true) await configureClaudeHooks()
@@ -979,8 +1121,9 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
     return
   }
   if (key === 'name') value = cleanName(value)
-  const valid = key === 'idleMinutes' ? value === null || [5, 15, 30, 60].includes(value as number) : key === 'pauseAt' ? value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 50 && value <= 100) : key === 'name' || typeof value === 'boolean'
+  const valid = key === 'idleMinutes' ? value === null || [5, 15, 30, 60].includes(value as number) : key === 'pauseAt' ? value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 50 && value <= 100) : key === 'codexModel' ? value === null || (CODEX_MODELS as readonly unknown[]).includes(value) : key === 'codexEffort' ? value === null || (CODEX_EFFORTS as readonly unknown[]).includes(value) : key === 'name' || typeof value === 'boolean'
   if (!valid) return
+  if ((key === 'codexModel' || key === 'codexEffort') && value === null) value = undefined
   if (key === 'oneWindow') {
     if (process.platform !== 'darwin') return
     // Before one-window.json the kept value lived in this window's globalState; read it once, then drop it.
@@ -994,7 +1137,8 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
   void store?.update(CONTROLS_KEY, kept)
   hub.set({ controls: { ...controls, switchboard } })
   if (key === 'statusBar') applyStatusBar()
-  if (key === 'askClaude' || key === 'askCodex') applyAsk()
+  if (key === 'smartModelSwitch') saveCompany()
+  if (key === 'askClaude' || key === 'askCodex' || key === 'codexModel' || key === 'codexEffort') applyAsk()
   if (key === 'keepApp') keepApp(value !== false)
   if (key === 'syncRules') syncKit()
   if (key === 'showBrowsers') { const why = applyAgentBrowsers(value === true); if (why) log.warn(`Agent browsers: ${why}`) }
@@ -1077,11 +1221,31 @@ function sendToChat(sessionId: string, message: string): true | string | Promise
 
 const CARD_LINK = 'Kenneth linked these in Switchboard'
 
+// New chats from New chat that wait on others: sent once the chat runs and takes messages, which waitFor needs.
+const pendingWaits = new Map<string, { on: string[]; at: number }>()
+/** newChat for a hub-new-chat: a Claude chat's id is picked here so its waits and group can find it; a new Codex chat's id is only known once it runs, so it cannot wait yet. */
+async function startChat(folder: string, m: Extract<WebviewToExtensionMessage, { type: 'hub-new-chat' }>): Promise<string | undefined> {
+  const claude = (m.ai ?? 'claude') === 'claude', waits = m.waitOn ?? []
+  const id = claude && (waits.length || m.group) ? randomUUID() : undefined
+  // A Codex chat has no id yet: its waits are applied once bindCodexTerminals ties it.
+  const text = [m.text, takeSeeded(folder)].filter(Boolean).join('\n\n') || m.text
+  const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits)
+  if (!problem && id && waits.length) pendingWaits.set(id, { on: waits, at: Date.now() })
+  return problem
+}
+function startWaits(now = Date.now()): void {
+  for (const [id, w] of pendingWaits) {
+    if (now - w.at > START_GRACE_MS) { pendingWaits.delete(id); log.warn(`Chat ${id.slice(0, 8)} never started, so its waits were dropped`); continue }
+    if (!hub.get().chats.some(c => c.sessionId === id && c.live && c.takes)) continue
+    pendingWaits.delete(id)
+    for (const to of w.on) void Promise.resolve(waitFor(id, to)).then(r => { if (r !== true) log.warn(`Chat ${id.slice(0, 8)} could not wait on ${to.slice(0, 8)}: ${r}`) })
+  }
+}
+
 /** A link made on the cards: recorded once the waiting chat has the message. */
 function waitFor(from: string, to: string): true | string | Promise<true | string> {
   const target = hub.get().chats.find(c => c.sessionId === to)
   if (from === to) return refuse('a chat cannot wait on itself')
-  if (hub.get().chats.find(c => c.sessionId === from)?.ai === 'codex') return refuse('a Codex chat has no chats_wait')
   if (!target?.live) return refuse('that chat is not running')
   const who = target.name ?? to
   if (waitsOn(hub.get().links, to, from)) return refuse(`${who} already waits on this chat, so both would wait forever`)
@@ -1159,6 +1323,23 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-switchboard':
       void setSwitchboard(m.key, m.value)
       return true
+    case 'hub-advanced': {
+      const problem = setAdvanced(m.path, m.on)
+      return problem ? refuse(problem) : true
+    }
+    case 'hub-stage': {
+      if (!hub.get().projects.some(p => p.path === m.path)) return refuse(`${m.path} is not in the project list`)
+      if (hub.get().controls.switchboard.advancedMode?.[m.path] !== true) return refuse(`Advanced mode is off for ${m.path}`)
+      let problem: string | undefined
+      try { problem = setStageStatus(m.path, m.run, m.n, m.status) } catch (err) { problem = `stage not saved (${(err as Error).message})` }
+      if (problem) return refuse(problem)
+      refreshStages(hub.get().chats)
+      return true
+    }
+    case 'hub-escalation-reset':
+      try { resetEscalations(LEARN_FILE, m.project, m.role, m.files) } catch (err) { return refuse(`model-learn.json not written (${(err as Error).message})`) }
+      refreshStages(hub.get().chats)
+      return true
     case 'hub-compact':
       hub.queue(m.sessionId, { kind: 'compact' })
       return true
@@ -1176,7 +1357,14 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       if (m.repo) { void startInNewRepo(m.repo, m).then(problem => { if (problem) refuse(problem) }); return true }
       // Naming the chat waits on a quick model call, so a refusal shows on the Mac but the route has already answered.
       // A window opened for a new repo can get this before its own project scan lists the folder.
-      void (hub.get().projects.some(p => p.path === m.path) ? Promise.resolve() : refreshProjects().catch(() => undefined)).then(() => inHome(m.path, m)).then(sent => { if (!sent) void newChat(m.path, m.text, m.remote, m.branch, m.ai, m.tools).then(problem => { if (problem) refuse(problem) }) })
+      void (hub.get().projects.some(p => p.path === m.path) ? Promise.resolve() : refreshProjects().catch(() => undefined)).then(() => inHome(m.path, m)).then(sent => {
+        if (sent) return
+        // A Claude chat's id is picked here so its waits and group can find it; a new Codex chat's id is only known once it runs.
+        void startChat(m.path, m).then(problem => { if (problem) refuse(problem) })
+      })
+      return true
+    case 'hub-split':
+      void splitAsks(m.text, quickAsk).then(asks => posters.send({ type: 'hub-split-result', reqId: m.reqId, asks }))
       return true
     case 'hub-pick-tools': {
       if (m.path && !hub.get().projects.some(p => p.path === m.path)) return refuse(`${m.path} is not in the project list`)
@@ -1187,9 +1375,74 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-chat-tools':
       void saveChatTools(m.sessionId, m.tools).catch(err => `could not save the chat's tools (${(err as Error).message})`).then(problem => { if (problem) refuse(problem) })
       return true
-    case 'hub-focus-chat':
-      focusChat(m.sessionId)
+    case 'hub-indefinite': {
+      const chat = hub.get().chats.find(c => c.sessionId === m.sessionId)
+      void setIndefinite(m.sessionId, m.on).then(fresh => {
+        // Codex has no mod to queue through: type it into the terminal, if this window holds it.
+        if (fresh && chat?.ai === 'codex') { if (codexTied(chat.sessionId)) void sendToCodex(chat, INDEFINITE_TEXT).then(p => { if (p) refuse(p) }) }
+        else if (fresh && chat?.live && hub.takes(chat, false)) hub.queue(chat.sessionId, { kind: 'prompt', text: INDEFINITE_TEXT })
+      }).catch(err => { refuse(`could not turn Run indefinitely ${m.on ? 'on' : 'off'} (${(err as Error).message})`) })
       return true
+    }
+    case 'hub-budget':
+      void setBudget(m.sessionId, m).catch(err => refuse(`could not set the budget (${(err as Error).message})`))
+      return true
+    case 'hub-checkback':
+    case 'hub-checkback-clear':
+      void setCheckBack(m.sessionId, m.type === 'hub-checkback' ? m.everyMin : null).catch(err => refuse(`could not change check-back (${(err as Error).message})`))
+      return true
+    case 'hub-refine':
+      return sendToChat(m.sessionId, REFINE_TEXT)
+    case 'hub-snapshots':
+    case 'hub-snapshot-restore':
+      try {
+        const undone = m.type === 'hub-snapshot-restore' ? restoreSnapshot(m.id) : undefined
+        const skipped = undone?.skipped ?? []
+        // The undo's own "before" snapshot carries the skipped paths so the list can say so inline.
+        hub.set({ snapshots: listSnapshots().map(s => (undone && skipped.length && s.id === undone.id ? { ...s, skipped } : s)) })
+        if (skipped.length) return refuse(`Undo skipped ${skipped.length} file${skipped.length === 1 ? '' : 's'} outside your home folder: ${skipped.map(p => p.replace(/ \(outside home\)$/, '')).join(', ')}`)
+      } catch (err) { return refuse((err as Error).message) }
+      return true
+    case 'hub-health':
+    case 'hub-health-fix': {
+      const was = hub.get().health
+      hub.set({ health: { busy: true, results: was?.results ?? [], ...(was?.at ? { at: was.at } : {}) } })
+      void (m.type === 'hub-health' ? checkHealth() : fixHealth(m.ids ?? [])).then(results => hub.set({ health: { busy: false, at: Date.now(), results } }))
+        .catch(err => { hub.set({ health: { busy: false, results: was?.results ?? [] } }); refuse((err as Error).message) })
+      return true
+    }
+    case 'hub-pipeline-save':
+    case 'hub-pipelines':
+    case 'hub-pipeline-seed':
+      if (m.type !== 'hub-pipelines' && !hub.get().projects.some(p => p.path === m.path)) return refuse(`${m.path} is not in the project list`)
+      try {
+        if (m.type === 'hub-pipeline-save') savePipeline(m.path, m.run, m.name)
+        else if (m.type === 'hub-pipeline-seed') seedPipeline(m.slug, m.path, m.run)
+        hub.set({ pipelines: listPipelines() })
+      } catch (err) { return refuse((err as Error).message) }
+      return true
+    case 'hub-trend':
+      try { hub.set({ trend: dailyTrend() }) } catch (err) { return refuse((err as Error).message) }
+      return true
+    case 'hub-focus-chat': {
+      if (focusChat(m.sessionId)) return true
+      const s = hub.get(), chat = s.chats.find(c => c.sessionId === m.sessionId && c.live) ?? s.chats.find(c => c.sessionId === m.sessionId)
+      const gone = () => {
+        // No process (killed with no SessionEnd), never listed or deleted: an ended row takes it off the board; resuming it brings it back.
+        const row = goneRow(s, m.sessionId)
+        if (row) recordArchive(row)
+        hub.set({ archive: readArchive() })
+        return refuse('that chat is no longer running, so it moved to History')
+      }
+      // Running, or a Codex chat (live only means its rollout moved lately): a terminal here by pid, else the window that holds its folder.
+      if (!chat?.live && chat?.ai !== 'codex') return gone()
+      return (chat.pid ? chatTerminal(chat.pid, vscode.window.terminals) : Promise.resolve(undefined)).then(async t => {
+        if (t) { t.show(); return true }
+        if (await sendHome(chat.cwd, m)) return true
+        // A quiet Codex rollout may still sit open in an unmatched terminal, with no pid to prove it ended: warn, never archive.
+        return chat.pid ? refuse(`that chat runs outside this ${editor.name} window`) : refuse('no terminal here holds that Codex chat; archive it from its menu if it has ended')
+      })
+    }
     case 'hub-terminal': {
       const problem = terminalAction(m.id, m.act)
       if (problem) refuse(problem)
@@ -1315,6 +1568,12 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       void installed().then(i => hub.set({ installed: i })).catch(err => log.warn('Roles failed:', err))
       return true
     }
+    case 'hub-role-codex': {
+      const problem = setRoleCodex(path.join(os.homedir(), '.claude', 'agents'), m.role, m.model, m.effort)
+      if (problem) return refuse(problem)
+      void installed().then(i => hub.set({ installed: i })).catch(err => log.warn('Roles failed:', err))
+      return true
+    }
     case 'hub-hand-to': {
       const s = hub.get()
       const chat = s.chats.find(c => c.sessionId === m.sessionId)
@@ -1328,14 +1587,9 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       void newChat(proj.path, note, false, undefined, from === 'claude' ? 'codex' : 'claude').then(problem => { if (problem) refuse(problem) })
       return true
     }
-    case 'hub-ai-login': {
-      const t = vscode.window.createTerminal({ name: `${AIS[m.ai].name}: sign in` })
-      t.show()
-      t.sendText(AIS[m.ai].loginCommand)
-      const ai = m.ai
-      const done = vscode.window.onDidCloseTerminal(c => { if (c !== t) return; done.dispose(); forgetLogin(ai); refreshHub() })
+    case 'hub-ai-login':
+      if (!signInTerminal(m.ai, refreshHub)) refuse(`${AIS[m.ai]?.name ?? m.ai} has no sign-in command`)
       return true
-    }
     case 'hub-handoff':
       hub.handoffNow(m.sessionId)
       return true
@@ -1512,6 +1766,42 @@ const inHome = async (folder: string | undefined, m: { type: string }) => {
   return sent
 }
 
+// SessionStart ids not yet prompted, in the window that owns the chat (hooks never mirror here).
+const unprompted = new Set<string>()
+
+/** Smart switch: a chat typed in one project's window whose first prompt is about another listed project starts there instead. */
+export async function smartSwitch(payload: Record<string, unknown>): Promise<void> {
+  const id = String(payload.session_id ?? ''), cwd = String(payload.cwd ?? '')
+  if (!id || !cwd || payload.agent_id) return
+  if (payload.hook_event_name === 'SessionStart') { if (payload.source === 'startup') unprompted.add(id); return }
+  if (payload.hook_event_name === 'SessionEnd') { unprompted.delete(id); return }
+  if (payload.hook_event_name !== 'UserPromptSubmit' || !unprompted.delete(id)) return
+  await refreshChats().catch(() => undefined)
+  const rows = hub.get().chats.filter(c => c.sessionId === id && c.live)
+  // A named chat was started by Switchboard (new chat, handoff, To-do) in a project picked on purpose.
+  if (!rows.length || rows.some(c => c.name || (c.ai ?? 'claude') !== 'claude')) return
+  // Only chats in this window's terminals: one in the Claude panel or another app stays put.
+  const terms = await Promise.all(rows.map(c => chatTerminal(c.pid, vscode.window.terminals)))
+  if (terms.some(t => !t)) return
+  const prompt = promptText(String(payload.prompt ?? ''))
+  const to = await routeProject(prompt, cwd, hub.get().projects, quickAsk)
+  if (!to) return
+  // Close the wrong chat first so it stops working in the wrong folder. Another window can take the move and still
+  // fail to start it, so the prompt goes on the clipboard first and is never lost.
+  await vscode.env.clipboard.writeText(prompt).then(undefined, () => undefined)
+  for (const t of terms) t!.dispose()
+  const from = projectName(cwd), text = `${MOVED} ${from}.\n\n${prompt}`, remote = hub.get().rc.atStartup
+  const m = { type: 'hub-new-chat', path: to, text, remote }
+  if (!await inHome(to, m)) {
+    const problem = await newChat(to, text, remote, undefined)
+    if (problem) {
+      void vscode.window.showWarningMessage(`Switchboard: that chat was about ${projectName(to)} but could not start there (${problem}). Your prompt is on the clipboard.`)
+      return log.warn(`Smart switch to ${to} failed: ${problem}`)
+    }
+  }
+  void vscode.window.showInformationMessage(`Switchboard: that chat was about ${projectName(to)}, so it moved there from ${from}. Your prompt is also on the clipboard.`)
+}
+
 /** The folder of a dev command a request names: only a listed project's. */
 const devRequest = (folder: string) => knownDev(hub.get().dev, folder) ?? knownDev(devRows(devFolders(), readDev, [], null), folder)
 
@@ -1608,6 +1898,6 @@ async function startInNewRepo(repo: RepoAsk, m: Extract<WebviewToExtensionMessag
   void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(plan.folder), { forceNewWindow: true })
   const there: typeof start = { ...start, path: plan.folder }
   if (await sendHome(plan.folder, there, process.pid, undefined, 500, NEW_WINDOW_MS)) return undefined
-  return newChat(plan.folder, m.text, m.remote, m.branch, m.ai, m.tools)
+  return startChat(plan.folder, m)
 }
 const NEW_WINDOW_MS = 60_000

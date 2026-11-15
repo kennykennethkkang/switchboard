@@ -1,5 +1,228 @@
 # Changelog
 
+## 0.21.74
+
+- Every chat that finishes now updates the Source Control commit box, even when it already holds text: the new message goes on top and what was there (earlier chats, your own words, a box kept from before a reload) stays below as bullets
+
+## 0.21.73
+
+- A chat that runs the real Chrome app headless now has that browser stopped when the chat ends, like Playwright and Chrome for Testing; a leftover one caught link clicks from other apps, so links opened nothing
+
+## 0.21.72
+
+- Codex chats follow `/goal` too: the hub finds the goal file from the chat folder up, its Check is the gate, the done line alone cannot end the run while it fails, and the round names the goal file (Codex writes it under its `CODEX_THREAD_ID`)
+- A handoff to a fresh chat copies the old chat's goal file to the new one, so Run indefinitely keeps working toward the same goal; a Codex handoff note names the goal file for the new chat to copy
+- Run indefinitely for Codex: a new turn that lands while the gate still runs gets its round on a later poll instead of being dropped
+- Run indefinitely ask rule says to ask every question up front in one round, then decide; it used to say only "decide yourself" while the up-front round was still open
+
+## 0.21.71
+
+- `/goal <spec>` kit skill: writes how each function must work, what done looks like and a Check command to `.switchboard/goals/<chat id>.md`; asks every open question up front under Run indefinitely, as it goes in a normal chat
+- Run indefinitely follows a chat's goal file: each round works toward it, and its Check line is the gate (a hub gate still wins) and the done line cannot end the run while it fails, so the run ends when the goal holds; goal files and the Check use the project root
+
+## 0.21.70
+
+- Run indefinitely for Codex chats honours the time cap and gate: the gate runs in the background, a pass or a spent cap ends the run with the reason and usage, a failing gate's redacted tail goes into the next round
+- Undo says which files it skipped (outside your home folder), as a notice and under the snapshot in History
+- Send back is recorded: the answer to "Approve this chat as finished?" counts onto the chat's History row, and the daily trend counts real send backs (rows from before keep the old guess)
+- Codex chats' limits form hides the cost cap (Codex reports no cost) and says to use hours or a gate
+- Undo's "before undo" snapshot keeps the skipped paths, so History still lists them after a refresh
+- The map shows a chat's Run indefinitely limits and check-back quietly: a short line in its courtyard tag ("4h $5 gate · back 3/12") and the full one under the chat in a part's list of changers ("limit 4h / $5, gate · check back 30m 3/12")
+
+## 0.21.69
+
+- Run indefinitely budgets and gates: optional time cap, cost cap and gate command; the gate passing or a cap reached ends the run with the reason, and a failing gate's output tail goes into the next round
+- Goal budget card, check-back (10, 30 or 60 minutes, at most 12), and Refine now on the chat card
+- Undo points: `snapshot.mjs` (aar skill) and Learn copy kit, rules, agent and memory files to `~/.claude/switchboard/snapshots/` before editing them; History lists them with Undo, which snapshots the current state first
+- Check health and Fix safe ones in Settings (hook server, hub port, kit, mods, claude and codex on PATH, MCP config)
+- Daily summary and Today card show yesterday's chats, cost, approved and sent back with arrows against the day before and last week
+- Saved pipelines: Save as pipeline from a stages run, seed a new Advanced chat from one; the stages skill reads a seeded run
+- `.switchboard/` is excluded in git worktrees too (the exclude file comes from `git rev-parse --git-path`)
+- Run indefinitely now ends with a notice naming the reason and the usage (cost and hours)
+- discuss: Codex runs with `--sandbox read-only`, so the read-only discussion cannot change files
+- usage-meter 0.5.2 (bundled): model-learn.json is reread and merged before each write, so two chats finishing together no longer drop an entry
+
+## 0.21.68
+
+- Hook forwarder v12: Bash is no longer auto-allowed in a chat running in default or plan mode, or while Ask before actions is on; before, Switchboard's hook allowed every Bash call, so those prompts never showed
+- bash-approve 0.1.3 (bundled): turns a Bash ask into an allow only in acceptEdits, auto, dontAsk or bypassPermissions mode
+- done-check 0.1.8 (bundled): python and node one-liners that write files count as edits; reads and writes outside the repo do not
+- model-bench: role runs are sandboxed (Codex workspace-write, Claude acceptEdits with the Bash sandbox), so a bench agent cannot write outside its run folder
+
+## 0.21.67
+
+- Set up now installs done-check and bash-approve, which the rules already promised: a fresh machine gets the finish hold and the Bash guard (bash-approve still honors Ask before actions)
+- Every repo Switchboard lists gets `.switchboard/` in .git/info/exclude, not only Advanced mode projects
+- Codex chats get the phone push from Switchboard when they finish, and the Codex tool map says to skip the push step and that request_user_input is a fallback taking title and options
+- ask-server comment lists the Codex tools correctly
+- ask-server takes the Codex thread id from each call before CODEX_THREAD_ID, so a server started from inside another Codex shell files questions under the right chat
+- done-check 0.1.6 (claude-mods, bundled): files written by shell commands (redirects, tee, cp/mv, sed -i, apply_patch) count as edits; writes outside the repo or under .switchboard/ do not; hook-refused calls are neither edits nor checks; a turn that launched background agents is waiting; a chat that edited and checked but stops without the aar, standup and Approve question is held once to finish (main chat only); the hold cap counts per prompt; Windows paths and Codex patch moves and async asks are read right
+
+## 0.21.66
+
+- Run indefinitely switch moved out of the Tools popover into the chat header, next to Terminal, so it is always in view; hover it for the status line
+
+## 0.21.65
+
+- Codex questions go through Switchboard's ask tool (Codex only allows request_user_input in Plan mode): shown on the card and phone, answered there, and an Approve answer closes the chat like Claude's. The ask server reads the Codex thread id from the MCP call and skips Codex's own dialog, which declined under the bypass flags
+- Codex chats keep Switchboard's title (saved in codex-titles.json), and their terminal ties to the chat by first message, not display name, so Approve closes it again
+- Codex chats get what Claude chats get at start: persona, accounts and tools notes, the to-do env, and New chat's Wait on
+- Run indefinitely works on Codex chats: the next round is typed into the chat's terminal when its turn ends, with the usage-meter's stop rules
+- Codex guard hooks (claude-mods kit) also run account-guard, phone-mode, paid-guard and tab-close, and treat the Switchboard ask tool as the question tool
+
+## 0.21.64
+
+- Codex chats get names on the board: Codex's own thread title, else the first real message (the AGENTS.md and environment injections are skipped)
+- Codex closing question: an "Approve" answer to request_user_input closes the chat and its terminal, read from the rollout since Codex fires no hook for it (plain and exec code mode)
+- Ended Codex chats leave the board: archived once their terminal exits, or after 2h quiet with no running terminal; a resumed one comes back
+- ~/.codex/AGENTS.md ends with a Codex tool map (request_user_input, spawn_agent, skills under ~/.agents/skills), so Codex asks the Approve question with its own tool
+- Rules sync keeps a newer rules copy even when its text matches
+
+## 0.21.63
+
+- Codex chats: Approve closes the terminal and the message box types into it after a window reload too; the tie now falls back to the saved terminal memo, as Claude chats do
+
+## 0.21.62
+
+- Closing question gate: no longer looks for the standup text. Claude Code leaves some assistant text out of the transcript (the standup printed just before the question among them), so 0.21.61 refused a chat that had done both. The aar check stays
+
+## 0.21.61
+
+- Closing question gate: a chat that changed files and asks "Approve this chat as finished?" before it ran the aar and printed a standup with For you and Left gets the question refused, with "Run the aar skill and print the standup (done, for you, left, risks) before the Approve question." Only the turn since the last typed prompt counts; chats that edited nothing skip it
+
+## 0.21.60
+
+- New chat, Related: links, filler words (please, sure, these, ask questions...) and the project's own name no longer count toward a match; a 28-day replay showed every 0.2 hit on typed prompts came from them
+
+## 0.21.59
+
+- model-bench: role runs skip prompts, so they now get only the Claude and Codex sign-in variables; other tokens, keys, passwords and AWS variables are left out of their environment
+- Codex meters stay after the Codex chat goes quiet: the last Codex limits are kept in ~/.claude/switchboard/codex-limits.json until their window resets, apart from Claude's kept limits and never in a pause decision
+- Codex guard hooks (claude-mods kit): the installed copy in ~/.codex/switchboard-guard rebuilds itself on its next call when a file in the repo is newer, so mod edits reach Codex without rerunning setup
+
+## 0.21.58
+
+- Codex usage meter: Codex chats feed "Codex 5h" and "Codex week" meters from the rate limits in their rollouts. They stay apart from Claude's: they never pause chats, hold auto-start or Learn, or land in limits.json
+- Codex chat model and effort: two Settings rows after Lead effort. Default leaves config.toml in charge; a pick adds -m and -c model_reasoning_effort to new and resumed Codex chats
+- Codex guard hooks (claude-mods kit): setup installs a plain JS copy in ~/.codex/switchboard-guard, so the hook runs on any Node and survives the repo moving; if its mods fail to load, a built-in list still refuses the worst commands
+
+## 0.21.57
+
+- Open terminal on a chat with no terminal: a chat whose process is gone (killed with no SessionEnd), or that is no longer listed, moves to History as ended instead of sitting on the board as idle, and the toast says so; resuming it brings it back. A running chat started in a plain terminal is found by its pid, and one in another window is shown there. A Codex chat is only warned about, never archived, since a quiet one may still be open. Before, the button did nothing
+- Memory health reports supersede loops (`loops`: groups of notes whose supersedes edges run in a circle), counted in the Memory view's health line
+- New kit skill memory-fix: a script applies the safe repairs (MEMORY.md drift, superseded notes to archive/, unambiguous dangling links) with backups in ~/.cache/memory-fix, then lists the issues that need judgment; the aar skill points at it
+- Learn automatically: after improve-system, a sleep-time memory consolidation pass (after Letta) reads every project's memory notes and proposes rewrites and merges, never edits. It runs as a headless job with no shell and writes only its proposals file, which Switchboard keeps in ~/.claude/switchboard/consolidate/ and files as one to-do; the memory-fix skill holds its instructions
+- aar skill: memory-gold.mjs scores a gold set of hub_recall queries (~/.claude/memory-gold.json, query plus expected note slugs) against the running hub; `--save` before a note merge or archive, `--base` after lists lost hits and exits 1
+
+## 0.21.56
+
+- Run indefinitely: a switch on each Claude chat (chat view, under the message box; a tag on its card). On, the chat gets one prompt to ask all its questions in one round, then audits, fixes and checks in rounds with no more questions, until it ends an answer with `Run indefinitely: done`. The flag is kept in the chat's saved profile and in ~/.claude/switchboard/indefinite.json for the usage-meter mod, and follows a handoff to the fresh chat
+
+## 0.21.55
+
+- Set up registers the Codex ask entry with --codex, and re-registers an older entry that lacks it. Without the flag Codex never had chats_check, chats_wait, hub_ask or hub_recall, so the 0.21.53 wait fix could not work; run Set up once to repair an existing install
+
+## 0.21.54
+
+- Skill routing: chats loaded about 200 skills, past Claude Code's listing budget (1% of context), so most descriptions were dropped and chats could not tell when to use a skill. New chats now start with marketing-skills, aws-core and bland off (about 66k of 111k description chars). Smart turns one on from a goal or first message that names its field (AWS service names, Bland pathways, marketing terms such as SEO, cold email or competitor research), and the tools note names each off bundle so tool_on finds it. Every chat's settings also raise skillListingBudgetFraction to 0.02, written again on resume
+- Settings, Installed: the sweep's Needs review list and counts skip records for tools no longer installed or for an older plugin version
+## 0.21.53
+
+- A Codex chat can be told to wait on another chat (card link and the Wait for picker): it calls chats_wait through the switchboard MCP, which it has had since 0.21.x. The old refusal said it had none. A new Codex chat still cannot start with waits, since its id is only known once it runs
+- Checked the cross-chat edit guard against Codex's PreToolUse format: it already answers hookSpecificOutput with permissionDecision deny, and apply_patch paths (including Move to) are caught, so no change there
+- discuss tool and POST /hub/discuss: a chat's AI asks the other one (Claude or Codex) headless and read-only in the chat's folder, a few rounds, ending with Agreed on / Disagreed on lines (discuss.ts)
+- Sign in to an AI opens its terminal at the project folder and refuses an AI with no sign-in command; sign-in state is read again when the terminal closes (codex-login.ts)
+- New chat AI pick Auto: the project's Jev route preset labels the task with a role (a word table when Jev is unsure or off), code roles go to Codex and the rest to Claude, and a notice says which and why (picker.ts)
+
+## 0.21.52
+
+- qa-codex runs gpt-5.6-luna at high effort: it scored 100% on the qa bench (q1, q3) against 88% for gpt-6-luna@high, with half the tokens. engineer-codex stays on gpt-6-luna@high (99% on t12, t13, p2)
+
+## 0.21.51
+
+- Set up installs the Codex plugin for Claude Code (openai/codex-plugin-cc), so every chat has /codex:rescue, /codex:setup and the codex-cli-runtime skill. Claude only: the Codex mirror skips it
+
+## 0.21.50
+
+- Approve closes chat terminals that came back from a window reload with the warning icon: VS Code restores their name and icon after the open event, so they were taken for user terminals and left open. Each sync now claims them back
+
+## 0.21.49
+
+- Transcripts: one bad line no longer drops the rest of a read; null content blocks and tool calls without input are skipped; a watcher that errors closes and is set up again
+- Hook server: refuses a non-loopback Host; uploads that fail answer 500 instead of hanging; bodies are read as bytes, so text split across chunks stays intact
+- Changes view says why it cannot read a folder instead of staying on Reading; diff cards keep their open file per chat
+- Today: no duplicate row keys; 999,500 tokens reads 1.0M, not 1000K; CI jobs that ended neutral or stale show grey, not failed
+- AWS delete refusals match the command, not its text
+
+## 0.21.48
+
+- Role models: the Codex roles (engineer-codex, qa-codex) get a Codex model and a Codex effort pick in Settings, Models, written as -m and -c model_reasoning_effort flags on the role's codex exec line. Default drops the flag so config.toml decides. A Codex pick is not an edit, so kit updates still reach the role and keep it. Before, their row only changed the Sonnet relay's model
+
+## 0.21.47
+
+- To-do without git: two windows writing one list take a lock, so neither loses an item; a window that stalls past the lock's timeout re-reads instead of overwriting
+- A To-do chat stays off Remote Control even when writing its settings fails
+- Old first-message temp files (a day or more) are swept once per window
+- Browser app: a loopback request must also carry a loopback Host; -p/--port no longer swallows the next flag and a bad port says so
+- Ship card: a failed commit no longer clears the form on the next good result; branch links escape #; the memory view shows an error instead of hanging; Add tenants no longer reuses a hidden Chrome pick
+
+## 0.21.46
+
+- Ship and Commit record only the files you confirmed; a pre-commit hook's fixes reach the real index, a refused hook leaves staging as it was, and a partial staging on an unpicked file survives
+- Discard works on a newly added file; git exiting early no longer throws in the extension host; a failed git status shows an error instead of a partial list
+- AWS sign-in keeps the real error when it cannot start; closed Codex terminals are let go
+- New chat: Escape, Merge back and Start as one keep edited split asks; the first ask gets focus instead of Start all
+- Layout: Agents board zoom (+, -, Fit) and its keys sit in the canvas corner like the Code map's, 44px on touch and shown on phones; Needs you leads the header; the map's title and Find share the mode bar; map details keep Close in view; phone New chat is a pill above the usage strip; tool chip tips show on tap and Tab
+- Header New repo removed (New chat's "New GitHub repo..." does it); tabbing the agent list no longer opens each panel; phone mic turns off if recording fails
+- Kit rule: each chat writes a plain change note in .switchboard/changes
+
+## 0.21.45
+
+- chat-wait 0.2.2: a waiting chat cannot end its turn while a chat it waits on still works (told to call chats_wait again, up to about three hours; never during a usage pause or limit), and once they finish the stop hands it their reports and ends the link, even when the target closed or handed off
+- chat-wait: a target with subagents or shells still running counts as working; one at its Approve question or approved counts as finished clean, so the waiter continues instead of stopping to ask
+
+## 0.21.44
+
+- Approve after a reload: a revived terminal whose old chat ended and now runs a new chat belongs to the new one, so approving the old chat leaves it open
+
+## 0.21.43
+
+- Approve closes chat terminals after a window reload too: each chat terminal is remembered by its shell pid in workspace state, so a revived one keeps its chat and first-seen time (before, it came back unbound and looked newer than the approval)
+
+## 0.21.42
+
+- New chat, Split asks: a message with several unrelated asks shows a split preview on Start (one editable card per ask, Start all or Start as one). Chats from one split share a group. One quick model call, skipped when the text holds a secret; works from the phone through POST /hub/split
+- New chat, Related: "Related: <chat>" with Send there when a live chat in the project looks like the same work (TF-IDF, threshold 0.2). On a split card it sends that ask and keeps the rest
+- New chat, Wait on: a chip row of live chats; the new chat waits on the ones picked, new repo and clone too
+- Map: waiting yards say "Starts after X" or "Waiting on X" in their own tag, split siblings get a cord and "Split with X"; Code view shows the group in a part's chat list
+
+## 0.21.41
+
+- Role models: every role starts on its agent file model; usage-meter no longer forces its own table. Engineer now defaults to Sonnet
+- Smart model switch (Settings, Models): a role that redesigns the same component three rounds and still fails moves up one model (Haiku, Sonnet, Opus, Fable) for that component, remembers the fix per project in a memory note, and drops back after 5 clean runs. Debugging never counts. A raised role shows its reason and a Reset in its row
+- Advanced mode (Settings, Chats, per project): big tasks run as numbered stage folders in .switchboard/stages (kept out of git) with the new stages skill. The chat card shows the current stage and opens into the list, with Looks good and Redo between stages
+
+## 0.21.40
+
+- Map, Agents: a chat is its AI's realm, lead included. Claude and Codex chats look the same; only work handed to another AI (engineer-codex, helpers) docks a separate realm. Each yard keeps a free slot for its landmark so it never covers a desk
+- Map, Agents: tapping an agent opens its details on the map instead of the terminal. Live chats get a reply box (no focus change), a question without choices is answered there, research stays open after it starts, notice rows have Done. Open terminal is still in the panel
+- Map, Code: rebuilt as an architecture map. The app's parts in flow order with import links routed around boxes; a part's panel lists what it is, files, connects to and used by, the chats that changed it, the skills, plugins, mods and roles they used, and memory notes that name it
+
+## 0.21.39
+
+- Role models: qa and designer default to Sonnet after the model bench (qa 94% vs Opus 93% at under half the cost; designer 92% vs 88%). Engineer stays on Opus
+- model-bench: the judge no longer stalls on an unread stderr pipe, and a stuck judge call retries after 4 min instead of 15
+
+## 0.21.38
+
+- Approve: the closing question answered from Switchboard (phone or panel) is taken again; the tap marked the chat working first, so the Approve was refused and the chat never closed. A refused Approve is also written to ~/.claude/switchboard/approve.log with its reason, so it survives a reload
+
+## 0.21.37
+
+- Memory: notes in a project's memory/archive/ folder are read as superseded history; links to them still resolve, but they never show in the health line (broken links, unlinked, superseded, stale, contradictions). Their own supersedes and contradicts no longer touch live notes
+- Smart switch: a plain claude chat started in the wrong project's terminal is checked on its first prompt; when it clearly belongs to another listed project, it closes and starts again in that project's window with the same prompt. Named chats, Codex, slash commands, pasted images and folders outside a listed project stay put; the prompt is also left on the clipboard in case the start fails
+- Settings: Test models button in Role models starts a chat that runs the new model-bench skill (each role on every Claude model over hidden-test tasks, suggests the cheapest model within 5 points of the best)
+
 ## 0.21.36
 
 - Auth0: a sign-in adopts a hand-added login whose dashboard url names the tenant, so one tenant never shows twice

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { approvalBlock, approvedAnswer, approvedFields, closeApproved, LIVE_SUB_MS, isTempDir, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
+import { approvalBlock, approvedAnswer, closingPick, approvedFields, closeApproved, LIVE_SUB_MS, isTempDir, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
 import { HubService } from '../src/hub/hub-service'
 import type { ChatProgress } from '../src/hub/types'
 
@@ -52,6 +52,23 @@ describe('approvedAnswer', () => {
     assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), sub(now - LIVE_SUB_MS - 1), now), true)
     assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), sub(now - 60_000), now), false)
     assert.match(approvalBlock(sub(now - 60_000), now) ?? '', /a1/)
+  })
+  it('accepts Codex request_user_input, answers by question text or wrapped by id', () => {
+    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }, 'request_user_input')), true)
+    assert.equal(approvedAnswer({ hook_event_name: 'PostToolUse', tool_name: 'request_user_input', tool_input: { questions: [{ id: 'q1', question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }, tool_response: { answers: { q1: { answers: ['Approve'] } } } }), true)
+    assert.equal(approvedAnswer(post({ [Q]: 'Send back' }, 'request_user_input')), false)
+  })
+  it('accepts the Switchboard ask tool, whose reply is text lines', () => {
+    const mcp = (text: unknown, tool = 'mcp__switchboard__ask', input: unknown = ask()) => ({ hook_event_name: 'PostToolUse', tool_name: tool, tool_input: input, tool_response: text })
+    const line = `"${Q}": Approve`
+    for (const r of [line, { content: [{ type: 'text', text: line }] }, [{ type: 'text', text: line }], { text: line }]) assert.equal(approvedAnswer(mcp(r)), true)
+    assert.equal(approvedAnswer(mcp(line, 'switchboard.ask')), true)
+    assert.equal(approvedAnswer(mcp(`"${Q}": Send back`)), false)
+    assert.equal(approvedAnswer(mcp(`"${Q}": Approve; other: not yet`)), false)
+    assert.equal(approvedAnswer(mcp('The user declined to answer. Decide yourself and say what you decided.')), false)
+    assert.equal(approvedAnswer(mcp(`"Approve this design?": Approve`, 'mcp__switchboard__ask', ask('Approve this design?'))), false)
+    assert.equal(approvedAnswer(mcp(line, 'mcp__other__ask')), false)
+    assert.equal(approvedAnswer(mcp(line), chat({ state: 'working' })), false)
   })
   it('is false for other answers, tools and events', () => {
     assert.equal(approvedAnswer(post({ [Q]: 'Send back' })), false)
@@ -132,6 +149,59 @@ describe('HubService temp filter', () => {
     assert.equal(p.state, 'working')
     assert.equal(p.waiting, true)
     assert.equal(got.length, 2)
+  })
+  it('takes an Approve answered from Switchboard, whose tap already marked the chat working', () => {
+    const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
+    const hub = new HubService()
+    hub.approveLog = log
+    const got: string[] = []
+    hub.onApproved(id => got.push(id))
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const base = { session_id: 'r1', cwd: '/Users/k/proj', tool_name: 'AskUserQuestion', tool_input: input, tool_use_id: 'q1' }
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'r1', cwd: '/Users/k/proj', prompt: 'go' })
+    hub.hook({ ...base, hook_event_name: 'PreToolUse' })
+    hub.answered('r1', 'q1')
+    assert.equal(hub.get().progress.find(p => p.sessionId === 'r1')?.state, 'working')
+    hub.hook({ ...base, hook_event_name: 'PostToolUse', tool_response: { answers: { [Q]: 'Approve' } } })
+    assert.deepEqual(got, ['r1'])
+    assert.equal(fs.existsSync(log), false)
+  })
+  it('still refuses a working chat whose Approve carries no tool_use_id and was never tapped', () => {
+    const hub = new HubService()
+    const got: string[] = []
+    hub.onApproved(id => got.push(id))
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'p1', cwd: '/Users/k/proj', prompt: 'go' })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'p1', cwd: '/Users/k/proj', tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Approve' } } })
+    assert.deepEqual(got, [])
+  })
+  it('logs a refused Approve to a file that survives a reload', () => {
+    const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
+    const hub = new HubService()
+    hub.approveLog = log
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const cwd = '/Users/k/proj'
+    hub.hook({ hook_event_name: 'SubagentStart', session_id: 'r2', cwd, agent_id: 'a1', agent_type: 'engineer' })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'r2', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Approve' } } }, 1000)
+    const row = JSON.parse(fs.readFileSync(log, 'utf8').trim())
+    assert.deepEqual(row, { at: 1000, sessionId: 'r2', why: 'the chat is still working' })
+  })
+  it('keeps the approval log to its last 50 lines', () => {
+    const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
+    fs.writeFileSync(log, Array.from({ length: 200 }, (_, i) => JSON.stringify({ at: i, sessionId: 'x', why: 'w'.repeat(60) })).join('\n') + '\n')
+    const hub = new HubService()
+    hub.approveLog = log
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const cwd = '/Users/k/proj'
+    hub.hook({ hook_event_name: 'SubagentStart', session_id: 'r3', cwd, agent_id: 'a1', agent_type: 'engineer' })
+    hub.hook({ hook_event_name: 'PostToolUse', session_id: 'r3', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Approve' } } }, 1000)
+    const lines = fs.readFileSync(log, 'utf8').trim().split('\n')
+    assert.equal(lines.length, 50)
+    assert.equal(JSON.parse(lines.at(-1)!).sessionId, 'r3')
   })
   it('drops the close when the chat is sent back instead', () => {
     const hub = new HubService()
@@ -238,5 +308,21 @@ describe('stampedChats', () => {
     assert.deepEqual(hub.get().doneChecks, { a: { verified: true } })
     hub.set({ progress: [p('a', 'needs-you', { id: 'x', kind: 'permission', tool: 'Bash', options: ['Yes', 'No'] })] })
     assert.deepEqual(hub.get().doneChecks, {})
+  })
+})
+
+describe('closingPick', () => {
+  const Q = 'Approve this chat as finished?'
+  const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+  const post = (answers: unknown, tool = 'AskUserQuestion') => ({ hook_event_name: 'PostToolUse', tool_name: tool, tool_input: input, tool_response: { answers } })
+  it('names the answer to the closing question', () => {
+    assert.equal(closingPick(post({ [Q]: 'Send back' })), 'Send back')
+    assert.equal(closingPick(post({ [Q]: 'Approve' })), 'Approve')
+    assert.equal(closingPick(post({ [Q]: 'Send back' }, 'request_user_input')), 'Send back')
+    assert.equal(closingPick({ hook_event_name: 'PostToolUse', tool_name: 'mcp__switchboard__ask', tool_input: input, tool_response: `"${Q}": Send back` }), 'Send back')
+  })
+  it('is undefined for other questions and answers', () => {
+    assert.equal(closingPick(post({ [Q]: 'maybe' })), undefined)
+    assert.equal(closingPick({ ...post({ [Q]: 'Send back' }), hook_event_name: 'PreToolUse' }), undefined)
   })
 })

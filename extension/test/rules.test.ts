@@ -6,7 +6,8 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { BLOCK_END, BLOCK_START, GENERIC, HEADER, decideAgent, decideRules, rulesFile, rulesSha, shippedSha, syncRules, upsertBlock, withPointer } from '../src/hub/rules'
+import { withCodex } from '../src/hub/roles'
+import { BLOCK_END, CODEX_MAP, BLOCK_START, GENERIC, HEADER, decideAgent, decideRules, rulesFile, rulesSha, shippedSha, syncRules, upsertBlock, withPointer } from '../src/hub/rules'
 
 const RULES = '# Working style\n\nBe brief.\n'
 const V = '2026-10-28T10:00:00Z'
@@ -221,5 +222,33 @@ describe('withPointer', () => {
     assert.equal(withPointer('go', true, '/k'), 'go')
     assert.equal(withPointer('', false, '/k'), '')
     assert.equal(withPointer('go', false, '/k'), 'go\n\nFollow the working style in /k/rules.md; role briefs are in /k/agents.')
+  })
+})
+
+describe('a Codex pick in the gear is not an edit', () => {
+  const kit = fs.readFileSync(path.join(__dirname, '..', 'kit', 'agents', 'qa-codex.md'), 'utf8')
+  const picked = withCodex(kit, 'gpt-5.6-luna', 'max') ?? ''
+  it('skips a role that differs only by the pick', () => {
+    assert.notEqual(picked, kit)
+    assert.equal(decideAgent(picked, kit, []), 'skip')
+    assert.equal(decideAgent(picked, kit, [], true), 'skip')
+  })
+  it('retunes an old copy and still edited when the body changed', () => {
+    const old = kit.replace('Return', 'Send back')
+    const oldPicked = withCodex(old, 'default', 'low') ?? ''
+    assert.equal(decideAgent(oldPicked, kit, [rulesSha(old)]), 'retune')
+    assert.equal(decideAgent(picked + 'mine\n', kit, []), 'edited')
+  })
+})
+
+describe('codex tool map', () => {
+  it('rides on the Codex copy only and counts as current', () => {
+    const codex = rulesFile(RULES, V, CODEX_MAP)
+    assert.ok(codex.endsWith(CODEX_MAP) && codex.includes('mcp__switchboard__ask'))
+    assert.match(CODEX_MAP, /Phone push[^\n]*skip/)
+    assert.match(CODEX_MAP, /request_user_input[^\n]*fallback only[^\n]*title and options/)
+    assert.ok(!rulesFile(RULES, V).includes('Codex tool map'))
+    assert.equal(decideRules(codex, RULES, V, false, [], CODEX_MAP).action, 'skip')
+    assert.equal(decideRules(rulesFile(RULES, V), RULES, '2026-11-01T00:00:00Z', false, [], CODEX_MAP).action, 'write')
   })
 })

@@ -1,5 +1,5 @@
 /**
- * The standalone app's way to the hub: /hub/state, /hub/voice (GET, and a phone's clip POSTed), /hub/graph, /hub/runs, /hub/command and /hub/upload are passed to
+ * The standalone app's way to the hub: /hub/state, /hub/voice (GET, and a phone's clip POSTed), /hub/graph, /hub/runs, /hub/command, /hub/split and /hub/upload are passed to
  * a VS Code window's hook server, found through ~/.claude/switchboard/*.json, with
  * the window's token added here so it never reaches the browser. Only the app's
  * own page may call it: a custom header (no form can send one), the same Origin
@@ -154,7 +154,8 @@ const same = (a: string | null | undefined, b: string) => {
 /** Phone access. lan is undefined for a loopback localAddress, which passes as before. For a LAN one: the
  * Mac's own Host only, then /?k=<secret> once ('login': set the cookie), then the cookie on every request. */
 export function lanGate(h: http.IncomingHttpHeaders, url: string, port: number, lan: Lan | undefined): 'ok' | 'login' | 'deny' {
-  if (!lan) return 'ok'
+  // lanFor already sends a rebound Host here as lan; checked again so no caller can skip it.
+  if (!lan) return hostOk(h, port) ? 'ok' : 'deny'
   if (!hostOk(h, port, lan)) return 'deny'
   // '//' and the like throw, and a throw here takes the whole app down.
   let u: URL
@@ -314,7 +315,7 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
   try { u = new URL(req.url ?? '/', 'http://x') } catch { res.writeHead(400).end(); return }
   const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs' : req.method === 'GET' && u.pathname === '/hub/flowmap' ? 'flowmap'
     : req.method === 'GET' && CHAT_READS.has(u.pathname) ? u.pathname.slice('/hub/'.length) : req.method === 'POST' && u.pathname === '/hub/command' ? 'command'
-    : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : req.method === 'POST' && u.pathname === '/hub/voice' ? 'clip' : undefined
+    : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : req.method === 'POST' && u.pathname === '/hub/voice' ? 'clip' : req.method === 'POST' && u.pathname === '/hub/split' ? 'split' : undefined
   if (!route || !allowed(req.headers, port, lan)) { res.writeHead(route ? 403 : 404).end(); return }
   if (route === 'upload') return proxyUpload(req, res, u, workspace, list)
   if (route === 'clip') return proxyClip(req, res, workspace, list)

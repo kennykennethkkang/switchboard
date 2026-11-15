@@ -56,6 +56,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'hub-state'; hub: HubState }
   /** The mic's level, 0..1, about 12 a second while it listens; kept out of hub-state. */
   | { type: 'hub-voice-level'; level: number }
+  /** The asks hub-split found, same reqId; [text] on timeout or error. */
+  | { type: 'hub-split-result'; reqId: string; asks: string[] }
   /** The view was hidden or shown: a hidden view stops its animation (VS Code keeps it alive but sets no document.hidden). */
   | { type: 'hub-visible'; visible: boolean }
   /** One 'upload-chunk' is on disk; the webview sends the next only after this. */
@@ -112,9 +114,41 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string } }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string }
+  /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
+  | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
+  /** Advanced mode on or off for one project (an absolute path from the project list). */
+  | { type: 'hub-advanced'; path: string; on: boolean }
+  /** Looks good or Redo on one stage of an Advanced mode run (a folder under <path>/.switchboard/stages). */
+  | { type: 'hub-stage'; path: string; run: string; n: number; status: 'done' | 'redo' }
+  /** Clears a smart model switch escalation: its model-learn.json rows go. */
+  | { type: 'hub-escalation-reset'; project: string; role: string; files: string[] }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
+  /** Run indefinitely on or off for one chat. */
+  | { type: 'hub-indefinite'; sessionId: string; on: boolean }
+  /** Run indefinitely limits for one chat; a field set to null clears it, one left out keeps it. */
+  | { type: 'hub-budget'; sessionId: string; maxHours?: number | null; maxCostUsd?: number | null; gate?: string | null }
+  /** Check-back on for one chat at this interval (count starts over), or off. */
+  | { type: 'hub-checkback'; sessionId: string; everyMin: 10 | 30 | 60 }
+  | { type: 'hub-checkback-clear'; sessionId: string }
+  /** Refine now: tells the chat to run the aar skill on itself. */
+  | { type: 'hub-refine'; sessionId: string }
+  /** Reload HubState.snapshots. */
+  | { type: 'hub-snapshots' }
+  /** Put a snapshot back; the current files are snapshotted first. */
+  | { type: 'hub-snapshot-restore'; id: string }
+  /** Check health: fills HubState.health. */
+  | { type: 'hub-health' }
+  /** Fix safe ones: ids limits it to those results, none fixes every fixable one. */
+  | { type: 'hub-health-fix'; ids?: string[] }
+  /** Save a stages run (a folder under <path>/.switchboard/stages) as a pipeline; reloads HubState.pipelines. */
+  | { type: 'hub-pipeline-save'; path: string; run: string; name: string }
+  | { type: 'hub-pipelines' }
+  /** Seed <path>/.switchboard/stages/<run> from a saved pipeline, statuses reset to todo. */
+  | { type: 'hub-pipeline-seed'; slug: string; path: string; run: string }
+  /** Reload HubState.trend. */
+  | { type: 'hub-trend' }
   | { type: 'hub-star'; sessionId: string; ai: AiId; on: boolean }
   | { type: 'hub-resume'; sessionId: string; ai: AiId }
   | { type: 'hub-archive'; sessionId: string }
@@ -150,6 +184,8 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
   | { type: 'hub-role-model'; role: string; model: 'inherit' | 'fable' | 'opus' | 'sonnet' | 'haiku' }
+  /** A codex role's -m and reasoning effort flags; 'default' leaves a flag out. */
+  | { type: 'hub-role-codex'; role: string; model: 'default' | 'gpt-6-luna' | 'gpt-5.6-terra' | 'gpt-5.6-luna'; effort: 'default' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' }
   | { type: 'hub-rc-server'; folder: string; on: boolean }
   | { type: 'hub-handoff'; sessionId: string }
   /** The SkillSpector sweep: name rescans one tool, none sweeps everything installed. */

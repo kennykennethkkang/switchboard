@@ -30,6 +30,12 @@ export function todayView(cards: Card[], history: DayUsage[], live: SessionLive[
   }
 }
 
+/** 999,500 reads 1.0M, not 1000K: the unit is picked after rounding. */
+export function tokenText(n: number): string {
+  const k = Math.round(n / 1e3)
+  return k >= 1000 ? `${(n / 1e6).toFixed(1)}M` : `${k}K`
+}
+
 /** Today's Needs you rows, each led by what to do: choices to pick, questions, approvals, then the top hand step. */
 export function needsLines(t: Pick<Today, 'needs' | 'approve'>, you?: string): string[] {
   const ask = (n: Today['needs'][number]) => n.question ? `${n.question} (${n.name})` : n.name

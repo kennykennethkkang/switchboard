@@ -100,10 +100,131 @@ export async function deliver($: EngineInterface, items: InboxItem[]) {
   }
 }
 
-// Roles: model and daily budget per role.
+// Roles: model from ~/.claude/agents/<role>.md, raised by the smart switch; daily budget per role.
 
-const ROLE_MODEL: Record<string, string> = { engineer: 'opus', designer: 'opus', qa: 'opus', 'general-purpose': 'opus', researcher: 'haiku', Explore: 'haiku', ops: 'sonnet', growth: 'sonnet' }
-export const roleModel = (subagentType: string): string | undefined => ROLE_MODEL[subagentType]
+/** `model:` in an agent file's frontmatter; inherit or none leaves the spawn alone. */
+export function agentFileModel(text: string): string | undefined {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? ''
+  const m = /^model:\s*["']?([^\s"'#]+)/m.exec(front)?.[1]
+  return m && m !== 'inherit' ? m : undefined
+}
+
+const agentCache = new Map<string, { mtimeMs: number; model?: string }>()
+async function agentModel($: EngineInterface, role: string) {
+  if (!/^[\w-]+$/.test(role)) return undefined
+  const path = `${await homeDir($)}/.claude/agents/${role}.md`
+  const st = await $.fs.stat(path).catch(() => undefined)
+  if (!st) return undefined
+  const hit = agentCache.get(path)
+  if (hit?.mtimeMs === st.mtimeMs) return hit.model
+  const model = agentFileModel(String(await $.fs.read(path).catch(() => '')))
+  agentCache.set(path, { mtimeMs: st.mtimeMs, model })
+  return model
+}
+
+// Smart switch: three redesign rounds on one component raise that role one step.
+export const LADDER = ['haiku', 'sonnet', 'opus', 'fable']
+const level = (model?: string) => LADDER.findIndex(n => (model ?? '').toLowerCase().includes(n))
+const alias = (model: string) => LADDER[level(model)] ?? model
+export const cleanReport = (answer: string) => /^[\s*#_-]*status[\s*_]*:[\s*_]*done[\s.*_]*$/im.test(answer)
+// "debug" always reads as debugging; the other words lose to a design word ("redesign the error banner").
+export const debugBrief = (brief: string) => /\bdebug\w*/i.test(brief) ||
+  (/\b(bugs?|errors?|crash\w*|fail\w*|stack ?traces?)\b/i.test(brief) && !/\b(re)?design\w*|\b(layout|restyle|rebuild|rework|look)\w*/i.test(brief))
+const ROUNDS = 3
+const COOL_AFTER = 5
+
+export type Run = { role: string; brief: string; model: string; files: string[]; clean: boolean; round: number }
+export type Learned = { project: string; role: string; files: string[]; from: string; to: string; reason: string; at: number; resolvedBy?: string; clean?: number }
+const rel = (project: string, f: string) => (f.startsWith(`${project}/`) ? f.slice(project.length + 1) : f)
+const overlaps = (a: string[], b: string[]) => a.some(f => b.includes(f))
+
+/** What one finished subagent run teaches: its churn round, and the project's escalations after it. */
+export function learnRun(runs: Run[], learned: Learned[], r: Omit<Run, 'round'>, project: string, now: number) {
+  const files = r.files.map(f => rel(project, f))
+  const at = runs.map(x => x.role).lastIndexOf(r.role)
+  const prev = runs[at]
+  const qaFound = runs.slice(at + 1).some(x => x.role === 'qa' && !x.clean)
+  const churn = !!prev && overlaps(prev.files.map(f => rel(project, f)), files) && (!prev.clean || qaFound) && !debugBrief(r.brief)
+  let round = churn ? prev.round + 1 : 1
+  let changed = false
+  let out = learned.map(l => ({ ...l }))
+  for (const l of out) {
+    if (l.project !== project || l.role !== r.role || !overlaps(l.files, files) || level(r.model) < level(l.resolvedBy ?? l.to) || !r.clean) continue
+    changed = true
+    if (!l.resolvedBy) { l.resolvedBy = alias(r.model); continue }
+    l.clean = (l.clean ?? 0) + 1
+    if (l.clean < COOL_AFTER) continue
+    l.to = l.resolvedBy = LADDER[level(l.to) - 1]
+    l.clean = 0
+  }
+  out = out.filter(l => level(l.to) > level(l.from))
+  const up = LADDER[level(r.model) + 1]
+  if (round >= ROUNDS && !r.clean && up && level(r.model) >= 0) {
+    const reason = `${ROUNDS} redesign rounds without a clean Report`
+    const same = out.find(l => l.project === project && l.role === r.role && overlaps(l.files, files))
+    if (same) Object.assign(same, { files: [...new Set([...same.files, ...files])], to: up, reason, at: now, resolvedBy: undefined, clean: 0 })
+    else out.push({ project, role: r.role, files, from: alias(r.model), to: up, reason, at: now })
+    round = 0
+    changed = true
+  }
+  return { round, learned: out, changed }
+}
+
+// Project-relative path only: a bare basename (index.ts, page.tsx) names too many files.
+const named = (brief: string, f: string) => brief.includes(f)
+
+/** The spawn's model: its agent file's, or higher when this project learned that role needs more for the files the brief names. */
+export function pickModel(base: string | undefined, role: string, brief: string, learned: Learned[], project: string) {
+  const want = Math.max(-1, ...learned.filter(l => l.project === project && l.role === role && l.files.some(f => named(brief, f))).map(l => level(l.resolvedBy ?? l.to)))
+  return want > level(base) ? LADDER[want] : base
+}
+
+// Claude Code's own layout: the project root with every non-alphanumeric as '-'.
+export const projectDir = (home: string, root: string) => `${home}/.claude/projects/${root.replace(/[^a-zA-Z0-9]/g, '-')}`
+export const memoryDir = (home: string, root: string) => `${projectDir(home, root)}/memory`
+const rootOf = async ($: EngineInterface) => norm(await Promise.resolve().then(() => $.session.root()).catch(() => $.session.cwd()))
+const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+export const escalationNote = (learned: Learned[]) => [
+  '---', 'name: Model escalations', 'description: Roles the smart switch raised a model step after three redesign rounds, and which model fixed them', 'metadata:', '  type: project', '---', '',
+  ...learned.map(l => `- ${l.files.join(', ')}: ${l.role}, ${l.from} failed ${ROUNDS} redesign rounds, ${l.resolvedBy ? `${l.resolvedBy} fixed it` : `raised to ${l.to}, not fixed yet`} (${dayOf(l.at)})`),
+  '',
+].join('\n')
+const MEMORY_LINE = '- [Model escalations](model-escalations.md): roles raised a model step after three redesign rounds; which model fixed what'
+
+const cwdOf = ($: EngineInterface) => Promise.resolve().then(() => $.session.cwd()).then(norm).catch(() => '')
+const learnPath = async ($: EngineInterface) => `${await homeDir($)}/.claude/switchboard/model-learn.json`
+async function readLearn($: EngineInterface): Promise<Learned[]> {
+  try { const l = JSON.parse(String(await $.fs.read(await learnPath($)))); return Array.isArray(l) ? l : [] } catch { return [] }
+}
+
+// This chat's subagent runs, in the order they ended. ponytail: in memory, so a mod reload forgets the chain.
+const runs: Run[] = []
+const live = new Map<string, { role: string; brief: string; model: string; files: Set<string> }>()
+
+async function endRun($: EngineInterface, agentId: string, answer: string) {
+  const a = live.get(agentId)
+  if (!a) return
+  live.delete(agentId)
+  const project = await cwdOf($)
+  const r = { role: a.role, brief: a.brief, model: a.model, files: [...a.files], clean: cleanReport(answer) }
+  const now = await $.clock.now()
+  const path = await learnPath($)
+  // fs has no lock or rename: reread, merge, write, then verify; retry if another chat overwrote us.
+  let out = learnRun(runs, await readLearn($), r, project, now)
+  for (let i = 0; i < 4 && out.changed; i++) {
+    const text = JSON.stringify(out.learned, null, 2)
+    await $.fs.write(path, text)
+    const seen = JSON.stringify(await readLearn($), null, 2)
+    if (seen === text) break
+    out = learnRun(runs, await readLearn($), r, project, now)
+  }
+  runs.push({ ...r, round: out.round })
+  if (!out.changed) return
+  const dir = memoryDir(await homeDir($), await rootOf($).catch(() => project))
+  await $.fs.write(`${dir}/model-escalations.md`, escalationNote(out.learned.filter(l => l.project === project)))
+  const index = String(await $.fs.read(`${dir}/MEMORY.md`).catch(() => ''))
+  if (!index.includes('(model-escalations.md)')) await $.fs.write(`${dir}/MEMORY.md`, `${index}${index && !index.endsWith('\n') ? '\n' : ''}${MEMORY_LINE}\n`)
+}
 
 export function budgetDenial(role: string, used: Record<string, number>, budgets: Record<string, number>): string | undefined {
   const cap = budgets[role]
@@ -144,19 +265,22 @@ export const holdLine = (h: Hold, now: number) => `Paused: ${kindText(h.kind)} l
 export const holdDenial = (h: Hold, now: number) => `Paused by usage-meter: ${kindText(h.kind)} usage at ${h.percent}%. Stop here; this chat resumes by itself when the limit resets, in ${untilText(h.resetsAt - now)}.`
 
 const COMPANY_MS = 10_000
-const company: { at: number; paused: boolean; budgets: Record<string, number>; limit?: HubPause; windows: Window[]; pauseAt?: number | null; pauseOff: number } = { at: -Infinity, paused: false, budgets: {}, windows: [], pauseOff: -Infinity }
+const company: { at: number; paused: boolean; budgets: Record<string, number>; smart: boolean; advanced: Record<string, boolean>; limit?: HubPause; windows: Window[]; pauseAt?: number | null; pauseOff: number } = { at: -Infinity, paused: false, budgets: {}, smart: true, advanced: {}, windows: [], pauseOff: -Infinity }
+const homeDir = async ($: EngineInterface) => norm((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
 
 /** The hub's company.json, read at most every 10 seconds; missing or broken means not paused, no budgets. */
 async function readCompany($: EngineInterface) {
   const now = await $.clock.now()
   if (now - company.at < COMPANY_MS) return company
   company.at = now
-  const home = norm((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
+  const home = await homeDir($)
   try {
     const f = JSON.parse(String(await $.fs.read(`${home}/.claude/switchboard/company.json`)))
     company.paused = f.paused === true
     company.budgets = f.budgets && typeof f.budgets === 'object' ? f.budgets : {}
-  } catch { company.paused = false; company.budgets = {} }
+    company.smart = f.smartModelSwitch !== false
+    company.advanced = f.advancedMode && typeof f.advancedMode === 'object' ? f.advancedMode : {}
+  } catch { company.paused = false; company.budgets = {}; company.smart = true; company.advanced = {} }
   try {
     const l = JSON.parse(String(await $.fs.read(`${home}/.claude/switchboard/limits.json`)))
     company.limit = l.paused === true && l.pause && typeof l.pause === 'object' ? l.pause : undefined
@@ -174,6 +298,10 @@ let holdBusy = false
 // Switchboard's resume prompt (hub-service.ts PAUSE_CONTINUE).
 const HUB_RESUME = 'Usage limit reset. Continue where you stopped'
 const RESUME_DEDUP_MS = 30 * 60_000
+// A hold that starts this soon after a tool call, prompt or turn end cut work off, even with no call denied.
+const RECENT_MS = 10 * 60_000
+let activeAt = -Infinity
+export const noteActive = async ($: EngineInterface) => { activeAt = await Promise.resolve().then(() => $.clock.now()).catch(() => activeAt) }
 
 async function loadHold($: EngineInterface) {
   const id = await $.session.id()
@@ -208,7 +336,9 @@ export async function holdTick($: EngineInterface) {
     const due = overLimit([...measured, ...c.windows], c.pauseAt, now, c.pauseOff) ?? hubHold(c.limit, now)
     const was = held.hold
     if (due) {
-      held.hold = was && was.resetsAt >= due.resetsAt ? was : { ...due, ...(was?.mid ? { mid: true } : {}) }
+      await restoreFeed($).catch(() => undefined)
+      const busy = was ? was.mid : now - activeAt < RECENT_MS || feed.shells.size > 0 || [...feed.tasks.values()].some(t => t.status === 'in_progress')
+      held.hold = was && was.resetsAt >= due.resetsAt ? was : { ...due, ...(busy ? { mid: true } : {}) }
       if (held.hold !== was) { await saveHold($); await postHold($) }
       await $.ui.status(holdLine(held.hold, now))
       return
@@ -582,6 +712,7 @@ const pausePrompt = (shells: Shell[]) => [
   'Goal: <the goal in one line>', 'Tests: <last test command and its result, or not run>', 'Decisions:', '- <pick>: <why>', 'Next: <the next action>',
 ].join('\n')
 
+const stagesRule = (id: string) => `Advanced mode is on for this project: for a multi-step task, follow the \`stages\` skill and keep each step in its stage folder under .switchboard/stages/; this chat's id is ${id}.`
 const ASK_RULE = 'When you need the user to answer or act, ask with the AskUserQuestion tool so it pops up in the terminal and Switchboard. Never end a turn with open tasks you can do yourself.'
 // Same rule as Switchboard's progress.ts askedQuestion: the last paragraph, past a trailing fenced block, ends in '?'.
 // Both test suites hold the same table of cases (switchboard extension/test/progress.test.ts).
@@ -591,6 +722,123 @@ const NUDGES = 3
 // The main chat's last answer, so a later compaction does not push past a question; a reload forgets it.
 let lastAnswer = ''
 
+// Run indefinitely: a per-chat switch the hub keeps in ~/.claude/switchboard/indefinite.json as { sessionId: onAt } or { sessionId: { onAt, maxHours?, maxCostUsd?, gate? } }.
+const IND_READ_MS = 5_000
+const IND_ASK_MS = 15 * 60_000
+const IND_DONE = /^Run indefinitely: done\s*$/m
+const IND_ROUND = 'Run indefinitely is on. Do another round: audit the project for bugs, errors, user problems and hard-to-use parts; fix them; add components that would help this project; run the checks; dispatch role subagents as needed. Decide everything yourself and note decisions. Never commit. When nothing is left you can improve, end with the line `Run indefinitely: done`.'
+const IND_ASK_RULE = 'Run indefinitely is on: ask every question only the user can answer now, in one AskUserQuestion round before you start work; after that, decide yourself and note what you decided. Never end a turn with open tasks you can do yourself.'
+const ind: { at: number; flags: Record<string, unknown> } = { at: -Infinity, flags: {} }
+// onAt of the rounds already stopped, and of flags this chat ended itself (the file can lag the hub).
+const indStopped = new Map<string, number>()
+const indDone = new Map<string, number>()
+
+type IndCfg = { onAt: number; maxHours?: number; maxCostUsd?: number; gate?: string }
+const IND_GATE_MS = 600_000
+const IND_GATE_LINES = 20
+const posNum = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
+
+/** This chat's flag as a config: a plain number is just onAt. Missing, broken or already ended means off. */
+async function indefiniteCfg($: EngineInterface): Promise<IndCfg | undefined> {
+  const now = await $.clock.now()
+  if (now - ind.at >= IND_READ_MS) {
+    ind.at = now
+    try { ind.flags = JSON.parse(String(await $.fs.read(`${await homeDir($)}/.claude/switchboard/indefinite.json`))) ?? {} } catch { ind.flags = {} }
+  }
+  const id = await $.session.id()
+  const v = ind.flags[id] as Partial<IndCfg> | number | undefined
+  const onAt = typeof v === 'object' && v !== null ? v.onAt : v
+  if (typeof onAt !== 'number' || indDone.get(id) === onAt) return undefined
+  if (typeof v === 'number' || v === undefined) return { onAt }
+  return { onAt, maxHours: posNum(v.maxHours), maxCostUsd: posNum(v.maxCostUsd), gate: typeof v.gate === 'string' && v.gate.trim() ? v.gate.trim() : undefined }
+}
+
+/** onAt when Run indefinitely is on for this chat, else undefined. */
+export async function indefiniteOn($: EngineInterface): Promise<number | undefined> {
+  return (await indefiniteCfg($))?.onAt
+}
+
+const tailLines = (text: string) => text.trim().split('\n').slice(-IND_GATE_LINES).join('\n')
+
+/** Gate exit 0 passes; anything else, or a gate that cannot run, fails with its output tail. */
+async function runGate($: EngineInterface, gate: string, cwd?: string): Promise<{ ok: true } | { ok: false; out: string }> {
+  try {
+    const r = await $.process.run(['/bin/sh', '-c', gate], { cwd: cwd ?? (await $.session.cwd()), timeoutMs: IND_GATE_MS })
+    return r.exitCode === 0 ? { ok: true } : { ok: false, out: tailLines(`${r.stdout}\n${r.stderr}`) }
+  } catch (err) {
+    return { ok: false, out: `gate did not finish: ${err instanceof Error ? err.message : String(err)}` }
+  }
+}
+
+// A /goal file at the project root steers its rounds; its Check line is the gate when the hub sets none, and the done line alone cannot pass it.
+const goalPath = (root: string, id: string) => `${root}/.switchboard/goals/${id}.md`
+const goalRound = (file: string) => `Run indefinitely is on with a goal in ${file}. Do another round toward it: build or fix what is still missing, test every function it names against how it should work, run its check and the project checks, dispatch role subagents as needed. Decide everything yourself and note decisions in the goal file. Never commit. When every point in the goal works with no issues and its check passes, end with the line \`Run indefinitely: done\`.`
+
+/** A fresh chat copies the /goal file of the chat it took over from (the note path ends -<id8>.md); returns the new path. */
+export async function carryGoal($: EngineInterface, note: string): Promise<string | undefined> {
+  const old = /-([0-9a-f]{8})\.md$/.exec(note)?.[1]
+  if (!old) return undefined
+  const root = await rootOf($)
+  const dir = `${root}/.switchboard/goals`
+  const from = (await $.fs.list(dir).catch(() => [])).find(e => e.name.startsWith(old) && e.name.endsWith('.md'))
+  if (!from) return undefined
+  const to = goalPath(root, await $.session.id())
+  if (await $.fs.read(to).then(() => true, () => false)) return to
+  await $.fs.write(to, String(await $.fs.read(`${dir}/${from.name}`)))
+  return to
+}
+
+/** The next-round prompt for a Stop while on; the done line, a passing gate or a spent budget lets the stop through and tells the hub. A usage hold or handoff is never blocked. */
+export async function indefiniteStop($: EngineInterface, answer: string): Promise<string | undefined> {
+  const cfg = await indefiniteCfg($)
+  if (cfg === undefined) return undefined
+  const at = cfg.onAt
+  const id = await $.session.id()
+  const finish = async (reason?: string) => {
+    indDone.set(id, at)
+    const hours = Math.max(0, (await $.clock.now()) - at) / 3_600_000
+    const usd = (await $.session.usage({ breakdown: 'summary' }).catch(() => undefined))?.cost?.usd
+    const usage = `used ${typeof usd === 'number' ? `$${usd.toFixed(2)} ` : ''}over ${Math.round(hours * 10) / 10}h`
+    await post($, { kind: 'indefinite-done', sessionId: id, usage, ...(reason ? { reason } : {}) }).catch(() => undefined)
+  }
+  const root = await rootOf($)
+  const file = goalPath(root, id)
+  const goal = await $.fs.read(file).then(String, () => undefined)
+  const check = cfg.gate ? undefined : goal?.match(/^Check: `([^`\n]+)`/m)?.[1].trim()
+  if (IND_DONE.test(answer) && !check) { await finish(); return undefined }
+  if ((await holding($).catch(() => false)) || feed.pausing !== undefined || feed.handedOff === id || (await handedOff($).catch(() => undefined))) return undefined
+  indStopped.set(id, at)
+  let failed = ''
+  const gate = cfg.gate ?? check
+  if (gate) {
+    const g = await runGate($, gate, check ? root : undefined)
+    if (g.ok) { await finish(`gate passed: ${gate}`); return undefined }
+    failed = `\n\nThe gate \`${gate}\` failed. Its last output:\n${redact(g.out)}`
+  }
+  if (cfg.maxHours !== undefined || cfg.maxCostUsd !== undefined) {
+    const hours = ((await $.clock.now()) - at) / 3_600_000
+    const usd = (await $.session.usage({ breakdown: 'summary' }).catch(() => undefined))?.cost?.usd
+    if ((cfg.maxHours !== undefined && hours >= cfg.maxHours) || (cfg.maxCostUsd !== undefined && typeof usd === 'number' && usd >= cfg.maxCostUsd)) {
+      await finish('budget reached (not a success)')
+      return undefined
+    }
+  }
+  return (goal === undefined ? IND_ROUND : goalRound(file)) + failed
+}
+
+/** Deny text for asking the user while on; AskUserQuestion is open until the first stop or 15 min after on, the up-front round. */
+export async function indefiniteDenial($: EngineInterface, tool: string): Promise<string | undefined> {
+  if (tool !== 'AskUserQuestion' && tool !== 'mcp__switchboard__ask') return undefined
+  const at = await indefiniteOn($)
+  if (at === undefined) return undefined
+  // A handoff chat carries an old onAt, so the window keeps it from asking again.
+  if (tool === 'AskUserQuestion' && indStopped.get(await $.session.id()) !== at && (await $.clock.now()) - at < IND_ASK_MS) return undefined
+  return 'Run indefinitely is on: decide yourself and say what you decided.'
+}
+
+/** The ask rule to use while on, else undefined. */
+export const indefiniteAsk = async ($: EngineInterface) => ((await indefiniteOn($).catch(() => undefined)) === undefined ? undefined : IND_ASK_RULE)
+
 /** A turn that ended with open tasks and nothing running is asked to carry on, unless it asked the user something or wrapped up. */
 async function keepGoing($: EngineInterface, answer: string) {
   const tasks = JSON.stringify([...feed.tasks])
@@ -598,6 +846,7 @@ async function keepGoing($: EngineInterface, answer: string) {
   const open = [...feed.tasks.values()].filter(t => t.status !== 'completed')
   const n = feed.nudge?.n ?? 0
   if (await holding($)) return
+  if (await indefiniteOn($).catch(() => undefined) !== undefined) return
   if (!open.length || n >= NUDGES || endsAsking(answer) || /commit message[^\n]*\n+```/i.test(answer) || feed.shells.size || (await liveAgents($)).length) return
   feed.nudge = { n: n + 1, tasks }
   await $.prompt.submit({ text: `${OWN}you ended your turn with open tasks: ${open.slice(0, 10).map(t => t.subject.slice(0, 80)).join('; ')}. Keep working on them. ${ASK_RULE}` })
@@ -761,11 +1010,9 @@ async function start($: EngineInterface) {
   if (b) await post($, { kind: 'diet', ...dietOf(b, ((await $.store.get('uses')) ?? {}) as Record<string, number>) })
 }
 
-// Claude Code's own layout: the project root with every non-alphanumeric as '-'; a chat's subagents under <id>/subagents.
+// A chat's subagents sit under <id>/subagents.
 async function transcriptOf($: EngineInterface) {
-  const home = norm((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
-  const root = norm(await Promise.resolve().then(() => $.session.root()).catch(() => $.session.cwd()))
-  return `${home}/.claude/projects/${root.replace(/[^a-zA-Z0-9]/g, '-')}/${await $.session.id()}.jsonl`
+  return `${projectDir(await homeDir($), await rootOf($))}/${await $.session.id()}.jsonl`
 }
 
 async function readNote($: EngineInterface) {
@@ -957,6 +1204,7 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     shellsDone(e.text)
+    await noteActive($)
     // Notifications and this mod's own wrap-up are no requests of the user's.
     if (e.isMeta || e.command || e.origin?.kind === 'task-notification' || e.text.startsWith(OWN) || e.text.startsWith('<task-notification>')) return next(e)
     await restoreFeed($).catch(() => undefined)
@@ -966,7 +1214,7 @@ export const register: Register = on => {
     feed.ask = redact(e.text)
     feed.requests.push(feed.ask)
     const fresh = FRESH.exec(e.text)?.[1]
-    if (fresh) feed.freshNote = fresh
+    if (fresh) { feed.freshNote = fresh; await carryGoal($, fresh).catch(() => undefined) }
     await saveFeed($).catch(() => undefined)
     const note = await handedOff($).catch(() => undefined)
     const told = note ? wrapUp(note) : fresh ? freshStart(fresh) : undefined
@@ -977,7 +1225,9 @@ export const register: Register = on => {
   // Who to delegate to comes from ~/.claude/CLAUDE.md (kit/rules.md), not from here.
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
-    const sections = [...composed.sections, { id: 'usage-meter:asks', text: ASK_RULE, scope: 'session' as const }]
+    const c = await readCompany($).catch(() => company)
+    const advanced = c.advanced[await cwdOf($)] === true ? [{ id: 'usage-meter:stages', text: stagesRule(await $.session.id()), scope: 'session' as const }] : []
+    const sections = [...composed.sections, { id: 'usage-meter:asks', text: (await indefiniteAsk($)) ?? ASK_RULE, scope: 'session' as const }, ...advanced]
     return { sections: feed.brief ? [...sections, { id: 'usage-meter:brief', text: feed.brief, scope: 'session' as const }] : sections }
   })
 
@@ -988,13 +1238,15 @@ export const register: Register = on => {
     const held = await heldBack($)
     if (held) return { deny: held }
     const role = e.subagentType
-    const { budgets } = await readCompany($)
+    const { budgets, smart } = await readCompany($)
     const { day, used } = await startsToday($)
     const denial = budgetDenial(role, used, budgets)
     if (denial) return { deny: denial }
-    const model = roleModel(role)
+    const base = await agentModel($, role).catch(() => undefined)
+    const model = smart ? pickModel(base, role, e.prompt, await readLearn($), await cwdOf($)) : base
     const started = await next(model ? { ...e, model } : e)
     if (started.deny !== undefined) return started
+    if (started.agentId) live.set(started.agentId, { role, brief: e.prompt, model: started.model, files: new Set() })
     // Read-modify-write, so parallel spawns can undercount. Switch to an atomic increment if the store gets one.
     const counted = { ...used, [role]: (used[role] ?? 0) + 1 }
     await $.store.set('starts', { day, used: counted })
@@ -1004,9 +1256,12 @@ export const register: Register = on => {
 
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
+    await noteActive($)
     const c = await readCompany($).catch(() => company)
     const held = (await heldNow($).catch(() => undefined)) ?? pausedDenial(tool, c.paused)
     if (held) return { deny: held }
+    const noAsk = await indefiniteDenial($, tool).catch(() => undefined)
+    if (noAsk) return { deny: noAsk }
     if (tool === 'Bash' && (e as { run_in_background?: unknown }).run_in_background === true) {
       const held = await heldBack($)
       if (held) return { deny: held }
@@ -1019,6 +1274,8 @@ export const register: Register = on => {
     if (ran.deny === undefined) {
       // Only an edit that ran: a denied one would read as this chat editing a file it never wrote.
       if (EDITS.has(tool) && typeof file === 'string') feed.file = norm(file)
+      const agentId = (e as { agentId?: string }).agentId
+      if (EDITS.has(tool) && typeof file === 'string' && agentId) live.get(agentId)?.files.add(norm(file))
       noteTasks(tool, e as Record<string, unknown>, ran.result)
       noteShell(tool, e as Record<string, unknown>, ran.result, ran.text ?? '')
     }
@@ -1042,10 +1299,12 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
+    if (!e.agentId) await noteActive($)
     if (e.agentId) {
       // A subagent's report, one line; its whole transcript stays on disk.
       const line = redact(e.answer.split('\n').find(l => l.trim()) ?? '').trim().slice(0, 160)
       if (line) feed.results = [...feed.results.filter(r => r.id !== e.agentId), { id: e.agentId, line }].slice(-RESULTS_KEPT)
+      if (company.smart) await endRun($, e.agentId, e.answer).catch(() => undefined)
     } else if (e.reason === 'answer') {
       lastAnswer = e.answer
       await checkFresh($).catch(() => undefined)
@@ -1053,6 +1312,11 @@ export const register: Register = on => {
     }
     return done
   })
+
+  on('classic.Stop', async ($, e, next) => {
+    const block = await indefiniteStop($, (e as { last_assistant_message?: string }).last_assistant_message ?? lastAnswer)
+    return block ? { block } : next(e)
+  }).catch(($, e, next) => next(e))
 
   on('skill.prompt', async ($, e, next) => {
     await count($, e.pluginName ?? e.skill).catch(() => undefined)

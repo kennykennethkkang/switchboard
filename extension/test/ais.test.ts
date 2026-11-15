@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { AIS, chatTerminal, hermesMcp, pickCli, shareKitWithHermes, signedIn, closeChatTerminal, codexPaste, codexReady, codexRow, isCodexCommand, lastCodexPrompt, rolloutLines } from '../src/hub/ais'
+import { AIS, chatTerminal, hermesMcp, pickCli, shareKitWithHermes, signedIn, closeChatTerminal, codexPaste, codexReady, codexRow, endedCodex, readCodexOwn, saveCodexOwn, isCodexCommand, lastCodexPrompt, rolloutLines } from '../src/hub/ais'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -12,6 +12,38 @@ const meta = JSON.stringify({ type: 'session_meta', payload: { id: 'c0de', cwd: 
 const ask = JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'Fix the closet regen button please' } })
 
 describe('ais', () => {
+  const user = (text: string) => JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } })
+  it('names a Codex row from its thread title, else the first real response_item user text', () => {
+    const lines = [meta, user('# AGENTS.md instructions\n\n<INSTRUCTIONS>x'), user('<environment_context>\n<cwd>/x</cwd>'), user('Fix   the closet\nbutton')]
+    assert.equal(codexRow(lines, 0, 0)?.name, 'Fix the closet button')
+    assert.equal(codexRow(lines, 0, 0, undefined, new Map([['c0de', 'Closet work']]))?.name, 'Fix the closet button')
+    assert.equal(codexRow([meta], 0, 0, undefined, new Map([['c0de', 'Closet work']]))?.name, 'Closet work')
+    assert.equal(codexRow([meta, user('<environment_context>')], 0, 0)?.name, undefined)
+  })
+  it('shows the title Switchboard gave a chat it started, and keeps it on disk', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'titles-')), 'codex-titles.json')
+    saveCodexOwn('c0de', 'Closet regen', file)
+    saveCodexOwn('beef', 'Other', file)
+    const own = readCodexOwn(file)
+    assert.equal(own.get('c0de'), 'Closet regen')
+    assert.equal(codexRow([meta, ask], 0, 0, undefined, new Map([['c0de', 'Thread']]), own)?.name, 'Closet regen')
+    assert.equal(readCodexOwn(path.join(os.tmpdir(), 'no-such-titles.json')).size, 0)
+  })
+  it('skips the brief and notes block when naming a row', () => {
+    const msg = user('Switchboard brief for Armasu. Ask the hub_ask tool for more.\nSwitchboard notes: you are X.\n\nFix the closet button')
+    assert.equal(codexRow([meta, msg], 0, 0)?.name, 'Fix the closet button')
+    assert.equal(codexRow([meta, user('Switchboard notes: you are X.\n\nDo the thing')], 0, 0)?.name, 'Do the thing')
+  })
+  it('archives an ended Codex row only with no running terminal and an exit or long silence', () => {
+    const now = 10 * 3_600_000
+    const row = (sessionId: string, updatedAt: number, live = false) => ({ ai: 'codex', sessionId, updatedAt, live } as never)
+    const none = () => false
+    const ids = (cs: unknown[], tied = none, exited = new Set<string>()) => endedCodex(cs as never, tied, exited, now).map(c => c.sessionId)
+    assert.deepEqual(ids([row('exit', now - 60_000)], none, new Set(['exit'])), ['exit'])
+    assert.deepEqual(ids([row('old', now - 3 * 3_600_000)]), ['old'])
+    assert.deepEqual(ids([row('quiet', now - 3 * 3_600_000)], id => id === 'quiet'), [])
+    assert.deepEqual(ids([row('recent', now - 3_600_000), row('live', now - 5 * 3_600_000, true)]), [])
+  })
   it('reads a Codex rollout as a chat row named by its first message', () => {
     const now = 1_000_000_000
     const row = codexRow([meta, ask], now - 60_000, now)

@@ -250,3 +250,11 @@ describe('parseTaskNotification', () => {
     assert.equal(parseTaskNotification('<task-notification>\n<status>completed</status>'), null)
   })
 })
+
+describe('malformed content', () => {
+  it('skips null blocks and tool_use without input', () => {
+    const { events, feed } = setup()
+    feed({ type: 'assistant', uuid: 'n1', message: { role: 'assistant', content: [null, { type: 'tool_use', id: 't1', name: 'Read' }] } })
+    assert.equal(ofType(events, 'tool_call_start').length, 1)
+  })
+})

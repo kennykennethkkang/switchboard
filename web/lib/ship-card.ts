@@ -33,6 +33,18 @@ export function splitMessage(text: string): { summary: string; description: stri
   return { summary: first.trim(), description }
 }
 
+/** Two messages as one, like the extension's mergeCommit: add's summary on top, its lines, old's summary as a bullet, then the old lines it lacks. */
+export function mergeMessage(old: string, add: string): string {
+  const body = (m: string) => m.split('\n').slice(1).map(l => l.trimEnd()).filter(l => l.trim())
+  const summary = add.split('\n')[0].trim(), was = old.split('\n')[0].trim()
+  const lines = body(add)
+  const have = new Set([summary, ...lines.map(l => l.trim())])
+  const keep = (l: string) => { if (!have.has(l.trim())) { lines.push(l); have.add(l.trim()) } }
+  if (was && !have.has(was)) keep(`- ${was}`)
+  for (const l of body(old)) keep(l)
+  return lines.length ? `${summary}\n\n${lines.join('\n')}` : summary
+}
+
 export type Check = { name: string; ok: boolean; detail?: string }
 
 /** The newest test run, and types and lint when its command ran them too.

@@ -144,7 +144,7 @@ describe('ask-server', () => {
       s.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } })
       await s.next(m => m.id === 1)
       s.send({ id: 2, method: 'tools/list' })
-      assert.deepEqual((await s.next(m => m.id === 2)).result.tools.map((t: { name: string }) => t.name), ['ask', 'todo_add', 'todo_done', 'tool_on', 'sweep'])
+      assert.deepEqual((await s.next(m => m.id === 2)).result.tools.map((t: { name: string }) => t.name), ['ask', 'todo_add', 'todo_done', 'tool_on', 'sweep', 'discuss'])
       s.send({ id: 3, method: 'tools/call', params: { name: 'todo_add', arguments: { text: 'Set up the db', before_text: 'receipts' } } })
       assert.equal((await s.next(m => m.id === 3)).result.content[0].text, 'Added p1: Set up the db')
       const post = seen.find(r => r.url?.startsWith('/hub/todo'))!
@@ -196,6 +196,70 @@ describe('ask-server', () => {
     } finally { s.child.kill(); srv.close() }
   })
 
+  it('Codex mode adds chats_check, chats_wait, hub_ask and hub_recall, backed by the hub', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    const state = { chats: [{ sessionId: 'sess1', cwd: home, live: true, ai: 'codex' }, { sessionId: 'peer1234', name: 'engineer', cwd: home, live: true, ai: 'claude' }], progress: [{ sessionId: 'peer1234', state: 'working', tasks: [{ subject: 'Fix it', status: 'in_progress' }] }], live: [], links: [] }
+    const { srv, seen } = await fakeWindow(home, home, (res, _n) => { res.writeHead(200); res.end('x') })
+    srv.removeAllListeners('request')
+    srv.on('request', (req, res) => {
+      let body = ''
+      req.on('data', c => { body += c })
+      req.on('end', () => {
+        seen.push({ method: req.method, url: req.url, body })
+        if (req.url?.startsWith('/hub/state')) { res.writeHead(200); res.end(JSON.stringify(state)) } else if (req.url?.startsWith('/hub/ask') || req.url?.startsWith('/hub/recall')) { res.writeHead(200); res.end('answer') } else { res.writeHead(204); res.end() }
+      })
+    })
+    const s = start(home, home, {})
+    const c = spawn(process.execPath, [server, '--codex'], { env: { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: home }, stdio: ['pipe', 'pipe', 'inherit'] })
+    s.child.kill()
+    children.push(c)
+    const lines: Record<string, any>[] = []
+    let buf = ''
+    c.stdout!.on('data', (d: Buffer) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { lines.push(JSON.parse(buf.slice(0, i))); buf = buf.slice(i + 1) } })
+    const call = async (id: number, method: string, params?: object) => {
+      c.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
+      for (let i = 0; i < 200 && !lines.some(l => l.id === id); i++) await new Promise(r => setTimeout(r, 20))
+      return lines.find(l => l.id === id)!
+    }
+    try {
+      await call(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {} })
+      const names = (await call(2, 'tools/list')).result.tools.map((t: { name: string }) => t.name)
+      assert.deepEqual(names.slice(-5), ['discuss', 'chats_check', 'chats_wait', 'hub_ask', 'hub_recall'])
+      const check = (await call(3, 'tools/call', { name: 'chats_check', arguments: {} })).result.content[0].text
+      assert.match(check, /engineer \(peer1234, claude\): working, task: Fix it/)
+      assert.equal((await call(4, 'tools/call', { name: 'chats_wait', arguments: { chats: ['nobody'], reason: 'r' } })).result.content[0].text.split('\n')[0], 'No live chat in this project matches nobody. Live ones:')
+      assert.equal((await call(5, 'tools/call', { name: 'hub_ask', arguments: { question: 'who?' } })).result.content[0].text, 'answer')
+      assert.equal((await call(6, 'tools/call', { name: 'hub_recall', arguments: {} })).result.isError, true)
+      const ask = seen.find(r => r.url?.startsWith('/hub/ask'))!
+      assert.match(ask.url!, /token=tok.*&q=who%3F/)
+    } finally { c.kill(); srv.close() }
+  })
+
+  it('without Codex mode the mod tools are not listed, and discuss posts the question with this AI as from', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    const { srv, seen } = await fakeWindow(home, home, status(200))
+    srv.removeAllListeners('request')
+    srv.on('request', (req, res) => {
+      let body = ''
+      req.on('data', c => { body += c })
+      req.on('end', () => { seen.push({ method: req.method, url: req.url, body }); res.writeHead(200); res.end(JSON.stringify({ turns: [], text: 'codex:\nhi\n\nAgreed on: a\nDisagreed on: none' })) })
+    })
+    const s = start(home, home)
+    try {
+      s.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } })
+      await s.next(m => m.id === 1)
+      s.send({ id: 2, method: 'tools/call', params: { name: 'chats_check', arguments: {} } })
+      assert.ok((await s.next(m => m.id === 2)).error)
+      s.send({ id: 3, method: 'tools/call', params: { name: 'discuss', arguments: { question: 'Map or array?', rounds: 2 } } })
+      assert.match((await s.next(m => m.id === 3)).result.content[0].text, /Agreed on: a/)
+      const post = seen.find(r => r.url?.startsWith('/hub/discuss'))!
+      assert.equal(post.url, '/hub/discuss?token=tok')
+      assert.deepEqual(JSON.parse(post.body), { question: 'Map or array?', cwd: home, from: 'claude', rounds: 2 })
+      s.send({ id: 4, method: 'tools/call', params: { name: 'discuss', arguments: {} } })
+      assert.equal((await s.next(m => m.id === 4)).result.isError, true)
+    } finally { s.child.kill(); srv.close() }
+  })
+
   it('a Switchboard answer wins: the dialog is cancelled and the answer returned', T, async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
     const { srv, seen } = await fakeWindow(home, home, (res, n) => {
@@ -216,6 +280,37 @@ describe('ask-server', () => {
       assert.equal(body.questions[0].options[1].label, 'Blue')
       assert.ok(seen.some(r => r.method === 'GET' && r.url === `/hub/question?token=tok&id=${body.id}`))
     } finally { s.child.kill(); srv.close() }
+  })
+
+  it('Codex: the thread id from _meta names the chat, the hub is the only way, and todo_add carries the thread too', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    const { srv, seen } = await fakeWindow(home, home, (res, n) => {
+      if (n === 0) { res.writeHead(204); res.end() } else { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ choice: [0] })) }
+    })
+    const s = start(home, home, { SWITCHBOARD_AI: 'codex', CLAUDE_CODE_SESSION_ID: '' })
+    const meta = { threadId: 'thr-9', sessionId: 'thr-9' }
+    try {
+      s.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: { elicitation: {} } } })
+      await s.next(m => m.id === 1)
+      s.send({ id: 3, method: 'tools/call', params: { _meta: meta, name: 'ask', arguments: { questions: [{ question: 'Approve this chat as finished?', options: ['Approve', 'Send back'] }] } } })
+      const result = await s.next(m => m.id === 3)
+      assert.equal(result.result.content[0].text, '"Approve this chat as finished?": Approve')
+      assert.equal(JSON.parse(seen.find(r => r.method === 'POST')!.body).sessionId, 'thr-9')
+      s.send({ id: 4, method: 'tools/call', params: { _meta: meta, name: 'todo_add', arguments: { text: 'Set up the db' } } })
+      await s.next(m => m.id === 4)
+      assert.equal(JSON.parse(seen.find(r => r.url?.startsWith('/hub/todo'))!.body).session, 'thr-9')
+    } finally { s.child.kill(); srv.close() }
+  })
+
+  it('Codex: a window that is not up means no way to reach the user, not a dialog', T, async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
+    const s = start(home, home, { SWITCHBOARD_AI: 'codex', CLAUDE_CODE_SESSION_ID: '' })
+    try {
+      s.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: { elicitation: {} } } })
+      await s.next(m => m.id === 1)
+      s.send({ id: 3, method: 'tools/call', params: { name: 'ask', arguments: { questions: [{ question: 'Pick', options: ['A', 'B'] }] } } })
+      assert.match((await s.next(m => m.id === 3)).result.content[0].text, /No way to reach the user/)
+    } finally { s.child.kill() }
   })
 
   it('a dialog answer wins: the hub is told done', T, async () => {

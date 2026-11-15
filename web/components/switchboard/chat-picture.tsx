@@ -6,15 +6,17 @@ import { askChoice } from '@/lib/ask'
 import { limitLine, testsPrompt } from '@/lib/checks'
 import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
 import { projectName } from '@/lib/archive'
+import { INDEFINITE_LABEL, indefiniteHint, indefiniteOn } from '@/lib/indefinite'
 import { ago, almostDone, coverage } from './look'
 import { OrbitView } from './orbits'
 import { Switch } from './gear'
 import { Check, CopyCommit, Receipt, chipOf, finishedLine, hhmm, plural, stillRunning } from './chat-cards'
 import { ToolsCard } from './tools-card'
 import { CommitText } from './commit-text'
+import { ChatBudget } from './chat-budget'
 import { TestsCard } from './check-cards'
 import { onMac } from './dev-rows'
-import { vscodeBridge } from '@/lib/vscode-bridge'
+import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import { CheckStamp, Warn } from './approve'
 import './centre.css'
 
@@ -165,9 +167,9 @@ const NO_MODELS: Record<string, string> = {}
 /** profile: the chat's own plugins and skills, when Switchboard started it with a set; onProfile saves a change. */
 /** limits and autoContinue: for the usage-limit note; onSend: queues a message to this chat. note: an extra mute line under the head (a pause). */
 /** place: the VS Code window holding the chat. menu: Outputs and the more menu. message: the message box; given a function, it gets the Tools popover body. */
-export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onFocus, onAnswer, onCopy, onSend, approve, check, links = [] }: {
+export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onIndefinite, onCommand, onFocus, onAnswer, onCopy, onSend, approve, check, links = [] }: {
   chat: ChatRow; progress?: ChatProgress; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
-  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode; /** The done-check stamp under the closing question. */ check?: DoneCheck
+  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onIndefinite?: (on: boolean) => void; onCommand?: (c: HubCommand) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode; /** The done-check stamp under the closing question. */ check?: DoneCheck
   place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode | ((tools: ReactNode) => ReactNode); note?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void; /** Its wait links, for the Orbit arcs and the waiting word. */ links?: LinkChip[]
 }) {
   const [showTools, setShowTools] = useState(true)
@@ -261,11 +263,13 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
           </p>
         </div>
         <div className="hub-pic-acts cp-acts">
+          {onIndefinite && <span title={indefiniteHint(profile, now)}><Switch on={indefiniteOn(profile)} onChange={onIndefinite} label={INDEFINITE_LABEL} text={INDEFINITE_LABEL} /></span>}
           <button type="button" className="hub-btn" onClick={onFocus} title={remote ? 'Brings up its terminal on the Mac' : "Brings up this chat's terminal"}>{remote ? 'Terminal on Mac' : 'Terminal'}</button>
           {menu}
         </div>
       </div>
       {(notes.length > 0 || note) && <p className="cp-note">{notes.join(' · ')}{notes.length > 0 && note ? ' · ' : ''}{note}</p>}
+      {onCommand && <ChatBudget key={`budget-${chat.sessionId}`} chat={chat} send={onCommand} loop={indefiniteOn(profile)} />}
       {first}
       {progress?.tests && !progress.tests.ok && <TestsCard run={progress.tests} onSend={onSend && (() => onSend(testsPrompt(progress.tests!)))} />}
       <div className="cp-split">

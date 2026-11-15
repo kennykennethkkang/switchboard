@@ -56,6 +56,15 @@ describe('git args', () => {
     }
   })
 
+  it('handles stdin closing after git exits', async () => {
+    const r = await git(os.tmpdir(), ['--version'], 15_000, 'x'.repeat(16 << 20))
+    assert.equal(r.ok, true, r.err)
+  })
+
+  it('does not treat a failed status command as an empty repository', async () => {
+    await assert.rejects(readRepo(os.tmpdir()), /not a git repository/i)
+  })
+
   it('parses porcelain v2 status with renames and untracked', () => {
     const out = ['# branch.oid abc', '# branch.head main', '# branch.upstream origin/main', '# branch.ab +2 -1',
       '1 .M N... 100644 100644 100644 a b src/a.ts', '2 R. N... 100644 100644 100644 a b R100 src/new.ts', 'src/old.ts',
@@ -223,6 +232,16 @@ describe('git ops end to end', () => {
     assert.deepEqual((await readRepo(a)).files, [])
   })
 
+  it('discards a staged new file from both the index and worktree', async () => {
+    const file = path.join(a, 'added.txt')
+    fs.writeFileSync(file, 'new\n')
+    sh(a, 'add', 'added.txt')
+    const r = await gitOp(a, { op: 'discard', files: ['added.txt'], confirmed: true })
+    assert.equal(r.ok, true, r.text)
+    assert.equal(fs.existsSync(file), false)
+    assert.equal(sh(a, 'status', '--porcelain'), '')
+  })
+
   it('creates, publishes, switches and deletes a branch', async () => {
     assert.equal((await gitOp(a, { op: 'create', branch: 'bad..name' })).ok, false)
     assert.equal((await gitOp(a, { op: 'create', branch: 'feat/x' })).ok, true)
@@ -289,5 +308,86 @@ describe('git ops end to end', () => {
     assert.equal((await readRepo(a)).pending?.text, 'Add m2\n\n- m2.txt')
     sh(a, 'add', 'm2.txt'); sh(a, 'commit', '-qm', 'Add m2')
     assert.equal((await readRepo(a)).pending, undefined)
+  })
+})
+
+describe('pre-commit hooks that stage files', () => {
+  const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  let root = ''
+  before(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-hook-')) })
+  after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const fresh = (name: string, hook: string) => {
+    const d = path.join(root, name)
+    sh(root, 'init', '-q', '--bare', '-b', 'main', `${name}.git`); sh(root, 'init', '-q', '-b', 'main', name)
+    sh(d, 'config', 'user.email', 't@t'); sh(d, 'config', 'user.name', 'T'); sh(d, 'config', 'commit.gpgsign', 'false')
+    for (const f of ['c.txt', 'o.txt']) fs.writeFileSync(path.join(d, f), f + '\n')
+    sh(d, 'add', '-A'); sh(d, 'commit', '-qm', 'init'); sh(d, 'remote', 'add', 'origin', `../${name}.git`); sh(d, 'push', '-qu', 'origin', 'main')
+    fs.writeFileSync(path.join(d, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n${hook}\n`, { mode: 0o755 })
+    fs.writeFileSync(path.join(d, 'c.txt'), 'ugly\n')
+    return d
+  }
+  const fmt = 'echo pretty > c.txt\ngit add c.txt', late = 'echo hooked > late.txt\ngit add late.txt'
+  const ship = async (d: string) => gitOp(d, { op: 'ship', summary: 'S', files: (await readRepo(d)).ship!.files, confirmed: true })
+  const commit = (d: string) => gitOp(d, { op: 'commit', summary: 'S', files: ['c.txt'] })
+
+  for (const [op, run] of [['ship', ship], ['commit', commit]] as const) {
+    it(`${op}: a formatter hook's fix reaches the real index`, async () => {
+      const d = fresh(`${op}-fmt`, fmt)
+      const r = await run(d)
+      assert.equal(r.ok, true, r.text)
+      assert.equal(sh(d, 'show', 'HEAD:c.txt'), 'pretty')
+      assert.equal(sh(d, 'show', ':c.txt'), 'pretty')
+      assert.equal(sh(d, 'status', '--porcelain'), '')
+    })
+
+    it(`${op}: a file the hook adds stays tracked`, async () => {
+      const d = fresh(`${op}-late`, late)
+      const r = await run(d)
+      assert.equal(r.ok, true, r.text)
+      assert.equal(sh(d, 'show', 'HEAD:late.txt'), 'hooked')
+      assert.equal(sh(d, 'status', '--porcelain'), '')
+    })
+  }
+
+  it('commit: something else already staged stays out of the commit', async () => {
+    const d = fresh('commit-other', 'true')
+    fs.writeFileSync(path.join(d, 'o.txt'), 'other\n'); sh(d, 'add', 'o.txt')
+    const r = await commit(d)
+    assert.equal(r.ok, true, r.text)
+    assert.equal(sh(d, 'show', '--name-only', '--format=', 'HEAD'), 'c.txt')
+    assert.equal(sh(d, 'show', 'HEAD:o.txt'), 'o.txt')
+    assert.equal(fs.readFileSync(path.join(d, 'o.txt'), 'utf8'), 'other\n')
+  })
+
+  it('commit: a partial staging on an unpicked file survives', async () => {
+    const d = fresh('commit-partial', 'true')
+    fs.writeFileSync(path.join(d, 'o.txt'), 'staged\n'); sh(d, 'add', 'o.txt')
+    const blob = sh(d, 'rev-parse', ':o.txt')
+    fs.writeFileSync(path.join(d, 'o.txt'), 'worktree\n')
+    const r = await commit(d)
+    assert.equal(r.ok, true, r.text)
+    assert.equal(sh(d, 'show', '--name-only', '--format=', 'HEAD'), 'c.txt')
+    assert.equal(sh(d, 'rev-parse', ':o.txt'), blob)
+    assert.equal(fs.readFileSync(path.join(d, 'o.txt'), 'utf8'), 'worktree\n')
+  })
+
+  it('ship: a hook that refuses leaves the index as it was', async () => {
+    const d = fresh('ship-refused', 'exit 1')
+    fs.writeFileSync(path.join(d, 'o.txt'), 'staged\n'); sh(d, 'add', 'o.txt')
+    fs.writeFileSync(path.join(d, 'o.txt'), 'worktree\n')
+    const before = sh(d, 'write-tree')
+    const r = await ship(d)
+    assert.equal(r.ok, false)
+    assert.equal(sh(d, 'write-tree'), before)
+  })
+
+  it('commit: a hook that refuses leaves the index as it was', async () => {
+    const d = fresh('commit-refused', 'exit 1')
+    fs.writeFileSync(path.join(d, 'o.txt'), 'staged\n'); sh(d, 'add', 'o.txt')
+    const blob = sh(d, 'rev-parse', ':o.txt')
+    const r = await commit(d)
+    assert.equal(r.ok, false)
+    assert.equal(sh(d, 'rev-parse', ':o.txt'), blob)
+    assert.equal(sh(d, 'rev-parse', ':c.txt'), sh(d, 'rev-parse', 'HEAD:c.txt'))
   })
 })

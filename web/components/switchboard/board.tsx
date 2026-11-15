@@ -6,8 +6,9 @@ import { flushSync } from 'react-dom'
 import type { Ask, Choice, HubState, TaskRow } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { demoGraph, healthLine, loadGraph, relations, type MemoryGraph } from '@/lib/memory-graph'
-import { keepGraph, memoryTally, withDemoLearn, type GraphHold, type Item } from '@/lib/court-places'
-import { PLACES, PLATE, buildCourt, courtSummary, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
+import { keepGraph, memoryTally, todoRef, withDemoLearn, type GraphHold, type Item } from '@/lib/court-places'
+import { replyBox } from '@/lib/message-box'
+import { PLACES, PLATE, buildCourt, markSpot, courtSummary, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
 import { askChoice } from '@/lib/ask'
 import { END_S, THAW_S, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
 import { BASKET, CARP, pixCanvas } from '@/lib/sprites/carp'
@@ -21,7 +22,7 @@ import './board.css'
 type View = { x: number; y: number; z: number }
 type Box = { x: number; y: number; w: number; h: number; id: string }
 type Frame = { ox: number; oy: number; cx: number; cy: number; cv: HTMLCanvasElement; sig: string }
-export type Send = (m: Extract<HubCommand, { type: 'hub-answer' | 'hub-focus-chat' | 'hub-rc' | 'hub-rc-server' | 'hub-learn' | 'hub-key-test' | 'hub-new-chat' }>) => void
+export type Send = (m: Extract<HubCommand, { type: 'hub-answer' | 'hub-focus-chat' | 'hub-rc' | 'hub-rc-server' | 'hub-learn' | 'hub-key-test' | 'hub-new-chat' | 'hub-send' | 'hub-todo-remove' }>) => void
 // World units per art pixel; the art is drawn at whole-number device pixels per art pixel once zoomed in.
 const ART = 2, WALK = 90, STEP_HZ = 4, MAX_Z = 3
 // One-off sprite moves, seconds: a tap hop, a finish cheer, a lead and new subagent walking to meet.
@@ -44,7 +45,7 @@ const WIN: Record<string, string> = { violet: '#a08bff', amber: '#f2b24c', teal:
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 const folder = (p = '') => p.replace(/^\/Users\/[^/]+/, '~')
 const PLATE_BG = 'rgba(16,17,17,.94)', MUTE = '#a29cae', TEXT = '#f4f1ea'
-// Realm palettes: another AI's annex docked on a courtyard's rim.
+// Realm palettes: a chat's yard drawn as its own AI's realm, or another AI's annex docked on its rim.
 type Realm = { top: string; rim: string; dk: string; hi: string; glow: string }
 const REALM: Record<string, Realm> = {
   codex: { top: '#2a3550', rim: '#48608e', dk: '#141b2c', hi: '#5ad1ff', glow: '#c4f2ff' },
@@ -62,8 +63,12 @@ function realmDesk(g: G, x: number, y: number, lit: boolean, R: Realm, c: C) {
   if (lit) { g.globalAlpha = 0.3; rect(g, x + 15, y - 2, 9, 8, R.hi); g.globalAlpha = 1 }
 }
 function ell(g: G, x: number, y: number, rx: number, ry: number, col: string, a = 1) { g.globalAlpha = a; g.fillStyle = col; g.beginPath(); g.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, 7); g.fill(); g.globalAlpha = 1 }
-// Where a realm's landmark stands, in art px of the baked frame.
-const markAt = (n: CourtNode, A: (x: number) => number, B: (y: number) => number) => [Math.round(A(n.x + n.w / 2) - (n.w / ART / 2) * 0.66), Math.round(B(n.y + n.h / 2) + 2)] as const
+// Where a realm's landmark stands, in art px of the baked frame; a yard's goes in its free slot after k desks.
+const markAt = (n: CourtNode, A: (x: number) => number, B: (y: number) => number, k?: number) => {
+  if (k !== undefined) { const [x, y] = markSpot(n, k); return [Math.round(A(x)), Math.round(B(y))] as const }
+  return [Math.round(A(n.x + n.w / 2) - (n.w / ART / 2) * 0.66), Math.round(B(n.y + n.h / 2) + 2)] as const
+}
+const deskCount = (court: Court, n: CourtNode) => court.nodes.filter(d => d.kind === 'desk' && d.parent === n.id).length
 // Claude a spark on a plinth, Codex a terminal monolith, Jev a balance, Perplexity a lighthouse, Gemini twin spires under a spark.
 function landmark(g: G, ai: string | undefined, bx: number, by: number, R: Realm, c: C) {
   if (ai === 'claude') {
@@ -99,7 +104,7 @@ function landmark(g: G, ai: string | undefined, bx: number, by: number, R: Realm
   }
 }
 // An annex islet in its own sky, a gate where it meets its courtyard, the origin AI's badge on the lintel.
-function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x: number) => number, B: (y: number) => number) {
+function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x: number) => number, B: (y: number) => number, k?: number) {
   const R = realmOf(n.ai), x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = n.w / ART / 2, ry = n.h / ART / 2
   ell(g, x, y + 6, rx * 1.65, ry * 1.8, R.rim, 0.24); ell(g, x, y + 4, rx * 1.25, ry * 1.35, R.hi, 0.12)
   for (let i = 0; i < 18; i++) { const a = i * 2.4, d = 1.15 + (i % 4) * 0.14; rect(g, x + Math.cos(a) * rx * d, y + 4 + Math.sin(a) * ry * d * 1.2, 1, 1, R.glow) }
@@ -113,7 +118,7 @@ function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x:
   if (n.ai === 'jev') { for (let gx = -rx; gx < rx; gx += 5) for (let gy = -ry; gy < ry; gy += 5) if (((gx + gy) / 5) % 2 === 0 && (gx / rx) ** 2 + (gy / ry) ** 2 < 0.7) rect(g, x + gx, y + gy, 5, 5, R.dk) }
   else if (n.ai === 'perplexity') for (let i = 1; i < 5; i++) { g.strokeStyle = R.rim; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, rx * i / 5, ry * i / 5, 0, 0, 7); g.stroke() }
   else for (let gx = -rx; gx < rx; gx += 6) for (let gy = -ry; gy < ry; gy += 5) if ((gx / rx) ** 2 + (gy / ry) ** 2 < 0.72) rect(g, x + gx, y + gy, 3, 1, R.rim)
-  const [mx, my] = markAt(n, A, B)
+  const [mx, my] = markAt(n, A, B, k)
   landmark(g, n.ai, mx, my, R, c)
   if (!yard) return
   // Gate halfway between the two rims, on the line between their centers.
@@ -214,6 +219,28 @@ function spans(by: Map<string, CourtNode>, ropes: Rope[], ends: Map<string, { r:
     return [{ r, end, s, e, m: [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2 + sag] as [number, number] }]
   })
 }
+// Chats split from one message: a still jade cord chaining their yards, a knot on each rim.
+function tetherArt(g: G, court: Court, A: (x: number) => number, B: (y: number) => number, c: C) {
+  if (!court.ties?.length) return
+  g.save(); g.lineCap = 'round'; g.globalAlpha = 0.75
+  // Rim to rim, like the wait ropes, so the cord never crosses an island.
+  const rim = (n: CourtNode | undefined, p: [number, number], q: [number, number]): [number, number] => {
+    if (!n) return p
+    const dx = q[0] - p[0], dy = q[1] - p[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d
+    const rr = 0.8 * (n.w / 2) * (n.h / 2) / Math.hypot((n.h / 2) * ux, (n.w / 2) * uy)
+    return [p[0] + ux * rr, p[1] + uy * rr]
+  }
+  for (const t of court.ties) {
+    const ps = t.points, a = ps[0], z = ps[ps.length - 1]
+    const pts = [rim(court.nodes.find(n => n.id === t.from), a, ps[1] ?? z), ...ps.slice(1, -1), rim(court.nodes.find(n => n.id === t.to), z, ps[ps.length - 2] ?? a)]
+    const path = () => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(A(x), B(y)) : g.moveTo(A(x), B(y))) }
+    g.setLineDash([1, 5]); g.strokeStyle = c.jade_dk; g.lineWidth = 3; path(); g.stroke()
+    g.strokeStyle = c.jade_lt; g.lineWidth = 1.5; path(); g.stroke(); g.setLineDash([])
+    // A knot on each rim, so touching siblings still read as tied.
+    for (const [x, y] of [pts[0], pts[pts.length - 1]]) { g.globalAlpha = 1; rect(g, A(x) - 3, B(y) - 3, 6, 6, c.ink); rect(g, A(x) - 2, B(y) - 2, 4, 4, c.jade_lt) }
+  }
+  g.restore()
+}
 // Quiet at Fit: a thin dim dashed line. Awake: lantern, endpoints and full gold. Ending: a green glow with a spark to the far end, plain green under reduced motion.
 function ropeArt(g: G, sp: Span[], A: (x: number) => number, B: (y: number) => number, t: number, c: C, awake: (r: Rope) => boolean) {
   sp.forEach((r, i) => {
@@ -256,6 +283,7 @@ const timer = (n: CourtNode, now: number) => {
   const st = n.state ?? 'idle'
   return (st === 'working' || st === 'needs') && n.since ? `${WORD[st]} ${fmt(now - n.since)}` : WORD[st]
 }
+const roleTag = (n: CourtNode) => `${n.role ?? 'lead'}${n.model ? ` · ${n.model}` : ''}`.toUpperCase()
 const tally = (n: CourtNode) => `${n.runs ?? 0} ${n.runs === 1 ? 'run' : 'runs'} · ${n.shipped ?? 0} done`
 
 // 12x16 chibi per role, hat by role, sash in the AI's color, outlined in ink.
@@ -471,7 +499,7 @@ function bake(court: Court, c: C, sig: string): Frame {
       rect(g, x + 21, y + 8, 3, 3, c.ink)
       if (n.here) { rect(g, x - 2, y - 4, 6, 4, c.ink); rect(g, x - 1, y - 3, 4, 2, c.gold_lt); badge(g, ICONS.kenneth, x + 10, y + 5, c) }
     }
-    else if (n.kind === 'courtyard') island(n, c.jade, c.jade_lt, true)
+    else if (n.kind === 'courtyard') { if (REALM[n.ai ?? '']) realmIsle(g, n, undefined, c, A, B, deskCount(court, n)); else island(n, c.jade, c.jade_lt, true) }
     else if (n.kind === 'realm') realmIsle(g, n, by.get(n.parent ?? ''), c, A, B)
     else if (n.kind === 'garden') {
       island(n, c.jade, c.jade_lt, false)
@@ -618,8 +646,8 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   }
   // A working realm's landmark breathes; still under reduced motion (t is 0).
   for (const n of court.nodes) {
-    if (n.kind !== 'realm' || n.state !== 'working' || !seen(n)) continue
-    const [mx, my] = markAt(n, A, B), R = realmOf(n.ai)
+    if (!(n.kind === 'realm' || (n.kind === 'courtyard' && REALM[n.ai ?? ''])) || n.state !== 'working' || !seen(n)) continue
+    const [mx, my] = markAt(n, A, B, n.kind === 'courtyard' ? deskCount(court, n) : undefined), R = realmOf(n.ai)
     ell(g, mx, my - 18, 15, 20, R.glow, 0.16 + (t ? 0.12 * Math.sin(t * 2.4) : 0.06)); ell(g, mx, my - 18, 8, 11, R.hi, 0.18 + (t ? 0.1 * Math.sin(t * 2.4) : 0))
   }
   if (th) iceYards(g, by, held, th, A, B)
@@ -662,7 +690,8 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       sprHit(n.id, sx, sy + bob)
     }
     const up = by.get(n.parent ?? '')
-    if (!tea) { if (up?.kind === 'realm') realmDesk(g, x - 12, y - 2, n.state === 'working', realmOf(up.ai), c); else desk(g, x - 12, y - 2, n.state === 'working', c) }
+    const UR = up?.kind === 'realm' ? realmOf(up.ai) : up?.kind === 'courtyard' ? REALM[up.ai ?? ''] : undefined
+    if (!tea) { if (UR) realmDesk(g, x - 12, y - 2, n.state === 'working', UR, c); else desk(g, x - 12, y - 2, n.state === 'working', c) }
     if (seat === 'wait' && !tea) hourglass(g, x - 9, y - 1, t, c)
     if (seat === 'pause' && !tea) frostDesk(g, x - 12, y - 2, th!.ice)
     // Typing: hands take turns on the desk and a line of ink grows across the scroll.
@@ -673,6 +702,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
     if (scroll) { rect(g, scroll[0] - 3, scroll[1] - 1, 6, 4, c.ink); rect(g, scroll[0] - 2, scroll[1], 4, 2, c.cloud); rect(g, scroll[0] - 3, scroll[1], 1, 2, c.gold_dk); rect(g, scroll[0] + 2, scroll[1], 1, 2, c.gold_dk) }
     hits.push(boxOf(n))
   }
+  tetherArt(g, court, A, B, c)
   ropeArt(g, sp, A, B, t, c, awake)
   // Handed between AIs: the old AI's badge, an arrow, the new one, on the courtyard's rim.
   for (const n of court.nodes) {
@@ -786,6 +816,13 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
     if (!seen(yard, 260)) continue
     const own = kids.get(yard.id) ?? [], desks = [...own, ...own.filter(r => r.kind === 'realm').flatMap(r => kids.get(r.id) ?? [])].filter(d => d.kind === 'desk')
     const hot = desks.some(d => d.state === 'needs'), level = lod(v.z, yard.w)
+    // A yard with a realm palette is that AI's realm: titled so, the chat name under it.
+    const YR = REALM[yard.ai ?? ''], realmTitle = YR ? `${aiName(yard.ai).toUpperCase()} REALM` : undefined
+    // Wait or split note rides inside the yard's own tag, so crowded courts still show it.
+    const sibs = yard.group ? order.filter(o => o !== yard && o.group === yard.group).map(o => o.label) : []
+    const wait = yard.waitsOn?.length ? `${yard.state === 'waiting' || yard.state === 'idle' ? 'STARTS AFTER' : 'WAITING ON'} ${yard.waitsOn.join(', ').toUpperCase()}` : sibs.length ? `SPLIT WITH ${sibs.join(', ').toUpperCase()}` : undefined
+    const note = [wait, yard.limits?.toUpperCase()].filter(Boolean).join(' \u00b7 ') || undefined
+    const noteCol = yard.waitsOn?.length ? c.gold_lt : c.jade_lt
     if (level === 'plate') {
       for (const d of desks) {
         if (!seen(d)) continue
@@ -797,7 +834,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
         // The timer keeps its width; the role gives way.
         const tw = wid(g, PIX(8), t)
         text(g, t, x + w - 6, y + 9, PIX(8), stateColor(d.state, c), tw + 1, 'right')
-        text(g, (d.role ?? 'lead').toUpperCase(), x + 8, y + 9, PIX(8), rc, w - tw - 22)
+        text(g, roleTag(d), x + 8, y + 9, PIX(8), rc, w - tw - 22)
         text(g, d.task ?? SAY[d.state ?? 'idle'], x + 8, y + 23, SANS(12), d.state === 'waiting' || d.state === 'idle' ? MUTE : TEXT, w - 14)
         text(g, tally(d), x + 8, y + 37, SANS(10, 500), MUTE, w - 14)
         hits.push({ x, y, w, h: PLATE.h, id: d.id })
@@ -805,14 +842,14 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       continue
     }
     if (level === 'card') {
-      const rows = desks.slice(0, 6), w = 236, h = 26 + rows.length * 20 + (desks.length > 6 ? 16 : 0)
+      const rows = desks.slice(0, 6), w = 236, h = 26 + rows.length * 20 + (desks.length > 6 ? 16 : 0) + (note ? 16 : 0)
       const r = X(yard.x + yard.w) + 6, l = X(yard.x) - w - 6, top = Y(yard.y), mid = Y(yard.y + yard.h / 2) - h / 2
       const at = place([[r, top], [l, top], [r, mid], [l, mid]], w, h, yard.id, true)
       if (at) {
         const [x, y] = at
         card(g, x, y, w, h, c.red_lt, hot)
         rect(g, x + 8, y + 9, 7, 7, hot ? c.red_lt : c[AI_KEY[yard.ai ?? ''] ?? 'gold'])
-        text(g, yard.label.toUpperCase(), x + 21, y + 13, PIX(8), TEXT, w - 30)
+        text(g, realmTitle ? `${realmTitle} · ${yard.label.toUpperCase()}` : yard.label.toUpperCase(), x + 21, y + 13, PIX(8), YR?.hi ?? TEXT, w - 30)
         hits.push({ x, y, w, h: 24, id: yard.id })
         rows.forEach((d, i) => {
           const ry = y + 24 + i * 20, t = timer(d, wall)
@@ -820,12 +857,13 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
           const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai) : undefined
           rect(g, x + 1, ry, w - 2, 1, 'rgba(255,255,255,.07)')
           if (HR) rect(g, x + 1, ry + 1, 3, 18, HR.hi)
-          text(g, (d.role ?? 'lead').toUpperCase(), x + 8, ry + 10, PIX(8), HR ? HR.hi : roleColor(d.role, c), 62)
+          text(g, roleTag(d), x + 8, ry + 10, PIX(8), HR ? HR.hi : roleColor(d.role, c), 62)
           text(g, d.task ?? SAY[d.state ?? 'idle'], x + 74, ry + 10, SANS(12), d.state === 'waiting' || d.state === 'idle' ? MUTE : TEXT, w - 90 - tw)
           text(g, t, x + w - 8, ry + 10, PIX(8), stateColor(d.state, c), tw + 1, 'right')
           hits.push({ x, y: ry, w, h: 20, id: d.id })
         })
-        if (desks.length > 6) text(g, `+${desks.length - 6} more`, x + 8, y + h - 9, SANS(10, 500), MUTE, w - 16)
+        if (desks.length > 6) text(g, `+${desks.length - 6} more`, x + 8, y + h - 9 - (note ? 16 : 0), SANS(10, 500), MUTE, w - 16)
+        if (note) text(g, note, x + 8, y + h - 9, PIX(8), noteCol, w - 16)
         continue
       }
     }
@@ -845,12 +883,12 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       return a ? [a, fit(g, words.join(' '), max)] : [fit(g, name, max)]
     }
     for (const [max, force, wrap] of [[180, false, true], [180, false, false], [120, false, false], [90, false, false], [90, true, false]] as const) {
-      const lines = wrap ? two(max) : [fit(g, name, max)]
+      const lines = [...(realmTitle ? [fit(g, realmTitle, max), fit(g, name, max)] : wrap ? two(max) : [fit(g, name, max)]), ...(note ? [fit(g, note, max)] : [])]
       const w = Math.max(...lines.map(l => g.measureText(l).width)) + 26, h = 18 + (lines.length - 1) * 12, up = above - (h - 18)
       const at = force ? [Math.min(Math.max(cx - w / 2, stageBox[0]), stageBox[0] + stageBox[2] - w), up] as const : place([[cx - w / 2, up], [cx - w / 2, below], [cx - w, up], [cx, up], [cx - w, below], [cx, below], ...([[X(yard.x + yard.w) + 4, my], [X(yard.x) - w - 4, my]] as Array<[number, number]>).filter(([x]) => x >= 4 && x + w <= cw - 4)], w, h, yard.id, true)
       if (!at) continue
       const [x, y] = at
-      card(g, x, y, w, h, c.red_lt, hot); lines.forEach((l, i) => text(g, l, x + 17, y + 9.5 + i * 12, PIX(8), TEXT, max + 10))
+      card(g, x, y, w, h, hot || !YR ? c.red_lt : YR.hi, hot); lines.forEach((l, i) => text(g, l, x + 17, y + 9.5 + i * 12, PIX(8), note && i === lines.length - 1 ? noteCol : YR && !i ? YR.hi : TEXT, max + 10))
       hits.push({ x, y, w, h, id: yard.id })
       dot = [x + 9, y + 9]
       break
@@ -919,7 +957,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   const hh = s.hover ? heads.get(s.hover) : undefined, hn = s.hover ? by.get(s.hover) : undefined
   if (hh && hn) {
     const st = hn.state ?? 'idle', word = `${castOf(hn.role).name} · ${aiName(hn.ai)} · ${SAY[st]}`.toUpperCase()
-    const hf = fromOf(hn, by), task = (hf ? `Moved from ${aiName(hf)} · ` : '') + (hn.task ?? hn.ask ?? 'Tap to open its chat')
+    const hf = fromOf(hn, by), task = (hf ? `Moved from ${aiName(hf)} · ` : '') + (hn.task ?? hn.raise ?? hn.ask ?? 'Tap to open its chat')
     const w = Math.round(Math.min(240, Math.max(wid(g, PIX(8), word) + 14, wid(g, SANS(12), task)) + 20)), h = 36
     const x = Math.round(Math.max(6, Math.min(cw - w - 6, hh[0] - w / 2))), up = hh[1] - h - 10 > 6, y = Math.round(up ? hh[1] - h - 10 : hh[2] + 10)
     rect(g, x, y - 2, w, h + 4, c.ink); rect(g, x - 2, y, w + 4, h, c.ink); rect(g, x, y, w, h, c.cloud)
@@ -979,8 +1017,23 @@ function rowAct(kind: CourtNode['kind'], i: Item, hub: HubState, send: Send) {
   if (kind === 'study' && i.id) return <span className="bp-acts">
     <button type="button" className="hub-btn primary sm" onClick={() => send({ type: 'hub-learn', id: i.id!, ok: true })}>Approve</button>
     <button type="button" className="hub-btn sm" onClick={() => send({ type: 'hub-learn', id: i.id!, ok: false })}>Discard</button></span>
+  const todo = kind === 'notice' ? todoRef(i.id) : undefined
+  if (todo) return <button type="button" className="hub-btn sm" onClick={() => send({ type: 'hub-todo-remove', ...todo })}>Done</button>
   if (kind === 'treasury' && i.id) { const k = hub.signIns.keys?.find(x => x.name === i.id); if (k) return <button type="button" className="hub-btn sm" onClick={() => send({ type: 'hub-key-test', name: k.name })}>Test</button> }
   return null
+}
+
+// Messages the chat from the map; the toast says so if it does not arrive.
+function ReplyBox({ to, send, label = 'Message this chat' }: { to: { sessionId: string; note?: string }; send: Send; label?: string }) {
+  const [text, setText] = useState(''), [said, setSaid] = useState('')
+  if (to.note) return <p className="bp-sub">{to.note}</p>
+  const go = () => { const t = text.trim(); if (!t) return; send({ type: 'hub-send', sessionId: to.sessionId, text: t }); setText(''); setSaid(t) }
+  return <div className="bp-form">
+    <textarea className="bp-text" rows={3} aria-label={label} placeholder={label} value={text}
+      onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go() } }} />
+    <button type="button" className="hub-btn primary sm" disabled={!text.trim()} onClick={go}>Send</button>
+    <p className="bp-said" role="status">{said && <>Sent: {said}</>}</p>
+  </div>
 }
 
 function Library({ g, onMemory }: { g: MemoryGraph; onMemory?: () => void }) {
@@ -1005,7 +1058,7 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
   onPick: (id: string) => void; onAnswer: (sessionId: string, ask: Ask, choice: Choice, said: string) => void; onClose: () => void
 }) {
   const [tab, setTab] = useState<'t' | 'd'>('t')
-  const [ask0, setAsk0] = useState('')
+  const [ask0, setAsk0] = useState(''), [asked, setAsked] = useState('')
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
   // A pavilion's chats are its AI's, wherever they hang.
@@ -1015,16 +1068,21 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
   const yard = up?.kind === 'realm' ? court.nodes.find(n => n.id === up.parent) : up ?? node
   const lead = node.kind === 'desk' && roleKey(node.role) === 'lead'
   const ask = p?.ask && (node.kind === 'courtyard' || lead || node.state === 'needs') ? p.ask : undefined
+  const chat = node.kind === 'courtyard' || node.kind === 'desk' ? chatOf(court, node.id) : undefined, reply = replyBox(hub.chats, chat)
+  const bare = !ask && p?.question && p.state === 'needs-you' && (node.kind === 'courtyard' || lead)
   // Chats, like the header.
   const count = (st: CourtState) => court.nodes.filter(d => d.kind === 'courtyard' && d.state === st).length
   const roster = node.kind === 'council' ? desks.filter(d => d.state === 'needs') : kids
-  const eye = node.kind === 'desk' ? node.role ?? 'lead' : node.here ? 'This window' : node.kind === 'courtyard' ? `${node.ai ?? 'chat'} courtyard` : node.kind === 'realm' ? `${aiName(node.ai)} realm` : KINDS[node.kind]
+  const eye = node.kind === 'desk' ? `${node.role ?? 'lead'}${node.model ? ` · ${node.model}` : ''}` : node.here ? 'This window' : node.kind === 'courtyard' ? (REALM[node.ai ?? ''] ? `${aiName(node.ai)} realm` : `${node.ai ?? 'chat'} courtyard`) : node.kind === 'realm' ? `${aiName(node.ai)} realm` : KINDS[node.kind]
   const eyeColor = node.kind === 'desk' ? roleColor(node.role, c) : node.kind === 'council' ? c.gold : node.kind === 'window' ? WIN[node.color ?? ''] ?? MUTE : node.kind === 'realm' ? realmOf(node.ai).hi : c[AI_KEY[node.ai ?? ''] ?? 'jade_lt']
   const placeSub = isPlace(node.kind) ? node.task : undefined
   const title = node.kind === 'realm' ? node.task ?? SAY[node.state ?? 'idle'] : node.kind === 'desk' ? node.task ?? node.ask ?? yard?.label ?? SAY[node.state ?? 'idle'] : node.kind === 'council' ? 'Switchboard' : node.label
   const nf = node.from ?? (node.kind === 'desk' && yard?.ai && node.ai && yard.ai !== node.ai && up?.kind !== 'realm' ? yard.ai : undefined), via = nf ? ` · Moved from ${aiName(nf)}` : ''
-  const sub = node.kind === 'desk' ? `${castOf(node.role).name} · ${aiName(node.ai)}${yard ? ` · ${yard.label}` : ''}${via}` : node.kind === 'council' ? courtSummary(court)
+  const sub = node.kind === 'desk' ? `${castOf(node.role).name} · ${aiName(node.ai)}${yard ? ` · ${yard.label}` : ''}${via}${node.raise ? ` · ${node.raise}` : ''}` : node.kind === 'council' ? courtSummary(court)
     : node.kind === 'courtyard' ? `${aiName(node.ai)} · ${plural(kids.filter(k => k.kind === 'desk').length, 'agent')}${via}` : node.kind === 'pavilion' && !kids.length ? 'No chats yet' : node.kind === 'realm' ? node.sub : node.kind === 'window' ? (node.window ? folder(node.window) : 'Chats outside every open window') : placeSub
+  // Split siblings and wait targets, under the courtyard's sub line.
+  const sibs = node.kind === 'courtyard' && node.group ? court.nodes.filter(m => m.kind === 'courtyard' && m.group === node.group && m.id !== node.id).map(m => m.label) : []
+  const ties = [sibs.length ? `Split with ${sibs.join(', ')}` : '', node.kind === 'courtyard' && node.waitsOn?.length ? `Waiting on ${node.waitsOn.join(', ')}` : ''].filter(Boolean)
   const stats: Array<[string, string, boolean?]> = node.kind === 'desk' ? [[timer(node, now), 'status', node.state === 'needs'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'done']]
     : node.kind === 'council' ? [[`${count('working')}`, 'working'], [`${count('needs')}`, 'need you', count('needs') > 0], [`${count('done')}`, 'done']]
     : node.kind === 'window' ? [[`${kids.length}`, 'chats'], [`${kids.filter(k => k.state === 'needs').length}`, 'need you', kids.some(k => k.state === 'needs')], [`${kids.filter(k => k.state === 'done').length}`, 'done']]
@@ -1040,22 +1098,24 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
   return (
     <aside className="bp" aria-label={`${title} details`}>
       <button type="button" className="bp-close" aria-label="Close details" onClick={onClose}>×</button>
-      <header><p className="bp-eye" style={{ color: eyeColor }}>{eye}</p><h3>{title}</h3>{sub && <p className="bp-sub">{sub}</p>}</header>
+      <header><p className="bp-eye" style={{ color: eyeColor }}>{eye}</p><h3>{title}</h3>{sub && <p className="bp-sub">{sub}</p>}{ties.map(t => <p key={t} className="bp-sub bp-tie" data-wait={t.startsWith('Split') ? undefined : ''}>{t}</p>)}</header>
       {stats.length > 0 && <dl className="bp-stats">{stats.map(([v, l, hot]) => <div key={l}><dt>{l}</dt><dd className={hot ? 'hot' : undefined}>{v}</dd></div>)}</dl>}
       {node.kind === 'pavilion' && node.ai === 'research' && (() => {
         const proj = hub.projects.find(p => p.isOpen)?.path ?? hub.projects[0]?.path
-        const go = () => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false }); setAsk0(''); onClose() } }
-        return <div className="bp-pad" style={{ display: 'grid', gap: 8 }}>
-          <textarea rows={3} placeholder="What should the research chat look into?" value={ask0}
-            onChange={e => setAsk0(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go() }}
-            style={{ font: 'inherit', padding: 10, borderRadius: 8, resize: 'vertical', background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />
-          <button type="button" className="hub-btn primary sm" style={{ justifySelf: 'start' }} disabled={!ask0.trim() || !proj} onClick={go}>Research</button>
+        const go = () => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false }); setAsked(ask0.trim()); setAsk0('') } }
+        return <div className="bp-pad bp-form">
+          <textarea className="bp-text" rows={3} aria-label="Research question" placeholder="What should the research chat look into?" value={ask0}
+            onChange={e => setAsk0(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go() }} />
+          <button type="button" className="hub-btn primary sm" disabled={!ask0.trim() || !proj} onClick={go}>Research</button>
+          <p className="bp-said" role="status">{asked && <>Started a research chat: {asked}</>}</p>
         </div>
       })()}
       {node.kind === 'courtyard' && node.chatId && onSummary && <div className="bp-pad"><SummaryFold id={node.chatId} name={node.label} summary={hub.summaries?.[node.chatId]} onAsk={refresh => onSummary(node.chatId!, refresh)} onCopy={onCopy} /></div>}
       {ask && node.chatId && <AskBlock key={ask.id} ask={ask} sent={sent[ask.id]} onAnswer={(ch, said) => onAnswer(node.chatId!, ask, ch, said)} />}
-      {!ask && p?.question && p.state === 'needs-you' && (node.kind === 'courtyard' || lead) &&
-        <section className="bp-ask"><p className="bp-eye">Question for you</p><p>{p.question}</p><p className="bp-sub">No choices came with it; answer in the chat.</p></section>}
+      {bare && <section className="bp-ask"><p className="bp-eye">Question for you</p><p>{p.question}</p>
+        {reply ? <ReplyBox to={reply} send={send} label="Your answer" /> : <p className="bp-sub">No choices came with it; answer in the chat.</p>}</section>}
+      {reply && !bare && <div className="bp-pad"><ReplyBox to={reply} send={send} label={lead || node.kind === 'courtyard' ? 'Message this chat' : 'Message its lead'} /></div>}
+      {chat && <p className="bp-pad"><button type="button" className="bp-link" onClick={() => send({ type: 'hub-focus-chat', sessionId: chat })}>Open terminal</button></p>}
       {p && <>
         <div className="bp-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 't'} onClick={() => setTab('t')}>Tasks</button>
@@ -1076,7 +1136,7 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
       {roster.length > 0 && <>
         <p className="bp-eye bp-pad">{node.kind === 'council' ? 'Petitions' : node.kind === 'pavilion' || node.kind === 'window' ? 'Courtyards' : isPlace(node.kind) ? 'Nearby places' : 'Desks'}</p>
         <ul className="bp-roster">{roster.map(r => <li key={r.id}><button type="button" onClick={() => onPick(r.id)}>
-          <b style={{ color: r.kind === 'desk' ? roleColor(r.role, c) : undefined }}>{r.kind === 'desk' ? (node.kind === 'council' ? court.nodes.find(y => y.id === r.parent)?.label : r.role ?? 'lead') : r.label}</b>
+          <b style={{ color: r.kind === 'desk' ? roleColor(r.role, c) : undefined }}>{r.kind === 'desk' ? (node.kind === 'council' ? court.nodes.find(y => y.id === r.parent)?.label : `${r.role ?? 'lead'}${r.model ? ` · ${r.model}` : ''}`) : r.label}</b>
           <span>{r.kind === 'desk' ? (node.kind === 'council' ? r.ask : r.task) ?? SAY[r.state ?? 'idle'] : r.task ?? ''}</span>
           {r.state && <em style={{ color: stateColor(r.state, c) }}>{timer(r, now)}</em>}
         </button></li>)}</ul>
@@ -1119,11 +1179,11 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     court, view: { x: 0, y: 0, z: 0.5 }, zc: 0.5, colors: skin.court.colors, bands: skin.court.bands, hits: [], fx: new Map(), fit: false, stage: '', ropes: [], ends: new Map(), waits: new Set(),
     wake: () => {}, zoom: () => {}, refit: () => {}, show: () => {}, go: () => {},
   })
-  // A sprite tap opens its chat (a subagent's is its lead's) with a small hop.
+  // A sprite tap hops and opens its details; the panel's Open terminal link is the way to the chat.
   const go = (id: string) => {
-    const s = st.current, chat = chatOf(s.court, id)
+    const s = st.current
     s.fx.set(id, { kind: 'hop', at: performance.now() }); s.wake()
-    if (chat) send({ type: 'hub-focus-chat', sessionId: chat })
+    setPicked(id)
   }
   useEffect(() => { st.current.go = go })
   const [was] = useState(() => (typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null))
@@ -1364,9 +1424,13 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
             {SKINS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </label>}
-        <button type="button" className="hub-btn board-z" aria-label="Zoom out" onClick={() => st.current.zoom(-1)}>-</button>
-        <button type="button" className="hub-btn" onClick={() => st.current.refit()}>Fit</button>
-        <button type="button" className="hub-btn board-z" aria-label="Zoom in" onClick={() => st.current.zoom(1)}>+</button>
+        <span className="board-zoom" role="group" aria-label="Zoom">
+          {/* Same order as the Code map's controls: in, out, fit. */}
+          <button type="button" className="hub-btn board-z" aria-label="Zoom in" aria-keyshortcuts="+" title="Zoom in (+)" onClick={() => st.current.zoom(1)}>+</button>
+          <button type="button" className="hub-btn board-z" aria-label="Zoom out" aria-keyshortcuts="-" title="Zoom out (-)" onClick={() => st.current.zoom(-1)}>-</button>
+          <button type="button" className="hub-btn board-fit" aria-label="Fit board" aria-keyshortcuts="0" title="Fit board (0)" onClick={() => st.current.refit()}>Fit</button>
+          <span className="board-keys" aria-hidden><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></span>
+        </span>
       </header>
       <div className="board-stage">
         <canvas ref={canvas} className="board-canvas" aria-hidden />
@@ -1384,12 +1448,12 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
             </dl>
           </details></li>
         </ul>
-        {/* The canvas for screen readers and keys: one button per island and desk; focus opens its panel. */}
+        {/* The canvas for screen readers and keys: one button per island and desk; click or Enter opens its panel. */}
         <ul className="sr-only">
           {court.nodes.map(n => (
-            <li key={n.id}><button type="button" onFocus={() => open(n.id)} onClick={() => (n.kind === 'desk' ? go(n.id) : open(n.id))}>
+            <li key={n.id}><button type="button" onClick={() => (n.kind === 'desk' ? go(n.id) : open(n.id))}>
               {KINDS[n.kind]}: {n.kind === 'desk' ? `${n.role ?? 'lead'}, ${deskWhere(n)}` : n.label}
-              {n.state ? `, ${SAY[n.state]}` : ''}{n.task ? `, ${n.task}` : ''}{n.ask ? `, asks: ${n.ask}` : ''}{n.kind === 'desk' ? '. Enter opens its chat' : ''}
+              {n.state ? `, ${SAY[n.state]}` : ''}{n.task ? `, ${n.task}` : ''}{n.raise ? `, ${n.raise}` : ''}{n.ask ? `, asks: ${n.ask}` : ''}
             </button></li>
           ))}
         </ul>

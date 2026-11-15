@@ -8,7 +8,8 @@ import * as os from 'os'
 import * as path from 'path'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'child_process'
-import { aarWanted, applyRun, betterOrNot, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, proposeRun, stageMemory, syncMemory, tooBig, usageOk } from '../src/hub/learn'
+import type { Runner } from '../src/hub/learn'
+import { aarWanted, applyRun, betterOrNot, consolidate, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, proposalCount, proposeRun, stageMemory, syncMemory, tooBig, usageOk } from '../src/hub/learn'
 
 const row = (id: string, side: string, pass: boolean[]) => ({ id, side, pass })
 const won = { verdict: { baseline: 0.9, candidate: 1, regressed: [] }, judged: [row('a', 'baseline', [true, false]), row('a', 'candidate', [true, true]), row('b', 'baseline', [true]), row('b', 'candidate', [true])] }
@@ -30,6 +31,8 @@ describe('schedule', () => {
     assert.equal(usageOk({ windows: w(99), pauseAt: undefined, paused: false, retrying: false }), false)
     assert.equal(usageOk({ windows: w(99), pauseAt: null, paused: false, retrying: false }), true)
     assert.equal(usageOk({ windows: w(100), pauseAt: null, paused: false, retrying: false }), false)
+    // a spent Codex window does not hold Claude work
+    assert.equal(usageOk({ windows: [{ kind: 'codex_five_hour', percentUsed: 100 }, { kind: 'five_hour', percentUsed: 50 }], pauseAt: 99, paused: false, retrying: false }), true)
     assert.equal(usageOk({ windows: [], pauseAt: 99, paused: true, retrying: false }), false)
     assert.equal(usageOk({ windows: [], pauseAt: 99, paused: false, retrying: true }), false)
     // A window whose reset passed is stale: an idle chat keeps its last status line.
@@ -228,6 +231,37 @@ describe('headless runs', () => {
     }
     const deny = flag(jobArgs('improve', 'p', 'id', ['/s/scan.mjs']), '--disallowedTools')
     for (const d of ['Bash(curl:*)', 'Bash(wget:*)', 'Bash(sh:*)', 'Bash(bash:*)', 'Bash(zsh:*)', 'WebFetch', 'WebSearch']) assert.ok(deny.includes(d), d)
+  })
+  it('consolidate: no shell, no to-do tool, writes only its staged proposals', () => {
+    const a = jobArgs('consolidate', 'p', 'id', ['/s/scan.mjs'], '/h/.cache/s/c')
+    const allow = flag(a, '--allowedTools'), deny = flag(a, '--disallowedTools')
+    assert.deepEqual(allow.filter(x => /^(Edit|Write|Bash)/.test(x)), ['Edit(//h/.cache/s/c/**)', 'Write(//h/.cache/s/c/**)'])
+    assert.ok(allow.includes('Read') && !allow.includes('mcp__switchboard__todo_add'))
+    for (const d of ['Bash', 'Skill', 'WebFetch', 'mcp__switchboard__todo_add']) assert.ok(deny.includes(d), d)
+    assert.equal(a[a.indexOf('--permission-mode') + 1], 'dontAsk')
+  })
+  it('consolidate: keeps the proposals file and files one to-do; none written means no to-do', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'learn-con-')), keep = path.join(root, 'keep'), todos: string[] = []
+    const todo = async (_f: string, t: string) => { todos.push(t) }
+    let prompt = ''
+    const writes: Runner = async (args) => {
+      prompt = args[args.indexOf('-p') + 1]
+      const out = /Write every proposal to (\S+?), nothing else/.exec(prompt)![1]
+      fs.writeFileSync(out, '# Proposals\n\n## Merge a.md + b.md\nx\n\n## Rewrite c.md\ny\n')
+      return 0
+    }
+    assert.equal(await consolidate({ flow: root, mods: '/m' }, writes, todo, ['/mem1', '/mem2'], keep), 'memory consolidation: 2 proposed')
+    assert.ok(prompt.includes('/mem1, /mem2') && prompt.includes('/m/kit/skills/memory-fix/SKILL.md') && /never edit/.test(prompt))
+    const kept = fs.readdirSync(keep)
+    assert.equal(kept.length, 1)
+    assert.match(fs.readFileSync(path.join(keep, kept[0]), 'utf8'), /## Rewrite c\.md/)
+    assert.equal(todos.length, 1)
+    assert.ok(todos[0].includes(path.join(keep, kept[0])) && todos[0].includes('2 proposed'))
+    assert.equal(await consolidate({ flow: root, mods: '/m' }, async () => 0, todo, ['/mem1'], keep), 'memory consolidation: nothing to merge')
+    assert.equal(await consolidate({ flow: root, mods: '/m' }, async () => 0, todo, [], keep), 'no memory to consolidate')
+    assert.equal(todos.length, 1)
+    assert.equal(proposalCount('## Merge a.md + b.md\n```\n## Notes\n```\n## Rewrite c.md\n## Other'), 2)
+    fs.rmSync(root, { recursive: true, force: true })
   })
   it('passes only an env allow list', () => {
     const env = learnEnv({ HOME: '/h', PATH: '/p', GITHUB_TOKEN: 'x', OPENROUTER_API_KEY: 'y' })

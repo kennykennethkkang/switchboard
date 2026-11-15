@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { MAC_ONLY_GIT, type ChatRow, type GitOp, type RepoFile, type RepoView } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { boxNote } from '@/lib/message-box'
-import { resolvePrompt } from '@/lib/pr-card'
-import { splitMessage } from '@/lib/ship-card'
+import { branchUrl, resolvePrompt } from '@/lib/pr-card'
+import { mergeMessage, splitMessage } from '@/lib/ship-card'
 import { caps, panel, repoOf } from './look'
 import { PrCard } from './pr-card'
 import { CiCard } from './check-cards'
@@ -62,7 +62,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   const branchWrap = useRef<HTMLDivElement>(null), branchBtn = useRef<HTMLButtonElement>(null)
   useDismiss(menu, branchWrap, () => { setMenu(false); branchBtn.current?.focus() })
 
-  // Every finished chat's message since the last commit (or this chat's own) fills the form until Kenneth types in it.
+  // Every finished chat's message since the last commit (or this chat's own) fills the form; once Kenneth types, new ones merge on top.
   const pending = repo?.sessionId === sessionId ? repo.pending : undefined
   const fill = pending && pending.at !== spent.current.at ? pending.text : !pending && commit !== spent.current.commit ? commit : undefined
   useEffect(() => {
@@ -71,6 +71,13 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
     setSummary(m.summary); setDescription(m.description)
     seen.current = pending?.at ?? 0
   }, [fill, typed, pending?.at])
+  // A chat finishing after Kenneth typed goes on top of his text: its summary first, his lines kept below.
+  useEffect(() => {
+    if (!typed || !pending || pending.at <= seen.current) return
+    seen.current = pending.at
+    const m = splitMessage(mergeMessage(`${summary}\n${description}`, pending.text))
+    setSummary(m.summary); setDescription(m.description); keep(m.summary, m.description)
+  }, [typed, pending?.at]) // eslint-disable-line react-hooks/exhaustive-deps
   // Write commit message (per repo), each reply handled once. Watched from busy to done: fills the form, or waits behind
   // Use draft when Kenneth typed meanwhile. Done before this mount: fills only an empty form with nothing saved.
   const d = mine?.draft
@@ -98,12 +105,14 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   // A commit that went through clears the form.
   const result = mine?.result
   useEffect(() => {
-    if (!result?.ok || !sent.current || result.at < sent.current.at) return
+    if (!result || !sent.current || result.at < sent.current.at) return
     const op = sent.current.op
+    // Any outcome ends the wait; a failed commit must not let a later ok (Pull first) clear the form.
+    sent.current = undefined
+    if (!result.ok) return
     if (op === 'commit' || op === 'commit-push') { setSummary(''); setDescription(''); clearDraft(); spent.current = { commit, at: pending?.at }; setTyped(false); setReady(undefined); applied.current = ''; setToggled(new Set()); setPicking(false) }
     if (op === 'commit') setOfferPush(true)
     if (op === 'push' || op === 'sync' || op === 'commit-push') setOfferPush(false)
-    sent.current = undefined
   }, [result, commit, pending?.at, clearDraft])
 
   // null: not a git repo.
@@ -121,15 +130,6 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   const ship = r.ship && new Set(r.ship.files)
   const checked = r.files.filter(f => (ship ? ship.has(f.path) : true) !== toggled.has(f.path)).map(f => f.path)
   const left = r.files.length - checked.length
-  // New chat text since Kenneth typed: its lines he lacks go under his.
-  const fresh = typed && pending && pending.at > seen.current ? pending : undefined
-  const addFresh = () => {
-    if (!fresh) return
-    const have = new Set([summary.trim(), ...description.split('\n').map(l => l.trim())])
-    const add = splitMessage(fresh.text).description.split('\n').filter(l => l.trim() && !have.has(l.trim()))
-    if (add.length) setDescription(d => [d.trimEnd(), ...add].filter(Boolean).join('\n'))
-    seen.current = fresh.at
-  }
   const t = target(r)
   // Pushing to main or master asks in the page first.
   const pushing = (cmd: Git, what: string) => (MAIN.test(t.name) ? setAsk({ text: `${what} to ${t.remote}/${t.name}?`, yes: 'Push', cmd: { ...cmd, confirmed: true } }) : run(cmd))
@@ -143,7 +143,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   const all = checked.length === r.files.length
   // Shown whenever there is something to push, so the phone can push commits made before a reload; a fresh commit also offers publishing.
   const canPush = !!r.branch && (r.upstream ? r.ahead > 0 : offerPush)
-  const compare = r.github && r.branch && `${r.github}/compare/${encodeURI(t.name)}?expand=1`
+  const compare = r.github && r.branch && `${branchUrl(r.github, 'compare', t.name)}?expand=1`
   const head = r.log[0]
   const createPr = r.github && r.upstream && !MAIN.test(t.name) && (isVSCode
     ? <button type="button" className="hub-btn sm" disabled={busy} onClick={() => run({ op: 'pr' })} title="gh pr create --fill --web, or the compare page">Create pull request</button>
@@ -160,7 +160,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
       <h3 style={caps}>
         <span>Git · {r.name}</span>
         {r.github && <button type="button" className="hub-link" style={{ padding: '2px 4px', font: 'inherit', textTransform: 'none' }}
-          onClick={() => open(r.branch && r.upstream ? `${r.github}/tree/${encodeURI(t.name)}` : r.github!)}>Open on GitHub ↗</button>}
+          onClick={() => open(r.branch && r.upstream ? branchUrl(r.github!, 'tree', t.name) : r.github!)}>Open on GitHub ↗</button>}
       </h3>
 
       <div ref={branchWrap} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
@@ -242,10 +242,6 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
                 {ready && <>Draft ready<button type="button" className="hub-link" style={{ padding: '2px 4px', fontSize: 12 }} onClick={() => applyDraft(ready)}>Use draft</button></>}
               </span>
             </div>
-            {fresh && <p role="status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, margin: 0, fontSize: 12, color: 'var(--hub-ash)' }}>
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>New items from a chat: {fresh.last}</span>
-              <button type="button" className="hub-link" style={{ padding: '2px 4px', fontSize: 12 }} onClick={addFresh}>Add</button>
-            </p>}
             <input className="git-summary" aria-label="Commit summary" placeholder="Summary (required)" aria-describedby={needSummary ? 'git-need-summary' : undefined} aria-invalid={needSummary && !!description.trim() || undefined} value={summary} onChange={e => { setSummary(e.target.value); keep(e.target.value, description); setTyped(true) }} style={{ ...field, fontWeight: 500 }} />
             <textarea aria-label="Commit description" placeholder="Description: what this commit did, one bullet per line" rows={Math.min(12, Math.max(3, description.split('\n').length + 1))} value={description} onChange={e => { setDescription(e.target.value); keep(summary, e.target.value); setTyped(true) }} onBlur={fillSummary} style={{ ...field, resize: 'vertical' }} />
             {needSummary && <p id="git-need-summary" style={{ margin: 0, fontSize: 12, color: description.trim() ? 'var(--hub-yellow)' : 'var(--hub-ash)' }}>

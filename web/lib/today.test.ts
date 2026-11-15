@@ -1,7 +1,7 @@
 /** The Today card: what finished today, what waits on you, what runs, and what today cost. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { needsLines, todayView } from './today'
+import { needsLines, todayView, tokenText } from './today'
 import { demoHub } from './hub-demo'
 import { liveChats } from './archive'
 
@@ -45,4 +45,11 @@ test('needs you lines lead with what to do', () => {
   const t = { done: [], approve: ['Fix login'], needs: [{ name: 'Copy', question: 'Keep Closet?' }, { name: 'Picker', question: 'Which one?', choices: true as const }, { name: 'Quiet' }], working: [] }
   assert.deepEqual(needsLines(t, 'Reload VS Code'), ['Decide: Which one? (Picker)', 'Answer: Keep Closet? (Copy)', 'Answer: Quiet', 'Approve: Fix login', 'Do: Reload VS Code'])
   assert.deepEqual(needsLines({ ...t, approve: [], needs: [] }), [])
+})
+
+test('token text switches to M after rounding, not before', () => {
+  assert.equal(tokenText(12_400), '12K')
+  assert.equal(tokenText(999_400), '999K')
+  assert.equal(tokenText(999_500), '1.0M')
+  assert.equal(tokenText(2_450_000), '2.5M')
 })

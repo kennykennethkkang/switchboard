@@ -10,6 +10,12 @@ export function boxNote(chat: ChatRow): string | undefined {
     : 'This chat is not collecting messages: it is not running, or the usage-meter mod is not on in it. Type in its terminal.'
 }
 
+/** A map panel's reply box: the live chat it sends to, and why messages cannot reach it, if so. Ended chats get no box. */
+export function replyBox(chats: ChatRow[], sessionId: string | undefined): { sessionId: string; note?: string } | undefined {
+  const chat = sessionId ? chats.find(c => c.sessionId === sessionId) : undefined
+  return chat?.live ? { sessionId: chat.sessionId, note: boxNote(chat) } : undefined
+}
+
 /** The failure text for this send only: a late failure of an earlier send is not this one's. */
 export function sendFailure(sent: HubCommand | undefined, problem: { text: string; at: number; for?: HubCommand } | null): string | undefined {
   return sent && problem?.for === sent ? problem.text : undefined

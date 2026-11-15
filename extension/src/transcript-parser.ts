@@ -248,6 +248,7 @@ export class TranscriptParser {
     const emitRole = (role === 'user' || role === 'human') ? 'user' : 'assistant'
 
     for (const block of msg.content) {
+      if (!block) continue
       if (block.type === 'tool_use') {
         const toolBlock = block as ToolUseBlock
         if (ctxSeen.has(toolBlock.id)) { continue }
@@ -335,7 +336,7 @@ export class TranscriptParser {
     const toolName = block.name
     const args = summarizeInput(toolName, block.input)
 
-    const rawPath = block.input.file_path || block.input.path
+    const rawPath = block.input?.file_path || block.input?.path
     const filePath = typeof rawPath === 'string' ? rawPath : undefined
     ctxPending.set(block.id, {
       name: toolName,

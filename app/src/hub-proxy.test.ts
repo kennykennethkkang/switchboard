@@ -168,6 +168,10 @@ describe('lanGate', () => {
   const h = { host: 'mac.tail1.ts.net' }
   it('passes loopback requests as before', () => {
     assert.equal(lanGate({ host: '127.0.0.1:3131' }, '/', 3131, undefined), 'ok')
+    assert.equal(lanGate({ host: 'localhost:3131' }, '/push/subscribe', 3131, undefined), 'ok')
+    // A rebound name never passes, even with no lan.
+    for (const url of ['/', '/push/subscribe', '/hub/state']) assert.equal(lanGate({ host: 'evil.example' }, url, 3131, undefined), 'deny', url)
+    assert.equal(lanGate({ host: 'evil.example:3131' }, '/', 3131, undefined), 'deny')
     assert.equal(allowed({ host: '127.0.0.1:3131', 'x-switchboard': '1' }, 3131), true)
     assert.equal(allowed({ host: 'mac.tail1.ts.net', 'x-switchboard': '1' }, 3131), false)
   })

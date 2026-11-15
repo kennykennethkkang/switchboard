@@ -48,7 +48,7 @@ export function Nav({ page, go, counts, onFind, findKey }: { page: Page; go: (p:
   )
 }
 
-const MODES: [Page, string, string][] = [['map-board', 'Agents', 'Agents'], ['map-flow', 'Code', 'Flow map'], ['map-memory', 'Memory', 'Memory']]
+const MODES: [Page, string, string][] = [['map-board', 'Agents', 'Agents'], ['map-flow', 'Code', 'Code'], ['map-memory', 'Memory', 'Memory']]
 
 /**
  * Back plus the Agents / Code / Memory switch. The map views are modal dialogs, so the bar is portaled
@@ -60,8 +60,9 @@ export function MapBar({ page, go, onBack }: { page: Page; go: (p: Page) => void
   useEffect(() => {
     setHost(null)
     const find = () => { const d = document.querySelector<HTMLElement>(`dialog[open][aria-label="${label}"]`); if (d) { setHost(d); mo.disconnect() } }
+    // The map dialogs open with showModal, which sets open; watching only that skips every other DOM change.
     const mo = new MutationObserver(find)
-    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] })
+    mo.observe(document.body, { subtree: true, attributeFilter: ['open'] })
     find()
     return () => mo.disconnect()
   }, [label])

@@ -24,7 +24,8 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen, 
         {files.length > 0 && <Counts a={files.reduce((n, f) => n + f.added, 0)} r={files.reduce((n, f) => n + f.removed, 0)} />}
       </h3>
       {!mine && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading the changes in {repoOf(cwd)}…</p>}
-      {mine && !files.length && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No uncommitted changes in {repoOf(cwd)}.</p>}
+      {mine?.problem && <p role="alert" style={{ margin: 0, color: 'var(--hub-red)', fontSize: 13 }}>{mine.problem}</p>}
+      {mine && !mine.problem && !files.length && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No uncommitted changes in {repoOf(cwd)}.</p>}
       {files.length > 0 && <>
         <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 12 }}>Uncommitted in {repoOf(cwd)}: other chats in this folder may have made some of these.</p>
         <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>

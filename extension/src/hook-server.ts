@@ -13,6 +13,7 @@ import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
 import { handleHubRequest, handleUpload, handleVoice, tokenHeader, type HubReply } from './hub/routes'
 import { EDIT_TOOLS, editGuard, noteEdit } from './hub/brain'
+import { closingGate } from './hub/approve'
 
 const log = createLogger('HookServer')
 
@@ -99,13 +100,21 @@ export class HookServer implements vscode.Disposable {
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => {
+        // DNS rebinding: a rebound name reaches loopback with its own Host. Every caller sends 127.0.0.1:<port>.
+        const host = req.headers.host
+        if (host !== undefined && host !== `127.0.0.1:${this.port}` && host !== `localhost:${this.port}`) {
+          req.resume()
+          res.writeHead(403)
+          res.end()
+          return
+        }
         // An upload streams to disk; the string read below caps at 1 MB and is not binary safe.
         if (req.method === 'POST' && req.url?.startsWith('/hub/upload?')) {
           void handleUpload(hub, req.url, req, undefined, tokenHeader(req.headers)).then(r => {
             res.writeHead(r.status, r.contentType ? { 'Content-Type': r.contentType } : undefined)
             // Refused before the end (a bad token, over the cap): drop the rest once the answer is out.
             res.end(r.body, () => { if (!req.readableEnded) req.destroy() })
-          })
+          }, () => { res.writeHead(500).end() })
           return
         }
         if (req.method === 'POST' && (req.url === '/hub/voice' || req.url?.startsWith('/hub/voice?'))) {
@@ -127,18 +136,22 @@ export class HookServer implements vscode.Disposable {
           return
         }
         if (req.method === 'POST') {
-          let body = ''
+          const chunks: Buffer[] = []
+          let size = 0
           let oversized = false
           req.on('data', (chunk: Buffer) => {
             if (oversized) return
-            body += chunk.toString()
-            if (body.length > HOOK_MAX_BODY_SIZE) {
+            size += chunk.length
+            if (size > HOOK_MAX_BODY_SIZE) {
               oversized = true
-              body = ''
+              chunks.length = 0
               log.warn('Request body exceeded size limit, discarding')
+              return
             }
+            chunks.push(chunk)
           })
           req.on('end', () => {
+            const body = Buffer.concat(chunks).toString('utf8')
             let reply = ''
             if (!oversized) {
               try {
@@ -193,14 +206,17 @@ export class HookServer implements vscode.Disposable {
 
   /** The Hub's feed and inbox; same body cap as the hooks. */
   private serveHub(req: http.IncomingMessage, res: http.ServerResponse): void {
-    let body = ''
+    const chunks: Buffer[] = []
+    let size = 0
     let oversized = false
     req.on('data', (chunk: Buffer) => {
       if (oversized) return
-      body += chunk.toString()
-      if (body.length > HOOK_MAX_BODY_SIZE) { oversized = true; body = '' }
+      size += chunk.length
+      if (size > HOOK_MAX_BODY_SIZE) { oversized = true; chunks.length = 0; return }
+      chunks.push(chunk)
     })
     req.on('end', async () => {
+      const body = Buffer.concat(chunks).toString('utf8')
       let reply: HubReply
       try {
         reply = oversized ? { status: 413, body: '' } : await handleHubRequest(hub, req, body) ?? { status: 404, body: '' }
@@ -212,11 +228,11 @@ export class HookServer implements vscode.Disposable {
     })
   }
 
-  /** A PreToolUse deny for an edit that would land on another open chat's fresh edit, else ''. */
+  /** A PreToolUse deny for an edit that would land on another open chat's fresh edit, or a closing question asked too early, else ''. */
   private guard(payload: HookPayload): string {
     if (payload.hook_event_name !== 'PreToolUse') return ''
-    let why: string | undefined
-    for (const f of editedFiles(payload)) if ((why = editGuard(hub.get(), this.edits, this.tried, editor(payload), payload.cwd!, f, Date.now(), !!payload.role_run))) break
+    let why = payload.role_run ? undefined : closingGate(payload)
+    if (!why) for (const f of editedFiles(payload)) if ((why = editGuard(hub.get(), this.edits, this.tried, editor(payload), payload.cwd!, f, Date.now(), !!payload.role_run))) break
     return why ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: why } }) : ''
   }
 

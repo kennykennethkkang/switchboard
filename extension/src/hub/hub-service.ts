@@ -4,7 +4,7 @@
  * Feed posts from the usage mods come through ingest(); what the extension gathers itself comes through set(). Every
  * change fires onChange, which extension.ts throttles into `hub-state`.
  */
-import { approvalBlock, closingApprove, isTempDir, stampedChats } from './approve'
+import { approvalBlock, closingPick, isTempDir, stampedChats } from './approve'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -17,6 +17,7 @@ import { phonePause } from './phone'
 import { fixDue, snoozed, waitsOnUser } from './stuck'
 import { FLAGGED } from './tools'
 import { createLogger } from '../logger'
+import { recordSentBack } from './chains'
 import { foldPathCase } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
 import { MirofishPoller } from './mirofish'
@@ -114,6 +115,8 @@ export const resetMs = (v = '') => {
   const n = Number(v)
   return n < 1e12 ? n * 1000 : n
 }
+// Codex windows feed the meter only; they never pause chats or reach limits.json.
+const isClaudeLimit = (l: Limit) => !l.kind.startsWith('codex_')
 const limitsOf = (v: unknown): Limit[] =>
   Array.isArray(v)
     ? v.flatMap(l => (l && typeof l === 'object' && str((l as Limit).kind) && num((l as Limit).percentUsed) !== undefined
@@ -129,6 +132,7 @@ export class HubService {
   // When each limited chat gets its continue prompt, and its folder for a resume; kept in retriesFile so a window reload still sends it.
   private readonly retries = new Map<string, { due: number; cwd?: string; agents?: CutAgent[]; paused?: boolean; at?: number }>()
   private limitsFile?: string
+  private codexFile?: string
   // A pause ended by hand: no new one until this reset passes.
   private pauseOff = -Infinity
   private readonly changed = new TypedEventEmitter<HubState>()
@@ -141,6 +145,10 @@ export class HubService {
   // Old chats whose fresh chat has posted, closed once no subagent of theirs runs.
   private closing: { sessionId: string; at: number }[] = []
   private readonly closeAtStop = new Set<string>()
+  // A prompt answered from Switchboard, by chat: the tap marks the chat working before its PostToolUse lands.
+  private readonly answeredHere = new Map<string, string>()
+  /** Refused Approves, one JSON line each, so the reason survives a reload. Set by keepRetries; none: not kept. */
+  approveLog?: string
   // Handoffs held while the full chat still has subagents running.
   private waiting: { h: Handoff; since: number }[] = []
   // Chats Kenneth handed off by hand: no waiting on subagents.
@@ -171,6 +179,9 @@ export class HubService {
   private readonly handedOff = new Set<string>()
   /** A chat took a message sent from Switchboard; the window holding its terminal shows it. */
   readonly onPrompted = this.promptedChat.event
+  private readonly indefiniteEnded = new TypedEventEmitter<{ sessionId: string; usage?: string; reason?: string }>()
+  /** The mod saw `Run indefinitely: done` in a chat's last answer. */
+  readonly onIndefiniteDone = this.indefiniteEnded.event
   /** handleHubMessage, set by startHub; kept as a field so routes.ts needs no vscode. A string is why it was refused. */
   runner?: (c: { type: string }) => boolean | string | Promise<boolean | string>
   /** The sweep tool: rescan name, or start Sweep all without one; answers a line. Never approves. hub-panel.ts sets it. */
@@ -223,6 +234,10 @@ export class HubService {
     this.linksAt = Date.now()
     // limits.json sits beside it, shared by every window.
     this.limitsFile = path.join(path.dirname(file), 'limits.json')
+    // Codex limits are account-wide: kept apart from limits.json so they never reach a pause.
+    this.codexFile = path.join(path.dirname(file), 'codex-limits.json')
+    try { this.state = { ...this.state, codexKept: limitsOf(JSON.parse(fs.readFileSync(this.codexFile, 'utf8')).windows).filter(l => !isClaudeLimit(l)) } } catch { /* none yet */ }
+    this.approveLog = path.join(path.dirname(file), 'approve.log')
     try {
       const k = JSON.parse(fs.readFileSync(this.limitsFile, 'utf8')) as { at?: unknown; windows?: unknown; out?: KeptLimits['out']; pause?: LimitPause }
       if (typeof k.at === 'number') this.state = { ...this.state, limitsKept: { at: k.at, windows: limitsOf(k.windows), ...(k.out ? { out: k.out } : {}) } }
@@ -278,10 +293,20 @@ export class HubService {
     this.saveLimits()
   }
 
+  /** A feed's codex windows replace the kept ones of the same kind; meter only, never read by a pause. */
+  private noteCodex(live: Limit[]): void {
+    const fed = live.filter(l => !isClaudeLimit(l))
+    if (!fed.length) return
+    const codexKept = [...(this.state.codexKept ?? []).filter(k => !fed.some(l => l.kind === k.kind)), ...fed]
+    if (JSON.stringify(codexKept) === JSON.stringify(this.state.codexKept)) return
+    this.state = { ...this.state, codexKept }
+    if (this.codexFile) try { writeJsonAtomic(this.codexFile, { windows: codexKept }) } catch (err) { log.warn('Codex limits not kept:', err) }
+  }
+
   /** After a feed: keeps the highest % per window, and pauses this window's running chats at the threshold. */
   private noteLimits(now: number): void {
     const best = new Map<string, Limit>()
-    for (const l of this.state.live.flatMap(s => s.limits)) {
+    for (const l of this.state.live.flatMap(s => s.limits).filter(isClaudeLimit)) {
       const b = best.get(l.kind)
       if (!b || resetMs(l.resetsAt) > resetMs(b.resetsAt) + 5 * 60_000 || (l.percentUsed > b.percentUsed && !(resetMs(b.resetsAt) > resetMs(l.resetsAt) + 5 * 60_000))) best.set(l.kind, l)
     }
@@ -431,12 +456,26 @@ export class HubService {
     // The closing question is answered mid-turn, so approveChat cannot close it yet; it closes at this turn's Stop.
     if (payload.hook_event_name === 'SessionEnd') this.closeAtStop.delete(id)
     else if (!mirror && payload.hook_event_name === 'Stop' && (next?.state === 'done' || next?.state === 'idle' || next?.waiting) && this.closeAtStop.delete(id)) this.approvedChat.fire(id)
-    if (!mirror && closingApprove(payload)) {
-      const why = approvalBlock(was, now)
-      if (why) log.warn(`Approve for chat ${id.slice(0, 8)} not taken: ${why}`)
+    const tapped = payload.hook_event_name === 'PostToolUse' && typeof payload.tool_use_id === 'string' && this.answeredHere.get(id) === payload.tool_use_id
+    if (tapped || payload.hook_event_name === 'SessionEnd') this.answeredHere.delete(id)
+    const pick = mirror ? undefined : closingPick(payload)
+    if (pick === 'Send back') try { recordSentBack(id, now, undefined, typeof payload.tool_use_id === 'string' ? payload.tool_use_id : undefined) } catch (err) { log.warn('Send back not recorded:', err) }
+    if (pick === 'Approve') {
+      // Answered from Switchboard: judge the chat as it stood while the question was open.
+      const why = approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)
+      if (why) this.refusedApprove(id, why, now)
       else { this.closeAtStop.add(id); this.approvedChat.fire(id) }
     }
     return !mirror && next && next.state !== (was?.state ?? 'working') ? { from: was?.state, to: next } : undefined
+  }
+
+  private refusedApprove(id: string, why: string, now: number): void {
+    log.warn(`Approve for chat ${id.slice(0, 8)} not taken: ${why}`)
+    if (this.approveLog) try {
+      fs.appendFileSync(this.approveLog, `${JSON.stringify({ at: now, sessionId: id, why })}\n`)
+      // Past 8 KB keep the last 50 lines.
+      if (fs.statSync(this.approveLog).size > 8192) fs.writeFileSync(this.approveLog, fs.readFileSync(this.approveLog, 'utf8').trim().split('\n').slice(-50).join('\n') + '\n')
+    } catch { /* the warn still has it */ }
   }
 
   /** Still out of usage: before the told reset, or within RETRY_MS of a limit message with none. */
@@ -457,7 +496,7 @@ export class HubService {
   private resetAt(now: number): number {
     const told = this.state.limitsKept?.out?.resetsAt
     if (told && told > now) return told + 60_000
-    const at = this.state.live.flatMap(s => s.limits).filter(l => l.percentUsed >= 100).map(l => resetMs(l.resetsAt)).filter(Number.isFinite)
+    const at = this.state.live.flatMap(s => s.limits).filter(l => isClaudeLimit(l) && l.percentUsed >= 100).map(l => resetMs(l.resetsAt)).filter(Number.isFinite)
     return at.length ? Math.max(...at, now) + 60_000 : now + RETRY_MS
   }
 
@@ -494,6 +533,7 @@ export class HubService {
         const ready = was ? [] : this.pendingClose.filter(p => p.sessionId !== sessionId && p.cwd === pathKey(next.cwd) && now > p.at)
         this.closing = [...this.closing, ...ready.map(p => ({ sessionId: p.sessionId, at: now }))]
         if (ready.length) this.pendingClose = this.pendingClose.filter(p => !ready.includes(p))
+        this.noteCodex(next.limits)
         this.noteLimits(now)
         break
       }
@@ -545,6 +585,13 @@ export class HubService {
         if (b.force === true) this.forced.add(sessionId)
         this.waiting = [...this.waiting.filter(w => w.h.sessionId !== sessionId), { h, since: now }]
         break
+      }
+      case 'indefinite-done': {
+        const sessionId = str(b.sessionId)
+        if (!sessionId) return false
+        const usage = str(b.usage), reason = str(b.reason)
+        this.indefiniteEnded.fire({ sessionId, ...(usage ? { usage } : {}), ...(reason ? { reason } : {}) })
+        return true
       }
       case 'prompted': {
         const sessionId = str(b.sessionId)
@@ -672,6 +719,7 @@ export class HubService {
 
   /** Drops a prompt once answered from here, so a second tap has nothing to send; the next one waiting shows. */
   answered(sessionId: string, askId: string): void {
+    this.answeredHere.set(sessionId, askId)
     this.set({ progress: this.state.progress.map(p => (p.sessionId === sessionId ? dropAsk(p, askId) : p)) })
   }
 

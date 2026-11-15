@@ -66,17 +66,23 @@ export type HandoffWait = { sessionId: string; tasks: number; next: string; sinc
 export type ChatLink = { from: string; to: string[]; reason: string; auto: boolean; since: number }
 /** Kenneth removed `to` from `from`'s wait at `at`; kept five minutes so the waiting chat can tell it from a link gone missing. */
 export type ChatUnlink = { from: string; to: string; at: number }
-/** skills: a plugin's own skill names. model: a role's frontmatter model (inherit, an alias or a full id). description: plugin.json's or SKILL.md's, cut short. */
+/** skills: a plugin's own skill names. model: a role's frontmatter model (inherit, an alias or a full id). codex: its body runs codex exec; codexModel and codexEffort: that line's -m and reasoning effort flags (none = config.toml default). description: plugin.json's or SKILL.md's, cut short. */
 /** asset: a design reference in the project; path is relative to the project folder. */
 /** provider: the tool's own prepaid credit caps it; cap: Switchboard's monthly dollar cap; ask: every call. */
 export type SpendMode = 'provider' | 'cap' | 'ask'
 /** usd: estimated, from paid-guard's per call table. */
 export type SpendRow = { key: string; label: string; mode: SpendMode; monthlyUsd: number; calls: number; usd: number }
 /** held: the sweep holds it until approved (kit/sweep.mjs needsApproval); no chat may turn it on. */
-export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' | 'asset'; name: string; enabled: boolean; held?: boolean; tokens?: number; source?: string; skills?: string[]; model?: string; description?: string; path?: string }
+export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' | 'asset'; name: string; enabled: boolean; held?: boolean; tokens?: number; source?: string; skills?: string[]; model?: string; codex?: boolean; codexModel?: string; codexEffort?: string; description?: string; path?: string }
 /** One chat's plugins (by id) and user skills (by name), on or off; tools.ts turns it into the chat's --settings file. */
-/** assets: design references by project-relative path, named to the chat in its system note. */
-export type ChatProfile = { plugins: Record<string, boolean>; skills: Record<string, boolean>; assets?: Record<string, boolean> }
+/** assets: design references by project-relative path, named to the chat in its system note. indefinite: Run indefinitely is on since this epoch ms. */
+export type ChatProfile = { plugins: Record<string, boolean>; skills: Record<string, boolean>; assets?: Record<string, boolean>; indefinite?: number; /** Limits and a gate for Run indefinitely; dropped when it ends. */ budget?: IndefiniteBudget; /** Check-back setting; stays after Run indefinitely ends. */ checkBack?: CheckBack }
+/** maxHours, maxCostUsd: stop at the nearer limit (not a success). gate: shell command run in the project folder; exit 0 lets the chat stop. All off when absent. */
+export type IndefiniteBudget = { maxHours?: number; maxCostUsd?: number; gate?: string }
+/** One indefinite.json value: a bare number is onAt alone (older hubs), an object adds the budget. */
+export type IndefiniteEntry = number | ({ onAt: number } & IndefiniteBudget)
+/** Idle chats get a check-back text every everyMin minutes while work is open, up to 12 times. count: sent so far; lastAt: the latest, epoch ms. */
+export type CheckBack = { everyMin: 10 | 30 | 60; count: number; lastAt?: number }
 /** flagged: duplicates kept off unless turned on by hand. pick: the last hub-pick-tools answer (the all-on set), for its goal. chats: saved profiles by session id. */
 /** Smart toggle per chat (smart-tools.ts): why: rule per pick; on: what it switched on itself; refused: held picks; library: design library paths it picked; pending: waits for the next start or resume. */
 export type SmartRecord = { why: Record<string, string>; on: Record<string, string>; refused: string[]; library: string[]; pending: boolean; at: number }
@@ -96,10 +102,23 @@ export type LearnRun = { at: number; kind: 'improve' | 'aar'; what: string }
 /** A self-improve run that passed the gate, waiting on Kenneth's Approve. target: path in claude-mods; before, after: held-out pass rates. */
 export type LearnReady = { id: string; target: string; before: number; after: number; diff: string }
 
+/** A saved copy of files before an edit: undo puts them back. paths: absolute. chat: the session that made it. */
+export type Snapshot = { id: string; label: string; at: number; paths: string[]; chat?: string; /** Files it could not copy. */ skipped?: string[] }
+/** One Check health line. fixable: Fix safe ones can repair it. */
+export type HealthResult = { id: string; label: string; status: 'ok' | 'warn' | 'fail'; detail?: string; fixable: boolean }
+/** A pipeline saved from a stages run: stages.json and each CONTEXT.md, no outputs. */
+export type PipelineInfo = { slug: string; name: string; stages: number; savedAt: number }
+/** One number with its change against the day before and the same weekday last week (absent with no data then). */
+export type TrendValue = { value: number; vsDay?: number; vsWeek?: number }
+/** Yesterday (day: YYYY-MM-DD): chats run, cost, approved and sent back. */
+export type DailyTrend = { day: string; chats: TrendValue; costUsd: TrendValue; approved: TrendValue; sentBack: TrendValue }
+
 export type HubState = {
   live: SessionLive[]
   /** Last known limits from limits.json, so the meter still reads with no live chat; out: a limit was hit, until resetsAt (epoch ms). */
   limitsKept?: KeptLimits
+  /** Last Codex 5h and week windows, account-wide, kept past the chat that fed them; meter only, never a pause input. */
+  codexKept?: Limit[]
   /** Chats paused near the limit, resumed in order at resumeAt (epoch ms). */
   pause?: LimitPause
   history: DayUsage[]
@@ -118,6 +137,10 @@ export type HubState = {
   rc: { atStartup: boolean; requestedAt?: number }
   keep: KeepWorking
   projects: Project[]
+  /** Stage runs per project path, for projects with Advanced mode on. */
+  stages?: Record<string, StageRun[]>
+  /** model-learn.json rows by their project. */
+  escalations?: Record<string, Escalation[]>
   controls: Controls
   chats: ChatRow[]
   /** This window's terminals, and its folder's chats that have none (Open resumes them). An older extension sends neither. */
@@ -155,6 +178,14 @@ export type HubState = {
   cache?: CacheKeep[]
   /** Per chat tool sets; an older extension sends none. */
   tools?: ToolsState
+  /** Snapshots of kit, rules, agents and memory edits, newest first (snapshots.ts); an older extension sends none. */
+  snapshots?: Snapshot[]
+  /** The last Check health run: busy while it or Fix runs (health.ts). */
+  health?: { busy: boolean; at?: number; results: HealthResult[] }
+  /** Saved Advanced mode pipelines (pipelines.ts). */
+  pipelines?: PipelineInfo[]
+  /** Yesterday's numbers against the day before and the same weekday last week (notify.ts dailyTrend). */
+  trend?: DailyTrend
   /** The SkillSpector sweep (kit/sweep.mjs): one result per plugin or skill name; busy while a sweep or an add runs; note: the last add's or sweep's outcome; progress: Sweep all's count so far. An older extension sends none. */
   sweep?: { busy: boolean; tools: Record<string, SweepRecord>; note?: string; progress?: { done: number; total: number } }
   /** Spend limits per paid tool (spend.ts): mode, cap and this month's count; an older extension sends none. */
@@ -198,7 +229,8 @@ export type WindowInfo = { workspace: string; name: string; color: WindowColor }
 
 /** One uncommitted file in a chat's folder. diff: from the first hunk, capped; note: why there is none (binary, too big). */
 export type ChangedFile = { path: string; added: number; removed: number; status: 'modified' | 'added' | 'deleted' | 'untracked'; diff?: string; note?: string }
-export type Changes = { sessionId: string; cwd: string; files: ChangedFile[]; at: number }
+/** problem: why the files could not be read (no folder, folder gone, git failed); files is empty then. */
+export type Changes = { sessionId: string; cwd: string; files: ChangedFile[]; at: number; problem?: string }
 /** One file git status lists, relative to the repo root. from: a rename's old path. */
 export type RepoFile = { path: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'; from?: string }
 export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun' | 'ship' | 'push'
@@ -237,7 +269,7 @@ export type KeepSetting = 'autoCompactEnabled' | 'autoCompactWindow' | 'autoCont
 export type SettingKey = KeepSetting | 'remoteControlAtStartup' | 'agentPushNotifEnabled' | 'inputNeededNotifEnabled' | 'model' | 'effortLevel' | 'tui' | 'statusLine'
 export type ClaudeControls = { model?: 'fable' | 'opus' | 'sonnet' | 'haiku'; effortLevel?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; tui: 'default' | 'fullscreen'; statusLine: boolean; push: boolean; needInput: boolean }
 /** Switchboard's own switches, kept in VS Code's globalState. idleMinutes null: never hide. */
-export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. */ toasts?: boolean; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean }
+export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. */ toasts?: boolean; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string }
 export type SwitchboardKey = keyof SwitchboardControls
 /** rulesNote: what the last rules and roles sync did, one line. */
 export type Controls = { claude: ClaudeControls; switchboard: SwitchboardControls; statusLineReady: boolean; rulesNote?: string }
@@ -246,18 +278,28 @@ export type BoardChat = { sessionId: string; label?: string; prompt?: string; fi
 export type BoardProject = { project: string; cwd: string; chats: BoardChat[] }
 export type Suggestion = { id: string; kind: 'clash' | 'full' | 'task' | 'server'; text: string; sessions: string[]; folder?: string; task?: string }
 export type Project = { name: string; path: string; kind: 'repo' | 'project'; isOpen: boolean }
+/** One stage of an Advanced mode run, from <project>/.switchboard/stages/<run>/stages.json. */
+export type Stage = { n: number; name: string; role: string; status: 'todo' | 'doing' | 'done' | 'redo' }
+/** A stage run: the newest per chat named in its folder (sessionId), or the project's newest when none is named. at: stages.json mtime. */
+export type StageRun = { run: string; sessionId?: string; at: number; stages: Stage[] }
+/** A role smart model switch moved to another model, from model-learn.json. resolvedBy: who settled it. */
+export type Escalation = { project: string; role: string; files: string[]; from: string; to: string; reason: string; at: number; resolvedBy?: string }
 /** One running chat, and why it may be missing from the Claude app. fill: a Codex chat's context, 0..1. chain: the handoff chain it is in. takes: the message box reaches it. */
-export type ChatRow = { pid: number; sessionId: string; name?: string; cwd: string; status?: string; version?: string; kind?: string; updatedAt?: number; bridgeId?: string; link: string; live: boolean; why: string[]; ai?: AiId; fill?: number; chain?: string; takes?: boolean; /** The repo's name (projectName), so a chat in switchboard/extension reads switchboard. */ project?: string }
+export type ChatRow = { pid: number; sessionId: string; name?: string; cwd: string; status?: string; version?: string; kind?: string; updatedAt?: number; bridgeId?: string; link: string; live: boolean; why: string[]; ai?: AiId; fill?: number; chain?: string; takes?: boolean; /** The repo's name (projectName), so a chat in switchboard/extension reads switchboard. */ project?: string; /** Chats started from one split message share it. */ group?: string; /** Goal budget card: ms since the chat started, its cost so far (usage feed) and its Run indefinitely limits. */ elapsedMs?: number; costUsd?: number; budget?: IndefiniteBudget; checkBack?: CheckBack }
 
 /** A terminal in this window: who opened it, the chat in it and how that chat is doing. id: per window, until reload. */
 export type TerminalRow = { id: number; owner: 'switchboard' | 'user'; name: string; state: 'running' | 'ended' | 'exited'; sessionId?: string; chat?: string }
 /** The AIs the hub knows; a new one is one member here and one entry in ais.ts. */
 export type AiId = 'claude' | 'codex' | 'hermes'
+/** What New chat can pick: an AI, or auto, which the extension resolves to claude or codex. */
+export type NewChatAi = AiId | 'auto'
+/** The AI Auto picked and why, shown as "Auto: Codex, because <reason>". */
+export type AutoPick = { ai: 'claude' | 'codex'; reason: string }
 export type AiStatus = { id: AiId; name: string; installed: boolean; detail?: string; /** From the AI's status command; absent when unknown. */ signedIn?: boolean; chats: number }
 /** A starred chat and what the hub knows of it, read from disk with no model call. */
 export type StarredChat = { sessionId: string; ai: AiId; name: string; cwd: string; starredAt: number; live: boolean; chain?: string; digest: { lastPrompt?: string; note?: string; resume: string; updatedAt?: number } }
 /** A chat closed by a handoff, shown under History. origin: its chain's first chat's name; version: 1 for the origin. note: the handoff note it wrote. */
-export type ArchivedChat = { sessionId: string; ai: AiId; name: string; origin: string; version: number; cwd: string; project: string; note?: string; startedAt?: number; archivedAt: number; /** It ended on its own; it leaves the archive once it runs again. */ ended?: true; /** Kenneth approved it done. */ approvedAt?: number; commit?: string; doneCheck?: DoneCheck }
+export type ArchivedChat = { sessionId: string; ai: AiId; name: string; origin: string; version: number; cwd: string; project: string; note?: string; startedAt?: number; archivedAt: number; /** Its cost when archived (usage feed). */ costUsd?: number; /** It ended on its own; it leaves the archive once it runs again. */ ended?: true; /** Kenneth approved it done. */ approvedAt?: number; /** Times he answered Send back to the closing question; 0 when never, absent on rows from before it was recorded. */ sentBack?: number; /** The last Send back. */ sentBackAt?: number; commit?: string; doneCheck?: DoneCheck }
 /** What the done-check mod found: verified, or what is missing. */
 export type DoneCheck = { verified: boolean; missing?: string[] }
 /** Where a chat is: working, done (finished with a commit message or every task; almost done while a request is not covered), needs you (a question), idle (stopped, work open). */

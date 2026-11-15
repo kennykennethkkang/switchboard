@@ -17,6 +17,11 @@ export function sweepBadge(r: SweepRecord | undefined): 'Clean' | 'Review' | 'Re
   return r?.state === 'clean' ? 'Clean' : r?.state === 'review' ? 'Review' : 'Unscanned'
 }
 
+/** The sweep's tools still installed: a record for an uninstalled tool or an older plugin version never shows. */
+export function sweptNow(hub: Pick<HubState, 'installed' | 'sweep'>): [string, SweepRecord][] {
+  return Object.entries(hub.sweep?.tools ?? {}).filter(([n, r]) => hub.installed.some(i => i.name === n && (i.kind !== 'plugin' || !i.path || i.path === r.path)))
+}
+
 /** The triage verdict and why, for a tooltip, while the review counts. */
 export const sweepTip = (r: SweepRecord | undefined) => (r?.reviewed && reviewed(r) ? `${r.reviewed.verdict}: ${r.reviewed.why}` : undefined)
 
@@ -58,8 +63,11 @@ export function gearRows(hub: Pick<HubState, 'installed' | 'connections' | 'swee
 
 /** Each role's model as it runs: its frontmatter model, or the lead's for inherit (and no line, which Claude Code reads as inherit). */
 export function roleModels(installed: Installed[], lead?: string): Record<string, string> {
-  return Object.fromEntries(installed.filter(i => i.kind === 'role').map(i => [i.name, !i.model || i.model === 'inherit' ? lead ?? 'inherit' : i.model]))
+  return Object.fromEntries(installed.filter(i => i.kind === 'role').map(i => [i.name, i.codex ? i.codexModel ?? 'codex default' : !i.model || i.model === 'inherit' ? lead ?? 'inherit' : i.model]))
 }
 
 /** Whether a settings search hits one of the words: whole keywords by their start, so one letter does not match everything. */
 export const keywordHit = (words: string, q: string) => !!q && words.split(/\s+/).some(w => w.startsWith(q))
+
+/** What Models > Test models types into its new chat. */
+export const benchPrompt = 'Run the model-bench skill: benchmark each role on the current Claude models, then show me the results and a recommended model per role.'

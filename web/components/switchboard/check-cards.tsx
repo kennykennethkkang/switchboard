@@ -1,7 +1,7 @@
 'use client'
 import type { ReactNode } from 'react'
 import type { CiRun, TestRun } from '@/lib/hub-types'
-import { ciLine, ciState, testsLine } from '@/lib/checks'
+import { ciLine, ciState, FAILED, testsLine } from '@/lib/checks'
 import { short } from '@/lib/pr-card'
 import { usePopover } from './use-popover'
 
@@ -11,7 +11,7 @@ const CI: Record<string, { color: string; word: string }> = {
   running: { color: 'var(--hub-yellow)', word: 'Running' }, failed: { color: 'var(--hub-red)', word: 'Failed' },
   passed: { color: 'var(--hub-green)', word: 'Passed' }, other: { color: 'var(--hub-ash)', word: 'Ended' },
 }
-const jobColor = (j: CiRun['jobs'][number]) => j.status !== 'completed' ? CI.running.color : j.conclusion === 'success' ? CI.passed.color : j.conclusion === 'skipped' || j.conclusion === 'cancelled' ? CI.other.color : CI.failed.color
+const jobColor = (j: CiRun['jobs'][number]) => j.status !== 'completed' ? CI.running.color : j.conclusion === 'success' ? CI.passed.color : FAILED.has(j.conclusion ?? '') ? CI.failed.color : CI.other.color
 
 const Dot = ({ color, size = 8 }: { color: string; size?: number }) => <i aria-hidden style={{ width: size, height: size, borderRadius: '50%', flex: 'none', background: color }} />
 

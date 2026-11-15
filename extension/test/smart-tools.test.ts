@@ -4,7 +4,8 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { ChatProfile, Installed } from '../src/hub/types'
-import { applyPicks, designSet, indexPick, pickTools, readSmart, smartEvent, watchTools } from '../src/hub/smart-tools'
+import { applyPicks, designSet, indexPick, pickTools, readSmart, smartEvent, watchTools, withGoal } from '../src/hub/smart-tools'
+import { defaultProfile } from '../src/hub/tools'
 
 const inv: Installed[] = [
   { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true },
@@ -130,4 +131,13 @@ test('watchTools: a rename right before stop never reopens a watch', async () =>
   await new Promise(r => setTimeout(r, 80))
   assert.equal(opened, 1)
   assert.equal(closed, 1)
+})
+
+test('withGoal: a first message naming AWS starts the chat with aws-core on; a held one stays off', () => {
+  const d = defaultProfile(inv)
+  assert.equal(d.plugins['aws-core@claude-plugins-official'], false)
+  assert.equal(withGoal(d, 'deploy the lambda behind API Gateway', inv).plugins['aws-core@claude-plugins-official'], true)
+  assert.equal(withGoal(d, 'set up a voice agent pathway in bland', inv).plugins['bland@bland'], false)
+  assert.deepEqual(withGoal(d, 'fix the flaky unit test', inv), d)
+  for (const t of ['fix growth of the array', 'dedupe competitors in the engine', 'trace the code pathways', 'amplify the log signal']) assert.deepEqual(withGoal(d, t, inv), d, t)
 })

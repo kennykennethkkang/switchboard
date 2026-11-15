@@ -6,7 +6,8 @@
     "impeccable": "pbakaus/impeccable",
     "pixelfx": "patch-gg/pixelfx",
     "humanizer": "blader/humanizer",
-    "last30days-skill": "mvanhorn/last30days-skill"
+    "last30days-skill": "mvanhorn/last30days-skill",
+    "openai-codex": "openai/codex-plugin-cc"
   },
   "plugins": [
     "superpowers@superpowers-dev",
@@ -18,10 +19,11 @@
     "playwright@claude-plugins-official",
     "pixelfx@pixelfx",
     "humanizer@humanizer",
-    "last30days@last30days-skill"
+    "last30days@last30days-skill",
+    "codex@openai-codex"
   ],
-  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper", "ecc-agents", "chat-wait", "phone-mode", "todo-band", "tab-close", "account-guard"],
-  "own": ["aar", "deep-research", "harden", "animation-styles", "improve-system", "awwwards", "crowd-ab", "self-improve", "gemini", "phone", "accessibility", "click-path-audit", "e2e-testing", "accessible-motion", "hover-interactions", "page-transitions", "scroll-animations", "toolchain"],
+  "mods": ["usage-meter", "repo-rules", "paid-guard", "cache-keeper", "ecc-agents", "chat-wait", "phone-mode", "todo-band", "tab-close", "account-guard", "done-check", "bash-approve"],
+  "own": ["aar", "deep-research", "harden", "animation-styles", "improve-system", "awwwards", "crowd-ab", "model-bench", "self-improve", "stages", "gemini", "phone", "accessibility", "click-path-audit", "e2e-testing", "accessible-motion", "hover-interactions", "page-transitions", "scroll-animations", "toolchain", "memory-fix", "goal"],
   "mcps": [
     { "name": "slack", "url": "https://mcp.slack.com/mcp" },
     { "name": "cloudflare", "url": "https://mcp.cloudflare.com/mcp" },

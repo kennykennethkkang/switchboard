@@ -35,7 +35,7 @@ import { dailySummary, fillBoxes, notify } from './hub/notify'
 import { onSwitchboard, pendingReload, readBuild, RECHECK_MS } from './hub/self-update'
 import { idle, watchActivity } from './hub/idle'
 import { keepQuestions } from './hub/questions'
-import { refreshWeb } from './hub/hub-panel'
+import { refreshWeb, smartSwitch } from './hub/hub-panel'
 import { checkAsked } from './hub/coverage'
 import { markReloading, postLocal, readWindows } from './hub/dev'
 import { chatEnded, chatFinished, chatMissed, chatResumed } from './hub/todo'
@@ -122,6 +122,7 @@ export async function startClaudeRuntime(
     hookServer.onRaw(({ payload, mirror }) => {
       const change = hub.hook(payload, Date.now(), mirror)
       if (!mirror) smartHook(hub, payload).catch(err => log.warn('Smart toggle failed:', err))
+      if (!mirror) smartSwitch(payload).catch(err => log.warn('Smart switch failed:', err))
       // Every window, mirror or not: each fills the Source Control boxes of the repos it has open.
       fillBoxes(hub.get().progress.find(p => p.sessionId === payload.session_id))
       if (!change) return

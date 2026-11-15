@@ -16,7 +16,8 @@ import { hub } from './hub/hub-service'
 import { SliceUploads, chatLabel } from './hub/uploads'
 import { readGraph } from './hub/graph'
 import { readRuns } from './hub/runs'
-import { buildFlowMap, flowChatDirs, flowLabels, flowRoots } from './hub/flowmap'
+import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './hub/flowmap'
+import { readGroups } from './hub/split'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs } from './hub/chat-view'
 
 const log = createLogger('Extension')
@@ -332,7 +333,7 @@ function wirePanel(panel: VisualizerPanel): void {
 
       case 'flowmap-get': {
         const { id, cwd } = message
-        void buildFlowMap(cwd, flowLabels(hub.get()), flowRoots(hub.get()), undefined, flowChatDirs(hub.get())).then(map => panel.postMessage({ type: 'flowmap', id, map }), err => panel.postMessage({ type: 'flowmap', id, problem: (err as Error).message }))
+        void buildFlowMap(cwd, flowLabels(hub.get()), flowRoots(hub.get()), undefined, flowChatDirs(hub.get()), readGroups()).then(m => withLimits(m, hub.get().chats)).then(map => panel.postMessage({ type: 'flowmap', id, map }), err => panel.postMessage({ type: 'flowmap', id, problem: (err as Error).message }))
         break
       }
 

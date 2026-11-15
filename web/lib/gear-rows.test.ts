@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gearRows, keywordHit, roleModels, sweepBadge, sweepTip } from './gear-rows'
+import { benchPrompt, gearRows, keywordHit, roleModels, sweepBadge, sweepTip, sweptNow } from './gear-rows'
 import type { Connection, Installed, SweepRecord } from './hub-types'
 import { demoHub } from './hub-demo'
 
@@ -56,6 +56,14 @@ test('role models: the frontmatter model, or the lead model for inherit and no l
   assert.deepEqual(roleModels(roles), { qa: 'opus', ops: 'inherit', growth: 'inherit' })
 })
 
+test('a codex role shows its Codex model, else default', () => {
+  const roles: Installed[] = [
+    { kind: 'role', name: 'qa-codex', enabled: true, model: 'sonnet', codex: true, codexModel: 'gpt-6-luna', codexEffort: 'high' },
+    { kind: 'role', name: 'engineer-codex', enabled: true, model: 'sonnet', codex: true, codexEffort: 'low' },
+  ]
+  assert.deepEqual(roleModels(roles, 'opus'), { 'qa-codex': 'gpt-6-luna', 'engineer-codex': 'codex default' })
+})
+
 test('the demo roles carry models', () => {
   const h = demoHub(0)
   const m = roleModels(h.installed, h.controls.claude.model)
@@ -97,4 +105,20 @@ test('a human review quiets the sweep badge until the files change', () => {
   const plugins = rows.find(r => r.label === 'Plugins')!
   assert.match(plugins.names[0], /\(reviewed\)/)
   assert.equal(plugins.tips[0], 'X tool. CAUTION: shells out to git')
+})
+
+test('Test models starts a chat that runs the model-bench skill', () => {
+  assert.match(benchPrompt, /model-bench skill/)
+  assert.match(benchPrompt, /recommended model per role/)
+})
+
+test('sweptNow: drops records for uninstalled tools and older plugin versions', () => {
+  const rec = (path: string) => ({ kind: 'plugin', path, digest: 'd', scannedAt: 1, state: 'review' }) as SweepRecord
+  const installed: Installed[] = [
+    { kind: 'plugin', name: 'sg@m', enabled: true, path: '/c/sg/2.0.19' },
+    { kind: 'plugin', name: 'ok@m', enabled: true, path: '/c/ok/1.0.0' },
+    { kind: 'skill', name: 'gemini', enabled: true },
+  ]
+  const tools = { 'sg@m': rec('/c/sg/2.0.18'), 'ok@m': rec('/c/ok/1.0.0'), gemini: { ...rec('/s/gemini'), kind: 'skill' } as SweepRecord, 'gone@m': rec('/c/gone/1') }
+  assert.deepEqual(sweptNow({ installed, sweep: { busy: false, tools } }).map(([n]) => n), ['ok@m', 'gemini'])
 })

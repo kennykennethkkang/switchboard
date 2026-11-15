@@ -1,7 +1,7 @@
 ---
 name: engineer
 description: Writes and changes code for a task the coordinator hands over, test first, and reports what changed and how it was checked.
-model: opus
+model: sonnet
 disallowedTools: Agent
 maxTurns: 60
 ---

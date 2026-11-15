@@ -80,7 +80,7 @@ export function openBrowsers(tail: string) {
 
 // The user may need the page: a question, or a For you step left there.
 // The For you block runs from its heading to a blank line or the next label (Left:, Risks:); only a step on a page counts.
-const waiting = (msg: string) => /\?\s*$/.test(msg) || /^\W*For you\b[^\n]*(?:\n(?!\s*\n|\W*[A-Z][\w ]{0,20}:)[^\n]*)*?\b(tabs?|page|browser|sign(?:ed)? in)\b/im.test(msg)
+export const waiting = (msg: string) => /\?\s*$/.test(msg) || /^\W*For you\b[^\n]*(?:\n(?!\s*\n|\W*[A-Z][\w ]{0,20}:)[^\n]*)*?\b(tabs?|page|browser|sign(?:ed)? in)\b/im.test(msg)
 
 export function reason(held: { kind: string; id: string }[]) {
   const list = held.map(h => `${KINDS[h.kind].label}${h.kind === 'playwright' ? '' : ` ${h.id}`} (${KINDS[h.kind].closeWith})`)

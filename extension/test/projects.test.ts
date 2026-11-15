@@ -202,6 +202,22 @@ it('Ask before actions on for Codex: approvals come back, our hooks stay trusted
   } finally { ask.codex = false }
 })
 
+it('Codex chat model and effort go in as -m and -c on new and resumed chats, nothing when unset', () => {
+  const hook = '--dangerously-bypass-hook-trust'
+  ask.codex = true
+  try {
+    ask.codexModel = 'gpt-5.6-terra'
+    assert.deepEqual(codexArgs(['Fix']), [hook, '-m', 'gpt-5.6-terra', 'Fix'])
+    ask.codexEffort = 'xhigh'
+    assert.deepEqual(codexArgs(['Fix']), [hook, '-m', 'gpt-5.6-terra', '-c', 'model_reasoning_effort=xhigh', 'Fix'])
+    assert.deepEqual(codexArgs(['resume', 'abc']), ['resume', hook, '-m', 'gpt-5.6-terra', '-c', 'model_reasoning_effort=xhigh', 'abc'])
+    ask.codexModel = undefined
+    assert.deepEqual(codexArgs([]), [hook, '-c', 'model_reasoning_effort=xhigh'])
+    ask.codexEffort = undefined
+    assert.deepEqual(codexArgs([]), [hook])
+  } finally { ask.codex = false; ask.codexModel = undefined; ask.codexEffort = undefined }
+})
+
 it('Ask before actions for Claude goes to ask-mode.json, so bash-approve keeps the prompt', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'askmode-'))
   const was = askMode.file

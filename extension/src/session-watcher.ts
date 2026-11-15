@@ -211,6 +211,11 @@ export class SessionWatcher implements AgentSessionWatcher {
             }
           } catch { /* stat may fail for transient files */ }
         })
+        this.dirWatcher?.on('error', err => {
+          log.debug('CLAUDE_DIR watch error:', err)
+          this.dirWatcher?.close()
+          this.dirWatcher = null
+        })
       } catch (err) { log.debug('CLAUDE_DIR watch failed:', err) }
     }
   }
@@ -227,6 +232,11 @@ export class SessionWatcher implements AgentSessionWatcher {
             this.scanForActiveSessions()
           }
         }
+      })
+      watcher.on('error', err => {
+        log.debug('Dir watch error:', projectDir, err)
+        watcher.close()
+        this.dirWatchers.delete(projectDir)
       })
       this.dirWatchers.set(projectDir, watcher)
     } catch (err) { log.debug('Dir watch failed (may not exist yet):', err) }
@@ -468,11 +478,13 @@ export class SessionWatcher implements AgentSessionWatcher {
 
     // Watch for new content; the poll below covers it if the watch fails
     try {
-      session.fileWatcher = fs.watch(filePath, (eventType) => {
+      const fw = fs.watch(filePath, (eventType) => {
         if (eventType === 'change') {
           this.readNewLines(sessionId)
         }
       })
+      fw.on('error', err => { log.debug('File watch error:', filePath, err); fw.close() })
+      session.fileWatcher = fw
     } catch (err) { log.debug('File watch failed:', filePath, err) }
 
     // Poll fallback: fs.watch on macOS can silently stop firing events
@@ -503,7 +515,10 @@ export class SessionWatcher implements AgentSessionWatcher {
     if (!result) return
     session.fileSize = result.newSize
     for (const line of result.lines) {
-      this.parser.processTranscriptLine(line, ORCHESTRATOR_NAME, session.pendingToolCalls, session.seenToolUseIds, sessionId, session.seenMessageHashes)
+      // fileSize already moved on; one bad line must not drop the rest
+      try {
+        this.parser.processTranscriptLine(line, ORCHESTRATOR_NAME, session.pendingToolCalls, session.seenToolUseIds, sessionId, session.seenMessageHashes)
+      } catch (err) { log.debug('Transcript line failed:', err) }
     }
 
     // Reset inactivity timer first: the permission timer below compares against

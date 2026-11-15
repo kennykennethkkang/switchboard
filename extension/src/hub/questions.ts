@@ -99,7 +99,7 @@ export function choiceProblem(ask: Ask, choice: Choice): string | undefined {
 
 export const askRegistered = (claudeJson: unknown) => !!(claudeJson as { mcpServers?: Record<string, unknown> } | undefined)?.mcpServers?.switchboard
 
-const FILES = ['ask-core.mjs', 'ask-server.mjs']
+const FILES = ['ask-core.mjs', 'ask-server.mjs', 'chats.mjs']
 
 /** Copies files from one folder to another, skipping any already the same. */
 export function copyChanged(from: string, dir: string, files: string[]): void {

@@ -41,3 +41,6 @@ export function short(at: number, now = Date.now()): string {
   const m = Math.floor((now - at) / 60e3)
   return m < 1 ? 'now' : m < 60 ? `${m}m` : m < 48 * 60 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`
 }
+
+/** A GitHub tree or compare link for a branch; encodeURI leaves # alone, which would cut feat#1 short. */
+export const branchUrl = (github: string, page: 'tree' | 'compare', branch: string) => `${github}/${page}/${encodeURI(branch).replace(/#/g, '%23')}`

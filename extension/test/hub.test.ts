@@ -236,7 +236,7 @@ describe('brain routes', () => {
 describe('hub state and command routes', () => {
   it('answers the memory graph only with the token', async () => {
     const h = new HubService()
-    const health = { dangling: [], orphans: [], duplicates: [], contradictions: [], superseded: [], invalid: [], stale: [] }
+    const health = { dangling: [], orphans: [], duplicates: [], contradictions: [], superseded: [], invalid: [], stale: [], loops: [] }
     const graph = async () => ({ nodes: [{ id: 'project:/w', kind: 'project' as const, label: 'w' }], edges: [], health })
     const ask = (token: string) => route(h, 'GET', `/hub/graph?token=${token}`, '', undefined, undefined, graph) as HubReply | Promise<HubReply>
     assert.equal((await ask('wrong')).status, 403)
@@ -977,6 +977,28 @@ describe('usage limit pause', () => {
     assert.equal(file.pause, undefined)
   })
 
+  it('codex limits never pause or get kept', () => {
+    const { h } = setup()
+    h.ingest({ token: h.token, kind: 'live', sessionId: 'cx', cwd: '/u/c', limits: [{ kind: 'codex_five_hour', percentUsed: 100, resetsAt: new Date(reset).toISOString() }] }, now)
+    assert.equal(h.get().pause, undefined)
+    assert.equal(h.get().limitsKept, undefined)
+    assert.equal(h.get().live[0].limits[0].kind, 'codex_five_hour')
+  })
+
+  it('codex limits are kept apart, survive a reload, and never reach the Claude pause', () => {
+    const { h, dir } = setup()
+    const codex = [{ kind: 'codex_five_hour', percentUsed: 100, resetsAt: new Date(reset).toISOString() }]
+    h.ingest({ token: h.token, kind: 'live', sessionId: 'cx', cwd: '/u/c', limits: codex }, now)
+    assert.deepEqual(h.get().codexKept?.map(l => l.kind), ['codex_five_hour'])
+    assert.equal(fs.existsSync(path.join(dir, 'codex-limits.json')), true)
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'limits.json'), 'utf8')).windows, undefined)
+    const again = new HubService()
+    again.keepRetries(path.join(dir, 'retries-x.json'))
+    assert.deepEqual(again.get().codexKept?.map(l => l.kind), ['codex_five_hour'])
+    assert.equal(again.get().pause, undefined)
+    assert.equal(again.get().limitsKept, undefined)
+  })
+
   it('off, or after Cancel, does not pause again until the reset', () => {
     const off = setup(null)
     off.feed(100)
@@ -1107,5 +1129,33 @@ describe('chat links', () => {
     assert.deepEqual(h.get().links?.map(l => l.to), [['c']])
     h.unlink('a', ['c'], now)
     assert.deepEqual(h.get().links, [])
+  })
+})
+
+describe('indefinite-done', () => {
+  it('tells the window, and refuses a post without a session id', () => {
+    const h = new HubService()
+    const seen: unknown[] = []
+    h.onIndefiniteDone(d => seen.push(d))
+    assert.ok(h.ingest({ token: h.token, kind: 'indefinite-done', sessionId: 's1' }))
+    assert.ok(h.ingest({ token: h.token, kind: 'indefinite-done', sessionId: 's2', usage: 'used $1.20 over 2h', reason: 'budget reached (not a success)', junk: 1 }))
+    assert.equal(h.ingest({ token: h.token, kind: 'indefinite-done' }), false)
+    assert.deepEqual(seen, [{ sessionId: 's1' }, { sessionId: 's2', usage: 'used $1.20 over 2h', reason: 'budget reached (not a success)' }])
+  })
+
+  it('the Run indefinitely command needs a session id and a flag', () => {
+    assert.equal(commandProblem({ type: 'hub-indefinite', sessionId: 'x', on: true }), undefined)
+    assert.ok(commandProblem({ type: 'hub-indefinite', sessionId: 'x' }))
+  })
+
+  it('checks the budget, check-back and feature commands', () => {
+    assert.equal(commandProblem({ type: 'hub-budget', sessionId: 'x', maxHours: 2, maxCostUsd: null, gate: 'pnpm test' }), undefined)
+    assert.ok(commandProblem({ type: 'hub-budget', sessionId: 'x', maxHours: '2' }))
+    assert.equal(commandProblem({ type: 'hub-checkback', sessionId: 'x', everyMin: 30 }), undefined)
+    assert.ok(commandProblem({ type: 'hub-checkback', sessionId: 'x', everyMin: 5 }))
+    assert.equal(commandProblem({ type: 'hub-snapshot-restore', id: 'a' }), undefined)
+    assert.equal(commandProblem({ type: 'hub-health-fix' }), undefined)
+    assert.equal(commandProblem({ type: 'hub-pipeline-seed', slug: 's', path: '/p', run: 'r' }), undefined)
+    assert.ok(commandProblem({ type: 'hub-pipeline-save', path: '/p', run: 'r' }))
   })
 })
