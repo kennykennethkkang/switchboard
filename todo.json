@@ -1,6 +1,12 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "bb6dac7e",
+   "text": "Memory consolidation: 7 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-16-5e06aab1.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "at": 1794810760098
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -531,6 +537,5 @@
    "run": 58,
    "auto": true
   }
- ],
- "cleared": 3
+ ]
 }
