@@ -1,18 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "ec2c21a3",
-   "text": "Proposed kit rule (aar 2026-11-16): add to claude-mods/kit/agents/engineer.md and qa.md: \"Never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use git show HEAD:<path> or git worktree add <scratch>/base HEAD.\" (a stash in the iceberg chat lost two edits of a parallel engineer)",
-   "at": 1794857333245,
-   "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
-   "name": "Instagram Reel Switchboard Planning",
-   "chat": "476535e0-ab88-4ee0-9414-5182c1813347",
-   "host": "62903adf5e340f87",
-   "run": 67,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -440,10 +428,21 @@
   "f92819f4": 1794801047712,
   "fb269eb8": 1794801047712,
   "0a4a36e6": 1794801047712,
-  "bb6dac7e": 1794810847568
+  "bb6dac7e": 1794810847568,
+  "ec2c21a3": 1794857368705
  },
  "seq": 67,
  "ticked": [
+  {
+   "id": "ec2c21a3",
+   "text": "Proposed kit rule (aar 2026-11-16): add to claude-mods/kit/agents/engineer.md and qa.md: \"Never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use git show HEAD:<path> or git worktree add <scratch>/base HEAD.\" (a stash in the iceberg chat lost two edits of a parallel engineer)",
+   "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
+   "name": "Instagram Reel Switchboard Planning",
+   "run": 67,
+   "auto": true,
+   "at": 1794857368705,
+   "by": "476535e0-ab88-4ee0-9414-5182c1813347"
+  },
   {
    "id": "bb6dac7e",
    "text": "Memory consolidation: 7 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-16-5e06aab1.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
@@ -529,18 +528,6 @@
    "why": "later",
    "run": 60,
    "auto": true
-  },
-  {
-   "id": "17474366-ok",
-   "text": "The map page and its flow view weren't updated for this fix.",
-   "at": 1794510367738,
-   "by": "8287b1c9-7f8e-4f3b-9709-d45e9c5d4f38",
-   "from": "ed0484db-bcc7-4726-90db-fdbb905d2237",
-   "name": "Terminal approval reload fix",
-   "why": "later",
-   "run": 59,
-   "auto": true
   }
- ],
- "streak": 67
+ ]
 }
