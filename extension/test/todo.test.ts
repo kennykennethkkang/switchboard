@@ -9,7 +9,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, junkPath, extraTodoFolders, loadLocalTodos, tickShipped, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -176,12 +176,12 @@ describe('todo finish', () => {
   })
 
   it('takes an older doc\'s auto added Left items back while Kenneth keeps working in it, and its next Done settles them', () => {
-    const p = chat({ report: { done: ['x'], left: ['Live test in two windows', 'Deploy'] } })
+    const p = chat({ report: { done: ['x'], left: ['Run live test in two windows', 'Deploy'] } })
     // Before the Suggested tray, Left lines went straight into todo.
     const auto = afterFinish(emptyDoc(), p, [], 1)
     const d = addTodo({ ...auto, todo: auto.suggested!, suggested: undefined }, 'Kenneth item', 1, 'k1')
     const back = backInChat(d, 's1', 2)
-    assert.deepEqual(back.todo.map(l => [l.text, l.chat]), [['Live test in two windows', 's1'], ['Deploy', 's1'], ['Kenneth item', undefined]])
+    assert.deepEqual(back.todo.map(l => [l.text, l.chat]), [['Run live test in two windows', 's1'], ['Deploy', 's1'], ['Kenneth item', undefined]])
     // It did the test; only Deploy is still left.
     const next = afterFinish(back, chat({ report: { done: ['tested'], left: ['Deploy'] } }), [], 3)
     assert.deepEqual(next.todo.map(l => [l.text, l.chat]), [['Deploy', undefined], ['Kenneth item', undefined]])
@@ -198,9 +198,9 @@ describe('todo finish', () => {
     const after = afterFinish(d, chat({ sessionId: 's2', report: { done: ['x'], left: [] } }), ['aaaa1111'], 5)
     assert.deepEqual(after.todo.map(l => l.id), ['bbbb2222'])
     assert.equal(after.removed.aaaa1111, 5)
-    const z = afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Z'] } }), [], 1)
+    const z = afterFinish(emptyDoc(), chat({ report: { done: [], left: ['Fix Z'] } }), [], 1)
     const dismissed = dismissSuggestion(z, z.suggested![0].id, 2)
-    assert.equal(afterFinish(dismissed, chat({ report: { done: [], left: ['Z'] } }), [], 3).suggested, undefined)
+    assert.equal(afterFinish(dismissed, chat({ report: { done: [], left: ['Fix Z'] } }), [], 3).suggested, undefined)
   })
 
   it('keeps the last 10 items the model ticked, with the chat, and puts one back under a new id', () => {
@@ -270,7 +270,7 @@ describe('todo suggestions', () => {
   })
 
   it('accepts a suggestion into the to-do keeping where it came from, and dismisses one for good', () => {
-    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Deploy', 'Docs'] } }), 1)
+    const d = afterEnd(emptyDoc(), chat({ state: 'idle', report: { done: [], left: ['Deploy', 'Write docs'] } }), 1)
     const [dep, docs] = d.suggested!
     const ok = acceptSuggestion(d, dep.id, 2, 'new11111')
     assert.deepEqual(ok.todo, [{ id: 'new11111', text: 'Deploy', at: 2, from: 's1', why: 'later' }])
@@ -280,7 +280,7 @@ describe('todo suggestions', () => {
     assert.equal(gone.suggested, undefined)
     assert.equal(gone.removed[docs.id], 3)
     // Neither comes back when the chat ends again with the same Left.
-    assert.deepEqual(afterEnd(gone, chat({ state: 'idle', report: { done: [], left: ['Deploy', 'Docs'] } }), 4), gone)
+    assert.deepEqual(afterEnd(gone, chat({ state: 'idle', report: { done: [], left: ['Deploy', 'Write docs'] } }), 4), gone)
     assert.equal(acceptSuggestion(gone, 'nope', 5), gone)
   })
 
@@ -412,14 +412,14 @@ describe('todo sync gate', () => {
 })
 
 describe('todo end', () => {
-  const tasks = [{ id: '1', subject: 'Open task', status: 'pending' as const }, { id: '2', subject: 'Closed', status: 'completed' as const }, { id: '3', subject: 'Already listed', status: 'in_progress' as const }]
+  const tasks = [{ id: '1', subject: 'Open task', status: 'pending' as const }, { id: '2', subject: 'Closed', status: 'completed' as const }, { id: '3', subject: 'Fix already listed', status: 'in_progress' as const }]
 
   it('adds the standup Left items of a chat that ends unfinished, once, deduped by text, never its open tasks', () => {
     const d: TodoDoc = { ...emptyDoc(), todo: [{ id: 'x', text: 'already listed', at: 1, from: 'other' }] }
-    const p = chat({ state: 'idle', tasks, report: { done: [], left: ['Docs', 'Already listed'] } })
+    const p = chat({ state: 'idle', tasks, report: { done: [], left: ['Write docs', 'Fix already listed'] } })
     const after = afterEnd(d, p, 5)
     assert.deepEqual(after.todo.map(l => l.text), ['already listed'])
-    assert.deepEqual(after.suggested?.map(l => l.text), ['Docs'])
+    assert.deepEqual(after.suggested?.map(l => l.text), ['Write docs'])
     assert.deepEqual(afterEnd(after, p, 6), after)
   })
 
@@ -683,11 +683,11 @@ describe('todo storage', () => {
 
   it('a slower, older Done of the same chat never writes over a newer one', async () => {
     const s = await storeFor(fs.mkdtempSync(path.join(os.tmpdir(), 'race-')), fs.mkdtempSync(path.join(os.tmpdir(), 'race-files-')))
-    const slow = todoFinished(s, chat({ sessionId: 'r1', report: { done: ['a'], left: ['Old A'] } }), () => new Promise(r => setTimeout(() => r('1'), 100)))
-    await todoFinished(s, chat({ sessionId: 'r1', report: { done: ['b'], left: ['New B'] } }), async () => '1')
+    const slow = todoFinished(s, chat({ sessionId: 'r1', report: { done: ['a'], left: ['Fix old A'] } }), () => new Promise(r => setTimeout(() => r('1'), 100)))
+    await todoFinished(s, chat({ sessionId: 'r1', report: { done: ['b'], left: ['Fix new B'] } }), async () => '1')
     await slow
     const d = await readDoc(s)
-    assert.deepEqual(d.suggested?.map(l => l.text), ['New B'])
+    assert.deepEqual(d.suggested?.map(l => l.text), ['Fix new B'])
     assert.deepEqual(d.removed, {})
   })
 
@@ -695,30 +695,30 @@ describe('todo storage', () => {
     const s = await storeFor(plain, files)
     // The Left filter keeps every line here; its own tests are above.
     const keep = (f: (q: string) => Promise<string>) => async (q: string) => q.startsWith("A coding chat's standup") ? '1, 2, 3, 4, 5' : f(q)
-    await todoFinished(s, chat({ sessionId: 'c1', report: { done: [], left: ['Old thing'] } }), keep(async () => 'none'))
-    const sug = (await readDoc(s)).suggested!.find(t => t.text === 'Old thing')!
+    await todoFinished(s, chat({ sessionId: 'c1', report: { done: [], left: ['Fix old thing'] } }), keep(async () => 'none'))
+    const sug = (await readDoc(s)).suggested!.find(t => t.text === 'Fix old thing')!
     await updateDoc(s, d => acceptSuggestion(d, sug.id, 2, 'acc11111'))
     const id = 'acc11111'
     let asked = ''
-    await todoFinished(s, chat({ sessionId: 'c2', report: { done: ['Old thing done'], left: ['New thing'] } }), keep(async q => { asked = q; return id }))
+    await todoFinished(s, chat({ sessionId: 'c2', report: { done: ['Old thing done'], left: ['Fix new thing'] } }), keep(async q => { asked = q; return id }))
     assert.match(asked, /Old thing/)
     assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain'])
-    const next = (await readDoc(s)).suggested!.find(t => t.text === 'New thing')!
+    const next = (await readDoc(s)).suggested!.find(t => t.text === 'Fix new thing')!
     await updateDoc(s, d => acceptSuggestion(d, next.id, 3, 'new11111'))
-    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain', 'New thing'])
+    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain', 'Fix new thing'])
     // A failed model call removes nothing.
     await todoFinished(s, chat({ sessionId: 'c3', report: { done: ['x'], left: [] } }), keep(async () => { throw new Error('offline') }))
-    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain', 'New thing'])
+    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Plain', 'Fix new thing'])
     // An item typed in by hand, or one this chat added itself, is ticked too; one in progress on a chat is not asked about.
     await updateDoc(s, d => startTodo(addTodo(addTodo(d, 'Mine', 2, 'm1', { from: 'c4' }), 'Busy', 2, 'b1'), 'b1', 'other', 3))
     await todoFinished(s, chat({ sessionId: 'c4', report: { done: ['did it'], left: [] } }), keep(async q => { asked = q; return 'p, m1, b1' }))
     assert.doesNotMatch(asked, /Busy/)
-    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['New thing', 'Busy'])
+    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Fix new thing', 'Busy'])
     // Finishing again with the same Left line keeps it, whatever the model says.
     asked = ''
-    await todoFinished(s, chat({ sessionId: 'c2', report: { done: ['part of it'], left: ['New thing'] } }), keep(async q => { asked = q; return (await readDoc(s)).todo.map(l => l.id).join(',') }))
+    await todoFinished(s, chat({ sessionId: 'c2', report: { done: ['part of it'], left: ['Fix new thing'] } }), keep(async q => { asked = q; return (await readDoc(s)).todo.map(l => l.id).join(',') }))
     assert.doesNotMatch(asked, /New thing/)
-    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['New thing', 'Busy'])
+    assert.deepEqual((await readDoc(s)).todo.map(l => l.text), ['Fix new thing', 'Busy'])
   })
 
   it('any finished chat ticks tray lines another chat left when its work covers them; its own listed Left line is never asked about', async () => {
@@ -796,7 +796,7 @@ describe('todo run', () => {
     { id: 'a', text: 'Ship receipts', at: 1 },
     { id: 'p', text: 'Set up the db', at: 2, before: 'a' },
     { id: 'pp', text: 'Get the key', at: 3, before: 'p' },
-    { id: 'b', text: 'Docs', at: 4 },
+    { id: 'b', text: 'Write docs', at: 4 },
   ]
   it('runs open prerequisites first, each once, in list order', () => {
     assert.deepEqual(runOrder(list, ['a']).map(t => t.id), ['pp', 'p', 'a'])
@@ -816,7 +816,7 @@ describe('todo run', () => {
 })
 
 describe('todo tool', () => {
-  const d = startTodo(addTodo(addTodo(emptyDoc(), 'Ship receipts', 1, 'a'), 'Docs', 1, 'b'), 'a', 'c1', 2)
+  const d = startTodo(addTodo(addTodo(emptyDoc(), 'Ship receipts', 1, 'a'), 'Write docs', 1, 'b'), 'a', 'c1', 2)
   it('adds a prerequisite before an item by id or text, in progress where that item is', () => {
     const r = toolStep(d, { op: 'add', text: 'Set up the db', before: 'receipts', session: 'c1' }, 5, 'p1')
     assert.deepEqual(r.doc.todo.at(-1), { id: 'p1', text: 'Set up the db', at: 5, before: 'a', chat: 'c1', host: hostId(), from: 'c1' })
@@ -1293,5 +1293,123 @@ const tag = process.argv[2]
     assert.ok(fs.existsSync(`${file}.lock`))
     await b
     assert.ok(!fs.existsSync(`${file}.lock`))
+  })
+})
+
+describe('strict intake and shipped auto-tick', () => {
+  const doc = (over: Partial<TodoDoc> = {}): TodoDoc => ({ ...emptyDoc(), ...over })
+  const left = (texts: string[], d = emptyDoc()) => (afterEnd(d, chat({ sessionId: 'sX', state: 'stopped' as ChatProgress['state'] }), 1000, texts).suggested ?? []).map(x => x.text)
+
+  it('keeps action lines, drops status remarks and fragments', () => {
+    const got = left([
+      'reviewing to-do b6447aa8.',
+      "Pokemon Price Tracker hasn't made a real call yet, because that needs the pushed code.",
+      '89 products have no PriceCharting price because the strict matcher found no confident page for them.',
+      'Once, a direct load of a product page stuck on "Loading..." during qa\'s run. It didn\'t happen in three more tries, so I haven\'t traced it.',
+      'Set retail prices by hand under Edit for the 23 products with no tier',
+      'Re-run the model bench chain from Explore r1',
+    ])
+    assert.deepEqual(got, ['Set retail prices by hand under Edit for the 23 products with no tier', 'Re-run the model bench chain from Explore r1'])
+  })
+
+  it('typed questions and complaints never become missed', () => {
+    const p = chat({ sessionId: 'sQ', asked: ['Sorry how come the cards are still in the new site...?', 'is it because I have not pushed the code yet?', 'Add the Transcript tab for Codex chats'], covered: [0, 0, 0] })
+    assert.deepEqual((addMissed(emptyDoc(), p, 1000).suggested ?? []).map(x => x.text), ['Add the Transcript tab for Codex chats'])
+  })
+
+  it("can't and cannot do not mean blocked", () => {
+    assert.equal(whyLeft("you can't edit a sale after it closes"), 'later')
+    assert.equal(whyLeft('cannot reproduce the crash'), 'later')
+    assert.equal(whyLeft('Blocked: needs the key'), 'blocked')
+  })
+
+  it('skips cache and tmp paths as to-do projects', () => {
+    assert.equal(junkPath(path.join(os.tmpdir(), 'sb-audit-fresh-1')), true)
+    assert.equal(junkPath(path.join(os.homedir(), '.cache', 'x')), true)
+    assert.equal(junkPath('/Users/someone/code/app'), false)
+  })
+
+  const src = { commits: [{ sha: 'abc1234', subject: 'Fix the sync push retry on a dropped connection', at: 5000 }], changelog: ['Added dark mode toggle to the settings header'] }
+  it('ticks an open item and a suggestion that a commit or CHANGELOG line shipped', () => {
+    const d = doc({ todo: [{ id: 'a1', text: 'Fix sync push retry when the connection is dropped', at: 1000 }, { id: 'a2', text: 'Add a dark mode toggle in the settings header', at: 1000 }], suggested: [{ id: 'a3', text: 'Fix the sync push retry on dropped connection', at: 1000, from: 's9', why: 'later' }] })
+    const out = tickShipped(d, src, 9000)
+    assert.equal(out.todo.length, 0)
+    assert.equal(out.suggested?.length ?? 0, 0)
+    const by = Object.fromEntries((out.ticked ?? []).map(t => [t.id, t.shipped?.sha]))
+    assert.deepEqual(by, { a1: 'abc1234', a2: 'CHANGELOG', a3: 'abc1234' })
+  })
+
+  it('keeps labelled and clause-led action lines, drops hand steps addressed to Kenneth', () => {
+    const keep = ['Also wire the map page to the new counts', 'Zellizard Tracker: add eBay sold-listing prices to the card page', 'Next Switchboard release: add CHANGELOG line for the map', 'AAR fix plan (chat d354fc0f): done-check edits() should ignore reads', 'Proposed fix (qa round 2): guard the empty list', 'Chat view: add the Transcript tab for Codex chats',
+      'Before turning on Firebase AI Logic for the Add page: enable App Check', 'After the next Switchboard build and a Reload Window, check both maps', 'Switchboard to-do, in this order: 1. Map and flow view first']
+    assert.deepEqual(left(keep), keep)
+    const more = ['Re-run the chain', 'Debounce the save handler', 'Re-run the model bench chain from Explore r1', 'Backport the fix to 0.21', 'Hook the panel into the map']
+    assert.deepEqual(left(more), more)
+    const junk = ['Chat cards, the approve bar and the map views still say "Ready to approve"', 'AWS IAM users: kennykang and Royce-Li still have no MFA', 'Your plugin list is empty, so tool_on can turn on anything', 'reviewing to-do b6447aa8.', 'The saved list could mismatch when two windows write', 'JustTCG answers "too many requests" under load', 'one item page shows two different market numbers', 'Once, a direct load of a product page stuck on Loading', 'It is still slow on the map page', 'We should check the sync later']
+    assert.deepEqual(left(junk), [])
+    const drop = ['Give me a phone call if anything comes up', 'Approve or drop to-do 0dd5d1e1', 'Open a new chat in Switchboard.', "Log out of Instagram in Chrome if you don't want to stay signed in.", "Close VS Code and the chats in agent-flow when you're ready", 'Keep waiting for X to end']
+    assert.deepEqual(left(drop), [])
+  })
+
+  it('Put back on a shipped item sticks', () => {
+    const d = doc({ todo: [{ id: 'c1', text: 'Add a dark mode toggle in the settings header', at: 1000 }] })
+    const t = tickShipped(d, src, 9000)
+    assert.equal(t.ticked?.[0].shipped?.sha, 'CHANGELOG')
+    const back = restoreTicked(t, 'c1', 10000, 'c2')
+    assert.equal(back.todo.length, 1)
+    assert.equal(tickShipped(back, src, 11000), back)
+  })
+
+  it('near misses and older commits stay open', () => {
+    const d = doc({ todo: [
+      { id: 'n1', text: 'Fix the sync pull retry on a dropped connection from the panel', at: 1000 },
+      { id: 'n2', text: 'Fix sync push retry', at: 1000 },
+      { id: 'n3', text: 'Fix the sync push retry on a dropped connection', at: 6000 },
+    ] })
+    assert.equal(tickShipped(d, src, 9000), d)
+  })
+})
+
+describe('every repo project on the page', () => {
+  it('lists repo projects with no chat, minus the window, chats and junk paths', () => {
+    const was = hub.get().projects, wasChats = hub.get().chats
+    try {
+      hub.set({ chats: [], projects: [
+        { name: 'ws', path: '/Users/x/code/ws', kind: 'repo', isOpen: true }, { name: 'zt', path: '/Users/x/code/zt', kind: 'repo', isOpen: false },
+        { name: 'notes', path: '/Users/x/code/notes', kind: 'project', isOpen: false }, { name: 'tmp', path: path.join(os.tmpdir(), 'sb-audit-fresh'), kind: 'repo', isOpen: false }] })
+      assert.deepEqual(extraTodoFolders('/Users/x/code/ws'), ['/Users/x/code/zt'])
+    } finally { hub.set({ projects: was, chats: wasChats }) }
+  })
+
+  it('reads the local list only: no sync state, no shipped tick, nothing written', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-extra-'))
+    try {
+      execFileSync('git', ['init', '-q', repo])
+      execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'Fix the sync push retry on a dropped connection'])
+      const s = await storeFor(repo)
+      await updateDoc(s, d => addTodo(d, 'Fix sync push retry when the connection is dropped', Date.now() - 100_000, 'e1'))
+      const ref = () => execFileSync('git', ['-C', repo, 'rev-parse', TODO_REF]).toString()
+      const before = ref()
+      await loadLocalTodos([repo])
+      const l = hub.get().todos?.[repo]
+      assert.deepEqual(l?.todo.map(t => t.id), ['e1'])
+      assert.equal(l?.sync, undefined)
+      assert.equal(ref(), before)
+    } finally { fs.rmSync(repo, { recursive: true, force: true }) }
+  })
+
+  it('writes a pruned doc back locally, with no push', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-extra-'))
+    try {
+      execFileSync('git', ['init', '-q', repo])
+      const s = await storeFor(repo)
+      await updateDoc(s, d => ({ ...d, suggested: [{ id: 'j1', text: 'reviewing to-do b6447aa8.', at: 1, from: 'sJ', why: 'later' }, { id: 'j2', text: 'Add retries to the export', at: 1, from: 'sJ', why: 'later' }] }))
+      assert.equal((await readDoc(s)).suggested?.length, 2)
+      await loadLocalTodos([repo])
+      const after = await readDoc(s)
+      assert.deepEqual(after.suggested?.map(x => x.id), ['j2'])
+      assert.ok(after.removed.j1)
+      assert.equal(hub.get().todos?.[repo]?.sync, undefined)
+    } finally { fs.rmSync(repo, { recursive: true, force: true }) }
   })
 })

@@ -18,14 +18,22 @@ export const SHADES: Record<WindowColor, { light: string; dark: string; bar: [st
   cobalt: { light: '#2f5fd0', dark: '#7ea2ff', bar: ['#1f3566', '#1f2a43'] },
 }
 
-/** A saved folder keeps its color; a new one gets the first color no other live window has, wrapping when all are taken. */
+/**
+ * A saved folder keeps its color unless an earlier live window already has it and a free one exists; a new folder gets the
+ * first color no other live window has, wrapping when all are taken.
+ */
 export function assignColors(saved: Record<string, WindowColor>, live: string[]): { colors: Record<string, WindowColor>; changed: boolean } {
   const colors = { ...saved }
   let changed = false
+  const kept = new Set<WindowColor>()
   for (const ws of live) {
-    if (colors[ws]) continue
-    const used = new Set(live.map(w => colors[w]).filter(Boolean))
-    colors[ws] = PALETTE.find(c => !used.has(c)) ?? PALETTE[used.size % PALETTE.length]
+    const c = colors[ws]
+    if (c && !kept.has(c)) { kept.add(c); continue }
+    const used = new Set([...kept, ...live.map(w => colors[w]).filter(Boolean)])
+    const free = PALETTE.find(p => !used.has(p))
+    if (c && !free) continue // every color taken: a clash can't be helped
+    colors[ws] = free ?? PALETTE[used.size % PALETTE.length]
+    kept.add(colors[ws])
     changed = true
   }
   return { colors, changed }

@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "2026-11-11T05:17:10Z",
+  "rulesVersion": "2026-11-16T05:22:15Z",
   "generic": true,
   "history": {
     "Explore.md": [
@@ -69,7 +69,8 @@
       "2960775433ea",
       "ad81738693bc",
       "b4339eadf6f2",
-      "d090ba6073ba"
+      "d090ba6073ba",
+      "bbd781b54c39"
     ],
     "engineer-codex.md": [
       "00fb5490c78f"

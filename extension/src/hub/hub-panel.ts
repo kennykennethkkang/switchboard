@@ -63,7 +63,7 @@ import { jarvis } from './jarvis'
 import { installVoice, macVoice, voiceBox } from './voice'
 import { installKeeper, keepApp } from './keeper'
 import { rememberChats } from './reap'
-import { acceptSuggestion, addTodo, chatApproved, autoStartPlan, changeTodo, claimTodo, START_GRACE_MS, clearGoneChats, dismissSuggestion, editTodo, finishItem, loadTodos, moveTodo, replaceRemoteTodo, restoreTicked, runLabel, runMessage, runOrder, projectOf, setPilot, setTodoSync, startTodo, todoFolders } from './todo'
+import { acceptSuggestion, addTodo, chatApproved, autoStartPlan, changeTodo, claimTodo, START_GRACE_MS, clearGoneChats, dismissSuggestion, editTodo, finishItem, loadLocalTodos, loadTodos, extraTodoFolders, moveTodo, replaceRemoteTodo, restoreTicked, runLabel, runMessage, runOrder, projectOf, setPilot, setTodoSync, startTodo, todoFolders } from './todo'
 import { randomUUID } from 'crypto'
 import { dailyTrend, fillDraft, notifyIndefiniteDone, notifyAwsExpiry, notifyPaused, notifyStuck } from './notify'
 import { CHECK_BACK_TEXT, dueCheckBacks, hasOpenWork } from './checkback'
@@ -308,6 +308,7 @@ export function startHub(context: vscode.ExtensionContext): void {
     hub.set({ starred: starredRows(stars, hub.get(), notes, readChains()) })
     await refreshChanges(true)
     await loadTodos(todoFolders(ws)).catch(err => log.warn('To-do lists failed:', err))
+    await loadLocalTodos(extraTodoFolders(ws)).catch(err => log.warn('Other projects to-do lists failed:', err))
     hub.set({ jevProjects: Object.fromEntries(todoFolders(ws).map(f => [f, jevProject(f)])) })
   }
   const near = () => nearOnce().catch(err => log.warn('Plan, git or servers failed:', err))

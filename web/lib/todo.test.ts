@@ -159,7 +159,7 @@ describe('autopilot', () => {
   })
   it('the demo lists carry a plan', () => {
     const l = demoHub(1e12).todos!['/Users/k/GitHub/Armasu']
-    assert.deepEqual(l.plan, { runs: [{ n: 3, ids: ['dt1'] }, { n: 4, ids: ['dt4'] }], held: [{ id: 'dt5', why: 'stopped' }] })
+    assert.deepEqual(l.plan, { runs: [{ n: 3, ids: ['dt1'] }, { n: 4, ids: ['dt4'] }, { n: 5, ids: ['dt7'] }], held: [{ id: 'dt5', why: 'stopped' }] })
   })
   it('no plan (an older extension): queued in list order, no numbers', () => {
     const p = autopilot(list({ plan: undefined }), true, live)

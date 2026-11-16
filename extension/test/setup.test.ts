@@ -222,6 +222,10 @@ describe('setup steps', () => {
     assert.match(text(), /codex mcp login posthog, codex mcp login composio/)
   })
 
+  it('installs untangle-codebase from caldoai/skills', () => {
+    assert.ok(KIT.skills?.some(k => k.repo === 'caldoai/skills' && k.names.includes('untangle-codebase')))
+  })
+
   it('installs caveman as a skill, not as a plugin with hooks', () => {
     assert.ok(KIT.skills?.some(k => k.repo === 'JuliusBrussee/caveman' && k.names.includes('caveman')))
     assert.ok(!KIT.plugins.some(p => p.startsWith('caveman')))

@@ -6,8 +6,6 @@
 textarea.hub-todo-edit { width: 100%; box-sizing: border-box; resize: vertical; line-height: 1.45; overflow-wrap: anywhere; }
 span.hub-todo-text:not([data-open]) { cursor: pointer; }
 .hub-todo-text[data-open] { white-space: normal; overflow-wrap: anywhere; }
-.hub-todo-needs { border-color: color-mix(in srgb, var(--hub-yellow) 35%, var(--hub-hair)); background: var(--hub-yellow-soft); }
-.hub-todo-needs > li { padding-right: 4px; }
 .hub-todo-cap { flex: 1 0 100%; font: 400 11px/1.2 var(--hub-sans); color: var(--hub-ash); }
 .hub-todo-cap[data-near] { color: var(--hub-yellow); }
 .hub-todo > li[aria-busy] { opacity: 0.6; }
@@ -31,19 +29,10 @@ span.hub-todo-text:not([data-open]) { cursor: pointer; }
 .hub-todo-text[data-clamp] { padding-block: 0; }
 button.hub-todo-text { cursor: pointer; font: inherit; font-size: 13px; color: var(--hub-ink); }
 button.hub-todo-text[data-open] { white-space: normal; overflow-wrap: anywhere; }
-.hub-todo-else { margin-left: auto; font: 400 12px/1.2 var(--hub-sans); color: var(--hub-ash); }
 .hub-todo-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .hub-todo-add > input { flex: 1 1 160px; min-width: 0; }
-.hub-todo-sub { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font: 500 12px/1.2 var(--hub-sans); color: var(--hub-mute); }
 .hub-todo-hint { margin-left: auto; font-weight: 400; color: var(--hub-ash); }
 @media (pointer: coarse) { .hub-todo-hint { display: none; } }
-.hub-todo-next { display: grid; gap: 6px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--hub-hair-strong); background: var(--hub-surface); }
-.hub-todo-kicker { margin: 0; font: 500 11px/1 var(--hub-mono); letter-spacing: 0.4px; text-transform: uppercase; color: var(--hub-blue); }
-.hub-todo-next-text { margin: 0; font: 500 15px/1.4 var(--hub-sans); color: var(--hub-ink); overflow-wrap: anywhere; }
-.hub-todo-next-text[data-clamp]:not([data-open]) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.hub-todo-next-meta { margin: 0; font: 400 12px/1.4 var(--hub-sans); color: var(--hub-ash); }
-.hub-todo-next-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
-.hub-todo-next-acts .hub-btn { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .hub-todo-status { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .hub-todo-ai { flex: none; padding: 2px 6px; border: 1px solid var(--hub-hair-strong); border-radius: 999px; font: 500 11px/1.2 var(--hub-sans); color: var(--hub-mute); white-space: nowrap; }
 .hub-todo > li { flex-wrap: wrap; }
@@ -55,24 +44,19 @@ button.hub-todo-text[data-open] { white-space: normal; overflow-wrap: anywhere; 
 .hub-todo > li[data-drag] { opacity: 0.5; }
 .hub-todo > li[data-drag] .hub-todo-grip { cursor: grabbing; }
 .hub-todo > li[data-over] { box-shadow: inset 0 2px 0 var(--hub-blue); }
-.hub-todo-empty { margin: 0; padding: 18px 12px; border: 1px dashed var(--hub-hair-strong); border-radius: 8px; text-align: center; font: 400 13px/1.5 var(--hub-sans); color: var(--hub-ash); }
-.hub-todo-foot { margin: 4px 0 0; font: 400 12px/1.4 var(--hub-sans); color: var(--hub-ash); }
 @media (pointer: coarse) {
   .hub-todo > li { min-height: 44px; }
   .hub-todo .hub-done, .hub-todo-grip { width: 44px; height: 44px; margin: 0 -8px; }
   .hub-todo-row-acts { padding-left: 12px; }
-  .hub-todo-next-acts .hub-btn, .hub-todo-add .hub-btn { min-height: 44px; }
   .hub-todo-add > input { font-size: 16px; }
 }
 .hub-todo > li > .hub-todo-text { flex: 1 1 150px; }
 span.hub-todo-text { padding-block: 0; }
-.hub-todo-status, .hub-todo > li > .hub-todo-acts { margin-left: auto; }
 .hub-todo-send { padding: 2px 0; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 @media (pointer: coarse) { .hub-todo-send { padding: 12px 0; } }
 
 /* Layout A: autopilot bar, your steps, For your OK, Running, Queue. */
 .hub-todo-pilot-ctl { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; }
-.hub-todo-pilot-hint { flex: 1 0 100%; margin: 0; font: 400 12px/1.4 var(--hub-sans); color: var(--hub-ash); }
 .hub-todo-pause { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .hub-pilot { display: grid; gap: 10px; padding: 14px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--hub-blue) 40%, var(--hub-hair)); background: var(--hub-blue-soft); }
 .hub-pilot[data-mode='off'], .hub-pilot[data-mode='empty'] { border-color: var(--hub-hair-strong); background: var(--hub-surface); }
@@ -114,11 +98,6 @@ span.hub-todo-text { padding-block: 0; }
 .hub-todo > li[data-next] { background: var(--hub-elev); border-radius: 7px; }
 .hub-todo > li[data-next] .hub-todo-text { font-weight: 600; }
 .hub-todo-start { flex: none; }
-.hub-todo-ok { border-color: color-mix(in srgb, var(--hub-blue) 35%, var(--hub-hair)); }
-.hub-todo-ok > li { padding-left: 12px; }
-.hub-todo-ok .hub-todo-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.hub-todo-all { margin-left: auto; font-weight: 500; color: var(--hub-ink); }
-.hub-todo-group > .hub-todo-add { margin-top: 8px; }
 .hub-todo > li + li { border-top: 1px solid var(--hub-hair); }
 .hub-pilot-card .hub-pilot-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .hub-pilot-lanes > li { display: grid; grid-template-columns: minmax(90px, 140px) minmax(0, 1fr); gap: 6px 12px; align-items: center; padding-top: 10px; border-top: 1px solid var(--hub-hair); }
@@ -136,9 +115,15 @@ span.hub-todo-text { padding-block: 0; }
   .hub-chain-t { max-width: 140px; }
 }
 @media (pointer: coarse) {
-  .hub-todo-panel .hub-link { min-height: 44px; padding-inline: 6px; }
   .hub-todo-pilot-ctl .hub-switch { min-height: 44px; }
 }
-.hub-todo-head > .hub-todo-else { margin-left: 0; }
 .hub-todo-row-acts .hub-todo-meta { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 @media (max-width: 520px) { .hub-todo-row-acts { padding-left: 12px; } }
+.hub-todo-status { margin-left: auto; }
+@media (pointer: coarse) { .tdo-add .hub-btn, .tdo-jump, .tdo-all, .hub-todo-pilot-ctl .hub-link { min-height: 44px; } }
+@media (pointer: coarse) {
+  .tdo-check, .tdo-project .hub-done { position: relative; }
+  .tdo-check::after, .hub-todo .hub-done::after { content: ''; position: absolute; inset: -13px; }
+  .tdo-project .hub-btn, .tdo-project .hub-link, .tdo-project .hub-switch { min-height: 44px; }
+  .hub-todo-send { padding: 14px 4px; }
+}

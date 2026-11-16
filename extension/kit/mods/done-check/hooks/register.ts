@@ -98,6 +98,7 @@ const LIMIT = /usage limit|hit your (usage |session )?limit|rate limit|limit rea
 const HELD = 'Paused by usage-meter'
 const HANDOFF = /\bhand(ing|ed)? ?off\b|\bhandoff\b|next chat/i
 const APPROVAL = /\b(approve|approval|sign off|look good|ok to ship|ready to commit)\b/i
+const CLOSING = 'Approve this chat as finished'
 
 /** The last turn from a transcript tail: from the last prompt the user (or the lead) typed. */
 export function lastTurn(tail: string, cwd = ''): Turn {
@@ -158,7 +159,9 @@ export function judge(t: Turn, last: string, tasks: Task[], main = true) {
   if (t.edited && t.lastEdit > t.lastCheck) missing.push('files were edited after the last test, lint or typecheck run')
   if (t.edited && t.lastCheck >= 0 && t.checkFailed && CLAIM.test(last)) missing.push('the message claims success but the last check failed')
   const question = /\?\s*$/.test(last.trim()) && !APPROVAL.test(last)
-  const waiting = t.asked || t.bg === true || t.held === true || question || LIMIT.test(last) || HANDOFF.test(last)
+  // No ask tool in the session (it never loads): the closing question asked as text counts.
+  // ponytail: the tool list sits outside the tail, so text alone counts; check it if chats start skipping the tool.
+  const waiting = t.asked || last.includes(CLOSING) || t.bg === true || t.held === true || question || LIMIT.test(last) || HANDOFF.test(last)
   // Edited, checked, but never asked the closing question: hold once for the finish steps.
   const unclosed = main && t.edited && !waiting && missing.length === 0
   const reason = missing.length ? `${missing.join('. ')}. Finish it and run the checks, or say what is blocking.` : `${FINISH}.`
@@ -228,7 +231,6 @@ async function onStop($: EngineInterface, e: { session_id: string; cwd?: string;
   return block ? `done-check: not finished yet. ${v.reason}` : undefined
 }
 
-const CLOSING = 'Approve this chat as finished'
 const closing = (e: Record<string, unknown>) => e.tool === 'AskUserQuestion' && !e.agentId
   && Array.isArray(e.questions) && e.questions.some(q => String((q as { question?: unknown })?.question ?? '').includes(CLOSING))
 

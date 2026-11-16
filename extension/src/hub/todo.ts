@@ -142,9 +142,9 @@ export function moveTodo(d: TodoDoc, ids: string[], now = Date.now()): TodoDoc {
 export function restoreTicked(d: TodoDoc, id: string, now = Date.now(), newId = ID()): TodoDoc {
   const t = d.ticked?.find(x => x.id === id)
   if (!t) return d
-  const { id: _i, at: _a, by: _b, text, ...more } = t
+  const { id: _i, at: _a, by: _b, shipped: _s, text, ...more } = t
   const out = withTicked({ ...d, removed: { ...d.removed, [BACK(id)]: now } }, d.ticked!.filter(x => x !== t))
-  return addTodo(out, text, now, newId, more)
+  return addTodo(out, text, now, newId, { ...more, ...(_s ? { kept: true as const } : {}) })
 }
 
 /** Same text as an open item, ignoring case and spacing. */
@@ -253,7 +253,7 @@ export function whyLeft(text: string): TodoWhy {
   const t = text.toLowerCase()
   // Keyword guess; swap in a quick model call if these read wrong too often.
   if (/out of scope|not in scope|unrelated|separate (task|chat|pr)|beyond (this|the) (task|brief)/.test(t)) return 'scope'
-  if (/\bblocked\b|\bblocker|waiting (on|for)|waits (on|for)|can'?not|can't|no access|missing (key|token|access|credentials)/.test(t)) return 'blocked'
+  if (/\bblocked\b|\bblocker|waiting (on|for)|waits (on|for)|no access|missing (key|token|access|credentials)/.test(t)) return 'blocked'
   // No 'you' guess: For you lines are the hand steps, and a word guess dropped real work ("add retries to your handler").
   return 'later'
 }
@@ -261,12 +261,64 @@ export function whyLeft(text: string): TodoWhy {
 /** The chat's name now, so a suggestion still says it after the chat leaves the list. */
 const chatName = (id: string) => hub.get().chats.find(c => c.sessionId === id)?.name?.slice(0, 64)
 
+const VERBS = new Set(('add set re-run rerun run fix build make write create update remove delete drop replace rename move merge split check test verify review audit confirm ' +
+  'wire hook connect ship release publish deploy push pull install uninstall configure enable disable turn show hide display list print log record save load open close ' +
+  'start stop restart reload retry rebuild refactor simplify clean tidy port migrate upgrade bump revert undo restore handle support allow block prevent guard ' +
+  'document explain describe research investigate find look trace debug profile measure benchmark compare decide choose pick design draft sketch redesign polish ' +
+  'tune adjust change edit extend expand reduce cut trim cap limit sync import export copy paste send post call fetch read parse render sort filter group ' +
+  'track watch monitor notify alert warn ask tell ping sign log rotate revoke grant approve reject accept dismiss tick mark flag tag name label ' +
+  'map rework wrap implement introduce expose surface include exclude skip combine blocked waiting needs need wait try use apply keep make ensure give take get put prefer move teach train index scan seed backfill dedupe cover finish complete continue resume').split(' '))
+// Steps addressed to Kenneth: For you work, never a to-do.
+const HAND = /^(commit|quit|type|say go|reconnect|let the other|leave (out|unstaged)|delete the old|reload (vs ?code|each|the)|give me|approve or drop|open a new chat|log (out|in) of|sign (in|out)|close (vs ?code|the chats?)|keep waiting|reload (the )?window|call me|phone me)\b/i
+/** The line without a leading "Before/After/Once/When/Next ..." clause, a short "Label (note):" and a list number. */
+const lead = (text: string) => {
+  let t = text.trim().replace(/^(?:before|after|once|when|next)\b[^,:]*[,:]\s*/i, '')
+  const m = /^([^:]{1,60}?)(?:\s*\([^)]*\))?:\s+(.+)$/.exec(t)
+  if (m) t = m[2]
+  return { t: t.replace(/^\d+[.)]\s+/, ''), label: m?.[1] }
+}
+// Openers that make a line a statement: determiners, pronouns, numbers, adverb clauses.
+const STATEMENT = new Set('the a an this that these those it its there i we you they he she one once some all no also still currently now just only already yet maybe probably sometimes often because if so'.split(' '))
+const AUX = new Set(['is', 'are', 'was', 'were', 'has', 'have', 'had', "hasn't", "haven't", "doesn't", "didn't", "isn't", "won't", "can't", 'would', 'could', 'will', 'should', 'need', 'needs'])
+/** A real to-do: an imperative. Kept when it opens on a known verb; otherwise kept unless it reads as a statement (determiner, pronoun, number or gerund opener, "JustTCG answers", or a finite auxiliary early). Hand steps fail. */
+export function actionLine(text: string): boolean {
+  const { t, label } = lead(text)
+  if (HAND.test(t)) return false
+  // "Verify X once on a board: clicking ..." opens on a verb before its label is stripped.
+  if (VERBS.has(text.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z-]/g, ''))) return true
+  const raw = t.split(/\s+/), w = raw.map(x => x.toLowerCase().replace(/[^a-z0-9'-]/g, ''))
+  if (!w[0]) return false
+  if (VERBS.has(w[0]) || (w[0] === 'also' && VERBS.has(w[1] ?? ''))) return true
+  if (label && /\b(fix|plan|proposed|to-do|todo|task)\b/i.test(label)) return true
+  // A quoted title, a question, or a place or time opener with no verb up front is not a task.
+  if (/^["`]/.test(t) || questionLike(t) || (/^(on|in|at|for|with|from|your|my)$/.test(w[0]) && !w.slice(1, 4).some(x => VERBS.has(x)))) return false
+  if (STATEMENT.has(w[0]) || /^\d/.test(w[0]) || (w[0].endsWith('ing') && w[0].length > 5)) return false
+  // A CamelCase name opener ("JustTCG answers ...") is a subject, not a verb.
+  if (/^[A-Z][a-z0-9]*[A-Z]/.test(raw[0])) return false
+  for (const x of w.slice(0, 5)) { if (VERBS.has(x)) break; if (AUX.has(x)) return false }
+  // "... still say", "... no longer", "Your x is": a state report, unless a verb comes first.
+  const head = w.slice(0, 10)
+  for (const [i, x] of head.entries()) {
+    // Nouns like list, approve or name sit on the verb list, so only an opener verb ends the scan.
+    if (w[0] === 'your' && AUX.has(x)) return false
+    if (VERBS.has(x) && i < 3 && w[0] !== 'your') break
+    if (x === 'still' || x === 'already' || x === 'currently' || (x === 'no' && head[i + 1] === 'longer')) return false
+  }
+  return true
+}
+// Questions and complaints typed at a chat are not work to do.
+const QUESTION = /^(sorry\b|how come\b|why\b|is it because\b|are we\b|are they\b|is (this|that|there)\b|did you\b|do you\b|does\b|what (is|s|are)\b|where (is|s|are)\b|when (is|will|did)\b|who\b)|\bhow come\b|\bis it because\b/
+const questionLike = (t: string) => QUESTION.test(t.toLowerCase().replace(/[^a-z0-9?' ]+/g, ' ').replace(/\s+/g, ' ').trim())
+
+/** Paths that are never a to-do project: test and cache dirs. */
+export const junkPath = (p: string) => [path.join(os.homedir(), '.cache'), os.tmpdir(), '/tmp', '/private/tmp', '/var/folders'].some(j => { const f = foldPathCase(p), q = foldPathCase(j); return f === q || f.startsWith(q + path.sep) })
+
 /** This chat's lines as suggestions, skipping junk, a tombstone, a known id and text an open item or suggestion already says; then prune. */
-function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why: (t: string) => TodoWhy, idOf = leftId): TodoDoc {
+function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why: (t: string) => TodoWhy, idOf = leftId, strict = true): TodoDoc {
   const add: TodoItem[] = [], had = d.suggested ?? [], name = chatName(p.sessionId)
   for (const raw of texts) {
     const text = workText(raw)
-    if (!text) continue
+    if (!text || (strict && !actionLine(text))) continue
     const id = idOf(p.sessionId, text)
     if (Object.hasOwn(d.removed, id) || [...d.todo, ...had, ...add].some(l => l.id === id || sameWork(l.text, text))) continue
     add.push({ id, text, at: now, from: p.sessionId, ...(name ? { name } : {}), why: why(text) })
@@ -278,6 +330,54 @@ function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why:
 const sameWork = (a: string, b: string) => { const x = words(a), y = words(b); return !!x && !!y && (` ${x} `.includes(` ${y} `) || ` ${y} `.includes(` ${x} `) || overlap(x, y, 2)) }
 // Oldest first, then smallest id: every machine keeps the same one of two duplicates.
 const byAge = <T extends { id: string; at: number }>(xs: T[]) => [...xs].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+
+export type ShippedSources = { commits: Array<{ sha: string; subject: string; at: number }>; changelog: string[] }
+const STOP = new Set('the and for with that this from into when then than have has not are was were its their about after before under over each only also more most some such what which while will would should could there here your you our out all any can but via per use used using'.split(' '))
+const keys = (t: string) => [...new Set(words(t).split(' ').filter(w => w.length > 3 && !STOP.has(w)).map(w => w.slice(0, 5)))]
+/** Strong overlap on distinctive words: 3 or more shared and 75% of the longer side. */
+const shippedBy = (text: string, subject: string) => {
+  const a = keys(text), b = new Set(keys(subject)), n = a.filter(w => b.has(w)).length
+  return n >= 3 && n / Math.max(a.length, b.size) >= 0.75
+}
+/** Open items and suggestions that a later commit subject or a CHANGELOG line already says, ticked with the match. */
+export function tickShipped(d: TodoDoc, src: ShippedSources, now = Date.now()): TodoDoc {
+  let out = d
+  for (const t of [...d.todo.filter(x => !x.chat), ...d.suggested ?? []]) {
+    if (handStep(t) || (t as TodoItem).kept) continue
+    const c = src.commits.find(x => x.at >= t.at && shippedBy(t.text, x.subject))
+    const line = c ? undefined : src.changelog.find(l => shippedBy(t.text, l))
+    const shipped = c ? { sha: c.sha, subject: c.subject } : line ? { sha: 'CHANGELOG', subject: line } : undefined
+    if (!shipped) continue
+    out = finishItem(out, t.id, undefined, now)
+    out = { ...out, ticked: out.ticked?.map(x => x.id === t.id ? { ...x, shipped } : x) }
+  }
+  return out
+}
+const shippedCache = new Map<string, { key: string; src: ShippedSources }>()
+const clMtime = (root: string) => { try { return fs.statSync(path.join(root, 'CHANGELOG.md')).mtimeMs } catch { return 0 } }
+/** The repo's last 300 commit subjects and CHANGELOG lines; cached per HEAD and CHANGELOG mtime, and a failed git log is not cached. */
+async function shippedSources(root: string): Promise<ShippedSources | undefined> {
+  const head = (await git(root, ['rev-parse', '-q', '--verify', 'HEAD'])).out.trim()
+  const key = `${head}:${clMtime(root)}`
+  const hit = shippedCache.get(root)
+  if (hit && hit.key === key) return hit.src
+  const r = head ? await git(root, ['log', '-n', '300', '--format=%h%x09%ct%x09%s']) : undefined
+  if (!r?.ok) return hit?.src
+  const commits = r.out.split('\n').flatMap(l => { const [sha, ct, ...x] = l.split('\t'); return sha && x.length ? [{ sha, subject: x.join('\t'), at: Number(ct) * 1000 }] : [] })
+  const changelog = (() => { try { return fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').split('\n').map(l => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim()).filter(l => l.length > 20 && !l.startsWith('#')) } catch { return [] } })()
+  const src = { commits, changelog }
+  shippedCache.set(root, { key, src })
+  return src
+}
+/** After the list shows: refresh the sources and tick what shipped, written back like a prune. */
+function tickLater(folder: string, s: TodoStore): void {
+  if (!s.root) return
+  shippedSources(s.root).then(async src => {
+    if (!src) return
+    const d = await readDoc(s)
+    if (tickShipped(d, src) !== d) await changeTodo(folder, x => tickShipped(x, src))
+  }).catch(err => log.warn('Shipped check failed:', err))
+}
 
 /**
  * The list without junk. A For you hand step, open (accepted) or suggested. Suggestions: wrapped blocks or nudges (workText),
@@ -297,13 +397,14 @@ export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
   }
   const kept: TodoItem[] = []
   for (const s of byAge(d.suggested ?? [])) {
-    if (handStep(s) || !workText(s.text, s.why === 'missed') || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
+    if (handStep(s) || !workText(s.text, s.why === 'missed') || (s.why === 'missed' ? questionLike(s.text) : !actionLine(s.text)) || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
     else kept.push(s)
   }
   const n = d.todo.length + (d.suggested?.length ?? 0) - out.todo.length - (out.suggested?.length ?? 0)
   return n ? { ...out, cleared: n } : out
 }
 const addLeft = (d: TodoDoc, p: ChatProgress, texts: string[], now: number) => suggest(d, p, texts, now, whyLeft)
+
 // For you lines used to land as suggestions under this id; only those go, not a Left line once guessed as 'you'.
 const youId = (chat: string, text: string) => leftId(chat, `you\n${text}`)
 const handStep = (t: TodoItem) => t.why === 'you' && !!t.from && t.id.replace(/-ok$/, '') === youId(t.from, t.text)
@@ -318,7 +419,7 @@ export function addMissed(d: TodoDoc, p: ChatProgress, now = Date.now()): TodoDo
   const covered = new Set(scored.filter((_, i) => (p.covered?.[i] ?? 0) > MISSED).map(t => clean(workText(t, true) ?? t)))
   const gone = (d.suggested ?? []).filter(x => x.from === p.sessionId && x.why === 'missed' && covered.has(x.text) && x.id === missedId(p.sessionId, x.text))
   const out = gone.reduce((o, x) => dismissSuggestion(o, x.id, now), d)
-  return suggest(out, p, [...new Set(missed(p).map(clean).filter(t => t && !chatty(t)))], now, () => 'missed', missedId)
+  return suggest(out, p, [...new Set(missed(p).map(clean).filter(t => t && !chatty(t) && !questionLike(t)))], now, () => 'missed', missedId, false)
 }
 
 /** Kenneth approved the chat as finished, so the requests Jev scored as missed were covered after all. */
@@ -875,7 +976,8 @@ export function projectOf(cwd: string): string {
 }
 
 /** This window's project and every chat's, shown in the panel. */
-export const todoFolders = (workspace: string | undefined) => [...new Set([...(workspace ? [workspace] : []), ...hub.get().chats.map(c => c.cwd)].filter(Boolean).map(projectOf))]
+export const todoFolders = (workspace: string | undefined) => [...new Set([...(workspace ? [workspace] : []), ...hub.get().chats.map(c => c.cwd)].filter(Boolean).map(projectOf)
+  .filter(f => !junkPath(f) && (repoTop(f) === f || hub.get().projects.some(p => foldPathCase(p.path) === foldPathCase(f)))))]
 
 function laterSync(folder: string, s: TodoStore): void {
   if (!s.root) return
@@ -885,6 +987,25 @@ function laterSync(folder: string, s: TodoStore): void {
     // A failed push is retried by the next change or refresh sync.
     syncNow(folder, s).then(() => readDoc(s)).then(d => show(folder, d), err => { log.warn('To-do sync failed:', err); show(folder) })
   }, PUSH_WAIT_MS))
+}
+
+/** Every repo project the window and chats do not cover: shown on the one page, read-only here (loadLocalTodos). */
+export const extraTodoFolders = (workspace: string | undefined) => {
+  const own = new Set(todoFolders(workspace))
+  return [...new Set(hub.get().projects.filter(p => p.kind === 'repo').map(p => projectOf(p.path)))].filter(f => !own.has(f) && !junkPath(f))
+}
+
+/** Reads those folders' local lists only: no fetch or push, no shipped check, prune written locally, never claimed or auto-started. */
+export async function loadLocalTodos(folders: string[]): Promise<void> {
+  await Promise.all(folders.map(async folder => {
+    let d: TodoDoc | undefined
+    try {
+      const st = await storeOf(folder)
+      d = await readDoc(st)
+      // Junk goes from the file too (local write, no push); the next normal sync carries the tombstones.
+      show(folder, prune(d) === d ? d : await updateDoc(st, prune))
+    } catch { show(folder, d && prune(d)) }
+  }))
 }
 
 /** Reads each folder's lists; fetches and merges when due (or forced by Refresh). */
@@ -897,9 +1018,12 @@ export async function loadTodos(folders: string[], force = false): Promise<void>
     }
     try {
       const d = await readDoc(s)
-      // Old junk goes on read too, written back so sync carries the tombstones.
-      if (prune(d) === d) show(folder, d)
-      else await changeTodo(folder, prune).catch(() => show(folder, d))
+      // Old junk and shipped work go on read too, written back so sync carries the tombstones.
+      const src = s.root ? shippedCache.get(s.root)?.src : undefined
+      const tidy = (x: TodoDoc) => { const p = prune(x); return src ? tickShipped(p, src) : p }
+      if (tidy(d) === d) show(folder, d)
+      else await changeTodo(folder, tidy).catch(() => show(folder, d))
+      tickLater(folder, s)
     } catch (err) {
       syncState.set(folder, { ...syncState.get(folder), state: 'failing', why: (err as Error).message.slice(0, 120) })
       show(folder)

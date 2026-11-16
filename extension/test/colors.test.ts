@@ -41,6 +41,14 @@ describe('window colors', () => {
     assert.equal(colors['/gone'], 'violet')
   })
 
+  it('moves a live window off a color another live window already has', () => {
+    const { colors, changed } = assignColors({ '/a': 'violet', '/b': 'teal', '/c': 'teal' }, ['/a', '/b', '/c'])
+    assert.equal(colors['/b'], 'teal')
+    assert.equal(colors['/c'], 'amber')
+    assert.equal(changed, true)
+    assert.equal(assignColors(colors, ['/a', '/b', '/c']).changed, false)
+  })
+
   it('wraps around when every color is taken', () => {
     const live = PALETTE.map((_, i) => `/w${i}`)
     const { colors } = assignColors({}, [...live, '/extra'])

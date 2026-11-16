@@ -40,7 +40,8 @@
     { "repo": "tt-a1i/archify", "path": ".", "names": ["archify"] },
     { "repo": "cathrynlavery/diagram-design", "names": ["diagram-design"] },
     { "repo": "vercel-labs/skills", "names": ["find-skills"] },
-    { "repo": "JuliusBrussee/caveman", "names": ["caveman"] }
+    { "repo": "JuliusBrussee/caveman", "names": ["caveman"] },
+    { "repo": "caldoai/skills", "names": ["untangle-codebase"] }
   ],
   "tools": [
     { "uv": "scrapling[ai]", "skill": { "repo": "D4Vinci/Scrapling", "path": "agent-skill", "name": "scrapling-official" }, "mcp": { "name": "scrapling", "command": "scrapling-mcp" } },

@@ -181,7 +181,7 @@ export function askedQuestion(text: string): string | undefined {
 const ITEM = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/
 // A whole section that only says so is empty; an item that merely opens with "Nothing" is real.
 const NONE = /^\(?(none|nothing|n\/a|no (open |remaining |more )?(items?|tasks?|work))\)?[.!]?$/i
-const REPORT_ITEM = 160, REPORT_MAX = 12
+const REPORT_ITEM = 2000, REPORT_MAX = 12
 // The whole label first: "Left (needs you)" and "Left for you" are the user's steps too. Done and Left go by the first word.
 const YOU = 'for you|needs you|your steps|left for you|left \\(needs you\\)'
 // A short For you line that opens with none or no ("No manual steps.") says it is empty; a longer one is a real step.
@@ -288,7 +288,14 @@ export function toolTarget(tool: string, input: Payload): string | undefined {
   return t ? plainText(t).slice(0, 48).trim() || undefined : undefined
 }
 
-const cut = (v: unknown, n: number) => { const t = str(v); return t ? plainText(t).slice(0, n).trim() || undefined : undefined }
+const cut = (v: unknown, n: number) => {
+  const t = str(v)
+  if (!t) return undefined
+  const p = plainText(t)
+  // Past n, back up to the last space so a word is never split; one huge word (a path, a hash) still hard cuts.
+  const hard = p.slice(0, n), soft = hard.replace(/\s+\S*$/, '')
+  return (p.length <= n ? p : soft.length >= n / 2 ? soft : hard).trim() || undefined
+}
 /** Ties a permission prompt to the tool call it is for, so that call's end clears it. */
 const callKey = (tool: string, input: unknown) => createHash('sha1').update(`${tool}\n${JSON.stringify(input ?? {})}`).digest('hex').slice(0, 12)
 

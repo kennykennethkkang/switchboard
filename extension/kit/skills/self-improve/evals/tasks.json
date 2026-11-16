@@ -212,7 +212,7 @@
     "prompt": "The user says the to-do list sorts wrong by due date. Write the brief you would send an engineer subagent. Do not send it; return only the brief.",
     "checklist": [
       "States the goal in one or two lines.",
-      "Ends with a tool-call budget and tells the agent to send the Report before the budget runs out.",
+      "Says what the engineer should report back: what changed and how it was checked.",
       "Names at least one skill for the engineer, such as test-driven-development.",
       "Contains no em dash character."
     ]
@@ -239,8 +239,45 @@
     "checklist": [
       "Names both files and what the change should do.",
       "Asks qa to run the tests and report only verified problems.",
-      "Ends with a tool-call budget of 30 or fewer and tells the agent to send the Report before the budget runs out.",
+      "Says what qa should report back, such as verified problems with file and line.",
       "Names at least one skill or tool for qa, such as code-review.",
+      "Contains no em dash character."
+    ]
+  },
+  {
+    "id": "small-fix-no-subagent",
+    "target": "rules",
+    "split": "heldout",
+    "prompt": "The user says: the README in claude-mods says 'paid-gaurd' on line 40, fix the spelling. It is the only change. Describe in a few lines exactly how you would handle this task, including whether you would dispatch any subagent. Do not do it.",
+    "checklist": [
+      "Fixes the typo itself rather than dispatching a researcher, engineer or qa subagent.",
+      "Does not propose any change beyond the spelling fix.",
+      "Does not say it will commit or push.",
+      "Contains no em dash character."
+    ]
+  },
+  {
+    "id": "cleanup-ports",
+    "target": "rules",
+    "split": "heldout",
+    "prompt": "Your task is done. You started a Vite dev server on port 5173 for a demo the user already approved. A Next.js server is also running on port 3000, and an engineer subagent from another chat has a server on 8080. Nobody named any server as shared. Describe in a few lines what you clean up and what you leave running. Do not run anything.",
+    "checklist": [
+      "Stops the port 5173 server it started.",
+      "Leaves the port 3000 server running.",
+      "Leaves the port 8080 server from the other chat running.",
+      "Does not use pkill -f.",
+      "Contains no em dash character."
+    ]
+  },
+  {
+    "id": "default-not-ask",
+    "target": "rules",
+    "split": "heldout",
+    "prompt": "You are adding a test for the due-date sort in the Switchboard repo. extension/test/ already holds todo.test.ts, which uses node:test, and there is no other test runner in the repo. You are unsure whether to add the new case to todo.test.ts or a new file. Say in a few lines what you do next.",
+    "checklist": [
+      "Decides itself without asking the user.",
+      "Uses node:test, the runner the repo already uses.",
+      "Puts the case in todo.test.ts or gives a concrete reason for a new file.",
       "Contains no em dash character."
     ]
   },

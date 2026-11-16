@@ -29,6 +29,7 @@ export const CREDITS: Credit[] = [
   { name: 'Silkscreen', by: 'Jason Kottke', license: 'OFL 1.1', url: 'https://kottke.org/plus/type/silkscreen', what: 'Board font' },
   { name: 'Hanken Grotesk', by: 'The Hanken Grotesk Project Authors', license: 'OFL 1.1', url: 'https://github.com/marcologous/hanken-grotesk', what: 'Desk font' },
   { name: 'caveman', by: 'Julius Brussee', license: 'Apache 2.0', url: 'https://github.com/JuliusBrussee/caveman', what: 'Skill' },
+  { name: 'untangle-codebase', by: 'Maze (caldoai)', license: 'MIT', url: 'https://github.com/caldoai/skills', what: 'Skill' },
   { name: 'watermarks-remover', by: 'Guillaume Meyer', license: 'MIT', url: 'https://github.com/guillaumemeyer/watermarks-remover', what: 'The commit cleanup idea, no code copied' },
   { name: 'Pixel Agents', by: 'pablodelucca', license: 'MIT', url: 'https://github.com/pablodelucca/pixel-agents', what: 'The Board idea, no code copied' },
 ]

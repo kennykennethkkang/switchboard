@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.21.78
+
+- To-do suggestions keep any imperative, not only lines that start with a listed verb ("Debounce the save", "Re-run the chain", "Also wire the map"); lines that read as a status report ("X still says...", "Your list is empty...", "The saved list could...") are dropped
+- Repos with no open chat get their to-do cleanup written to the local list too (no push); the next sync carries it
+
+## 0.21.77
+
+- Two open windows no longer share a title bar color: when a saved color clashes with another open window, the later one moves to a free color
+
+## 0.21.76
+
+- To-do shows every listed repo that has work, not just this window's project and those with a chat; other repos are read from their local list (no fetch, never auto-started)
+
+## 0.21.75
+
+- To-do panel redesigned: every project with work on one page, your own steps first, then Running, Queue and an add box, then suggestions with Add, Dismiss and Add all; a "N suggested" link in each project title jumps to them; done items sit in a "done this week" fold with Undo
+- Suggestions take only real action lines (a verb and a target, after any "Label:" or "Before ...," lead-in); status remarks, fragments and steps addressed to you are dropped, and old ones are cleared on the next read
+- Your typed questions and complaints no longer turn into "missed" to-do items
+- An item whose words match a recent commit or a CHANGELOG line is ticked as shipped, with the commit shown and Undo; Put back keeps it open for good
+- Left lines keep their full text instead of stopping at 160 characters; "can't" in a line no longer marks it blocked
+- Test and temp folders (~/.cache, tmp) no longer show up as to-do projects
+- Panel controls get 44px touch targets on phones
+
 ## 0.21.74
 
 - Every chat that finishes now updates the Source Control commit box, even when it already holds text: the new message goes on top and what was there (earlier chats, your own words, a box kept from before a reload) stays below as bullets

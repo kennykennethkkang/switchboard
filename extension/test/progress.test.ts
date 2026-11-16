@@ -955,7 +955,7 @@ test('standup: Done and Left items from bold lines, headings or labels; an empty
   assert.equal(standup(''), undefined)
   const many = standup(`**Done**\n${Array.from({ length: 20 }, () => `- ${'x'.repeat(300)}`).join('\n')}`)!
   assert.equal(many.done.length, 12)
-  assert.equal(many.done[0].length <= 160, true)
+  assert.equal(many.done[0].length <= 2000, true)
 })
 
 test('standup: a For you section holds the user\'s own steps; Left (needs you) and Left for you are too', () => {

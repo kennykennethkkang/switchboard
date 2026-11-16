@@ -147,7 +147,13 @@ function baseHub(now: number): HubState {
         { id: 'dt2', text: 'Put a Stripe test key in .env.local', at: now - 2 * DAY, before: 'dt1', from: 'd-work', chat: 'd-work', run: 2, auto: true },
         { id: 'dt4', text: 'Check the outfit picker on a real phone', at: now - 5 * 60e3, from: 'd-gone' },
         { id: 'dt5', text: 'Move the route release preset to the shared kit', at: now - 60 * 60e3, chat: 'd-gone' },
-      ], ticked: [{ id: 'dt6', text: 'Fix the login redirect on Safari', at: now - 20 * 60e3, by: 'd-done', from: 'd-work', run: 1, auto: true }],
+        // Long on purpose: the panel must show it whole, not cut at a fixed length.
+        { id: 'dt7', text: 'Make the receipts export match what accounting asked for: one row per line item, the tax split into its own column, refunds as negative rows on the day they happened, and the file named by month so it sorts in Finder. Keep the old CSV format behind a toggle until they confirm the new one imports cleanly into Xero.', at: now - 26 * 60 * 60e3, from: 'd-done', name: 'Receipts export' },
+      ], ticked: [{ id: 'dt6', text: 'Fix the login redirect on Safari', at: now - 20 * 60e3, by: 'd-done', from: 'd-work', run: 1, auto: true },
+        // Auto-ticked: a commit already said it.
+        { id: 'dt8', text: 'Show a spinner while the outfit picker loads', at: now - 3 * 60 * 60e3, from: 'd-old', shipped: { sha: '9f3c2a17be04d1', subject: 'Outfit picker: loading spinner and empty state' } },
+        { id: 'dt9', text: 'Bump the Stripe SDK to v15', at: now - 2 * DAY, shipped: { sha: 'CHANGELOG', subject: '0.9.2: Stripe SDK 15' } },
+        { id: 'dt10', text: 'Old finished work nobody needs to see', at: now - 20 * DAY, by: 'd-done' }],
       // An auto chain: To-do 1 done, 2 running in d-work, the rest queued.
       seq: 2, streak: 1, pilot: { on: true, at: now - 60 * 60e3 },
       // What finished chats left, waiting for Accept or Dismiss; d-old is gone from the chat list, so it reads by project and date.
@@ -156,6 +162,8 @@ function baseHub(now: number): HubState {
         { id: 'ds2', text: 'Show tax lines on receipts once the API returns them', at: now - 40 * 60e3, from: 'd-done', why: 'blocked' },
         { id: 'ds3', text: 'Move receipts to the new PDF library', at: now - 2 * DAY, from: 'd-old', why: 'scope' },
       ] },
+      // No open work, only an old tick: the redesign hides it.
+      '/Users/k/GitHub/notes': { todo: [], ticked: [{ id: 'dn1', text: 'Archive the 2025 notes', at: now - 40 * DAY }] },
       '/Users/k/GitHub/switchboard': { sync: { state: 'local', why: 'public repo', canSync: true }, todo: [
         { id: 'da1', text: 'Rebuild the vsix and reload VS Code', at: now - 4 * 60e3, from: 'd-almost' },
       ], pilot: { on: true, paused: true, at: now - 10 * 60e3 }, suggested: [
@@ -469,6 +477,7 @@ const demoMerge = (now: number): Pick<RepoView, 'pr' | 'merge' | 'ci'> => {
 }
 
 /** The browser demo has no extension behind it, so the Hub's own settings apply here. */
+let demoSeq = 0
 export function demoApply(h: HubState, c: HubCommand): HubState {
   switch (c.type) {
     // Like approveChat: an approved row in the archive; the card leaves the live list.
@@ -685,7 +694,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const list = h.todos?.[c.path] ?? (c.type === 'hub-todo-add' ? { todo: [] } : undefined)
       if (!list) return h
       const set = (l: typeof list) => withPlans({ ...h, todos: { ...h.todos, [c.path]: l } })
-      const now = Date.now(), id = `dt-${now.toString(36)}`
+      const now = Date.now(), id = `dt-${now.toString(36)}-${++demoSeq}`
       if (c.type === 'hub-todo-pilot') return set({ ...list, pilot: { ...list.pilot, ...(c.on !== undefined ? { on: c.on } : {}), ...(c.paused !== undefined ? { paused: c.paused } : {}), at: now } })
       if (c.type === 'hub-todo-add') return c.text.trim() ? set({ ...list, todo: [...list.todo, { id, text: c.text.trim(), at: now }] }) : h
       if (c.type === 'hub-todo-move') { const at = new Map(c.ids.map((id, i) => [id, i])); return set({ ...list, todo: list.todo.map((t, i) => ({ t, k: at.get(t.id) ?? c.ids.length + i })).sort((x, y) => x.k - y.k).map(x => x.t) }) }

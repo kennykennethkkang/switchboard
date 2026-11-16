@@ -1,11 +1,13 @@
 'use client'
-import { useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useDraft } from '@/hooks/use-draft'
-import type { ArchivedChat, ChatProgress, ChatRow, TickedItem, TodoItem, TodoList, TodoWhy, WindowInfo } from '@/lib/hub-types'
+import type { ArchivedChat, ChatProgress, ChatRow, TodoItem, TodoList, TodoWhy, WindowInfo } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
-import { aiPath, autopilot, finishUp, HELD, moved, openCount, openElsewhere, ordered, pilotLanes, runLanded, runTargets, stepLabel, type Pilot, type Step } from '@/lib/todo'
-import { ago, caps, panel, placeOf, repoOf } from './look'
+import { aiPath, autopilot, finishUp, HELD, moved, ordered, pilotLanes, runLanded, runTargets, stepLabel, type Pilot, type Step } from '@/lib/todo'
+import { caps, panel, placeOf, repoOf } from './look'
 import { Check, chipOf } from './chat-cards'
+import { recentDone, shippedOf, shownProjects } from '@/lib/todo-view'
+import { Shipped, Suggest, YouRow, when } from './todo-rows'
 import './todo-panel.css'
 export { todoFolder } from '@/lib/todo'
 
@@ -26,19 +28,33 @@ const WHY: Record<TodoWhy, { label: string; short: string; color: string }> = {
 }
 const same = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase()
 const day = (at: number) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-const when = (at: number) => { const a = ago(at); return a === 'now' ? 'just now' : `${a} ago` }
 const Dot = ({ color }: { color: string }) => <i aria-hidden className="hub-todo-dot" style={{ background: color }} />
-// Dot plus words, so the reason never rests on color alone.
-const Why = ({ why }: { why: TodoWhy }) => <span className="hub-todo-meta" title={WHY[why].label}><Dot color={WHY[why].color} />{WHY[why].short}</span>
 
 // sent: when it went out; the row stays hidden until the list drops it, so it never flickers back.
 type Pend = { key: string; ids: string[]; verb: 'done' | 'dismissed'; msg: string; cmd: HubCommand; sent?: number }
 
-/** Future work for a project, kept across chats until done. The top item gets a Start button; the rest drag into order. */
+/** One project's block: your steps, running, queue with the add box, suggestions, done. The top item gets a Start button; the rest drag into order. */
 /** windows: the chat a row runs in names its window on hover. archive: closed chats, for the AI a handoff chain ran in. */
-/** autoStart: the global Auto-start, which a project's pilot.on overrides. onFolder: the project picker, held by the page so it outlives a remount. */
-export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windows, archive = [], autoStart = false, send }: { folder: string; todos: Record<string, TodoList>; chats: ChatRow[]; progress?: ChatProgress[]; windows?: WindowInfo[]; archive?: ArchivedChat[]; autoStart?: boolean; send: (c: HubCommand) => void; onFolder: (f: string) => void }) {
+/** autoStart: the global Auto-start, which a project's pilot.on overrides. */
+type Props = { todos: Record<string, TodoList>; chats: ChatRow[]; progress?: ChatProgress[]; windows?: WindowInfo[]; archive?: ArchivedChat[]; autoStart?: boolean; send: (c: HubCommand) => void }
+
+/** Every project with work on one page, each as its own block; the picked project stands in when none has any. */
+export function TodoPanel({ folder, ...p }: Props & { folder: string }) {
+  const shown = shownProjects(p.todos, folder)
+  return <section aria-labelledby="tdo-h" className="tdo" style={panel}>
+    <div className="tdo-head"><h3 id="tdo-h" style={{ ...caps, flex: 'none' }} title="Work for later, shared by every chat in the project">To-do</h3>
+      <span className="tdo-proj-one">{shown.length} {shown.length === 1 ? 'project' : 'projects'} with work</span></div>
+    {shown.map(f => <ProjectBlock key={f} folder={f} {...p} />)}
+  </section>
+}
+
+function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = [], autoStart = false, send }: { folder: string; todos: Record<string, TodoList>; chats: ChatRow[]; progress?: ChatProgress[]; windows?: WindowInfo[]; archive?: ArchivedChat[]; autoStart?: boolean; send: (c: HubCommand) => void }) {
   const list = todos[folder] ?? { todo: [] }
+  const uid = useId(), addSel = `[data-add="${folder}"]`, sugBox = useRef<HTMLDivElement>(null)
+  const recent = recentDone(list, Date.now())
+  // Only done rows left: title and the done fold, nothing else.
+  const compact = recent.length > 0 && !list.todo.length && !list.suggested?.length
+  const older = (list.ticked?.length ?? 0) - recent.length
   const [text, setText, clearText] = useDraft(`todo:new:${folder}`)
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   // Escape cancels; the blur that follows must not save.
@@ -110,7 +126,7 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
     if (!t) return
     const dup = list.todo.find(x => !hidden.has(x.id) && same(x.text, t))
     if (dup) { say('Already on the list.'); return }
-    send({ type: 'hub-todo-add', path: folder, text: t }); clearText()
+    send({ type: 'hub-todo-add', path: folder, text: t }); clearText(); refocus(addSel)
     const top = addForm.current?.getBoundingClientRect().top
     if (top !== undefined) anchor.current = { top, until: Date.now() + 15_000 }
   }
@@ -145,10 +161,10 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
     send({ type: 'hub-todo-run', path: folder, ids, ...(to ? { to } : {}) })
     setWait({ path: folder, ids, msg: to ? 'Sent to the chat.' : 'Started a chat on it.', ok: l => runLanded(l.todo, ids, was, to) })
   }
-  const done = (t: TodoItem) => { refocus('[aria-label="New to-do item"]'); later([t.id], 'done', `Done: ${t.text}`, { type: 'hub-todo-remove', path: folder, id: t.id }) }
-  const drop = (t: TodoItem) => { refocus('[aria-label="New to-do item"]'); later([t.id], 'dismissed', `Dismissed: ${t.text}`, { type: 'hub-todo-dismiss', path: folder, id: t.id }) }
+  const done = (t: TodoItem) => { refocus(addSel); later([t.id], 'done', `Done: ${t.text}`, { type: 'hub-todo-remove', path: folder, id: t.id }) }
+  const drop = (t: TodoItem) => { refocus(addSel); later([t.id], 'dismissed', `Dismissed: ${t.text}`, { type: 'hub-todo-dismiss', path: folder, id: t.id }) }
   const keep = (t: TodoItem) => {
-    refocus('[aria-label="New to-do item"]')
+    refocus(addSel)
     send({ type: 'hub-todo-accept', path: folder, id: t.id })
     setWait({ path: folder, ids: [t.id], msg: 'Added to the list.', ok: l => !l.suggested?.some(x => x.id === t.id) })
   }
@@ -160,8 +176,6 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
     send(c?.live ? { type: 'hub-focus-chat', sessionId: id } : { type: 'hub-resume', sessionId: id, ai: c?.ai ?? 'claude' })
   }
   const from = (t: TodoItem) => `${t.from ? `${t.why ? 'Left by' : 'Added by'} ${source(t)}` : 'Added by you'}, ${when(t.at)}`
-  const by = (t: TickedItem) => `Done by ${t.by ? name(t.by) ?? `a ${repoOf(folder)} chat` : 'you'}, ${when(t.at)}`
-  const others = openElsewhere(todos, folder), folders = Object.keys(todos)
   const targets = runTargets(chats, folder)
 
   // Long text clamps to two lines; More shows the rest.
@@ -235,7 +249,7 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
     <span className="hub-done" aria-hidden><span /></span>
     <form style={{ display: 'flex', flex: 1, minWidth: 0 }} onSubmit={e => { e.preventDefault(); save() }}>
       {/* Enter saves, Shift+Enter breaks the line, Esc cancels. Caret starts at the top so long text reads from its start. */}
-      <textarea className="hub-todo-edit" aria-label="Edit to-do item" aria-describedby="todo-edit-keys" autoFocus maxLength={MAX} value={editing!.text}
+      <textarea className="hub-todo-edit" aria-label="Edit to-do item" aria-describedby={`${uid}-k`} autoFocus maxLength={MAX} value={editing!.text}
         rows={Math.min(8, Math.max(2, Math.ceil(editing!.text.length / 60)))}
         ref={el => { if (el && !el.dataset.placed) { el.dataset.placed = '1'; el.setSelectionRange(0, 0); el.scrollTop = 0 } }}
         onChange={e => setEditing({ id: t.id, text: e.target.value })} onBlur={save}
@@ -243,7 +257,7 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); save(); refocus(`[data-edit="${t.id}"]`) }
           if (e.key === 'Escape') { e.stopPropagation(); cancelled.current = true; setEditing(null); refocus(`[data-edit="${t.id}"]`) }
         }} />
-      <span id="todo-edit-keys" hidden>Enter saves, Shift Enter adds a line, Escape cancels</span>
+      <span id={`${uid}-k`} hidden>Enter saves, Shift Enter adds a line, Escape cancels</span>
     </form>
   </li>
 
@@ -259,63 +273,33 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
   const empty = !todo.length && !mine.length && !suggested.length
 
   return (
-    <section aria-labelledby="todo-title" className="hub-todo-panel" style={panel}>
-      <div className="hub-todo-head">
-        <h3 id="todo-title" style={{ ...caps, flex: 'none' }} title="Work for later, shared by every chat in the project">To-do</h3>
-        {folders.length > 1
-          ? <select className="hub-select" aria-label="Project" value={folder} onChange={e => onFolder(e.target.value)}>
-              {folders.map(f => <option key={f} value={f}>{repoOf(f)} ({openCount(todos[f]) + finishUp(todos[f]).length})</option>)}
-            </select>
-          : <span style={{ fontSize: 13, color: 'var(--hub-ink)' }}>{repoOf(folder)}</span>}
-        {others > 0 && <span className="hub-todo-else">{others} in other projects</span>}
-        <span className="hub-todo-pilot-ctl">
-          <button type="button" role="switch" className="hub-switch" aria-checked={pilot.on} aria-describedby="todo-pilot-hint" onClick={() => setPilot({ on: !pilot.on })}>
+    <div className="tdo-project" role="group" aria-labelledby={`${uid}-t`}>
+      <div className="tdo-phead">
+        <h4 id={`${uid}-t`} className="tdo-ptitle">{repoOf(folder)}
+          <span className="tdo-pcount">{mine.length > 0 && `${mine.length} for you · `}{compact ? 'done this week' : `${todo.length} open`}
+            {suggested.length > 0 && <> · <button type="button" className="hub-link tdo-jump" onClick={() => { sugBox.current?.scrollIntoView({ block: 'center' }); sugBox.current?.querySelector<HTMLElement>('.tdo-sub')?.focus() }}>{suggested.length} suggested</button></>}</span>
+        </h4>
+        {!compact && <span className="hub-todo-pilot-ctl">
+          <button type="button" role="switch" className="hub-switch" aria-checked={pilot.on} aria-describedby={`${uid}-h`} onClick={() => setPilot({ on: !pilot.on })}>
             <span aria-hidden />Auto-run next
           </button>
           {pilot.on && <button type="button" className="hub-btn sm hub-todo-pause" aria-pressed={pilot.paused} onClick={() => setPilot({ paused: !pilot.paused })}>
             {pilot.paused ? <><Play />Resume</> : <><Bars />Pause</>}
           </button>}
-        </span>
-        <p id="todo-pilot-hint" className="hub-todo-pilot-hint">Starts the next item by itself when the running one is done. This project only.</p>
+        </span>}
+        <span id={`${uid}-h`} hidden>Starts the next item by itself when the running one is done. This project only.</span>
       </div>
 
-      <PilotBar pilot={pilot} onOpen={autoChat ? () => jump(autoChat) : undefined} onResume={() => setPilot({ paused: false })} />
+      {!compact && <PilotBar pilot={pilot} onOpen={autoChat ? () => jump(autoChat) : undefined} onResume={() => setPilot({ paused: false })} />}
 
-      {mine.length > 0 && <div className="hub-todo-group" role="region" aria-labelledby="todo-you-h">
-        <h4 id="todo-you-h" className="hub-todo-sub">Only you can do these<span className="hub-todo-n">{mine.length}</span></h4>
-        <ul role="list" aria-label="Only you can do these" className="hub-todo hub-todo-needs">{mine.map(t => <li key={t.id}>
-          <button type="button" className="hub-done" aria-label={`Mark ${t.text} done`} onClick={() => done(t)}><span><Check size={10} /></span></button>
-          <span className="hub-todo-text" {...clamp(t)} title={`${t.text}\n${from(t)}`} onClick={() => expand(t)}>{t.text}</span>
-          {more(t)}
-        </li>)}</ul>
+      {mine.length > 0 && <div className="tdo-group" data-tone="you">
+        <h4 className="tdo-sub">Only you can do these<span className="hub-todo-n">{mine.length}</span></h4>
+        <ul role="list" aria-label={`${repoOf(folder)}: only you can do these`} className="tdo-list">{mine.map(t => <YouRow key={t.id} t={t} meta={from(t)} onDone={() => done(t)} />)}</ul>
       </div>}
 
-      {suggested.length > 0 && <div className="hub-todo-group" role="region" aria-labelledby="todo-ok-h">
-        <h4 id="todo-ok-h" className="hub-todo-sub" title="Left over when a chat finished. Approve puts it in the queue.">For your OK<span className="hub-todo-n">{suggested.length}</span>
-          {suggested.length > 1 && <button type="button" className="hub-link hub-todo-all" onClick={() => {
-            const ids = suggested.map(t => t.id)
-            for (const id of ids) send({ type: 'hub-todo-accept', path: folder, id })
-            refocus('[aria-label="New to-do item"]')
-            setWait({ path: folder, ids, msg: `Added ${ids.length} to the queue.`, ok: l => !l.suggested?.some(x => ids.includes(x.id)) })
-          }}>Approve all</button>}
-        </h4>
-        <ul role="list" aria-label="For your OK" className="hub-todo hub-todo-ok">{suggested.map(t => <li key={t.id} aria-busy={busy.has(t.id) || undefined}>
-          <div className="hub-todo-body">
-            <span className="hub-todo-text" {...clamp(t)} title={`${t.text}\n${t.why ? `${WHY[t.why].label}. ` : ''}${from(t)}`} onClick={() => expand(t)}>{t.text}</span>
-            <span className="hub-todo-src">{from(t)}</span>
-          </div>
-          {more(t)}
-          <span className="hub-todo-acts">
-            {t.why && <Why why={t.why} />}
-            <button type="button" className="hub-btn sm" disabled={busy.has(t.id)} aria-label={`Approve ${t.text}`} onClick={() => keep(t)}>{busy.has(t.id) ? 'Adding...' : 'Approve'}</button>
-            <button type="button" className="hub-link" disabled={busy.has(t.id)} aria-label={`Dismiss ${t.text}`} onClick={() => drop(t)}>Dismiss</button>
-          </span>
-        </li>)}</ul>
-      </div>}
-
-      {running.length > 0 && <div className="hub-todo-group">
-        <h4 className="hub-todo-sub">Running<span className="hub-todo-n">{running.length}</span></h4>
-        <ul role="list" aria-label="Running" className="hub-todo">{running.map(({ t }) => {
+      {!compact && running.length > 0 && <div className="tdo-group">
+        <h4 className="tdo-sub">Running<span className="hub-todo-n">{running.length}</span></h4>
+        <ul role="list" aria-label={`${repoOf(folder)}: running`} className="hub-todo tdo-list">{running.map(({ t }) => {
           if (editing?.id === t.id) return editRow(t)
           const c = liveChat(t.chat)!, place = placeOf(c.cwd, windows)
           return <li key={t.id}>
@@ -329,10 +313,10 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
         })}</ul>
       </div>}
 
-      <div className="hub-todo-group">
-        <h4 className="hub-todo-sub">Queue<span className="hub-todo-n">{queue.length}</span>
-          {top.length > 1 && <span className="hub-todo-hint">Drag to reorder</span>}</h4>
-        {queue.length > 0 && <ul role="list" aria-label="Queue" className="hub-todo">
+      {!compact && <div className="tdo-group">
+        {queue.length > 0 && <h4 className="tdo-sub">Queue<span className="hub-todo-n">{queue.length}</span>
+          {top.length > 1 && <span className="hub-todo-hint">Drag to reorder</span>}</h4>}
+        {queue.length > 0 && <ul role="list" aria-label={`${repoOf(folder)}: queue`} className="hub-todo tdo-list">
           {queue.map(({ t, depth }) => {
             const indent = depth ? { paddingLeft: 10 + depth * 20 } : undefined
             if (editing?.id === t.id) return editRow(t, indent)
@@ -345,46 +329,49 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
               <span className="hub-todo-tag" data-k={first ? 'next' : pilot.held.has(t.id) ? 'held' : 'q'}>{first && <Arrow />}{pilot.held.has(t.id) ? HELD[pilot.held.get(t.id)!] : num.get(t.id) ?? ''}{first ? ' · Next' : ''}</span>
               {body(t, meta)}
               {status(t)}
-              {first && !t.chat && !busy.has(t.id) && <button type="button" className="hub-btn sm primary hub-todo-start" onClick={() => run(undefined, [t.id])}>Start now</button>}
+              {first && !t.chat && !busy.has(t.id) && <button type="button" className="hub-btn sm primary hub-todo-start" aria-label={`Start ${t.text} now`} onClick={() => run(undefined, [t.id])}>Start now</button>}
               {(first || isOpen) && <div className="hub-todo-row-acts">
                 {first && targets.length > 0 && <span className="hub-todo-meta">Or send to:{' '}
                   {targets.slice(0, 3).map((c, i) => <span key={c.sessionId}>{i ? ', ' : ''}<button type="button" className="hub-link hub-todo-send" onClick={() => run(c.sessionId, [t.id])}>{c.name ?? 'running chat'}</button></span>)}
                 </span>}
                 <span style={{ flex: 1 }} />
-                {!first && !t.chat && <button type="button" className="hub-btn sm" onClick={() => run(undefined, [t.id])}>Start now</button>}
+                {!first && !t.chat && <button type="button" className="hub-btn sm" aria-label={`Start ${t.text} now`} onClick={() => run(undefined, [t.id])}>Start now</button>}
                 {pos > 0 && <button type="button" className="hub-btn sm" onClick={() => move(t.id, 0)}>Move to top</button>}
                 {first && top.length > 1 && pos === 0 && <button type="button" className="hub-link" onClick={() => move(t.id, 1)}>Not now</button>}
-                <button type="button" className="hub-link" data-edit={t.id} onClick={() => edit(t)}>Edit</button>
+                <button type="button" className="hub-link" data-edit={t.id} aria-label={`Edit ${t.text}`} onClick={() => edit(t)}>Edit</button>
               </div>}
             </li>
           })}
         </ul>}
-        {empty && <p className="hub-todo-empty">
+        {empty && <p className="tdo-foot">
           {list.ticked?.length ? 'All done. ' : 'Nothing here yet. '}Add something below, or chats will leave work here when they finish.
         </p>}
-        <form ref={addForm} className="hub-todo-add" onSubmit={e => { e.preventDefault(); add() }}>
-          <input className="hub-todo-edit" aria-label="New to-do item" placeholder="Add something to do later" maxLength={MAX} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" />
+        <form ref={addForm} className="tdo-add" onSubmit={e => { e.preventDefault(); add() }}>
+          <input className="hub-todo-edit" data-add={folder} aria-label={`New to-do item for ${repoOf(folder)}`} placeholder="Add something to do later" maxLength={MAX} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" />
           <button type="submit" className={`hub-btn sm${text.trim() ? ' primary' : ''}`} disabled={!text.trim()}>Add</button>
           {text.length > MAX * 0.8 && <span className="hub-todo-cap" data-near>{text.length} / {MAX} characters</span>}
         </form>
-      </div>
+      </div>}
 
-      {!!list.ticked?.length && <details className="hub-fold-list hub-todo-group">
-        <summary>
-          <b aria-hidden>›</b>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--hub-ink)' }}>Done</span>
-          <span className="hub-todo-n">{list.ticked.length}</span>
-        </summary>
-        <ul role="list" aria-label="Done items" className="hub-todo" data-ticked>
-          {list.ticked.map(t => <li key={t.id}>
-            <span className="hub-done" aria-hidden style={{ color: 'var(--hub-green)' }}><Check size={12} /></span>
-            <span className="hub-todo-text" {...clamp(t)} title={`${t.text}\n${by(t)}`} onClick={() => expand(t)}>{t.text}</span>
-            {more(t)}
-            <Ai id={t.by} />
-            <button type="button" className="hub-link" aria-label={`Put back ${t.text}`} onClick={() => { send({ type: 'hub-todo-restore', path: folder, id: t.id }); say('Put back on the list.') }}>Put back</button>
-          </li>)}
+      {suggested.length > 0 && <div ref={sugBox} className="tdo-group" data-tone="suggest">
+        <h4 className="tdo-sub" tabIndex={-1}>Suggested by chats<span className="hub-todo-n">{suggested.length}</span>
+          {suggested.length > 1 && <button type="button" className="hub-link tdo-all" onClick={() => {
+            const ids = suggested.map(t => t.id)
+            for (const id of ids) send({ type: 'hub-todo-accept', path: folder, id })
+            refocus(addSel)
+            setWait({ path: folder, ids, msg: `Added ${ids.length} to the queue.`, ok: l => !l.suggested?.some(x => ids.includes(x.id)) })
+          }}>Add all</button>}
+        </h4>
+        <ul role="list" aria-label={`${repoOf(folder)}: suggested by chats`} className="tdo-list">{suggested.map(t =>
+          <Suggest key={t.id} t={t} busy={busy.has(t.id)} meta={`${t.why ? `${WHY[t.why].label} · ` : ''}${from(t)}`} onAdd={() => keep(t)} onDrop={() => drop(t)} />)}</ul>
+      </div>}
+
+      {recent.length > 0 && <details className="tdo-fold">
+        <summary>{recent.length} done this week{recent.some(t => shippedOf(t)) ? ', some by commit' : ''}</summary>
+        <ul role="list" aria-label={`${repoOf(folder)}: done`} className="tdo-list">
+          {recent.map(t => <Shipped key={t.id} t={t} onBack={() => { send({ type: 'hub-todo-restore', path: folder, id: t.id }); say('Put back on the list.') }} />)}
         </ul>
-        {!!list.cleared && <p className="hub-todo-foot" title="Repeats and stale suggestions; their text is not kept">{list.cleared} older {list.cleared === 1 ? 'repeat' : 'repeats'} cleared</p>}
+        {older > 0 && <p className="tdo-foot">{older} older done {older === 1 ? 'item' : 'items'} hidden</p>}
       </details>}
 
       <p role="status" style={{ margin: 0, fontSize: 12, color: 'var(--hub-green)', minHeight: said ? undefined : 0 }}>{said}</p>
@@ -409,7 +396,7 @@ export function TodoPanel({ folder, onFolder, todos, chats, progress = [], windo
         <span className="hub-todo-toast-msg">{toast}</span>
         <button type="button" className="hub-btn sm" onClick={undoAll}>{undoable.length > 1 ? 'Undo all' : 'Undo'}</button>
       </div>}
-    </section>
+    </div>
   )
 }
 
@@ -430,10 +417,11 @@ export function Chain({ steps, label }: { steps: Step[]; label: string }) {
 }
 
 function PilotBar({ pilot, onOpen, onResume }: { pilot: Pilot; onOpen?: () => void; onResume: () => void }) {
-  return <div className="hub-pilot" data-mode={pilot.mode} role="region" aria-labelledby="todo-pilot-h">
+  const id = useId()
+  return <div className="hub-pilot" data-mode={pilot.mode} role="region" aria-labelledby={id}>
     <div className="hub-pilot-top">
       {pilot.mode === 'paused' ? <Bars /> : pilot.mode === 'running' ? <i aria-hidden className="hub-chain-dot" /> : null}
-      <p id="todo-pilot-h" className="hub-pilot-head" aria-live="polite">{pilot.head}</p>
+      <p id={id} className="hub-pilot-head" aria-live="polite">{pilot.head}</p>
       {pilot.mode === 'paused' && <button type="button" className="hub-btn sm primary" onClick={onResume}><Play /> Resume</button>}
       {pilot.mode === 'running' && onOpen && <button type="button" className="hub-link" onClick={onOpen}>Open chat <Arrow /></button>}
     </div>

@@ -134,7 +134,7 @@ test('the demo applies to-do commands to its sample list, with one item a chat t
   const at = '/Users/k/GitHub/Armasu'
   let h = demoHub(0)
   const list = () => h.todos![at]
-  assert.equal(list().ticked?.length, 1)
+  assert.equal(list().ticked?.length, 4)
   h = demoApply(h, { type: 'hub-todo-remove', path: at, id: 'dt1' })
   assert.ok(!list().todo.some(t => t.id === 'dt1'))
   assert.equal(list().ticked?.[0].id, 'dt1')
@@ -144,7 +144,7 @@ test('the demo applies to-do commands to its sample list, with one item a chat t
   assert.equal(list().todo.find(t => t.id === 'dt4')?.text, 'Edited')
   const ticked = list().ticked![1]
   h = demoApply(h, { type: 'hub-todo-restore', path: at, id: ticked.id })
-  assert.equal(list().ticked?.length, 1)
+  assert.equal(list().ticked?.length, 4)
   assert.ok(list().todo.some(t => t.text === ticked.text && t.id !== ticked.id && t.from === ticked.from && t.before === ticked.before))
   h = demoApply(h, { type: 'hub-todo-run', path: at, ids: ['dt4'] })
   assert.ok(list().todo.find(t => t.id === 'dt4')?.chat)
@@ -337,4 +337,14 @@ test('demo: two chats share a group, one waits on another, new chats keep group 
   const n = demoApply(h, { type: 'hub-new-chat', path: '/g/app', text: 'add dark mode', remote: false, group: 'g-x', waitOn: ['d-work'] } as Parameters<typeof demoApply>[1])
   assert.equal(n.chats[0].group, 'g-x')
   assert.ok(n.links?.some(l => l.from === n.chats[0].sessionId && l.to.includes('d-work')))
+})
+
+test('accepting several suggestions in one tick keeps every row', () => {
+  let h = demoHub(); const todos = () => h.todos ?? {}
+  const at = Object.keys(todos()).find(k => (todos()[k].suggested ?? []).filter(t => t.why !== 'you').length > 1)!
+  const ids = todos()[at].suggested!.filter(t => t.why !== 'you').map(t => t.id), before = todos()[at].todo.length
+  for (const id of ids) h = demoApply(h, { type: 'hub-todo-accept', path: at, id })
+  const added = todos()[at].todo
+  assert.equal(added.length, before + ids.length)
+  assert.equal(new Set(added.map(t => t.id)).size, added.length)
 })

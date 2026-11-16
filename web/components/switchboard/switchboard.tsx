@@ -274,7 +274,7 @@ export function Switchboard() {
   const list = todoAt ? todos[todoAt] : undefined
   const next = list && { you: finishUp(list)[0]?.text, up: ordered(list.todo.filter(t => t.why !== 'you'))[0]?.t.text }
   const todayCard = <TodayCard today={today} tasks={tasks} next={next} trend={hub.trend} />
-  const todo = plan.folder && <TodoPanel key={plan.folder} folder={plan.folder} onFolder={pickPlan} todos={todos} chats={hub.chats} progress={hub.progress} windows={windows} archive={hub.archive} autoStart={hub.controls.switchboard.autoStart} send={send} />
+  const todo = plan.folder && <TodoPanel folder={plan.folder} todos={todos} chats={hub.chats} progress={hub.progress} windows={windows} archive={hub.archive} autoStart={hub.controls.switchboard.autoStart} send={send} />
   // The project the to-do follows gets its Jev card too.
   const jev = todoAt && <JevCard key={`jev-${todoAt}`} folder={todoAt} jev={hub.jevProjects?.[todoAt]} send={send} />
   const place = placeOf(current?.chat.cwd, windows)

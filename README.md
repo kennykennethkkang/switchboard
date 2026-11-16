@@ -177,6 +177,7 @@ Installed by Set up from their own repos (not bundled):
 - [Codex plugin for Claude Code](https://github.com/openai/codex-plugin-cc) by OpenAI, Apache 2.0; /codex:rescue and /codex:setup hand a job to the Codex CLI from a chat. Claude only, Codex does not get it
 - [find-skills](https://github.com/vercel-labs/skills) by Vercel
 - [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache-2.0
+- [untangle-codebase](https://github.com/caldoai/skills) by Maze (caldoai), MIT; /untangle-codebase lists every hidden link, needless link and bit of surplus in a repo, then fixes the list
 - [Scrapling](https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause
 - [Agent Reach](https://github.com/Panniantong/Agent-Reach) by Panniantong
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs, Apache 2.0; npm install -g, then agent-browser install for its browser, skipped when already on PATH
