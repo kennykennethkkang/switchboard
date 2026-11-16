@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "ec2c21a3",
+   "text": "Proposed kit rule (aar 2026-11-16): add to claude-mods/kit/agents/engineer.md and qa.md: \"Never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use git show HEAD:<path> or git worktree add <scratch>/base HEAD.\" (a stash in the iceberg chat lost two edits of a parallel engineer)",
+   "at": 1794857328228,
+   "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
+   "name": "Instagram Reel Switchboard Planning"
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -435,10 +443,10 @@
   {
    "id": "bb6dac7e",
    "text": "Memory consolidation: 7 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-16-5e06aab1.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "run": 66,
-   "auto": true,
    "at": 1794810847568,
-   "by": "2a97fd6a-f622-4543-84d9-552485b075eb"
+   "by": "2a97fd6a-f622-4543-84d9-552485b075eb",
+   "run": 66,
+   "auto": true
   },
   {
    "id": "01cae3f9",
