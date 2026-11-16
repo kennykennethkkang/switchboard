@@ -1,16 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "bb6dac7e",
-   "text": "Memory consolidation: 7 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-16-5e06aab1.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794810786293,
-   "chat": "2a97fd6a-f622-4543-84d9-552485b075eb",
-   "host": "62903adf5e340f87",
-   "run": 66,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -437,10 +427,19 @@
   "01cae3f9": 1794603575419,
   "f92819f4": 1794801047712,
   "fb269eb8": 1794801047712,
-  "0a4a36e6": 1794801047712
+  "0a4a36e6": 1794801047712,
+  "bb6dac7e": 1794810847568
  },
  "seq": 66,
  "ticked": [
+  {
+   "id": "bb6dac7e",
+   "text": "Memory consolidation: 7 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-16-5e06aab1.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "run": 66,
+   "auto": true,
+   "at": 1794810847568,
+   "by": "2a97fd6a-f622-4543-84d9-552485b075eb"
+  },
   {
    "id": "01cae3f9",
    "text": "AAR fix plan (chat d354fc0f): done-check edits() in claude-mods/done-check/hooks/register.ts counts node -e \"fs.writeFileSync(process.argv[2],...)\" \"$TMPDIR/x\" as a repo edit and held a read-only chat twice. When the write path is process.argv[N] or sys.argv[N], judge it by the Nth trailing argument (outside the repo = not an edit). Add a test next to done-check.test.ts:306, bump plugin.json.",
@@ -529,18 +528,6 @@
    "why": "later",
    "run": 59,
    "auto": true
-  },
-  {
-   "id": "310588c4-ok",
-   "text": "Switchboard to-do, in this order: 1. Map and flow view: show a chat's current Advanced mode stage (name, role, status from hub state stages via web/lib/stages-ui.ts chatRun/stageView) on its map node",
-   "at": 1794510290785,
-   "by": "4028ce56-6281-4336-adb4-8ee33da18aa2",
-   "from": "06a07f13-5707-47c1-a490-326cfd0e199a",
-   "name": "To-do 43: Chat map and flow stage",
-   "why": "missed",
-   "run": 58,
-   "auto": true
   }
- ],
- "streak": 66
+ ]
 }
