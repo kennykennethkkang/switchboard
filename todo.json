@@ -4,9 +4,13 @@
   {
    "id": "ec2c21a3",
    "text": "Proposed kit rule (aar 2026-11-16): add to claude-mods/kit/agents/engineer.md and qa.md: \"Never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use git show HEAD:<path> or git worktree add <scratch>/base HEAD.\" (a stash in the iceberg chat lost two edits of a parallel engineer)",
-   "at": 1794857328228,
+   "at": 1794857333245,
    "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
-   "name": "Instagram Reel Switchboard Planning"
+   "name": "Instagram Reel Switchboard Planning",
+   "chat": "476535e0-ab88-4ee0-9414-5182c1813347",
+   "host": "62903adf5e340f87",
+   "run": 67,
+   "auto": true
   }
  ],
  "removed": {
@@ -438,7 +442,7 @@
   "0a4a36e6": 1794801047712,
   "bb6dac7e": 1794810847568
  },
- "seq": 66,
+ "seq": 67,
  "ticked": [
   {
    "id": "bb6dac7e",
@@ -537,5 +541,6 @@
    "run": 59,
    "auto": true
   }
- ]
+ ],
+ "streak": 67
 }
