@@ -437,11 +437,11 @@
   {
    "id": "ebcfb494",
    "text": "Kit fix proposal (aar, Armasu session 77071046): in claude-mods/kit/rules.md, Finishing bullet (line 64, \"Finish only after the checks ran...\"), after \"Kenneth approves finished chats:\" add the sentence \"If the standup still offers a choice (\"unless you want\", \"if you want\", \"optional\"), ask it as its own question and do the work before the Approve question.\" Why: Approve was asked 4 times on 2026-11-17 and Kenneth sent it back 3 times through its free text because Yo's GCP billing close was left as an optional line.",
+   "at": 1794942688168,
+   "by": "b754e76d-27b1-4f15-9730-f2e7b2bbb735",
    "from": "232cf8ef-f843-4349-bf6c-d14d30528c97",
    "run": 68,
-   "auto": true,
-   "at": 1794942688168,
-   "by": "b754e76d-27b1-4f15-9730-f2e7b2bbb735"
+   "auto": true
   },
   {
    "id": "ec2c21a3",
@@ -528,6 +528,16 @@
    "name": "To-do 60: Verify similarity threshold",
    "run": 61,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "c49d3ecf",
+   "text": "Allow select all for design library in tools",
+   "at": 1794952038706,
+   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
+   "name": "Enable select all design library",
+   "why": "missed"
   }
  ]
 }
