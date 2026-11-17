@@ -61,9 +61,20 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
   const library = () => {
     const map = profile.assets ?? {}
     const keys = Object.keys(map).filter(isLib)
-    const head = <h4 style={caps}><span>Design library</span><span>{keys.length ? `${keys.filter(k => map[k]).length} of ${keys.length} on` : 'none'}</span></h4>
-    if (!keys.length) return <div style={{ display: 'grid', gap: 6 }}>{head}<p style={{ ...caps, textTransform: 'none' }}>No looks found in ~/.claude/switchboard/design-md.</p></div>
+    if (!keys.length) return <div style={{ display: 'grid', gap: 6 }}><h4 style={caps}><span>Design library</span><span>none</span></h4><p style={{ ...caps, textTransform: 'none' }}>No looks found in ~/.claude/switchboard/design-md.</p></div>
     const shown = (order.current = libraryOrder(order.current, map, find)).keys
+    // All and None act on the looks the search shows, so a search then All picks just those.
+    const setAll = (on: boolean) => onChange({ ...profile, assets: { ...map, ...Object.fromEntries(shown.map(k => [k, on])) } })
+    const head = (
+      <h4 style={caps}>
+        <span>Design library</span>
+        <span style={{ display: 'flex', gap: 10 }}>
+          {keys.filter(k => map[k]).length} of {keys.length} on
+          <button type="button" style={link} onClick={() => setAll(true)}>All</button>
+          <button type="button" style={link} onClick={() => setAll(false)}>None</button>
+        </span>
+      </h4>
+    )
     return (
       <div style={{ display: 'grid', gap: 6 }}>
         {head}

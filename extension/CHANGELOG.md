@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.87
+
+- Design library in Tools has All and None, like the other groups; with a search typed they act on the matching looks only
+
 ## 0.21.86
 
 - Worktrees left behind after a window reload, or by a chat that moved into one after it started, are now found on disk and removed after 10 idle minutes when their branch is already in the main checkout and nothing is uncommitted
