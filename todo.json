@@ -4,8 +4,12 @@
   {
    "id": "ebcfb494",
    "text": "Kit fix proposal (aar, Armasu session 77071046): in claude-mods/kit/rules.md, Finishing bullet (line 64, \"Finish only after the checks ran...\"), after \"Kenneth approves finished chats:\" add the sentence \"If the standup still offers a choice (\"unless you want\", \"if you want\", \"optional\"), ask it as its own question and do the work before the Approve question.\" Why: Approve was asked 4 times on 2026-11-17 and Kenneth sent it back 3 times through its free text because Yo's GCP billing close was left as an optional line.",
-   "at": 1794942646945,
-   "from": "232cf8ef-f843-4349-bf6c-d14d30528c97"
+   "at": 1794942650717,
+   "from": "232cf8ef-f843-4349-bf6c-d14d30528c97",
+   "chat": "b754e76d-27b1-4f15-9730-f2e7b2bbb735",
+   "host": "62903adf5e340f87",
+   "run": 68,
+   "auto": true
   }
  ],
  "removed": {
@@ -438,7 +442,7 @@
   "bb6dac7e": 1794810847568,
   "ec2c21a3": 1794857368705
  },
- "seq": 67,
+ "seq": 68,
  "ticked": [
   {
    "id": "ec2c21a3",
@@ -536,5 +540,6 @@
    "run": 60,
    "auto": true
   }
- ]
+ ],
+ "streak": 68
 }
