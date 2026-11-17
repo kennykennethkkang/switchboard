@@ -19,12 +19,13 @@ import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
 import { CLI_APPS, cliBinary, cliBusy, deviceUrl, endCli, startCli } from './cli-logins'
 import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
-import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, stillRunning } from './projects'
+import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, repoTop, stillRunning } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { saveGroup } from './split'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
 import { titleFor } from './title'
+import { excludeWorktrees } from './advanced'
 import { heldLabel, moveTodoChat, projectOf, todoEnv, type RunLabel } from './todo'
 import { trustFolder, trustedWindowRoots } from './trust'
 import { openChatTerminal, tags } from './terminals'
@@ -129,6 +130,9 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
   return t
 }
 
+/** A worktree folder name from a chat title, made unique with a short suffix. */
+const worktreeName = (title: string) => `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '') || 'chat'}-${crypto.randomUUID().slice(0, 4)}`
+
 /** Auto becomes claude or codex with the reason; a named AI stays as it is. */
 export async function resolveAi(ai: NewChatAi, text: string | undefined, folder: string): Promise<{ ai: AiId; reason?: string }> {
   if (ai !== 'auto') return { ai }
@@ -144,8 +148,9 @@ export async function resolveAi(ai: NewChatAi, text: string | undefined, folder:
  * noRemote: Remote Control stays off even when it is on at startup, so a To-do run stays in VS Code.
  * todo: a To-do run's label (runLabel): the chat is named `To-do N: <title>` and gets it as SWITCHBOARD_TODO.
  * group: a split's group id (split.ts), saved once the session id is known.
+ * worktree: Claude only, starts in repo/.claude/worktrees/<slug> on branch worktree-<slug>.
  */
-export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[]): Promise<string | undefined> {
+export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[], worktree = false): Promise<string | undefined> {
   const project = hub.get().projects.find(p => p.path === folder)
   if (!project) return `${folder} is not in the project list yet; open Switchboard once and try again`
   const { ai, reason } = await resolveAi(want, text, folder)
@@ -183,11 +188,12 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, worktree: worktree && repoTop(folder) ? worktreeName(title) : undefined, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
   trustHere(folder)
+  if (worktree && repoTop(folder)) excludeWorktrees(folder)
   if (group && sessionId) saveGroup(sessionId, group)
   const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: { ...chatEnv(folder), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
   t.show(true)

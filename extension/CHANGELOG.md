@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.21.80
+
+- A worktree kept by Merge back is removed once no chat has run in it for 10 minutes, if its branch is merged and the tree is clean (no force); case twins count as one folder
+- Denied card note puts the reason in parentheses; the Auto permissions hint says a classifier blocks risky actions beyond the task and asks after 3 blocks in a row
+- Demo shows a worktree chat with Merge back and the new card notes
+
+## 0.21.79
+
+- Own worktree: a Claude chat started in a project that already has a live chat can run in its own git worktree (ticked by default); the Git panel gets Merge back, which merges the branch into the main checkout, never pushes, and keeps the worktree while a chat still runs in it
+- Settings, Claude chat permissions: Bypass, Ask or Auto (Claude Code's classifier mode, no prompts; a classifier blocks risky actions beyond what the chat was asked)
+- Cards note context compactions, denied tool calls and loaded rule files (PostCompact, PermissionDenied, InstructionsLoaded hooks); TaskCompleted ticks the task list
+- Path-scoped kit rules: rules for some files only install to ~/.claude/rules and load when a chat touches a match; Codex keeps them inline
+
 ## 0.21.78
 
 - To-do suggestions keep any imperative, not only lines that start with a listed verb ("Debounce the save", "Re-run the chain", "Also wire the map"); lines that read as a status report ("X still says...", "Your list is empty...", "The saved list could...") are dropped

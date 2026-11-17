@@ -1173,3 +1173,27 @@ test('indefiniteText adds usage and reason when sent', () => {
   assert.equal(indefiniteText('Fix', 'used $1.20 over 2h', 'gate passed: pnpm test'), 'Switchboard: Fix: Run indefinitely finished: gate passed: pnpm test. Used $1.20 over 2h.')
   assert.equal(indefiniteText('Fix', 'used $3 over 4h', 'budget reached (not a success)'), 'Switchboard: Fix: Run indefinitely finished: budget reached (not a success). Used $3 over 4h.')
 })
+
+test('PostCompact notes the compaction and its trigger', () => {
+  const p = run([ev('SessionStart'), ev('PostCompact', { trigger: 'auto', compact_summary: 'long text' })])
+  assert.deepEqual(p?.compacted, { at: 1001, trigger: 'auto' })
+  assert.equal(JSON.stringify(p).includes('long text'), false)
+})
+
+test('PermissionDenied keeps the newest denial with its tool, target and reason', () => {
+  const p = run([ev('SessionStart'), ev('PermissionDenied', { tool_name: 'Bash', tool_input: { command: 'rm -rf /tmp/build' }, reason: '[Irreversible Local Destruction]' })])
+  assert.deepEqual(p?.denied, { at: 1001, tool: 'Bash', target: 'rm -rf /tmp/build', reason: '[Irreversible Local Destruction]' })
+})
+
+test('InstructionsLoaded lists each rule file once, short, newest last', () => {
+  const load = (file_path: string) => ev('InstructionsLoaded', { file_path, memory_type: 'Project', load_reason: 'session_start' })
+  const p = run([ev('SessionStart'), load('/r/CLAUDE.md'), load('/r/.claude/rules/a.md'), load('/r/CLAUDE.md')])
+  assert.deepEqual(p?.rules, ['r/CLAUDE.md', 'rules/a.md'])
+})
+
+test('TaskCompleted completes a listed task; TaskCreated leaves the TaskCreate call to add it', () => {
+  const p = run([ev('SessionStart'), ev('PreToolUse', { tool_name: 'TaskCreate', tool_input: { subject: 'Build it' } }), ev('PostToolUse', { tool_name: 'TaskCreate', tool_input: { subject: 'Build it' } }),
+    ev('TaskCreated', { task_id: '1', task_subject: 'Build it' }), ev('TaskCompleted', { task_id: '1', task_subject: 'Build it' })])
+  assert.deepEqual(p?.tasks.map(t => [t.id, t.subject, t.status]), [['1', 'Build it', 'completed']])
+  assert.ok(p?.tasks[0].doneAt)
+})

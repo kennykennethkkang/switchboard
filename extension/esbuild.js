@@ -43,9 +43,22 @@ function bundleKit() {
   for (const [, src] of files) if (SECRET.test(fs.readFileSync(src, 'utf8'))) throw new Error(`kit: ${src} looks like it holds a secret; not bundled`)
   const rules = marked(fs.readFileSync(path.join(KIT_SRC, 'rules.md'), 'utf8'))
   // Same version as kit/setup.mjs writes: when rules.md last changed, kept while its text is unchanged.
-  const rulesVersion = read(path.join(KIT_OUT, 'rules.md')) === rules && old.rulesVersion ? old.rulesVersion : `${fs.statSync(path.join(KIT_SRC, 'rules.md')).mtime.toISOString().slice(0, 19)}Z`
+  // Path rules (kit/rules/*.md) count too: they are part of what rules.md used to hold.
+  const ruleDir = path.join(KIT_SRC, 'rules')
+  const pathRules = fs.existsSync(ruleDir) ? fs.readdirSync(ruleDir).filter(n => n.endsWith('.md')) : []
+  const same = read(path.join(KIT_OUT, 'rules.md')) === rules && pathRules.every(n => read(path.join(KIT_OUT, 'rules', n)) === genericRules(fs.readFileSync(path.join(ruleDir, n), 'utf8')))
+    && (fs.existsSync(path.join(KIT_OUT, 'rules')) ? fs.readdirSync(path.join(KIT_OUT, 'rules')).length === pathRules.length : pathRules.length === 0)
+  const newest = Math.max(...['rules.md', ...pathRules.map(n => `rules/${n}`)].map(n => fs.statSync(path.join(KIT_SRC, n)).mtimeMs))
+  const rulesVersion = same && old.rulesVersion ? old.rulesVersion : `${new Date(newest).toISOString().slice(0, 19)}Z`
   const history = old.history ?? {}
   fs.mkdirSync(path.join(KIT_OUT, 'agents'), { recursive: true })
+  fs.rmSync(path.join(KIT_OUT, 'rules'), { recursive: true, force: true })
+  if (pathRules.length) fs.mkdirSync(path.join(KIT_OUT, 'rules'), { recursive: true })
+  for (const n of pathRules) {
+    const t = fs.readFileSync(path.join(ruleDir, n), 'utf8')
+    if (SECRET.test(t)) throw new Error(`kit: rules/${n} looks like it holds a secret; not bundled`)
+    fs.writeFileSync(path.join(KIT_OUT, 'rules', n), genericRules(t))
+  }
   // A role the kit dropped leaves the bundle too.
   for (const n of fs.readdirSync(path.join(KIT_OUT, 'agents'))) if (!files.some(([name]) => name === `agents/${n}`)) fs.rmSync(path.join(KIT_OUT, 'agents', n))
   for (const [name, src] of files) {

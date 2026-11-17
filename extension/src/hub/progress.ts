@@ -11,6 +11,7 @@ import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, DailyTrend, Helper,
 
 type Payload = Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+const RULES_MAX = 20
 const STATUS = new Set(['pending', 'in_progress', 'completed'])
 const RESET = new Set(['startup', 'clear'])
 const ASKS = new Set(['permission_prompt', 'elicitation_dialog'])
@@ -599,6 +600,22 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const keep = new Set(p.running)
       const roles = trim(p.roles.map(r => keep.has(r.id) ? r : finish(r)))
       return { ...p, ...NO_ASK, roles, finishing: undefined, waiting: undefined, state: 'needs-you', question, limited: LIMITS.has(error) ? { at: now, error } : undefined }
+    }
+    case 'PostCompact':
+      return { ...p, compacted: { at: now, trigger: str(payload.trigger) ?? 'auto' } }
+    case 'PermissionDenied': {
+      const tool = str(payload.tool_name) ?? 'a tool', target = toolTarget(tool, (payload.tool_input ?? {}) as Payload)
+      return { ...p, denied: { at: now, tool, ...(target ? { target } : {}), ...(cut(payload.reason, PREVIEW_MAX) ? { reason: cut(payload.reason, PREVIEW_MAX) } : {}) } }
+    }
+    case 'InstructionsLoaded': {
+      const f = str(payload.file_path)?.split(/[\\/]/).filter(Boolean).slice(-2).join('/')
+      return f && !p.rules?.includes(f) ? { ...p, rules: [...(p.rules ?? []), f].slice(-RULES_MAX) } : p
+    }
+    case 'TaskCompleted': {
+      // TaskCreate/TaskUpdate calls already keep the list; this covers a teammate finishing its turn. TaskCreated adds nothing for the same reason.
+      const id = str(payload.task_id), subject = str(payload.task_subject)
+      const t = p.tasks.find(t => t.status !== 'completed' && (t.id === id || t.subject === subject))
+      return t ? { ...p, tasks: p.tasks.map(o => o === t ? { ...o, status: 'completed', doneAt: now, startedAt: o.startedAt ?? now } : o) } : p
     }
     case 'SwitchboardCovered':
       // Sent by the window that ran the check (coverage.ts), to itself and every mirror.

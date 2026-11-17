@@ -3,7 +3,7 @@ import type { LinkChip } from '@/lib/wait-links'
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import type { Ask, ChatProfile, Choice, DoneCheck, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, TaskRow } from '@/lib/hub-types'
 import { askChoice } from '@/lib/ask'
-import { limitLine, testsPrompt } from '@/lib/checks'
+import { hookNotes, limitLine, testsPrompt } from '@/lib/checks'
 import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
 import { projectName } from '@/lib/archive'
 import { INDEFINITE_LABEL, indefiniteHint, indefiniteOn } from '@/lib/indefinite'
@@ -195,6 +195,7 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
   const role = e?.current?.role
   const notes = [
     progress?.limited ? limitLine(limits, autoContinue) : '',
+    ...(progress ? hookNotes(progress) : []),
   ].filter(Boolean)
 
   const first = state === 'needs-you'

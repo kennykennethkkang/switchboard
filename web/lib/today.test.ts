@@ -15,7 +15,7 @@ test('sorts live chats into done today, needs you (with the question) and workin
   assert.deepEqual(t.approve, ['Hub AIs and Starred', 'Finished receipt'])
   assert.deepEqual(t.jev, { runs: 2, costUsd: 0.0184 })
   assert.deepEqual(t.needs, [{ name: 'Outfit picker copy', question: "Keep 'Closet' or rename it to 'Wardrobe'?" }, { name: 'Search filters', question: 'Approve this chat as finished?' }])
-  assert.deepEqual(t.working, ['Fix login redirect v4', 'Accurate Done state'])
+  assert.deepEqual(t.working, ['Fix login redirect v4', 'Fix login (worktree)', 'Accurate Done state'])
   assert.equal(t.openCostUsd, 1.84)
   const today = h.history[h.history.length - 1]
   assert.equal(t.tokens, today.written + today.io)

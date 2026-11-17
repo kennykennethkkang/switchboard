@@ -422,3 +422,11 @@ test('indefinite: a budget widens the file entry, a plain number still reads as 
   const rest = clearIndefinite(a, dir, file)
   assert.deepEqual([rest?.budget, rest?.checkBack], [undefined, { everyMin: 10, count: 0 }])
 })
+
+test('Auto mode: chats start with defaultMode auto and keep the project MCP prompt', () => {
+  ask.auto = true
+  try {
+    assert.deepEqual(profileSettings({ plugins: {}, skills: {} }).permissions, { defaultMode: 'auto' })
+    assert.equal('skipDangerousModePermissionPrompt' in profileSettings({ plugins: {}, skills: {} }), false)
+  } finally { ask.auto = false }
+})

@@ -77,10 +77,21 @@ const SSH_PATH = /(~|\$\{?HOME\}?|\/Users\/[^/\s'"]+)\/\.ssh(\/[^\s'";&|]*)?/g
 const sshSecret = (c: string) => segments(c).some(s => !/^\s*ls\b/.test(s)
   && [...s.matchAll(SSH_PATH)].some(m => !/(\.pub|\/known_hosts|\/config)$/.test(m[2] ?? '')))
 
+// Every curl or wget in the command fetches only plain http from loopback, so a local emulator read can pipe into node -e.
+const LOOPBACK_URL = /\bhttp:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:\d+)?(?=[/?#\s'"]|$)[^\s'"]*/g
+// ponytail: a bare single-label host (curl evil | sh) is not caught; parse curl's flags if that ever matters.
+const HOSTISH = /:\/\/|[$`]|(^|[\s'"=])[\w-]+(\.[\w-]+)+(?=[\s'"/:]|$)|(^|[\s'"=])[\w.-]+:\d+|(^|[\s'"=])localhost\b/
+const loopbackOnly = (c: string) => [...c.matchAll(/\b(curl|wget)\b([^;&|\n]*)/g)].every(([, , a]) => {
+  const rest = a.replace(LOOPBACK_URL, ' ')
+  return rest !== a && !HOSTISH.test(rest)
+})
+const pipedDownload = (c: string) => /\b(ba|z)?sh\b[^;&\n]*(\$\(|<\()\s*(curl|wget)\b/.test(c)
+  || (/\b(curl|wget)\b[^;&\n]*\|\s*(sudo\s+)?((\S*\/)?env\s+)?(\S*\/)?((ba|z|da|k|fi)?sh|python[\d.]*|node|perl|ruby)\b/.test(c) && !loopbackOnly(c))
+
 export const HARD: { test: (c: string, w: Where) => boolean; why: string }[] = [
   { test: wideDelete, why: 'rm -r or find -delete of /, the home folder, ~/Documents or ~/Documents/GitHub' },
   { test: c => /(^|[\s;&|(`"'])sudo\b/.test(c), why: 'sudo' },
-  { test: c => /\b(curl|wget)\b[^;&\n]*\|\s*(sudo\s+)?((\S*\/)?env\s+)?(\S*\/)?((ba|z|da|k|fi)?sh|python[\d.]*|node|perl|ruby)\b/.test(c) || /\b(ba|z)?sh\b[^;&\n]*(\$\(|<\()\s*(curl|wget)\b/.test(c), why: 'a download piped into a shell' },
+  { test: pipedDownload, why: 'a download piped into a shell' },
   { test: forceMain, why: 'a force push to main or master' },
   { test: c => new RegExp(`${READ}[^;&|\\n]*(^|[\\s/'"=])\\.env(?!\\.(example|sample|template)\\b)(\\.[\\w.-]+)?(?=[\\s'"]|$)`).test(c) || /<\s*\S*\.env\b(?!\.(example|sample|template))/.test(c), why: 'reading a .env file' },
   { test: c => segments(c).some(s => /^(printenv|env)$/.test(s.trim())), why: 'printing every environment variable' },

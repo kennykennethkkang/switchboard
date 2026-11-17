@@ -43,6 +43,7 @@ type RoleModel = Extract<HubCommand, { type: 'hub-role-model' }>['model']
 type CodexModel = Extract<HubCommand, { type: 'hub-role-codex' }>['model']
 type CodexEffort = Extract<HubCommand, { type: 'hub-role-codex' }>['effort']
 const CODEX_MODELS: Array<[string, string]> = [['default', 'Default (config.toml)'], ['gpt-6-luna', 'gpt-6-luna'], ['gpt-5.6-terra', 'gpt-5.6-terra'], ['gpt-5.6-luna', 'gpt-5.6-luna']]
+const CLAUDE_MODES: Array<[string, string]> = [['bypass', 'Bypass'], ['ask', 'Ask'], ['auto', 'Auto']]
 const CODEX_EFFORTS: Array<[string, string]> = [['default', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const EFFORTS: Array<[string, string]> = [['default', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const IDLE: Array<[string, string]> = [['5', 'After 5 min'], ['15', 'After 15 min'], ['30', 'After 30 min'], ['60', 'After 1 h'], ['never', 'Never']]
@@ -165,8 +166,8 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
     { section: 'Chats', label: `Pop-up notices in ${ed}`, hint: `Done, question, stuck and AWS sign-in notices pop up in ${ed} with a button. Off shows them in the status bar; the Mac notice, the Needs you strip and the phone push still come.`,
       control: <Switch label={`Pop-up notices in ${ed}`} on={sb.toasts === true} onChange={next => own('toasts', next)} /> },
-    { section: 'Chats', label: 'Ask before actions (Claude)', hint: 'Claude chats ask before running commands and tools. Off runs them without asking and also trusts project MCP servers. Applies to chats started or resumed after the change. Chats you reach from the Claude app (Remote Control) pick it up the next time Remote Control restarts.',
-      control: <Switch label="Ask before actions (Claude)" on={!!sb.askClaude} onChange={next => own('askClaude', next)} /> },
+    { section: 'Chats', label: 'Claude chat permissions', hint: 'Bypass runs commands and tools without asking and trusts project MCP servers. Ask brings the approval prompts back. Auto lets a classifier approve each call and block risky ones beyond the task; after 3 blocks in a row it asks you. Applies to chats started or resumed after the change. Chats you reach from the Claude app (Remote Control) pick it up the next time Remote Control restarts.',
+      control: <Pick label="Claude chat permissions" options={CLAUDE_MODES} value={sb.claudeMode ?? (sb.askClaude ? 'ask' : 'bypass')} onChange={v => own('claudeMode', v)} /> },
     { section: 'Chats', label: 'Ask before actions (Codex)', hint: 'Codex chats ask before running commands, inside its sandbox. Off runs them without asking or a sandbox. Applies to chats started or resumed after the change.',
       control: <Switch label="Ask before actions (Codex)" on={!!sb.askCodex} onChange={next => own('askCodex', next)} /> },
     { section: 'Chats', label: 'One window', hint: hub.windowTabs?.mac === false ? 'Needs macOS.' : `Every ${ed} window shows as a tab of one window; Merge all, Split all, Show and Pop out sit above the chat list. Quit and reopen ${ed} after changing it. Off puts your old setting back.`,

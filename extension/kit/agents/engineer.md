@@ -12,6 +12,8 @@ Timeouts: macOS has no `timeout`. Wrap every test run in `perl -e 'alarm 600; ex
 
 Secrets: code that sends repo files to a model lists secret-looking files (.env*, *.pem, *.key, id_*, *secret*, *credential*) and symlinks by name only, never their contents.
 
+Shared tree: never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use `git show HEAD:<path>` or `git worktree add <scratch>/base HEAD`.
+
 Usual kit: superpowers:test-driven-development, superpowers:systematic-debugging, superpowers:verification-before-completion, ponytail, context7, claude-api for anything Claude or Anthropic, run to see the app working, e2e-testing when writing Playwright tests, plus the bland and aws-core skills when the task touches them.
 
 <!-- switchboard generic copy -->

@@ -39,6 +39,9 @@ Switchboard is based on [Agent Flow](https://github.com/patoles/agent-flow) by S
 - **Auto AI pick.** New chat's Auto labels the task with a role through the project's Jev route preset (a word table when Jev is unsure or off): code roles go to Codex, the rest to Claude, and a notice says why.
 - **Discuss.** A chat can ask the other AI (Claude or Codex) through the `discuss` tool: a few headless, read-only rounds in the chat's folder that end with what the two agreed and disagreed on.
 - **Window colors.** Each VS Code window gets its own color, on its title bar, status bar and in Switchboard. The title bar color goes in the project's `.vscode/settings.json`; turn off `switchboard.colorTitleBar` to skip it.
+- **Own worktree.** When a Claude chat starts in a project that already has a live chat, New chat offers Own worktree, ticked. The chat runs in `<repo>/.claude/worktrees/<name>` on branch `worktree-<name>` (`claude --worktree`), shows under its project, and the Git panel's Merge back merges that branch into the main checkout and removes the worktree. It never pushes.
+- **Claude chat permissions.** Settings picks Bypass (default), Ask, or Auto, Claude Code's own classifier mode: no prompts, but a classifier blocks risky actions that go beyond what the chat was asked to do. Questions to you still ask in every mode.
+- **More chat events.** Cards note when a chat's context was compacted, when a tool call was denied and which rule files loaded, from the PostCompact, PermissionDenied and InstructionsLoaded hooks; TaskCompleted ticks the task list.
 
 ## What's included
 
@@ -48,7 +51,7 @@ Switchboard is based on [Agent Flow](https://github.com/patoles/agent-flow) by S
 - **Project skills.** Skills in the project's `.claude/skills` and `.agents/skills` are listed for that project's chats and can be turned off per chat like your own.
 - **Design references.** `design-md/<brand>/`, `docs/design/*.md` and a root `DESIGN.md` in the project. A pick takes up to three for UI work, and the chat is told their paths.
 - **Roles.** lead, researcher, engineer, qa, designer, ops and growth, from `extension/kit/agents`.
-- **The kit.** On start, the extension writes the working rules (`extension/kit/rules.md`) to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and the role agents to `~/.claude/agents`. `extension/kit/bundle.json` holds the rules version, so newer rules are never overwritten by older ones. A role file you edited is left alone, with the new copy saved beside it.
+- **The kit.** On start, the extension writes the working rules (`extension/kit/rules.md`) to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and the role agents to `~/.claude/agents`. `extension/kit/bundle.json` holds the rules version, so newer rules are never overwritten by older ones. Rules that only apply to some files (`extension/kit/rules/*.md`, with `paths:` frontmatter) go to `~/.claude/rules/switchboard-<name>.md` and load only when a chat touches a matching file; Codex gets them inline in AGENTS.md. Files there without Switchboard's mark are never touched. A role file you edited is left alone, with the new copy saved beside it.
 
 ## Built here
 

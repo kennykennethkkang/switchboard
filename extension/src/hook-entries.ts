@@ -41,6 +41,7 @@ export function isSwitchboardHook(entry: ClaudeHookEntry): boolean {
 export const HOOK_EVENTS = [
   'SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure',
   'SubagentStart', 'SubagentStop', 'Notification', 'PermissionRequest', 'Stop', 'StopFailure', 'SessionEnd',
+  'PostCompact', 'TaskCreated', 'TaskCompleted', 'PermissionDenied', 'InstructionsLoaded',
 ] as const
 
 /** The events Switchboard registers in ~/.codex/hooks.json. Their payloads (session_id, cwd, hook_event_name,

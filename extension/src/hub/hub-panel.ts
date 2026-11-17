@@ -54,7 +54,7 @@ import { installGuard } from './git-guard'
 import { addRepo, confirmApprove, fixBrief, held, line, needsApprove, readSweep, rescan, sweepAll } from './sweep'
 import { keyStatus, keyStore, keyTest, reconcileKeys, removeKey, saveKey, testKey } from './keys'
 import { envSetup, fillRecipes } from './env-setup'
-import { ghPath, git, gitOp, readRepo, repoRoot } from './git'
+import { cleanWorktree, endedWorktrees, ghPath, git, gitOp, readRepo, repoRoot } from './git'
 import { jevProject } from './jev-project'
 import { decideLearn, learnTick, usageOk } from './learn'
 import { showSummary } from './summary'
@@ -689,6 +689,7 @@ async function refreshChats(): Promise<void> {
       ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
   }), ais, doneChecks })
   startWaits()
+  for (const w of endedWorktrees(wtSeen, chats)) void cleanWorktree(w).catch(err => log.warn('Worktree cleanup failed:', err))
   refreshStages(chats)
   void syncTerminals(chats).catch(err => log.warn('Terminal list failed:', err))
   const ended = endedCodex(chats, codexTied, codexExited).filter(c => !hub.get().archive.some(a => a.sessionId === c.sessionId))
@@ -785,6 +786,9 @@ async function checkBacks(): Promise<void> {
   // Approved or ended chats drop the setting.
   for (const c of mine) if (cb[c.sessionId] && s.archive.some(a => a.sessionId === c.sessionId)) void setCheckBack(c.sessionId, null).catch(() => undefined)
 }
+
+// Worktree folders with a live chat, so one that ends is cleaned up.
+const wtSeen = new Map<string, number | undefined>()
 
 // To-do items started in this window (auto or Run), never auto-started again: a chat that keeps failing to start would loop.
 const autoTried = new Set<string>()
@@ -930,7 +934,8 @@ async function runGit(m: Extract<WebviewToExtensionMessage, { type: 'hub-git' }>
   mark({ busy: m.op })
   try {
     const { sessionId: _s, type: _t, ...cmd } = m
-    const r = await gitOp(root, cmd, await ghPath())
+    const inRoot = (cwd?: string) => !!cwd && (cwd === root || cwd.startsWith(root + path.sep))
+    const r = await gitOp(root, cmd, await ghPath(), hub.get().chats.some(c => c.live && inRoot(c.cwd)))
     if (r.open) openPage(r.open)
     mark({ busy: undefined, result: { text: r.text, ok: r.ok, at: Date.now() } })
     return r.ok || refuse(r.text)
@@ -1075,7 +1080,8 @@ function applyStatusBar(): void {
 /** Ask before actions, for the command builders; keepApp lives in app.nokeep, which the keeper reads. */
 function applyAsk(): void {
   const sb = hub.get().controls.switchboard
-  Object.assign(ask, { claude: !!sb.askClaude, codex: !!sb.askCodex, codexModel: sb.codexModel, codexEffort: sb.codexEffort })
+  const mode = sb.claudeMode ?? (sb.askClaude ? 'ask' : 'bypass')
+  Object.assign(ask, { claude: mode === 'ask', auto: mode === 'auto', codex: !!sb.askCodex, codexModel: sb.codexModel, codexEffort: sb.codexEffort })
 }
 
 const COMPANY_FILE = path.join(os.homedir(), '.claude', 'switchboard', 'company.json')
@@ -1122,7 +1128,7 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
     return
   }
   if (key === 'name') value = cleanName(value)
-  const valid = key === 'idleMinutes' ? value === null || [5, 15, 30, 60].includes(value as number) : key === 'pauseAt' ? value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 50 && value <= 100) : key === 'codexModel' ? value === null || (CODEX_MODELS as readonly unknown[]).includes(value) : key === 'codexEffort' ? value === null || (CODEX_EFFORTS as readonly unknown[]).includes(value) : key === 'name' || typeof value === 'boolean'
+  const valid = key === 'idleMinutes' ? value === null || [5, 15, 30, 60].includes(value as number) : key === 'pauseAt' ? value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 50 && value <= 100) : key === 'codexModel' ? value === null || (CODEX_MODELS as readonly unknown[]).includes(value) : key === 'codexEffort' ? value === null || (CODEX_EFFORTS as readonly unknown[]).includes(value) : key === 'claudeMode' ? value === 'bypass' || value === 'ask' || value === 'auto' : key === 'name' || typeof value === 'boolean'
   if (!valid) return
   if ((key === 'codexModel' || key === 'codexEffort') && value === null) value = undefined
   if (key === 'oneWindow') {
@@ -1139,7 +1145,7 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
   hub.set({ controls: { ...controls, switchboard } })
   if (key === 'statusBar') applyStatusBar()
   if (key === 'smartModelSwitch') saveCompany()
-  if (key === 'askClaude' || key === 'askCodex' || key === 'codexModel' || key === 'codexEffort') applyAsk()
+  if (key === 'askClaude' || key === 'claudeMode' || key === 'askCodex' || key === 'codexModel' || key === 'codexEffort') applyAsk()
   if (key === 'keepApp') keepApp(value !== false)
   if (key === 'syncRules') syncKit()
   if (key === 'showBrowsers') { const why = applyAgentBrowsers(value === true); if (why) log.warn(`Agent browsers: ${why}`) }
@@ -1230,7 +1236,7 @@ async function startChat(folder: string, m: Extract<WebviewToExtensionMessage, {
   const id = claude && (waits.length || m.group) ? randomUUID() : undefined
   // A Codex chat has no id yet: its waits are applied once bindCodexTerminals ties it.
   const text = [m.text, takeSeeded(folder)].filter(Boolean).join('\n\n') || m.text
-  const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits)
+  const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits, claude && m.worktree === true)
   if (!problem && id && waits.length) pendingWaits.set(id, { on: waits, at: Date.now() })
   return problem
 }

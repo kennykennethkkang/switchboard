@@ -65,6 +65,9 @@ export function NewChat({ hub, send, upload, split, onDone }: { hub: HubState; s
   const texts = useMemo(() => Object.fromEntries(hub.progress.map(p => [p.sessionId, (p.tasks.find(t => t.status === 'in_progress') ?? p.tasks[0])?.subject ?? ''])), [hub.progress])
   const targets = startTargets(hub.chats, project, ai)
   const [picked, setPicked] = useState<string[]>([])
+  // A second Claude chat in a busy project gets its own git worktree unless unticked.
+  const [own, setOwn] = useState(true)
+  const busyProject = !making && ai === 'claude' && targets.length > 0
   const waitOn = picked.filter(id => targets.some(c => c.sessionId === id))
   const after = startsAfter(waitOn.map(id => targets.find(c => c.sessionId === id)?.name || id.slice(0, 8)))
   const waitProps = { targets, progress: hub.progress, project, picked: waitOn, onToggle: (id: string) => setPicked(p => toggleId(p, id)) }
@@ -88,7 +91,7 @@ export function NewChat({ hub, send, upload, split, onDone }: { hub: HubState; s
   const startOne = (text: string, group?: string) => {
     // Seeded first: the extension adds the run to this chat's first prompt.
     if (slug && !group) send({ type: 'hub-pipeline-seed', slug, path, run: freshRun(slug) })
-    send({ type: 'hub-new-chat', path: repo ? '' : path, text, ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}), ...(waitOn.length ? { waitOn } : {}), ...(group ? { group } : {}) })
+    send({ type: 'hub-new-chat', path: repo ? '' : path, text, ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}), ...(waitOn.length ? { waitOn } : {}), ...(group ? { group } : {}), ...(busyProject && own ? { worktree: true } : {}) })
   }
   const finish = () => { clearText(); files.clear(); onDone() }
   const start = () => {
@@ -177,6 +180,8 @@ export function NewChat({ hub, send, upload, split, onDone }: { hub: HubState; s
             {pipes.map(p => <option key={p.slug} value={p.slug}>{p.name} ({p.stages} stages)</option>)}
           </select>
         </span>}
+        {busyProject && <label style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--hub-mute)', fontSize: 13 }} title="Starts in .claude/worktrees on its own branch, so it cannot clobber the other chat's files. Merge back on its Git card.">
+          <input type="checkbox" checked={own} onChange={e => setOwn(e.target.checked)} /> Own worktree</label>}
         <button type="button" className="hub-btn nc-tools" disabled={!path || making || ai !== 'claude'} onClick={askPick} title="Every plugin and skill starts on; turn any off for this chat">Tools</button>
         <AttachButton onFiles={files.add} />
         <button type="submit" className="hub-btn primary nc-start" disabled={!ready}>Start ⏎</button>

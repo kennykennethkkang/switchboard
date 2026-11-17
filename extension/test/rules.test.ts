@@ -7,7 +7,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { withCodex } from '../src/hub/roles'
-import { BLOCK_END, CODEX_MAP, BLOCK_START, GENERIC, HEADER, decideAgent, decideRules, rulesFile, rulesSha, shippedSha, syncRules, upsertBlock, withPointer } from '../src/hub/rules'
+import { BLOCK_END, CODEX_MAP, PATH_RULE_MARK, BLOCK_START, GENERIC, HEADER, decideAgent, decideRules, rulesFile, rulesSha, shippedSha, syncRules, upsertBlock, withPointer } from '../src/hub/rules'
 
 const RULES = '# Working style\n\nBe brief.\n'
 const V = '2026-10-28T10:00:00Z'
@@ -250,5 +250,61 @@ describe('codex tool map', () => {
     assert.ok(!rulesFile(RULES, V).includes('Codex tool map'))
     assert.equal(decideRules(codex, RULES, V, false, [], CODEX_MAP).action, 'skip')
     assert.equal(decideRules(rulesFile(RULES, V), RULES, '2026-11-01T00:00:00Z', false, [], CODEX_MAP).action, 'write')
+  })
+})
+
+describe('path rules', () => {
+  const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sb-prules-'))
+  const PR = '---\npaths:\n  - "**/*.test.*"\n---\n\nUse the repo runner.\n'
+  const kit = (dir: string) => {
+    fs.mkdirSync(path.join(dir, 'agents'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'rules'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'rules.md'), RULES)
+    fs.writeFileSync(path.join(dir, 'rules', 'tests.md'), PR)
+    fs.writeFileSync(path.join(dir, 'bundle.json'), JSON.stringify({ rulesVersion: V }))
+  }
+
+  it('installs them beside CLAUDE.md, marked, and Codex gets the full text', () => {
+    const home = tmp(), k = tmp()
+    kit(k)
+    fs.mkdirSync(path.join(home, '.claude'))
+    fs.mkdirSync(path.join(home, '.codex'))
+    syncRules({ home, kit: k, write: true })
+    const got = fs.readFileSync(path.join(home, '.claude', 'rules', 'switchboard-tests.md'), 'utf8')
+    assert.ok(got.startsWith('---\npaths:'))
+    assert.ok(got.includes(PATH_RULE_MARK))
+    assert.ok(!fs.readFileSync(path.join(home, '.claude', 'CLAUDE.md'), 'utf8').includes('Use the repo runner'))
+    const codex = fs.readFileSync(path.join(home, '.codex', 'AGENTS.md'), 'utf8')
+    assert.ok(codex.includes('Use the repo runner.') && !codex.includes('paths:'))
+  })
+
+  it('removes ours that left the kit, never one without the mark', () => {
+    const home = tmp(), k = tmp()
+    kit(k)
+    const dir = path.join(home, '.claude', 'rules')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'switchboard-old.md'), `---\npaths:\n  - "x"\n---\n${PATH_RULE_MARK}\nold\n`)
+    fs.writeFileSync(path.join(dir, 'switchboard-mine.md'), 'hand written\n')
+    fs.writeFileSync(path.join(dir, 'style.md'), 'mine\n')
+    syncRules({ home, kit: k, write: true })
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['style.md', 'switchboard-mine.md', 'switchboard-tests.md'])
+  })
+
+  it('does not overwrite a hand written file of the same name', () => {
+    const home = tmp(), k = tmp()
+    kit(k)
+    const dir = path.join(home, '.claude', 'rules')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'switchboard-tests.md'), 'mine\n')
+    syncRules({ home, kit: k, write: true })
+    assert.equal(fs.readFileSync(path.join(dir, 'switchboard-tests.md'), 'utf8'), 'mine\n')
+  })
+
+  it('dry mode writes none', () => {
+    const home = tmp(), k = tmp()
+    kit(k)
+    fs.mkdirSync(path.join(home, '.claude'))
+    syncRules({ home, kit: k, write: false })
+    assert.ok(!fs.existsSync(path.join(home, '.claude', 'rules')))
   })
 })

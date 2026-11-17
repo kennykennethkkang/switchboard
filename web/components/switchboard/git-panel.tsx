@@ -264,6 +264,8 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
         {head && (!r.upstream || r.ahead > 0) && <button type="button" className="hub-link" disabled={busy} title="git reset --soft HEAD~1: the commit's changes stay, staged"
           onClick={() => setAsk({ text: `Undo the last commit, "${head.subject}"? Its changes stay as staged files.`, yes: 'Undo', danger: true, cmd: { op: 'undo', confirmed: true } })}>Undo last commit</button>}
         {r.files.length > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'stash' })} title="git stash push -u">Stash</button>}
+        {r.worktree && may('merge-back') && <button type="button" className="hub-link" disabled={busy} title="git merge into the main checkout, then remove this worktree. Never pushes."
+          onClick={() => setAsk({ text: `Merge ${r.branch} into the main checkout? The worktree is removed too unless a chat is still running in it. Nothing is pushed.`, yes: 'Merge back', cmd: { op: 'merge-back', confirmed: true } })}>Merge back</button>}
         {r.stashes > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'pop' })} title="git stash pop">Pop stash ({r.stashes})</button>}
         {checked.length > 0 && may('discard') && <button type="button" className="hub-link" disabled={busy} style={{ color: 'var(--hub-red)' }}
           onClick={() => setAsk({ text: `Discard the changes in ${plural(checked.length, 'checked file')}? New files are deleted. This cannot be undone.`, yes: 'Discard', danger: true, cmd: { op: 'discard', files: checked, confirmed: true } })}>Discard checked ({checked.length})</button>}

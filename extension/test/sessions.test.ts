@@ -75,6 +75,8 @@ describe('rcServerCommand', () => {
     assert.equal(rcServerCommand(), "claude remote-control --name 'Mac' --spawn same-dir --permission-mode bypassPermissions")
     ask.claude = true
     try { assert.equal(rcServerCommand(), "claude remote-control --name 'Mac' --spawn same-dir --permission-mode default") } finally { ask.claude = false }
+    ask.auto = true
+    try { assert.ok(rcServerCommand().endsWith('--permission-mode auto')) } finally { ask.auto = false }
     assert.ok(new RegExp(rcPattern(RC_NAME)).test(rcServerCommand().replace(/'/g, '')))
   })
 })

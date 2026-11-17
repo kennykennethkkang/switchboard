@@ -1,5 +1,5 @@
 /** The tests, CI and usage-limit cards' words, from hub data alone. */
-import type { CiRun, Limit, TestRun } from './hub-types'
+import type { ChatProgress, CiRun, Limit, TestRun } from './hub-types'
 import { resetAt, resetText } from './limits'
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
@@ -35,4 +35,14 @@ export function limitLine(limits: Limit[], autoContinue: boolean, now = Date.now
   const at = Math.max(...limits.filter(l => l.percentUsed >= 100).map(l => resetAt(l.resetsAt) ?? NaN).filter(Number.isFinite))
   const when = Number.isFinite(at) ? `Resets ${resetText(at, now)}. ` : ''
   return when + (autoContinue ? 'Auto-continue is on, so Claude Code picks it up then.' : `Auto-continue is off; Switchboard sends it again a minute after${when ? '' : ' the reset'}.`)
+}
+
+/** Card note parts from the newer hook events: a compaction, the last auto-mode denial, the rule files loaded. */
+export function hookNotes(p: Pick<ChatProgress, 'compacted' | 'denied' | 'rules'>): string[] {
+  const d = p.denied
+  return [
+    p.compacted ? `Context compacted (${p.compacted.trigger})` : '',
+    d ? ['Denied:', d.tool, d.target, d.reason && `(${d.reason})`].filter(Boolean).join(' ') : '',
+    p.rules?.length ? `${p.rules.length} rule file${p.rules.length > 1 ? 's' : ''} loaded: ${p.rules.join(', ')}` : '',
+  ].filter(Boolean)
 }

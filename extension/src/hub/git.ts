@@ -405,6 +405,47 @@ export async function readMerge(root: string, branch: string, remote: string, pr
 
 export const repoRoot = async (cwd: string) => { const r = await git(cwd, ['rev-parse', '--show-toplevel']); return r.ok ? r.out.trim() : undefined }
 
+/** The worktree's folder and its main checkout, or undefined in a plain checkout (git dir equals the common dir). */
+async function worktreeOf(root: string): Promise<{ wt: string; main: string } | undefined> {
+  const r = await git(root, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel'])
+  const [dir, common, top] = r.out.trim().split('\n')
+  return r.ok && top && dir !== common && path.basename(common) === '.git' ? { wt: top, main: path.dirname(common) } : undefined
+}
+
+const WT_DIR = /^(.*[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)/
+
+const WT_IDLE_MS = 10 * 60_000
+const realOf = (p: string) => { try { return fs.realpathSync.native(p) } catch { return p } }
+
+/**
+ * Worktree folders that have had no live chat for 10 minutes straight. seen carries the state between calls:
+ * a worktree maps to when it was first seen without a live chat, or undefined while one is live. Keys are real paths.
+ */
+export function endedWorktrees(seen: Map<string, number | undefined>, chats: { live: boolean; cwd: string }[], now = Date.now()): string[] {
+  const live = new Set(chats.flatMap(c => { const w = c.live ? WT_DIR.exec(c.cwd)?.[1] : undefined; return w ? [realOf(w)] : [] }))
+  const ended: string[] = []
+  for (const [w, since] of seen) {
+    if (live.has(w)) continue
+    if (since === undefined) seen.set(w, now)
+    else if (now - since >= WT_IDLE_MS) { ended.push(w); seen.delete(w) }
+  }
+  for (const w of live) seen.set(w, undefined)
+  return ended
+}
+
+/** Removes a worktree whose branch is already in the main checkout's HEAD and has no changes; anything else stays. Never forced. */
+export async function cleanWorktree(wt: string): Promise<boolean> {
+  const w = await worktreeOf(wt)
+  if (!w || !fs.existsSync(wt)) return false
+  const branch = (await git(wt, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
+  if (!branch || branch === 'HEAD') return false
+  if ((await status(wt)).files.length) return false
+  if (!(await git(w.main, ['merge-base', '--is-ancestor', branch, 'HEAD'])).ok) return false
+  if (!(await git(w.main, ['worktree', 'remove', w.wt])).ok) return false
+  await git(w.main, ['branch', '-d', branch])
+  return true
+}
+
 export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView, 'sessionId' | 'busy' | 'result'>> {
   const [s, heads, log, stash] = await Promise.all([status(root), branches(root), git(root, ['log', '-15', '--format=%h%x09%s%x09%ar']), git(root, ['stash', 'list', '--format=%gd'])])
   const remote = (s.branch && (await config(root, `branch.${s.branch}.remote`))) || 'origin'
@@ -424,6 +465,7 @@ export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView
   return {
     merge, ...(lanes ? { lanes } : {}), ...(outgoing ? { outgoing } : {}), ship,
     ...(p ? { pending: { text: leftovers(p.text, ship.files), last: p.last, at: p.at } } : {}),
+    ...(await worktreeOf(root) ? { worktree: true } : {}),
     name: path.basename(root), branch: s.branch, upstream: s.upstream, ahead: s.ahead, behind: s.behind, files: s.files, branches: heads, sync: syncAction(s),
     log: log.out.split('\n').filter(Boolean).map(l => { const [hash, subject, when] = l.split('\t'); return { hash, subject: subject ?? '', when: when ?? '' } }),
     stashes: stash.out.split('\n').filter(Boolean).length, github, pr, ...(ci ? { ci } : {}), at: Date.now(),
@@ -468,12 +510,13 @@ async function unparkFiles(moved: Parked[]): Promise<void> {
 
 /** One button press. Refuses rather than guesses; confirmed comes from the in-page confirm. */
 /** Holds off an update reload while the op runs. */
-export async function gitOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
+/** inUse: a live chat runs in this folder (merge-back then keeps the worktree). */
+export async function gitOp(root: string, c: GitCmd, gh?: string, inUse = false): Promise<GitResult> {
   const release = hold()
-  try { return await runOp(root, c, gh) } finally { release() }
+  try { return await runOp(root, c, gh, inUse) } finally { release() }
 }
 
-async function runOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
+async function runOp(root: string, c: GitCmd, gh?: string, inUse = false): Promise<GitResult> {
   // Any op may change the branch's PR and run; look again after it.
   prs.clear()
   runs.clear()
@@ -656,6 +699,28 @@ async function runOp(root: string, c: GitCmd, gh?: string): Promise<GitResult> {
       // -d, not -D: git keeps a branch with unmerged commits.
       const r = await git(root, ['branch', '-d', b])
       return r.ok ? { ok: true, text: `Deleted ${b}` } : no(why(r))
+    }
+    case 'merge-back': {
+      if (!c.confirmed) return no('Confirm the merge first')
+      const w = await worktreeOf(root)
+      if (!w) return no('This is not a worktree, so there is nothing to merge back')
+      if (!s.branch) return no('The worktree is on a detached HEAD, so nothing was merged')
+      if (s.files.length) return no(`Commit the ${plural(s.files.length, 'changed file')} in the worktree first`)
+      const head = (await git(w.main, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
+      if (!head || head === 'HEAD') return no('The main checkout is on a detached HEAD, so nothing was merged')
+      const m = await git(w.main, ['merge', '--no-edit', s.branch], SLOW)
+      if (!m.ok) {
+        const conflict = /CONFLICT/.test(m.out)
+        await git(w.main, ['merge', '--abort'])
+        return no(conflict ? `Merge conflict merging ${s.branch} into ${head}. Nothing was changed; merge ${head} into the worktree branch and fix it there first` : why(m))
+      }
+      // A chat still running there would lose its cwd, so the worktree and branch stay until it ends.
+      if (inUse) return { ok: true, text: `Merged; worktree kept while the chat runs. ${s.branch} went into ${head}, nothing was pushed` }
+      // Never forced: a worktree git will not remove stays, with the merge already done.
+      const rm = await git(w.main, ['worktree', 'remove', w.wt])
+      if (!rm.ok) return { ok: true, text: `Merged ${s.branch} into ${head}, but the worktree stayed: ${why(rm)}` }
+      await git(w.main, ['branch', '-d', s.branch])
+      return { ok: true, text: `Merged ${s.branch} into ${head} and removed the worktree. Nothing was pushed` }
     }
     case 'stash': {
       if (!s.files.length) return no('Nothing to stash')

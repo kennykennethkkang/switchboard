@@ -6,7 +6,7 @@
  * hides user and project skills, plugin skills go with their plugin. Mods are never touched.
  * Design references (assets) left on are named to the chat in its appended system note, to read before UI work.
  * The bundled design library (source 'library', absolute paths) is the opposite: off unless turned on by hand.
- * Every chat gets --settings with bypassPermissions (or default with Ask before actions on), so a project's own mode cannot change it.
+ * Every chat gets --settings with bypassPermissions (default with Ask before actions on, auto with Auto chosen), so a project's own mode cannot change it.
  * Bypass also approves project .mcp.json servers and skips the bypass warning; asking keeps both prompts.
  */
 import * as fs from 'fs'
@@ -107,6 +107,8 @@ export function toolsNote(p: ChatProfile, held?: Set<string>): string {
 // LISTING rides here so a resume rewrites old settings files with it too.
 const mode = () => ask.claude
   ? { ...LISTING, permissions: { defaultMode: 'default' } }
+  : ask.auto
+  ? { ...LISTING, permissions: { defaultMode: 'auto' } }
   : { ...LISTING, permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
 
 export const profileSettings = (p: ChatProfile) => ({

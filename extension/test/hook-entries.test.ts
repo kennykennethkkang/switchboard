@@ -97,6 +97,12 @@ describe('hasSwitchboardHook', () => {
   })
 })
 
+describe('HOOK_EVENTS', () => {
+  it('registers the five newer events', () => {
+    for (const e of ['PostCompact', 'TaskCreated', 'TaskCompleted', 'PermissionDenied', 'InstructionsLoaded']) assert.ok((HOOK_EVENTS as readonly string[]).includes(e), e)
+  })
+})
+
 describe('missingHookEvents', () => {
   it('names events that lack our hook, so an older install gets new ones without touching the rest', () => {
     const ours = () => ({ hooks: [{ type: 'command', command: HOOK_CMD }] })

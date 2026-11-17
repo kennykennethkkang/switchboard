@@ -1,7 +1,7 @@
 /** The tests, CI and usage-limit cards' words, from hub data with no model call. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ciLine, ciState, limitLine, testsLine, testsPrompt } from './checks'
+import { ciLine, ciState, hookNotes, limitLine, testsLine, testsPrompt } from './checks'
 import type { CiRun, TestRun } from './hub-types'
 
 const t: TestRun = { command: 'npm test', ok: false, at: 1, failed: 2, total: 538, first: 'rcInList ignores a reused pid', tail: ['✖ rcInList ignores a reused pid', 'ℹ fail 2'] }
@@ -47,4 +47,11 @@ test('limitLine: the used-up limit\'s reset and who continues', () => {
   assert.equal(limitLine([{ kind: 'seven_day', percentUsed: 100, resetsAt: at(9, 31) }], true, now), 'Resets Sat 9:30 AM. Auto-continue is on, so Claude Code picks it up then.')
   assert.equal(limitLine([{ kind: 'five_hour', percentUsed: 100, resetsAt: String(new Date(2026, 9, 29, 14, 30).getTime() / 1000) }], true, now), 'Resets 2:30 PM. Auto-continue is on, so Claude Code picks it up then.')
   assert.equal(limitLine([], false, now), 'Auto-continue is off; Switchboard sends it again a minute after the reset.')
+})
+
+test('hookNotes: compacted, denied and rule-file lines', () => {
+  assert.deepEqual(hookNotes({}), [])
+  assert.deepEqual(hookNotes({ compacted: { at: 1, trigger: 'auto' } }), ['Context compacted (auto)'])
+  assert.deepEqual(hookNotes({ denied: { at: 1, tool: 'Bash', target: 'rm -rf /tmp/b', reason: '[Destruction]' } }), ['Denied: Bash rm -rf /tmp/b ([Destruction])'])
+  assert.deepEqual(hookNotes({ rules: ['r/CLAUDE.md', 'rules/a.md'] }), ['2 rule files loaded: r/CLAUDE.md, rules/a.md'])
 })

@@ -33,7 +33,7 @@ Check: `<one shell command that exits 0 only when the goal holds>`
 
 - Keep every behavior the user named; do not trade any away for a smaller goal.
 - The Check line is one command run from the project folder, for example a test file you add for these functions plus the project's own suite. Write those tests first; they fail until the work is done. Leave the line out only when no command can show it (pure visual work), and then say so in Decisions.
-- Under Run indefinitely the usage-meter mod reads this file at every stop: a failing Check sends another round with its output, a passing one ends the run, and the done line alone cannot end it while the Check fails. Paths and the Check run from the project root. A gate set in the hub wins over the Check line.
+- Write the command as `Check: \`one shell command\`` on its own line. Outside Run indefinitely, done-check runs it from the project root at each main chat stop and holds the stop while it fails, for at most two blocks per turn. Under Run indefinitely, usage-meter runs it from the project root: a failing Check sends another round with its output, a passing one ends the run, and the done line alone cannot end it while the Check fails. A gate set in the hub wins over the Check line.
 
 ## 2. Questions
 

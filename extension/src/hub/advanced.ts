@@ -21,7 +21,12 @@ export function keepSwitchboardDir(project: string): void {
 }
 
 /** The exclude line alone, for every repo a chat may work in (chat notes and stage runs live there). */
-export function excludeSwitchboard(project: string): void {
+export const excludeSwitchboard = (project: string) => excludeLine(project, '.switchboard')
+
+/** Own-worktree chats live in <project>/.claude/worktrees; keep them out of git too. */
+export const excludeWorktrees = (project: string) => excludeLine(project, '.claude/worktrees')
+
+function excludeLine(project: string, line: string): void {
   const git = path.join(project, '.git')
   const st = fs.statSync(git, { throwIfNoEntry: false })
   if (!st) return
@@ -34,9 +39,9 @@ export function excludeSwitchboard(project: string): void {
   }
   let text = ''
   try { text = fs.readFileSync(exclude, 'utf8') } catch { /* none yet */ }
-  if (text.split('\n').some(l => ['.switchboard', '.switchboard/', '/.switchboard', '/.switchboard/'].includes(l.trim()))) return
+  if (text.split('\n').some(l => [line, `${line}/`, `/${line}`, `/${line}/`].includes(l.trim()))) return
   fs.mkdirSync(path.dirname(exclude), { recursive: true })
-  fs.writeFileSync(exclude, `${text}${text && !text.endsWith('\n') ? '\n' : ''}.switchboard/\n`)
+  fs.writeFileSync(exclude, `${text}${text && !text.endsWith('\n') ? '\n' : ''}${line}/\n`)
 }
 
 const STATUS = new Set(['todo', 'doing', 'done', 'redo'])

@@ -39,7 +39,7 @@ export type HubCommand =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean }
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }

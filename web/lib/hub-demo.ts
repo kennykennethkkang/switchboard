@@ -124,6 +124,7 @@ function baseHub(now: number): HubState {
       { pid: 1, sessionId: 'd-work', ai: 'codex', takes: true, name: 'Fix login redirect v4', chain: 'Fix login redirect', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [], elapsedMs: 95 * 60e3, costUsd: 3.4, budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' }, checkBack: { everyMin: 30, count: 3 } },
       { pid: 2, sessionId: 'd-done', takes: true, name: 'Hub AIs and Starred', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
       { pid: 3, sessionId: 'd-ask', takes: true, name: 'Outfit picker copy', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
+      { pid: 8, sessionId: 'd-tree', takes: true, name: 'Fix login (worktree)', cwd: '/Users/k/GitHub/Armasu/.claude/worktrees/fix-login', link: '', live: true, why: [] },
       { pid: 7, sessionId: 'd-close', takes: true, name: 'Search filters', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
       // Started from one split message; d-wrap also waits on d-almost (links).
       { pid: 6, sessionId: 'd-almost', takes: true, name: 'Finished receipt', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [], group: 'g-demo' },
@@ -250,6 +251,10 @@ function baseHub(now: number): HubState {
           questions: [{ header: 'Finish', question: 'Approve this chat as finished?', options: ['Approve', 'Send back'] }] } },
       { sessionId: 'd-idle', cwd: '/Users/k/GitHub/claude-mods', state: 'idle', startedAt: now - 90 * 60e3, at: now - 30 * 60e3,
         roles: [], tasks: [{ id: '1', subject: 'Drop old presets', status: 'pending' }] },
+      { sessionId: 'd-tree', cwd: '/Users/k/GitHub/Armasu/.claude/worktrees/fix-login', state: 'working', startedAt: now - 20 * 60e3, at: now - 10e3,
+        roles: [], tasks: [{ id: '1', subject: 'Fix the login redirect on its own branch', status: 'in_progress' }],
+        compacted: { at: now - 6 * 60e3, trigger: 'auto' }, denied: { at: now - 3 * 60e3, tool: 'Bash', target: 'rm -rf node_modules', reason: 'outside the task' },
+        rules: ['.claude/rules.md', 'kit/rules.md', 'Armasu/CLAUDE.md'] },
     ],
     ais: [
       { id: 'claude', name: 'Claude Code', installed: true, chats: 3 },
@@ -431,7 +436,7 @@ const CHANGES: Record<string, ChangedFile[]> = {
 const demoRepo = (h: HubState, sessionId: string): RepoView => {
   const cwd = h.chats.find(x => x.sessionId === sessionId)?.cwd ?? ''
   const files = (CHANGES[sessionId] ?? []).map(f => ({ path: f.path, status: f.status }))
-  const branch = sessionId === 'd-done' ? 'main' : 'fix/login-redirect'
+  const branch = sessionId === 'd-done' ? 'main' : sessionId === 'd-tree' ? 'worktree-fix-login' : 'fix/login-redirect'
   return {
     sessionId, name: cwd.split('/').pop() ?? '', branch, upstream: `origin/${branch}`, ahead: 2, behind: 0, files, ship: { files: files.map(f => f.path), kept: [] },
     branches: [branch, 'main', 'design/outfit-copy'].filter((b, i, a) => a.indexOf(b) === i), sync: { kind: 'push', label: 'Push 2' },
@@ -439,6 +444,7 @@ const demoRepo = (h: HubState, sessionId: string): RepoView => {
     stashes: 0, github: `https://github.com/kennykennethkkang/${cwd.split('/').pop()}`, at: Date.now(),
     ...(sessionId === 'd-work' ? demoMerge(Date.now()) : {}),
     ...(sessionId === 'd-done' ? demoLanes(Date.now()) : {}),
+    ...(sessionId === 'd-tree' ? { worktree: true, branch: 'worktree-fix-login', upstream: undefined, branches: ['worktree-fix-login', 'main'], sync: { kind: 'publish' as const, label: 'Publish branch' } } : {}),
   }
 }
 

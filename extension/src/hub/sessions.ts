@@ -59,7 +59,7 @@ export const rcTargets = (rows: ChatRow[]) => rows.filter(r => r.live && !r.brid
 export const RC_NAME = 'Mac'
 
 /** same-dir: phone chats start in the GitHub folder and can work in any repo under it. */
-export const rcServerCommand = () => `claude remote-control --name '${RC_NAME}' --spawn same-dir --permission-mode ${ask.claude ? 'default' : 'bypassPermissions'}`
+export const rcServerCommand = () => `claude remote-control --name '${RC_NAME}' --spawn same-dir --permission-mode ${ask.claude ? 'default' : ask.auto ? 'auto' : 'bypassPermissions'}`
 
 /** `pgrep -f` pattern for a Remote Control server named `name`, as the kit's LaunchAgent starts it. */
 export const rcPattern = (name: string) => `remote-control --name ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`

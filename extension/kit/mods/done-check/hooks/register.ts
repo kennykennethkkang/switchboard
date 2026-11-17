@@ -203,6 +203,30 @@ async function taskList($: EngineInterface, owner: string) {
   return { all, mine: new Map(all[owner] ?? []) }
 }
 
+async function goalCheck($: EngineInterface, cwd: string, edit: string): Promise<{ command: string; output: string } | undefined> {
+  const id = await $.session.id()
+  const cacheKey = `goal-check-passed:${id}`
+  if (await $.store.get(cacheKey).catch(() => undefined) === edit) return
+  const root = await Promise.resolve().then(() => $.session.root()).catch(() => cwd)
+  const home = (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? ''
+  let indefinite: Record<string, unknown> = {}
+  try { indefinite = JSON.parse(String(await $.fs.read(`${home}/.claude/switchboard/indefinite.json`))) ?? {} } catch { /* missing switch means off */ }
+  if (Object.hasOwn(indefinite, id)) return
+  const goal = await $.fs.read(`${root}/.switchboard/goals/${id}.md`).then(String, () => undefined)
+  const command = goal?.match(/^Check: `([^`\n]+)`/m)?.[1].trim()
+  if (!command) return
+  try {
+    const r = await $.process.run(['/bin/sh', '-c', command], { cwd: root, timeoutMs: 600_000 })
+    if (r.exitCode === 0) {
+      await $.store.set(cacheKey, edit).catch(() => undefined)
+      return
+    }
+    return { command, output: `${r.stdout}\n${r.stderr}`.trim().split('\n').slice(-20).join('\n') }
+  } catch (err) {
+    return { command, output: `check did not finish: ${err instanceof Error ? err.message : String(err)}` }
+  }
+}
+
 async function tail($: EngineInterface, path: string) {
   const r = await $.process.run(['tail', '-c', String(TAIL_BYTES), path]).catch(() => undefined)
   if (r?.exitCode === 0) return r.stdout
@@ -224,11 +248,17 @@ async function writeStatus($: EngineInterface, s: Status) {
 async function onStop($: EngineInterface, e: { session_id: string; cwd?: string; transcript_path: string; stop_hook_active: boolean; last_assistant_message?: string }, agent?: string) {
   const owner = agent ? `${e.session_id}:${agent}` : e.session_id
   const { t, v } = await verdict($, e.transcript_path, owner, e.last_assistant_message ?? '', e.cwd, !agent)
+  const failedGoal = agent || !t.edited
+    ? undefined
+    : await goalCheck($, e.cwd ?? '', `${t.key}:${t.lastEdit}`).catch(() => undefined)
   const turn = `${owner}:${t.key}`
-  const n = await blockCount($, turn, n => v.block && n < MAX_BLOCKS)
-  const block = v.block && n < MAX_BLOCKS
-  await writeStatus($, { session: e.session_id, agent, verified: v.verified, state: v.verified ? 'verified' : v.waiting ? 'waiting' : 'unverified', missing: v.missing, edited: t.edited, blocks: n + (block ? 1 : 0), at: Date.now() })
-  return block ? `done-check: not finished yet. ${v.reason}` : undefined
+  const shouldBlock = v.block || Boolean(failedGoal)
+  const n = await blockCount($, turn, n => shouldBlock && n < MAX_BLOCKS)
+  const block = shouldBlock && n < MAX_BLOCKS
+  const missing = failedGoal ? [...v.missing, `goal Check failed: ${failedGoal.command}`] : v.missing
+  await writeStatus($, { session: e.session_id, agent, verified: v.verified && !failedGoal, state: failedGoal ? 'unverified' : v.verified ? 'verified' : v.waiting ? 'waiting' : 'unverified', missing, edited: t.edited, blocks: n + (block ? 1 : 0), at: Date.now() })
+  const reason = failedGoal ? `goal Check failed: ${failedGoal.command}. Last output:\n${failedGoal.output}` : v.reason
+  return block ? `done-check: not finished yet. ${reason}` : undefined
 }
 
 const closing = (e: Record<string, unknown>) => e.tool === 'AskUserQuestion' && !e.agentId

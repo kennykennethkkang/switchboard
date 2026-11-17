@@ -99,6 +99,21 @@ function retuned(bundled: string, mine: string): string {
 export type SyncResult = { note: string; ready: Record<AiId, boolean>; changed: string[] }
 type Bundle = { rulesVersion: string; generic?: boolean; history?: Record<string, string[]> }
 
+/** Marks a ~/.claude/rules file Switchboard wrote; a file without it is the user's and stays untouched. */
+export const PATH_RULE_MARK = '<!-- switchboard path rule: generated from kit/rules; edit the kit copy -->'
+const RULE_PREFIX = 'switchboard-'
+
+/** kit/rules/<topic>.md: paths: frontmatter, then the rule text. Claude Code loads it only when a matching file is read. */
+function pathRules(kit: string): { name: string; installed: string; body: string }[] {
+  const dir = path.join(kit, 'rules')
+  if (!fs.existsSync(dir)) return []
+  return fs.readdirSync(dir).filter(n => n.endsWith('.md')).sort().map(n => {
+    const text = fs.readFileSync(path.join(dir, n), 'utf8').replace(/\r\n/g, '\n')
+    const head = /^---\n[\s\S]*?\n---\n/.exec(text)?.[0] ?? ''
+    return { name: `${RULE_PREFIX}${n}`, installed: `${head}${PATH_RULE_MARK}\n${text.slice(head.length)}`, body: text.slice(head.length).replace(/^\n+/, '') }
+  })
+}
+
 const read = (p: string) => { try { return fs.readFileSync(p, 'utf8') } catch { return undefined } }
 
 /** write false: decide only, for a dry run. Tools whose folder is missing are left alone. */
@@ -110,10 +125,13 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
   // Hermes has no rules file here, so its chats always get the pointer.
   const ready = { claude: false, codex: false, hermes: false }
   const put = (p: string, text: string) => { if (o.write) fs.writeFileSync(p, text) }
+  const prules = pathRules(o.kit)
   const targets = [['claude', path.join(o.home, '.claude', 'CLAUDE.md')], ['codex', path.join(o.home, '.codex', 'AGENTS.md')]] as const
   for (const [tool, file] of targets) {
     if (!fs.existsSync(path.dirname(file))) continue
-    const d = decideRules(read(file), rules, bundle.rulesVersion, bundle.generic, shipped, tool === 'codex' ? CODEX_MAP : '')
+    // Codex has no path rules, so it gets them appended in full.
+    const full = tool === 'codex' ? rules + prules.map(r => `\n${r.body}`).join('') : rules
+    const d = decideRules(read(file), full, bundle.rulesVersion, bundle.generic, shipped, tool === 'codex' ? CODEX_MAP : '')
     if (d.why === 'personal copy') personal.push(path.basename(file))
     if (d.why === 'block broken') { broken.push(path.basename(file)); continue }
     try {
@@ -123,6 +141,21 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
   }
   const claude = path.join(o.home, '.claude')
   if (fs.existsSync(claude)) {
+    const rdir = path.join(claude, 'rules')
+    try {
+      const keep = new Set(prules.map(r => r.name))
+      for (const r of prules) {
+        const dest = path.join(rdir, r.name), mine = read(dest)
+        if (mine === r.installed) continue
+        if (mine !== undefined && !mine.includes(PATH_RULE_MARK)) { personal.push(r.name); continue }
+        if (o.write) fs.mkdirSync(rdir, { recursive: true })
+        put(dest, r.installed); changed.push(`rules/${r.name}`)
+      }
+      for (const n of fs.existsSync(rdir) ? fs.readdirSync(rdir) : []) {
+        if (!n.startsWith(RULE_PREFIX) || !n.endsWith('.md') || keep.has(n)) continue
+        if (read(path.join(rdir, n))?.includes(PATH_RULE_MARK)) { if (o.write) fs.rmSync(path.join(rdir, n)); changed.push(`rules/${n} (removed)`) }
+      }
+    } catch { failed.push('rules') }
     const dir = path.join(claude, 'agents')
     try {
       if (o.write) fs.mkdirSync(dir, { recursive: true })
@@ -155,7 +188,7 @@ export function syncRules(o: { home: string; kit: string; write: boolean }): Syn
 /** The kit's whole content, so activation syncs once per change of it. */
 export function kitHash(kit: string): string {
   const h = crypto.createHash('sha256')
-  for (const f of ['rules.md', 'bundle.json', ...fs.readdirSync(path.join(kit, 'agents')).sort().map(n => `agents/${n}`)]) h.update(f).update(fs.readFileSync(path.join(kit, f)))
+  for (const f of ['rules.md', 'bundle.json', ...(fs.existsSync(path.join(kit, 'rules')) ? fs.readdirSync(path.join(kit, 'rules')).sort().map(n => `rules/${n}`) : []), ...fs.readdirSync(path.join(kit, 'agents')).sort().map(n => `agents/${n}`)]) h.update(f).update(fs.readFileSync(path.join(kit, f)))
   return h.digest('hex')
 }
 
