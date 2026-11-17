@@ -214,3 +214,21 @@ describe('CODEX_HOOK_EVENTS', () => {
     assert.deepEqual(Object.keys(out.hooks).sort(), [...CODEX_HOOK_EVENTS].sort())
   })
 })
+
+describe('plain JS copies of the hook rules', () => {
+  const setup = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'setup.js'), 'utf8')
+  const uninstall = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'uninstall.js'), 'utf8')
+  const list = (src: string, name: string) => [...(new RegExp(`${name} = \\[([^\\]]*)\\]`).exec(src)?.[1] ?? '').matchAll(/'(\w+)'/g)].map(m => m[1])
+  it('setup.js registers the same events', () => {
+    assert.deepEqual(list(setup, 'const HOOK_EVENTS'), [...HOOK_EVENTS])
+    assert.deepEqual(list(setup, 'const CODEX_HOOK_EVENTS'), [...CODEX_HOOK_EVENTS])
+  })
+  it('setup.js and uninstall.js match legacy URLs the same way', () => {
+    const re = /LEGACY_HOOK_URL_RE = (\/.*\/);?$/m
+    const want = re.exec(setup)?.[1]
+    assert.ok(want)
+    assert.equal(re.exec(uninstall)?.[1], want)
+    assert.equal(want, String(/^http:\/\/127\.0\.0\.1:\d+\/?$/))
+    assert.equal(isLegacyHookUrl('http://127.0.0.1:1'), true)
+  })
+})

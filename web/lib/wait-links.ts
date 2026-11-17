@@ -1,10 +1,9 @@
 /** Chat wait links as the cards and the Orbit arc show them. */
 import type { ChatLink, ChatRow } from './hub-types'
+import { baseName } from './path'
 
 /** One side of a link. out: this chat waits on id; in: id waits on this chat. file: an auto link's file. */
 export type LinkChip = { dir: 'out' | 'in'; id: string; name: string; file?: string }
-
-export const baseName = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 
 export function linkChips(links: ChatLink[] = [], chats: ChatRow[], id: string): LinkChip[] {
   const name = (sid: string) => chats.find(c => c.sessionId === sid)?.name ?? sid.slice(0, 8)

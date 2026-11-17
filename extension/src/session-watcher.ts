@@ -488,7 +488,7 @@ export class SessionWatcher implements AgentSessionWatcher {
     } catch (err) { log.debug('File watch failed:', filePath, err) }
 
     // Poll fallback: fs.watch on macOS can silently stop firing events
-    // for long-lived watchers. This ensures we still detect new content.
+    // for long-lived watchers.
     session.pollTimer = setInterval(() => {
       this.readNewLines(sessionId)
       // Also poll subagent files; fs.watch may not fire after extension restart

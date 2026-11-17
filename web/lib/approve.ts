@@ -1,12 +1,6 @@
 /** Approve: a done chat waits for Kenneth's OK before it closes and moves to History. */
 import type { ArchivedChat, ChatProgress, DoneCheck } from './hub-types'
 
-/** Done chats not yet approved or archived. */
-export const awaiting = (progress: ChatProgress[], archive: ArchivedChat[]) => {
-  const gone = new Set(archive.map(a => a.sessionId))
-  return progress.filter(p => p.state === 'done' && !gone.has(p.sessionId))
-}
-
 /** The done-check verdict beside the button; undefined when the mod wrote none. */
 export const checkLine = (c?: DoneCheck) => !c ? undefined : c.verified ? 'Verified' : `Unverified${c.missing?.length ? `: ${c.missing.join(', ')}` : ''}`
 

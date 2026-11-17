@@ -3,6 +3,8 @@
  * `claude --name` can carry it (a running chat cannot rename itself). The quick model
  * call is Claude Code's own Haiku on the subscription; slow or failed, the goal's first words.
  */
+import { withDeadline } from './deadline'
+
 const MAX_WORDS = 5
 export const TITLE_MS = 20000
 
@@ -22,9 +24,6 @@ export function cleanTitle(answer: string): string | undefined {
 /** `ask` gets the wait too, so its model call can be killed when the wait ends. */
 export async function titleFor(goal: string, ask: (prompt: string, ms: number) => Promise<string>, ms = TITLE_MS): Promise<string> {
   const prompt = `Name this coding task in 3 to 5 plain words, no quotes, no punctuation. Answer with the name only.\n\nTask: ${goal.slice(0, 600)}`
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<undefined>(r => { timer = setTimeout(() => r(undefined), ms) })
-  const answer = await Promise.race([ask(prompt, ms).catch(() => undefined), timeout])
-  clearTimeout(timer)
+  const answer = await withDeadline(() => ask(prompt, ms), ms)
   return (answer && cleanTitle(answer)) ?? fallbackTitle(goal)
 }

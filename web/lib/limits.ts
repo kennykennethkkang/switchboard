@@ -1,5 +1,6 @@
 /** The header's 5h and weekly meters, merged across live chats. */
 import type { KeptLimits, Limit, LimitPause, SessionLive } from './hub-types'
+import { formatDuration } from './duration'
 
 /** level: 'none' with no data, 'high' from 80%, 'out' from 100%, by the raw value. */
 export type Meter = { kind: string; label: string; percent?: number; level?: 'none' | 'high' | 'out'; reset?: string }
@@ -25,8 +26,7 @@ export function resetText(at: number, now = Date.now()): string {
 
 /** "2h 5m", "12m", "under 1m" until at. */
 export function countdown(at: number, now = Date.now()): string {
-  const m = Math.ceil((at - now) / 60_000), h = Math.floor(m / 60)
-  return at - now < 60_000 ? 'under 1m' : h ? `${h}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`
+  return formatDuration(at - now, 'countdown')
 }
 
 /** "3 chats queued, resume at 11:51 PM (in 2h 5m)". */

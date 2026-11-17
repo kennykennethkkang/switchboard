@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "2026-11-16T18:54:16Z",
+  "rulesVersion": "2026-11-17T19:11:10Z",
   "generic": true,
   "history": {
     "Explore.md": [
@@ -20,7 +20,9 @@
       "ffd0c563be7b",
       "cc74731f66e0",
       "b89e4d21fec9",
-      "15ebdd6a3ab4"
+      "15ebdd6a3ab4",
+      "9c1ec7a68745",
+      "42e55a36e3e4"
     ],
     "engineer.md": [
       "f067ddefd984",
@@ -32,7 +34,9 @@
       "d60e6f8fe280",
       "714a3380f6ff",
       "48e0de755291",
-      "583242ab830b"
+      "583242ab830b",
+      "0eb77cdcac89",
+      "027b3985062c"
     ],
     "growth.md": [
       "8f83534c5908",

@@ -5,7 +5,8 @@ import type { HubCommand } from '@/lib/vscode-bridge'
 import { boxNote } from '@/lib/message-box'
 import { branchUrl, resolvePrompt } from '@/lib/pr-card'
 import { mergeMessage, splitMessage } from '@/lib/ship-card'
-import { caps, panel, repoOf } from './look'
+import { caps, panel } from './look'
+import { baseName } from '@/lib/path'
 import { PrCard } from './pr-card'
 import { CiCard } from './check-cards'
 import { useDismiss } from './use-popover'
@@ -119,7 +120,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   if (!mine) return repo === null ? null : (
     <section aria-label="Git" style={panel}>
       <h3 style={caps}><span>Git</span></h3>
-      <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading git in {chat ? repoOf(chat.cwd) : 'this repo'}…</p>
+      <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading git in {chat ? baseName(chat.cwd) : 'this repo'}…</p>
     </section>
   )
   const r = mine

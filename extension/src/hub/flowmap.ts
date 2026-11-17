@@ -280,7 +280,6 @@ export function assemble(project: string, code: Code, work: ChatWork[], labels: 
 
 const CACHE_MAX = 10
 const cache = new Map<string, { key: string; at: number; map: Promise<FlowMap> }>()
-export const flowCacheSize = () => cache.size
 
 async function keyOf(cwd: string, subs: string[], home: string): Promise<string> {
   const head = await fs.promises.readFile(path.join(cwd, '.git', 'HEAD'), 'utf8').catch(() => '')

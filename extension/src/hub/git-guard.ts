@@ -46,10 +46,3 @@ export async function installGuard(root: string): Promise<string | undefined> {
   }
   return dir
 }
-
-/** Deletes only our hooks. */
-export async function removeGuard(root: string): Promise<void> {
-  const dir = await hooksDir(root)
-  if (!dir) return
-  for (const h of HOOKS) if (read(path.join(dir, h))?.includes(GUARD_MARK)) fs.rmSync(path.join(dir, h), { force: true })
-}

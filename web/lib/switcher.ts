@@ -4,7 +4,7 @@
  */
 import type { ArchivedChat, ChatProgress, ChatRow, ChatState } from './hub-types'
 import { archiveChains, projectName, splitVersion } from './archive'
-import { almostDone } from '../components/switchboard/look'
+import { almostDone } from './look'
 
 export type Command = { id: string; label: string; group: 'Go to' | 'Do'; hint?: string; keywords?: string }
 

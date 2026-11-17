@@ -97,9 +97,9 @@ describe('trustFolder', () => {
 
   it('never throws, and never writes over a file it cannot read', () => {
     fs.writeFileSync(file, '{broken')
-    assert.doesNotThrow(() => trustFolder(A, ok, file, tmp))
+    trustFolder(A, ok, file, tmp)
     assert.equal(fs.readFileSync(file, 'utf8'), '{broken')
-    assert.doesNotThrow(() => trustFolder(A, ok, path.join(tmp, 'missing', '.claude.json'), tmp))
+    trustFolder(A, ok, path.join(tmp, 'missing', '.claude.json'), tmp)
     assert.ok(!fs.existsSync(path.join(tmp, 'missing')))
   })
 })

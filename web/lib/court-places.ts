@@ -2,7 +2,7 @@
  * Keys and links show as names and ok or missing only, never a value. */
 import type { HubState } from './hub-types'
 import type { GraphNode, MemoryGraph } from './memory-graph'
-import { ago } from '../components/switchboard/look'
+import { ago } from './look'
 
 /** id: what an action in the panel targets. ok: false paints it as a problem. */
 export type Item = { id?: string; name: string; note?: string; ok?: boolean }

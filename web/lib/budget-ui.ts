@@ -1,13 +1,12 @@
 import type { ChatRow, CheckBack, IndefiniteBudget, TrendValue } from './hub-types'
+import { formatDuration } from './duration'
 
 const H = 3_600_000
 export const CHECK_BACK_MAX = 12
 
 /** "1h 20m", "35m", "just now". */
 export function elapsedText(ms: number): string {
-  const m = Math.floor(ms / 60_000)
-  if (m < 1) return 'just now'
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}`
+  return formatDuration(ms, 'elapsed')
 }
 
 /** Goal line under the chat name: elapsed and cost, with the caps when set. */

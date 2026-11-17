@@ -2,15 +2,14 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { writeJsonAtomic } from '../fs-utils'
+import { readJsonOr, writeJsonAtomic } from '../fs-utils'
 import type { Escalation, Stage, StageRun } from './types'
 
 const obj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const readJson = (f: string): unknown => { try { return JSON.parse(fs.readFileSync(f, 'utf8')) } catch { return undefined } }
 
 /** usage-meter reads both from company.json; other keys there are left as they are. */
 export function writeCompany(file: string, s: { smartModelSwitch: boolean; advancedMode: Record<string, boolean> }): void {
-  const was = readJson(file)
+  const was = readJsonOr(file)
   writeJsonAtomic(file, { ...(obj(was) ? was : {}), smartModelSwitch: s.smartModelSwitch, advancedMode: s.advancedMode })
 }
 
@@ -54,7 +53,7 @@ export function readStages(project: string, chatIds: string[]): StageRun[] {
   try { names = fs.readdirSync(root) } catch { return [] }
   const runs = names.flatMap(run => {
     const f = path.join(root, run, 'stages.json')
-    const rows = readJson(f)
+    const rows = readJsonOr(f)
     if (!Array.isArray(rows)) return []
     return [{ run, at: fs.statSync(f).mtimeMs, stages: rows.filter(isStage).map(({ n, name, role, status }) => ({ n, name, role, status })) }]
   }).sort((a, b) => b.at - a.at)
@@ -64,7 +63,7 @@ export function readStages(project: string, chatIds: string[]): StageRun[] {
 
 /** model-learn.json rows by project; bad rows are dropped. */
 export function escalationsByProject(file: string): Record<string, Escalation[]> {
-  const rows = readJson(file)
+  const rows = readJsonOr(file)
   const out: Record<string, Escalation[]> = {}
   if (!Array.isArray(rows)) return out
   for (const e of rows) {
@@ -80,7 +79,7 @@ export function escalationsByProject(file: string): Record<string, Escalation[]>
 export function setStageStatus(project: string, run: string, n: number, status: 'done' | 'redo'): string | undefined {
   if (!run || run === '.' || run === '..' || /[\\/]/.test(run)) return `${run} is not a stage run`
   const f = path.join(project, '.switchboard', 'stages', run, 'stages.json')
-  const rows = readJson(f)
+  const rows = readJsonOr(f)
   if (!Array.isArray(rows)) return `${run} has no readable stages.json`
   const row = rows.find(r => obj(r) && r.n === n)
   if (!row) return `${run} has no stage ${n}`
@@ -93,7 +92,7 @@ const sameFiles = (a: unknown, b: string[]) => Array.isArray(a) && a.length === 
 
 /** Drops the model-learn.json rows for this project, role and file set; usage-meter writes the rest, so they stay. */
 export function resetEscalations(file: string, project: string, role: string, files: string[]): void {
-  const rows = readJson(file)
+  const rows = readJsonOr(file)
   if (!Array.isArray(rows)) return
   const kept = rows.filter(e => !(obj(e) && e.project === project && e.role === role && sameFiles(e.files, files)))
   if (kept.length !== rows.length) writeJsonAtomic(file, kept)

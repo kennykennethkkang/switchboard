@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { baseName, chipText, linkChips, waitTargets } from './wait-links'
+import { baseName } from './path'
+import { chipText, linkChips, waitTargets } from './wait-links'
 import type { ChatLink, ChatRow } from './hub-types'
 
 const row = (sessionId: string, name: string, cwd = '/w', live = true) => ({ pid: 1, sessionId, name, cwd, link: '', live, why: [] }) as unknown as ChatRow

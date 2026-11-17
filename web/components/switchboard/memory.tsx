@@ -5,6 +5,7 @@
  * Lazy-loaded by switchboard.tsx (the Next build splits it out; the app bundle inlines it). Read-only: the panel gets the graph
  * from the extension, the app from its own /hub/graph proxy.
  */
+import { useDialog } from '@/hooks/use-dialog'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph3D, { type ForceGraph3DInstance } from '3d-force-graph'
 import { AdditiveBlending, CanvasTexture, Group as Obj, LinearFilter, Sprite, SpriteMaterial, type PerspectiveCamera, type WebGLRenderer } from 'three'
@@ -84,15 +85,8 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
     return () => { stop = true }
   }, [isDemo])
 
-  // What opened the view (the Memory button), read before showModal moves focus; it gets focus back on close,
-  // since by cleanup time the dialog is already out of the page and focus has fallen to body.
-  const [was] = useState(() => (typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null))
-  useEffect(() => {
-    const d = dlg.current
-    // The dialog, not the search: + - 0 work at once, / goes to the search.
-    if (d && !d.open) { d.showModal(); d.focus() }
-    return () => { d?.close(); was?.focus?.() }
-  }, [was])
+  // The dialog, not the search: + - 0 work at once, / goes to the search.
+  useDialog(dlg, d => d.focus())
 
   // One instance per graph; filters and picks only restyle it.
   useEffect(() => {

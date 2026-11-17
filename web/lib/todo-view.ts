@@ -37,8 +37,6 @@ export const shownProjects = (todos: Record<string, TodoList>, fallback?: string
 /** Block title parts: counts in the order you act on them. */
 export const counts = (l?: TodoList) => ({ open: openOf(l).length, suggested: suggestedOf(l).length, you: youOf(l).length })
 
-/** Who filed it: you, or the chat (its name, else the project's chat on that day). */
-export const filedBy = (t: { from?: string; name?: string }, chatName?: string) => (t.from ? t.name ?? chatName ?? 'a chat' : 'you')
 
 /** Past this many characters a row folds to three lines with Show all. */
 export const LONG = 180

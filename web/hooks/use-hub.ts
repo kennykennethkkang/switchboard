@@ -7,20 +7,19 @@
  * it keeps the last real state and says why it is not live.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
+import { commandWait, vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import type { HubState } from '@/lib/hub-types'
 import { demoApply, demoHub, demoTick, demoUpload, emptyHub } from '@/lib/hub-demo'
 import { fetchHub, fetchHubWhy, postCommand, uploadFile } from '@/lib/hub-remote'
 import { keepSame } from '@/lib/hub-share'
 import { UPLOAD_MAX, fmtSize, type Upload } from '@/lib/attach'
-import { noAnswerMs, pending } from './in-flight'
+import { pending } from './in-flight'
 
 const POLL_MS = 2000
 const IDLE_POLL_MS = 15000
 // The button a click just pressed, for send to mark while its command is out. Only the click's own tick.
 let pressed: HTMLElement | undefined
 
-/** problem: why the last command to the standalone app's hub failed, for the Hub's toast. */
 // The app build sets NEXT_PUBLIC_DEMO to "0": a phone must never mistake sample chats for its own.
 const DEMO_OK = process.env.NEXT_PUBLIC_DEMO !== '0'
 
@@ -95,8 +94,8 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
       }).then(s => s && setRemote(r => keepSame(r, s))).finally(end)
     }
     else if (vscodeBridge) {
-      // VS Code never answers; the next hub state or noAnswerMs lets go.
-      setTimeout(pending.start(pressed, true), noAnswerMs(c.type))
+      // VS Code may not answer; commandWait releases it.
+      setTimeout(pending.start(pressed, true), commandWait(c))
       vscodeBridge.sendHub(c)
     }
   }, [isDemo, isVSCode])

@@ -4,8 +4,10 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { Installed } from '../src/hub/types'
-import { ask } from '../src/hub/projects'
-import { FLAGGED, clearIndefinite, indefiniteOn, syncIndefinite, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, startProfile, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, withLibrary, TOOLS_NOTE } from '../src/hub/tools'
+import { ask, askMode } from '../src/hub/projects'
+import { FLAGGED, clearIndefinite, indefiniteOn, syncIndefinite, chatSettings, cleanName, handoffSettings, isNoRemote, nameNote, cleanProfile, defaultProfile, startProfile, profileSettings, readProfiles, resumeSettingsArg, saveProfile, toolsNote, turnOn, uiSdkNote, withLibrary, TOOLS_NOTE } from '../src/hub/tools'
+
+askMode.file = path.join(os.tmpdir(), `ask-mode-${process.pid}.json`)
 
 const inv: Installed[] = [
   { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, description: 'TDD and plans' },
@@ -186,6 +188,28 @@ test('toolsNote: tells the chat to read the design references on before UI work'
   const n = toolsNote({ plugins: {}, skills: {}, assets: { 'design-md/apple/DESIGN.md': true, 'x.md': false } })
   assert.match(n, /read these design references first: design-md\/apple\/DESIGN\.md\.$/)
   assert.doesNotMatch(n, /x\.md/)
+})
+
+test('uiSdkNote: a project with @ui-sdk/* at its root or one folder down is told to use the ui-sdk skill', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'uisdk-'))
+  try {
+    assert.equal(uiSdkNote(root), undefined)
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ dependencies: { react: '19' } }))
+    assert.equal(uiSdkNote(root), undefined)
+    fs.mkdirSync(path.join(root, 'web'))
+    fs.writeFileSync(path.join(root, 'web', 'package.json'), JSON.stringify({ devDependencies: { '@ui-sdk/react': '0.1.0' } }))
+    assert.match(uiSdkNote(root) ?? '', /invoke the ui-sdk skill/)
+    fs.writeFileSync(path.join(root, 'package.json'), '{ not json')
+    assert.match(uiSdkNote(root) ?? '', /ui-sdk/)
+    assert.equal(uiSdkNote(path.join(root, 'missing')), undefined)
+    // A folder of sibling repos is not a ui-sdk project because one repo in it is.
+    const repos = path.join(root, 'repos')
+    fs.mkdirSync(path.join(repos, 'shop'), { recursive: true })
+    fs.writeFileSync(path.join(repos, 'shop', 'package.json'), JSON.stringify({ dependencies: { '@ui-sdk/vue': '0.1.0' } }))
+    assert.equal(uiSdkNote(repos), undefined)
+    fs.writeFileSync(path.join(repos, 'package.json'), JSON.stringify({ peerDependencies: { '@ui-sdk/core': '0.1.0' } }))
+    assert.match(uiSdkNote(repos) ?? '', /ui-sdk/)
+  } finally { fs.rmSync(root, { recursive: true, force: true }) }
 })
 
 test('profileSettings: a project skill turned off goes through skillOverrides', () => {

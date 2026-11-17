@@ -1,4 +1,3 @@
-/** Board skins. Adding one: write <id>.ts beside this file, add one line to SKINS. */
 import { journeyWest } from './journey-west'
 
 /** palette.panel, trim: the tool belt's plate and border. court: colors for islands, halls, desks and sprites; bands: the sky, top to bottom. */
@@ -21,15 +20,14 @@ export type CourtColors = Record<'ink' | 'ink2' | 'red_dk' | 'red' | 'red_lt' | 
   | 'cloud' | 'cloud_sh' | 'blue' | 'blue_lt' | 'sky' | 'brown_dk' | 'brown' | 'skin' | 'plum' | 'wood_dk' | 'wood' | 'wood_lt' | 'rail'
   | 'stone_dk' | 'stone' | 'stone_ln' | 'hall' | 'beam' | 'roof' | 'roof_dk' | 'roof_lt' | 'azure' | 'azure_dk' | 'azure_lt', string>
 
-export const SKINS: Skin[] = [journeyWest]
+export { journeyWest }
 export const SKIN_KEY = 'switchboard.boardSkin'
 export const MODE_KEY = 'switchboard.boardMode'
-export const skinOf = (id: string | null | undefined): Skin => SKINS.find(s => s.id === id) ?? SKINS[0]
 /** The skin with its night palette swapped in; day when the skin has no night. */
 export const lookOf = (skin: Skin, mode: Mode): Skin => mode === 'night' && skin.night ? { ...skin, ...skin.night } : skin
 
 /** Stored picks to a skin and mode. 'ink' was the old night skin; an unset mode follows the system. */
 export function readPick(skin: string | null, mode: string | null, dark: boolean): { id: string; mode: Mode } {
   const m: Mode = mode === 'day' || mode === 'night' ? mode : skin === 'ink' || dark ? 'night' : 'day'
-  return { id: skinOf(skin === 'ink' ? 'journey-west' : skin).id, mode: m }
+  return { id: journeyWest.id, mode: m }
 }

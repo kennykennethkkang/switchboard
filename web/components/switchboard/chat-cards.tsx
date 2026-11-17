@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useFlash } from '@/hooks/use-flash'
 import type { AiId, ArchivedChat, CacheKeep, ChatSummary, ChatProgress, ChatRow, ChatState, TaskRow, HandoffWait, NoteSearch, StuckItem, WindowInfo } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { stuckTone } from '@/lib/stuck'
@@ -8,7 +9,8 @@ import { cacheChip } from '@/lib/cache'
 import { byWindow, windowOf } from '@/lib/windows'
 import { busyLine, projectLeft, sayLeft, timeLeft } from '@/lib/eta'
 import { archiveChains, filterChains, historyCount, liveVersion, projectName, splitVersion } from '@/lib/archive'
-import { ALMOST, STATE, WINDOW_VAR, ago, almostDone, caps, coverage, label, missedCount } from './look'
+import { caps, label } from './look'
+import { ALMOST, STATE, WINDOW_VAR, ago, almostDone, coverage, missedCount } from '@/lib/look'
 import { Warn } from './approve'
 import { chip } from './tool-chips'
 import { chipText, type LinkChip } from '@/lib/wait-links'
@@ -99,17 +101,16 @@ export function TaskRows({ tasks, models = {}, max, small, state }: { tasks: Tas
 /** Copies the commit message and says so for 1.4 s; onCopy answers whether the clipboard took it.
  *  With no clipboard (an older webview, a denied permission) it shows the text selected for a manual copy. */
 export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (text: string) => Promise<boolean>; small?: boolean }) {
-  const [said, setSaid] = useState<string>()
+  const [said, setSaid] = useFlash<string | undefined>(undefined, 1400)
   const [manual, setManual] = useState(false)
   const copy = async () => {
     const ok = await onCopy(text)
     setManual(!ok)
-    setSaid(ok ? 'Copied' : `Press ${/Mac|iP/.test(navigator.platform) ? 'Cmd' : 'Ctrl'}+C to copy`)
-    if (ok) setTimeout(() => setSaid(undefined), 1400)
+    setSaid(ok ? 'Copied' : `Press ${/Mac|iP/.test(navigator.platform) ? 'Cmd' : 'Ctrl'}+C to copy`, ok ? undefined : null)
   }
   return <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%' }}>
     <button type="button" className={small ? 'hub-btn sm' : 'hub-btn'} onClick={() => void copy()} aria-live="polite">{said ?? 'Copy commit message'}</button>
-    {manual && <textarea readOnly aria-label="Commit message" value={text} rows={Math.min(12, Math.max(3, text.split("\n").length))} autoFocus onFocus={e => e.currentTarget.select()} onBlur={() => { setManual(false); setSaid(undefined) }}
+    {manual && <textarea readOnly aria-label="Commit message" value={text} rows={Math.min(12, Math.max(3, text.split("\n").length))} autoFocus onFocus={e => e.currentTarget.select()} onBlur={() => { setManual(false); setSaid(undefined, null) }}
       ref={el => el?.select()} style={{ font: '400 12px/1.5 var(--hub-mono)', padding: '6px 8px', borderRadius: 6, minWidth: 0, flex: '1 1 160px', background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)', resize: 'none' }} />}
   </span>
 }
@@ -367,13 +368,12 @@ export function History({ archive, chats, search, reveal, running = [], onSearch
 /** The Summary fold under a card: the first open asks the extension, later opens show the cached text with Copy and Refresh. */
 export function SummaryFold({ id, name, summary, onAsk, onCopy }: { id: string; name: string; summary?: ChatSummary; onAsk: (refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean> }) {
   const [open, setOpen] = useState(false)
-  const [said, setSaid] = useState<string>()
+  const [said, setSaid] = useFlash<string | undefined>(undefined, 1400)
   const v = summaryView(summary), panel = `summary-${id}`
   const toggle = () => { if (!open && v.ask) onAsk(false); setOpen(!open) }
   const copy = async () => {
     const ok = !!v.text && !!(await onCopy?.(v.text))
     setSaid(ok ? 'Copied' : 'Select the text to copy')
-    setTimeout(() => setSaid(undefined), 1400)
   }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 4 }}>

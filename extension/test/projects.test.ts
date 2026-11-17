@@ -218,6 +218,7 @@ it('Codex chat model and effort go in as -m and -c on new and resumed chats, not
   } finally { ask.codex = false; ask.codexModel = undefined; ask.codexEffort = undefined }
 })
 
+askMode.file = path.join(os.tmpdir(), `ask-mode-${process.pid}.json`)
 it('Ask before actions for Claude goes to ask-mode.json, so bash-approve keeps the prompt', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'askmode-'))
   const was = askMode.file
@@ -229,10 +230,6 @@ it('Ask before actions for Claude goes to ask-mode.json, so bash-approve keeps t
     assert.deepEqual(JSON.parse(fs.readFileSync(askMode.file, 'utf8')), { claude: false })
     assert.equal(ask.claude, false)
   } finally { askMode.file = was; fs.rmSync(dir, { recursive: true, force: true }) }
-})
-
-it('tests never write the real ask-mode.json', () => {
-  assert.equal(askMode.file, undefined)
 })
 
 describe('repoPlan', () => {

@@ -1,15 +1,17 @@
 'use client'
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useDraft } from '@/hooks/use-draft'
+import { useFlash } from '@/hooks/use-flash'
 import type { ArchivedChat, ChatProgress, ChatRow, TodoItem, TodoList, TodoWhy, WindowInfo } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { aiPath, autopilot, finishUp, HELD, moved, ordered, pilotLanes, runLanded, runTargets, stepLabel, type Pilot, type Step } from '@/lib/todo'
-import { caps, panel, placeOf, repoOf } from './look'
+import { caps, panel } from './look'
+import { placeOf } from '@/lib/look'
+import { baseName } from '@/lib/path'
 import { Check, chipOf } from './chat-cards'
 import { recentDone, shippedOf, shownProjects } from '@/lib/todo-view'
 import { Shipped, Suggest, YouRow, when } from './todo-rows'
 import './todo-panel.css'
-export { todoFolder } from '@/lib/todo'
 
 // Same cap as todo.ts and the route.
 const MAX = 2000
@@ -64,11 +66,7 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
   const [order, setOrder] = useState<string[] | null>(null)
   const [drag, setDrag] = useState<{ id: string; over?: number } | null>(null)
   const [open, setOpen] = useState<string[]>([])
-  const [said, setSaid] = useState('')
-  // Keyed by a count, so the same message twice still clears.
-  const [saidN, setSaidN] = useState(0)
-  const say = (m: string) => { setSaid(m); setSaidN(n => n + 1) }
-  useEffect(() => { if (!said) return; const t = setTimeout(() => setSaid(''), 3000); return () => clearTimeout(t) }, [said, saidN])
+  const [said, say] = useFlash('', 3000)
   // A message waits for the list to show the change; a refused one never says it went. ids show as busy meanwhile.
   const [wait, setWait] = useState<{ path: string; msg: string; ids: string[]; ok: (l: TodoList) => boolean } | null>(null)
   useEffect(() => { const l = wait && todos[wait.path]; if (l && wait.ok(l)) { say(wait.msg); setWait(null) } }, [todos, wait])
@@ -170,7 +168,7 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
   }
   const name = (id?: string) => chats.find(c => c.sessionId === id)?.name
   // Never "a finished chat": the name it had then, the one it has now, else the project and day.
-  const source = (t: { from?: string; name?: string; at: number }) => t.name ?? name(t.from) ?? `${repoOf(folder)} chat, ${day(t.at)}`
+  const source = (t: { from?: string; name?: string; at: number }) => t.name ?? name(t.from) ?? `${baseName(folder)} chat, ${day(t.at)}`
   const jump = (id: string) => {
     const c = chats.find(x => x.sessionId === id)
     send(c?.live ? { type: 'hub-focus-chat', sessionId: id } : { type: 'hub-resume', sessionId: id, ai: c?.ai ?? 'claude' })
@@ -275,7 +273,7 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
   return (
     <div className="tdo-project" role="group" aria-labelledby={`${uid}-t`}>
       <div className="tdo-phead">
-        <h4 id={`${uid}-t`} className="tdo-ptitle">{repoOf(folder)}
+        <h4 id={`${uid}-t`} className="tdo-ptitle">{baseName(folder)}
           <span className="tdo-pcount">{mine.length > 0 && `${mine.length} for you · `}{compact ? 'done this week' : `${todo.length} open`}
             {suggested.length > 0 && <> · <button type="button" className="hub-link tdo-jump" onClick={() => { sugBox.current?.scrollIntoView({ block: 'center' }); sugBox.current?.querySelector<HTMLElement>('.tdo-sub')?.focus() }}>{suggested.length} suggested</button></>}</span>
         </h4>
@@ -294,12 +292,12 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
 
       {mine.length > 0 && <div className="tdo-group" data-tone="you">
         <h4 className="tdo-sub">Only you can do these<span className="hub-todo-n">{mine.length}</span></h4>
-        <ul role="list" aria-label={`${repoOf(folder)}: only you can do these`} className="tdo-list">{mine.map(t => <YouRow key={t.id} t={t} meta={from(t)} onDone={() => done(t)} />)}</ul>
+        <ul role="list" aria-label={`${baseName(folder)}: only you can do these`} className="tdo-list">{mine.map(t => <YouRow key={t.id} t={t} meta={from(t)} onDone={() => done(t)} />)}</ul>
       </div>}
 
       {!compact && running.length > 0 && <div className="tdo-group">
         <h4 className="tdo-sub">Running<span className="hub-todo-n">{running.length}</span></h4>
-        <ul role="list" aria-label={`${repoOf(folder)}: running`} className="hub-todo tdo-list">{running.map(({ t }) => {
+        <ul role="list" aria-label={`${baseName(folder)}: running`} className="hub-todo tdo-list">{running.map(({ t }) => {
           if (editing?.id === t.id) return editRow(t)
           const c = liveChat(t.chat)!, place = placeOf(c.cwd, windows)
           return <li key={t.id}>
@@ -316,7 +314,7 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
       {!compact && <div className="tdo-group">
         {queue.length > 0 && <h4 className="tdo-sub">Queue<span className="hub-todo-n">{queue.length}</span>
           {top.length > 1 && <span className="hub-todo-hint">Drag to reorder</span>}</h4>}
-        {queue.length > 0 && <ul role="list" aria-label={`${repoOf(folder)}: queue`} className="hub-todo tdo-list">
+        {queue.length > 0 && <ul role="list" aria-label={`${baseName(folder)}: queue`} className="hub-todo tdo-list">
           {queue.map(({ t, depth }) => {
             const indent = depth ? { paddingLeft: 10 + depth * 20 } : undefined
             if (editing?.id === t.id) return editRow(t, indent)
@@ -347,7 +345,7 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
           {list.ticked?.length ? 'All done. ' : 'Nothing here yet. '}Add something below, or chats will leave work here when they finish.
         </p>}
         <form ref={addForm} className="tdo-add" onSubmit={e => { e.preventDefault(); add() }}>
-          <input className="hub-todo-edit" data-add={folder} aria-label={`New to-do item for ${repoOf(folder)}`} placeholder="Add something to do later" maxLength={MAX} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" />
+          <input className="hub-todo-edit" data-add={folder} aria-label={`New to-do item for ${baseName(folder)}`} placeholder="Add something to do later" maxLength={MAX} value={text} onChange={e => setText(e.target.value)} enterKeyHint="done" />
           <button type="submit" className={`hub-btn sm${text.trim() ? ' primary' : ''}`} disabled={!text.trim()}>Add</button>
           {text.length > MAX * 0.8 && <span className="hub-todo-cap" data-near>{text.length} / {MAX} characters</span>}
         </form>
@@ -362,13 +360,13 @@ function ProjectBlock({ folder, todos, chats, progress = [], windows, archive = 
             setWait({ path: folder, ids, msg: `Added ${ids.length} to the queue.`, ok: l => !l.suggested?.some(x => ids.includes(x.id)) })
           }}>Add all</button>}
         </h4>
-        <ul role="list" aria-label={`${repoOf(folder)}: suggested by chats`} className="tdo-list">{suggested.map(t =>
+        <ul role="list" aria-label={`${baseName(folder)}: suggested by chats`} className="tdo-list">{suggested.map(t =>
           <Suggest key={t.id} t={t} busy={busy.has(t.id)} meta={`${t.why ? `${WHY[t.why].label} · ` : ''}${from(t)}`} onAdd={() => keep(t)} onDrop={() => drop(t)} />)}</ul>
       </div>}
 
       {recent.length > 0 && <details className="tdo-fold">
         <summary>{recent.length} done this week{recent.some(t => shippedOf(t)) ? ', some by commit' : ''}</summary>
-        <ul role="list" aria-label={`${repoOf(folder)}: done`} className="tdo-list">
+        <ul role="list" aria-label={`${baseName(folder)}: done`} className="tdo-list">
           {recent.map(t => <Shipped key={t.id} t={t} onBack={() => { send({ type: 'hub-todo-restore', path: folder, id: t.id }); say('Put back on the list.') }} />)}
         </ul>
         {older > 0 && <p className="tdo-foot">{older} older done {older === 1 ? 'item' : 'items'} hidden</p>}
@@ -439,9 +437,9 @@ export function AutopilotCard({ todos, chats, autoStart = false }: { todos: Reco
   return <section aria-labelledby="pilot-card-h" className="hub-pilot-card" style={panel}>
     <h2 id="pilot-card-h" style={caps}><span>Autopilot</span><span>{[`${on} auto-running`, paused ? `${paused} paused` : ''].filter(Boolean).join(' · ')}</span></h2>
     <ul role="list" className="hub-pilot-lanes">{lanes.map(({ folder, pilot }) => <li key={folder} data-mode={pilot.mode}>
-      <span className="hub-pilot-lane-name">{repoOf(folder)}</span>
+      <span className="hub-pilot-lane-name">{baseName(folder)}</span>
       <span className="hub-pilot-state" data-mode={pilot.mode}>{pilot.mode === 'paused' && <Bars />}{STATE[pilot.mode]}{pilot.mode === 'paused' || pilot.mode === 'off' ? ` · ${pilot.queued} queued` : ''}</span>
-      <Chain steps={pilot.steps} label={`${repoOf(folder)} chain`} />
+      <Chain steps={pilot.steps} label={`${baseName(folder)} chain`} />
     </li>)}</ul>
   </section>
 }

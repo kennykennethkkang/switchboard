@@ -3,7 +3,7 @@
 // Settings: Check health button, the result lines, and Fix safe ones.
 import type { HubState } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
-import { ago } from './look'
+import { ago } from '@/lib/look'
 
 const TONE = { ok: 'var(--hub-green)', warn: 'var(--hub-yellow)', fail: 'var(--hub-red)' } as const
 const WORD = { ok: 'OK', warn: 'Warn', fail: 'Fail' } as const

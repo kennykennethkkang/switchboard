@@ -6,6 +6,7 @@
  * Search runs across every section; installed lists sit in folds apart from the switches.
  */
 import { useEffect, useState, type ReactNode } from 'react'
+import { useFlash } from '@/hooks/use-flash'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
 import { editorName } from '@/lib/editor'
 import { benchPrompt, gearRows, keywordHit, sweepBadge, sweptNow } from '@/lib/gear-rows'
@@ -55,8 +56,7 @@ type Row = { label: string; control: ReactNode; hint?: string; section: Section;
 
 function Line({ row }: { row: Row }) {
   // A switch or a pick saves at once, so the row says so for a moment.
-  const [saved, setSaved] = useState(0)
-  useEffect(() => { if (!saved) return; const t = setTimeout(() => setSaved(0), 2000); return () => clearTimeout(t) }, [saved])
+  const [saved, setSaved] = useFlash(0, 2000)
   const flash = () => setSaved(Date.now())
   return (
     <div className="hub-set-row">

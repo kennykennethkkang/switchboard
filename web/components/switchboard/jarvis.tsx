@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { readStore, removeStore, writeStore } from '@/lib/store'
 import type { HubState, JarvisReply } from '@/lib/hub-types'
 import { fetchVoice, type VoicePoll } from '@/lib/hub-remote'
 import { appendHeard, stillSpoken, takesHeard } from '@/lib/voice'
@@ -91,9 +92,9 @@ function usePhoneMic(want: boolean, heard: (text: string) => void) {
  * bare: inside the Cmd+K switcher, which owns the text and the input; this adds the mic and the reply. */
 export function Jarvis({ reply, voice: stateVoice, heard: stateHeard, mic, demo = false, send, bare }: { reply?: JarvisReply | null; voice?: HubState['voice']; heard?: HubState['heard']; mic: boolean; demo?: boolean; send: (c: HubCommand) => void; bare?: AskBits }) {
   // Kept in sessionStorage so a reload for a new build does not drop an unsent question.
-  const [draft, setQRaw] = useState(() => { try { return sessionStorage.getItem(DRAFT) ?? '' } catch { return '' } })
+  const [draft, setQRaw] = useState(() => readStore(DRAFT, 'session') ?? '')
   const q = bare ? bare.value : draft
-  const setQ = (v: string) => { if (bare) { bare.onValue(v); return } setQRaw(v); try { if (v) sessionStorage.setItem(DRAFT, v); else sessionStorage.removeItem(DRAFT) } catch { /* private mode */ } }
+  const setQ = (v: string) => { if (bare) { bare.onValue(v); return } setQRaw(v); if (v) writeStore(DRAFT, v, 'session'); else removeStore(DRAFT, 'session') }
   const own = useRef<HTMLInputElement>(null)
   const input = bare?.input ?? own
   const { levels, polled } = useMic(!!stateVoice, demo)

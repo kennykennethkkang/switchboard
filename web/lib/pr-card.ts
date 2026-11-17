@@ -1,5 +1,6 @@
 /** The PR card's words, from RepoView alone. */
 import type { RepoView } from './hub-types'
+import { formatDuration } from './duration'
 
 type R = Pick<RepoView, 'pr' | 'merge'>
 type Merge = NonNullable<RepoView['merge']>
@@ -38,8 +39,7 @@ export function pill({ pr, merge: m }: R): string {
 
 /** now, 6m, 2h, 3d */
 export function short(at: number, now = Date.now()): string {
-  const m = Math.floor((now - at) / 60e3)
-  return m < 1 ? 'now' : m < 60 ? `${m}m` : m < 48 * 60 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`
+  return formatDuration(now - at, 'short')
 }
 
 /** A GitHub tree or compare link for a branch; encodeURI leaves # alone, which would cut feat#1 short. */

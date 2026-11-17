@@ -3,7 +3,7 @@
  *
  * Kept free of `vscode` so they can be unit tested. scripts/setup.js and
  * extension/scripts/uninstall.js are plain JS and mirror the matching rules;
- * keep the three in sync.
+ * keep the three in sync (hook-entries.test.ts checks the lists and the URL pattern).
  */
 
 import * as fs from 'fs'

@@ -259,14 +259,12 @@ process.stdin.on('end', () => {
 
   const resolvedCwd = normPath(cwd);
 
-  // Read all discovery files
   let allFiles;
   try {
     allFiles = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && f !== 'workspaces.json');
   } catch { allFiles = []; }
 
-  // Parse discovery files and find workspaces that contain this cwd.
-  // Use longest-match-wins so /project/sub matches before /project.
+  // Longest match wins so /project/sub matches before /project.
   const matches = [];
   const live = [];
   for (const file of allFiles) {

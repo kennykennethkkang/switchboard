@@ -6,7 +6,6 @@ export type Pal = Record<string, string>
 // Journey West day colors.
 export const INK = '#1a1423'
 export const CARP_PAL: Pal = { y: '#f8d96a', g: '#e8a92a', G: '#a5621a', r: '#cf3f33', w: '#fffaf0', k: INK }
-export const BASKET_PAL: Pal = { b: '#5a3a2a', B: '#93503a', w: '#b86e48' }
 
 /** Colors per pixel, padded by one with the ink ring; undefined is clear. */
 export function pixGrid(rows: string[], pal: Pal, ink = INK): Array<Array<string | undefined>> {
@@ -29,7 +28,3 @@ export function pixSvg(rows: string[], pal: Pal, scale = 1, ink = INK) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * scale}" height="${h * scale}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${px}</svg>`
 }
 
-export const carpSvg = (scale = 3, pal = CARP_PAL) => pixSvg(CARP, pal, scale)
-export const basketSvg = (scale = 3, pal = BASKET_PAL) => pixSvg(BASKET, pal, scale)
-/** For an <img src> or a CSS url(). */
-export const svgUrl = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`

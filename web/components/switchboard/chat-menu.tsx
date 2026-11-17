@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useId, useRef, useState } from 'react'
+import { useFlash } from '@/hooks/use-flash'
 import type { ChatRow } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { projectName } from '@/lib/archive'
@@ -12,7 +13,7 @@ type Act = { label: string; hint: string; run: () => void }
  *  targets, onWait: Wait for..., which swaps the menu for a pick of the other live chats in the project; a refused pick (problem) reopens it with the reason. */
 export function ChatMenu({ chat, starred, send, onMac, inPicture, onRead, targets = [], onWait, problem }: { chat: ChatRow; starred: boolean; send: (c: HubCommand) => void; onMac?: boolean; inPicture?: boolean; onRead?: () => void; targets?: ChatRow[]; onWait?: (to: string) => void; problem?: { text: string; at: number; for?: HubCommand } | null }) {
   const [open, setOpen] = useState(false)
-  const [said, setSaid] = useState('')
+  const [said, setSaid] = useFlash('', 1800)
   const [armed, setArmed] = useState<string>()
   const [choosing, setChoosing] = useState(false)
   const [refused, setRefused] = useState('')
@@ -36,7 +37,6 @@ export function ChatMenu({ chat, starred, send, onMac, inPicture, onRead, target
     ...inPicture ? [] : [{ label: 'Open terminal', done: onMac === false ? 'Opened on the Mac' : 'Opened', hint: onMac === false ? 'Brings up its terminal on the Mac' : 'Brings up its terminal', cmd: { type: 'hub-focus-chat', sessionId } } as Item],
   ]
   const acts: Act[] = onRead ? [{ label: 'Read outputs and transcript', hint: 'What this chat produced, and its transcript', run: onRead }] : []
-  useEffect(() => { if (!said) return; const t = setTimeout(() => setSaid(''), 1800); return () => clearTimeout(t) }, [said])
   useEffect(() => {
     if (!open) return
     wrap.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()

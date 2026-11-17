@@ -1,4 +1,5 @@
 'use client'
+import { useDialog } from '@/hooks/use-dialog'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AiId, ChatProfile, ChatRow, HubState } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
@@ -35,9 +36,7 @@ function Related({ text, chats, project, texts, onSend }: { text: string; chats:
 }
 
 export function NewChat({ hub, send, upload, split, onDone }: { hub: HubState; send: (c: HubCommand) => void; upload: Upload; split?: SplitAsks; onDone: () => void }) {
-  // Focus goes back to whatever opened the dialog.
-  const [was] = useState(() => typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null)
-  useEffect(() => () => was?.focus(), [was])
+  useDialog()
   const open = hub.projects.find(p => p.isOpen) ?? hub.projects[0]
   const [path, setPath] = useState(open?.path ?? '')
   // New GitHub repo or Clone: the folder is made on Start, so Tools waits and files go under the open project.

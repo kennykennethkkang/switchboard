@@ -1,5 +1,6 @@
 'use client'
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { readStore, writeStore } from '@/lib/store'
 import { useHub } from '@/hooks/use-hub'
 import { chatProjects, hideDone, inProjects, liveChats, projectName } from '@/lib/archive'
 import { editorName } from '@/lib/editor'
@@ -39,7 +40,7 @@ import { ChatMenu } from './chat-menu'
 import { PauseBanner } from './pause-banner'
 import { linkChips, waitTargets } from '@/lib/wait-links'
 import { ChatView } from './chat-view'
-import { placeOf } from './look'
+import { placeOf } from '@/lib/look'
 import { useDismiss } from './use-popover'
 import { MapBar, Nav } from './nav'
 import { NowPage } from './now-page'
@@ -73,7 +74,7 @@ export function Switchboard() {
   sendRef.current = send
   const [pick, setPick] = useState<{ id?: string; key: boolean }>({ key: false })
   // The open chat outlives a reload; a gone id falls back to the first chat.
-  useEffect(() => { try { const id = localStorage.getItem(CHAT_KEY); if (id) setPick({ id, key: true }) } catch { /* no storage */ } }, [])
+  useEffect(() => { const id = readStore(CHAT_KEY); if (id) setPick({ id, key: true }) }, [])
   const [panel, setPanel] = useState<'none' | 'new'>('none')
   // The page lives in the hash; a map's Back returns to the last page that was not a map.
   const [page, setPage] = useState<Page>('now')
@@ -95,8 +96,8 @@ export function Switchboard() {
   const [reading, setReading] = useState<{ id: string; name: string }>()
   // The project filter is this device's own, like the tool-calls toggle.
   const [projects, setProjects] = useState<string[]>([])
-  useEffect(() => { try { const v = JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? '[]'); if (Array.isArray(v)) setProjects(v.filter(p => typeof p === 'string')) } catch { /* no storage: show all */ } }, [])
-  const pickProjects = (next: string[]) => { setProjects(next); try { localStorage.setItem(PROJECTS_KEY, JSON.stringify(next)) } catch { /* no storage */ } }
+  useEffect(() => { try { const v = JSON.parse(readStore(PROJECTS_KEY) ?? '[]'); if (Array.isArray(v)) setProjects(v.filter(p => typeof p === 'string')) } catch { /* no storage: show all */ } }, [])
+  const pickProjects = (next: string[]) => { setProjects(next); writeStore(PROJECTS_KEY, JSON.stringify(next)) }
   const cards: Card[] = useMemo(() => byNeed(liveChats(hub.chats, hub.archive ?? [])
     .map(chat => ({ chat, progress: hub.progress.find(p => p.sessionId === chat.sessionId) }))), [hub.chats, hub.archive, hub.progress])
   // The rail shows the picked projects only, and hides chats done past the setting (the picked one stays); Find still reaches every chat.
@@ -126,7 +127,7 @@ export function Switchboard() {
   // On a phone the chat page sits below the whole rail, so a tap brings it up.
   const select = (id: string, key: boolean) => {
     setPick({ id, key })
-    try { localStorage.setItem(CHAT_KEY, id) } catch { /* no storage */ }
+    writeStore(CHAT_KEY, id)
     if (!matchMedia(NARROW).matches) return
     const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches
     requestAnimationFrame(() => document.getElementById('pic-name')?.closest('section')?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }))
@@ -159,10 +160,10 @@ export function Switchboard() {
   const todos = useMemo(() => withHome(hub.todos, here ?? pickedCwd), [hub.todos, pickedCwd, here])
   // A project picked by hand (or the Board's Open to-do) holds, across reloads too, until the followed project changes (another window gets focus).
   const [planPick, setPlanPick] = useState<{ at: string; folder: string }>()
-  useEffect(() => { try { const v = JSON.parse(localStorage.getItem(PLAN_KEY) ?? 'null'); if (typeof v?.at === 'string' && typeof v?.folder === 'string') setPlanPick(v) } catch { /* no storage */ } }, [])
+  useEffect(() => { try { const v = JSON.parse(readStore(PLAN_KEY) ?? 'null'); if (typeof v?.at === 'string' && typeof v?.folder === 'string') setPlanPick(v) } catch { /* no storage */ } }, [])
   const plan = planFolder(Object.keys(todos), pickedCwd, here, planPick)
   const todoAt = plan.at
-  const pickPlan = (folder: string) => { if (!todoAt) return; const v = { at: todoAt, folder }; setPlanPick(v); try { localStorage.setItem(PLAN_KEY, JSON.stringify(v)) } catch { /* no storage */ } }
+  const pickPlan = (folder: string) => { if (!todoAt) return; const v = { at: todoAt, folder }; setPlanPick(v); writeStore(PLAN_KEY, JSON.stringify(v)) }
   const today = useMemo(() => todayView(cards, hub.history, hub.live, Date.now(), hub.jev, hub.archive), [cards, hub.history, hub.live, hub.jev, hub.archive])
   const tasks = useMemo(() => taskTotals(cards), [cards])
   const models = useMemo(() => roleModels(hub.installed, hub.controls.claude.model), [hub.installed, hub.controls.claude.model])

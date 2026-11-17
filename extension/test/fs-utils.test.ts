@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { readNewFileLines, readFileBytes, tryLock, upperDrive, withLock } from '../src/fs-utils'
+import { readNewFileLines, readFileBytes, readJsonOr, tryLock, upperDrive, withLock } from '../src/fs-utils'
 
 describe('upperDrive', () => {
   it('gives one spelling to c:\\ and C:\\, leaving other paths alone', () => {
@@ -163,4 +163,16 @@ describe('file locks across windows', () => {
     assert.ok(fs.existsSync(lock), 'the other holder keeps its lock')
     held()
   })
+})
+
+it('readJsonOr parses a file and falls back when it is missing or broken', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rjo-'))
+  try {
+    const f = path.join(dir, 'a.json')
+    fs.writeFileSync(f, '{"a":1}')
+    assert.deepEqual(readJsonOr(f), { a: 1 })
+    fs.writeFileSync(f, '{')
+    assert.equal(readJsonOr(f, 'x'), 'x')
+    assert.equal(readJsonOr(path.join(dir, 'none.json')), undefined)
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
 })

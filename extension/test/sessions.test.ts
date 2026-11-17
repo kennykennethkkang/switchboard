@@ -7,9 +7,10 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { ask } from '../src/hub/projects'
+import { ask, askMode } from '../src/hub/projects'
 import { chatRows, newer, RC_NAME, rcInList, rcPattern, rcRunning, rcRunningNow, rcServerCommand, rcTargets } from '../src/hub/sessions'
 
+askMode.file = path.join(os.tmpdir(), `ask-mode-${process.pid}.json`)
 const NOW = 1_800_000_000_000
 const base = { pid: 1, sessionId: 's1', cwd: '/u/Armasu', status: 'idle', version: '2.1.310', kind: 'interactive', updatedAt: NOW - 60_000 }
 

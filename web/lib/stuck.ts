@@ -1,12 +1,12 @@
 /** The Needs attention strip's text: what a stuck item uses, its diagnosis to copy, and the card chip's tone. */
 import type { StuckItem } from './hub-types'
+import { formatDuration } from './duration'
 
 // Same lines as extension/src/hub/stuck.ts STUCK.
 const HOT_CPU = 80, HOT_RSS = 2 * 1024 ** 3
 
 const size = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB` : `${Math.round(b / 1024 ** 2)} MB`)
-const span = (ms: number) => { const m = Math.round(ms / 60e3); return m < 60 ? `${Math.max(1, m)} min` : `${Math.round(m / 60)} h` }
-export const forHow = (i: StuckItem, now = Date.now()) => span(now - i.since)
+export const forHow = (i: StuckItem, now = Date.now()) => formatDuration(now - i.since, 'stuck')
 
 /** "CPU 97% · 1.5 GB", or '' when neither is known. */
 export const usage = (i: StuckItem) => [i.cpu !== undefined && `CPU ${Math.round(i.cpu)}%`, i.rss !== undefined && size(i.rss)].filter(Boolean).join(' · ')

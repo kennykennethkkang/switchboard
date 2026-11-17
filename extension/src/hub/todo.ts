@@ -790,12 +790,18 @@ export function dropped(mine: TodoDoc, theirs: TodoDoc): boolean {
   return lost(mine.todo, theirs.todo) || lost(mine.ticked ?? [], theirs.ticked ?? [])
 }
 
+/** Fetches origin's list into REMOTE_REF; local and remote are the two tips (remote only when the fetch worked). */
+async function fetchTodo(root: string) {
+  const f = await git(root, ['fetch', '-q', '--no-tags', '--no-write-fetch-head', 'origin', `+${TODO_REF}:${REMOTE_REF}`], 60_000)
+  const local = await revParse(root, TODO_REF), remote = f.ok ? await revParse(root, REMOTE_REF) : undefined
+  return { f, local, remote }
+}
+
 /** Fetch origin's ref, merge it in (both parents when both moved), push what origin lacks. Offline or no origin: local only. */
 export async function syncDoc(s: TodoStore): Promise<string | undefined> {
   const root = s.root
   if (!root || !(await hasOrigin(root))) return undefined
-  const f = await git(root, ['fetch', '-q', '--no-tags', '--no-write-fetch-head', 'origin', `+${TODO_REF}:${REMOTE_REF}`], 60_000)
-  const local = await revParse(root, TODO_REF), remote = f.ok ? await revParse(root, REMOTE_REF) : undefined
+  const { local, remote } = await fetchTodo(root)
   if (remote && remote !== local) {
     // Read before adopting or merging: a list that cannot be read would lock this one, and is never pushed over.
     const theirs = await docAt(root, remote).catch(() => undefined)
@@ -827,10 +833,9 @@ export async function syncDoc(s: TodoStore): Promise<string | undefined> {
 export async function claimRemote(root: string, fn: (d: TodoDoc) => TodoDoc, opts: { tries?: number; beforeClaim?: () => Promise<void>; beforePush?: () => Promise<void> } = {}): Promise<TodoDoc | undefined> {
   if (!(await hasOrigin(root))) return undefined
   for (let i = 0; i < (opts.tries ?? 3); i++) {
-    const f = await git(root, ['fetch', '-q', '--no-tags', '--no-write-fetch-head', 'origin', `+${TODO_REF}:${REMOTE_REF}`], 60_000)
+    const { f, local, remote } = await fetchTodo(root)
     // Origin with no list yet is an empty one; any other fetch failure is offline.
     if (!f.ok && !/couldn't find remote ref/i.test(f.err)) return undefined
-    const local = await revParse(root, TODO_REF), remote = f.ok ? await revParse(root, REMOTE_REF) : undefined
     let base: TodoDoc
     try { base = remote ? mergeDocs(await docAt(root, local), await docAt(root, remote)) : await docAt(root, local) } catch { return undefined }
     const next = fn(base)

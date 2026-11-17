@@ -1,7 +1,9 @@
 'use client'
 // The chat view: what one chat produced, and its transcript a page at a time. Read only.
 // A modal dialog on the right, full screen on a phone; Esc or Close shuts it and focus goes back to what opened it.
+import { useDialog } from '@/hooks/use-dialog'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useFlash } from '@/hooks/use-flash'
 import { fileName, loadOutputs, loadShot, loadTranscript, type ChatMessage, type ChatOutputs, type ChatTranscript } from '@/lib/chat-view'
 import { demoChat } from '@/lib/hub-demo'
 import type { HubState } from '@/lib/hub-types'
@@ -147,25 +149,17 @@ function Transcript({ sessionId, demo, body }: { sessionId: string; demo?: HubSt
 export function ChatView({ sessionId, name, demo: demoNow, onClose, onCopy }: Props) {
   // The demo hub changes every tick; the view reads the one it opened with.
   const [demo] = useState(demoNow)
-  const [was] = useState(() => typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null)
   const box = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<Tab>('outputs')
   const [o, setO] = useState<ChatOutputs | null | string>()
-  const [said, setSaid] = useState<string>()
-  useEffect(() => {
-    const d = box.current
-    if (!d) return
-    if (!d.open) d.showModal()
-    d.querySelector<HTMLElement>('#cv-title')?.focus()
-    return () => { d.close(); if (was?.isConnected) was.focus() }
-  }, [was])
+  const [said, setSaid] = useFlash<string | undefined>(undefined, 1600)
+  useDialog(box, d => d.querySelector<HTMLElement>('#cv-title')?.focus())
   useEffect(() => {
     let stop = false
     setO(undefined)
     void (demo ? Promise.resolve(demoChat(demo, sessionId, 'outputs').outputs ?? null) : loadOutputs(sessionId)).then(r => { if (!stop) setO(r) })
     return () => { stop = true }
   }, [sessionId, demo])
-  useEffect(() => { if (!said) return; const t = setTimeout(() => setSaid(undefined), 1600); return () => clearTimeout(t) }, [said])
   const copy = async (what: string, text: string) => setSaid(await onCopy(text) ? `${what} copied` : 'The clipboard is not available here')
   const tabs: Array<[Tab, string]> = [['outputs', 'Outputs'], ['transcript', 'Transcript']]
   const arrow = (e: React.KeyboardEvent) => {

@@ -4,6 +4,7 @@
 // Beside the picture on a wide view (an aside, the picture stays clickable); a bottom sheet on a narrow one (a modal dialog).
 // Read only: copy, open the transcript, jump to the chat. Nothing here changes a running agent.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useFlash } from '@/hooks/use-flash'
 import { teamOf } from '@/lib/orbit-views'
 import { sayLeft, type Left } from '@/lib/eta'
 import { clockDur, count, kindOf, loadRuns, roleLeft, runState, statusTone, type RunDetail } from '@/lib/runs'
@@ -11,8 +12,8 @@ import { demoRunDetails } from '@/lib/hub-demo'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import type { ChatProgress } from '@/lib/hub-types'
 import { Glyph, LABEL, LEAD_WORD, NAME, TONE, leadState } from './parts'
-import { almostDone } from '../look'
-import type { OrbitChat } from '../orbit'
+import { almostDone } from '@/lib/look'
+import type { OrbitChat } from './orbit'
 import './drawer.css'
 
 export type DrawerProps = {
@@ -57,7 +58,7 @@ function Run({ run, n, state, left, onCopy, onFocus, open, toggle }: Omit<BodyPr
 
 function RunBody({ run, state, left, lead, onCopy, onFocus }: BodyProps) {
   const [all, setAll] = useState(false)
-  const [said, setSaid] = useState<string>()
+  const [said, setSaid] = useFlash<string | undefined>(undefined, 1600)
   const now = Date.now(), end = state === 'active' ? now : run.endedAt, span = Math.max(1000, end - run.startedAt)
   const time = state === 'active' ? `${clockDur(now - run.startedAt)} so far` : clockDur(run.endedAt - run.startedAt)
   const tone = statusTone(run.report?.status)
@@ -66,7 +67,7 @@ function RunBody({ run, state, left, lead, onCopy, onFocus }: BodyProps) {
   const calls = [...run.calls].reverse(), shown = all ? calls : calls.slice(0, CALLS_SHOWN)
   const pos = (at: number) => `${(Math.min(1, Math.max(0, (at - run.startedAt) / span)) * 100).toFixed(2)}%`
   const report = run.report ?? (state === 'done' && run.reportText ? undefined : null)
-  const copy = async (what: string, text: string) => { if (onCopy && await onCopy(text)) { setSaid(`${what} copied`); setTimeout(() => setSaid(undefined), 1600) } }
+  const copy = async (what: string, text: string) => { if (onCopy && await onCopy(text)) setSaid(`${what} copied`) }
   const sent = [...(run.dispatches ?? [])].reverse()
   return (
       <>

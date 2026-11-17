@@ -630,30 +630,7 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub-more-said:empty { display: none; }
 .hub-commit:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 
-/* Modal sheets: native dialogs, so the page behind is inert. */
-.hub-sheet {
-  width: min(600px, calc(100% - 32px)); max-width: none; max-height: 84vh; margin: 8vh auto auto; padding: 0; overflow: hidden; color: var(--hub-body);
-  background: var(--hub-card); border: 1px solid var(--hub-hair-strong); border-radius: 16px; box-shadow: var(--hub-shadow-pop);
-  transition: opacity 180ms var(--hub-ease-out), transform 180ms var(--hub-ease-out);
-}
-.hub-sheet[open] { display: grid; }
-@starting-style { .hub-sheet[open] { opacity: 0; transform: translateY(6px) scale(0.98); } }
-.hub-sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
-/* A fixed height, so switching sections does not resize the sheet. */
-.hub-sheet.wide { width: min(1000px, calc(100% - 32px)); height: min(84vh, 720px); }
-.hub-sheet-in { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; max-height: 84vh; }
-.hub-sheet-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 20px; border-bottom: 1px solid var(--hub-hair); }
-.hub-sheet-h > h2 { margin: 0; font: 600 15px/1.2 var(--hub-sans); color: var(--hub-ink); letter-spacing: -0.01em; }
-.hub-sheet-b { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-/* New chat's form brings its own card; inside a sheet it is the sheet. */
-.hub-sheet-b > form { border: 0 !important; background: none !important; border-radius: 0 !important; padding: 20px !important; }
-.hub-sheet-b > .hub-settings { border-bottom: 0; background: transparent; padding: 20px; }
-.hub-sheet-b > section { padding: 20px; }
-@media (max-width: 760px) {
-  .hub-sheet, .hub-sheet.wide { width: 100%; height: 100%; max-height: none; margin: 0; border: 0; border-radius: 0; }
-  .hub-sheet-in { max-height: none; height: 100%; }
-}
-@media (prefers-reduced-motion: reduce) { .hub-menu, .hub-sheet, .hub-more-btn { transition-property: opacity, background-color; } }
+@media (prefers-reduced-motion: reduce) { .hub-menu, .hub-more-btn { transition-property: opacity, background-color; } }
 
 .hub .hub-call[aria-pressed='true'], .hub .hub-call[aria-pressed='true']:hover:not(:disabled) { background: var(--hub-blue-soft); border-color: var(--hub-blue); color: var(--hub-ink); }
 .hub-phone-mode { margin: 0; display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-bottom: 1px solid var(--hub-hair); background: var(--hub-canvas); font: 400 12px/1.4 var(--hub-sans); color: var(--hub-mute); }

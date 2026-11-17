@@ -5,7 +5,9 @@
  * in flow order, and per part the chats, tools and memory notes behind it. Lazy-loaded by switchboard.tsx; read-only.
  * Under 600px it is a list.
  */
+import { useDialog } from '@/hooks/use-dialog'
 import { createContext, memo, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { readStore, writeStore } from '@/lib/store'
 import { BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './flow-map.css'
@@ -192,9 +194,9 @@ function Panel({ p, all, hub, cwd, chatNodes, onPick, onClose }: { p: Part; all:
 /** here: this window's project; cwd: the picked chat's. Both follow the hub until a project is picked in the map. */
 export function FlowMapView({ isDemo, cwds, here, cwd: chatCwd, hub, onClose }: { isDemo: boolean; cwds: string[]; here?: string; cwd?: string; hub?: StageHub; onClose: () => void }) {
   const [chosen, setChosen] = useState<string>()
-  const [saved] = useState(() => { try { return localStorage.getItem(SAVED) ?? undefined } catch { return undefined } })
+  const [saved] = useState(() => readStore(SAVED) ?? undefined)
   const cwd = chosen ?? startProject(cwds, here, saved, chatCwd)
-  const pickProject = (c: string) => { setChosen(c); try { localStorage.setItem(SAVED, c) } catch { /* private window */ } }
+  const pickProject = (c: string) => { setChosen(c); writeStore(SAVED, c) }
   const [map, setMap] = useState<FlowMap>()
   const [mem, setMem] = useState<MemoryGraph>()
   const [problem, setProblem] = useState<string>()
@@ -215,12 +217,7 @@ export function FlowMapView({ isDemo, cwds, here, cwd: chatCwd, hub, onClose }: 
     return () => { stop = true }
   }, [isDemo, cwd])
 
-  const [was] = useState(() => (typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null))
-  useEffect(() => {
-    const d = dlg.current
-    if (d && !d.open) { d.showModal(); d.focus() }
-    return () => { d?.close(); was?.focus?.() }
-  }, [was])
+  useDialog(dlg, d => d.focus())
 
   // demo notes hang off /w/switchboard, so the demo matches by project name
   const all = useMemo(() => (map ? components(map, mem, isDemo ? undefined : cwd) : undefined), [map, mem, cwd, isDemo])

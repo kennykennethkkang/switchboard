@@ -8,6 +8,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { writeJsonAtomic } from '../fs-utils'
 import { redact } from './brain'
+import { withDeadline } from './deadline'
 
 export const SPLIT_MS = 8000
 const MAX_ASKS = 8
@@ -23,10 +24,7 @@ export async function splitAsks(text: string, ask: (prompt: string, ms: number) 
   // A secret in the text stays off the model; the message just starts as one.
   if (!body || redact(body) !== body) return whole
   const q = `Split this message to a coding assistant into its separate, unrelated asks. Keep related sub-steps of one task together in one ask. Copy each ask's wording from the message as closely as you can; never invent asks or add detail. If it is one task, return one ask.\nAnswer with a JSON array of strings only.\n\nMessage: ${body.slice(0, 4000)}`
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<undefined>(r => { timer = setTimeout(() => r(undefined), ms) })
-  const answer = await Promise.race([ask(q, ms).catch(() => undefined), timeout])
-  clearTimeout(timer)
+  const answer = await withDeadline(() => ask(q, ms), ms)
   const json = answer?.slice(answer.indexOf('['), answer.lastIndexOf(']') + 1)
   let asks: unknown
   try { asks = JSON.parse(json || 'null') } catch { return whole }

@@ -41,6 +41,7 @@ import {
 } from './tool-summarizer'
 import { estimateTokenCost, estimateTokensFromText } from './token-estimator'
 import { createLogger } from './logger'
+import { isRecord } from './fs-utils'
 
 const log = createLogger('CodexRolloutParser')
 
@@ -187,10 +188,6 @@ interface CompactedPayload {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object'
-}
 
 /** Flatten message content into a single trimmed string. */
 function flattenContent(content: MessageContent[] | string | undefined): string {

@@ -140,6 +140,13 @@ export type HubCommand =
   | { type: 'hub-pipeline-seed'; slug: string; path: string; run: string }
   | { type: 'hub-trend' }
 
+const COMMAND_WAIT: Partial<Record<HubCommand['type'], number>> = {
+  'hub-git': 8000, 'hub-sweep': 8000, 'hub-sweep-fix': 8000, 'hub-sweep-approve': 8000, 'hub-jarvis': 8000,
+  'hub-voice': 8000, 'hub-harden': 8000, 'hub-key-test': 8000, 'hub-aws-check': 8000, 'hub-setup': 8000,
+  'hub-rules-sync': 8000, 'hub-todo-sync': 8000, 'hub-search': 8000, 'hub-changes': 8000, 'hub-kit-export': 8000,
+}
+export const commandWait = (command: HubCommand) => COMMAND_WAIT[command.type] ?? 1200
+
 /** An attached file in slices; same shapes as extension/src/protocol.ts. */
 export type UploadToExtension =
   | { type: 'upload-start'; id: string; cwd: string; name: string; session?: string }
@@ -352,14 +359,19 @@ class VSCodeBridge {
     return sendSlices(file, { id, cwd, session }, m => this.postToExtension(m), listen, onProgress, signal)
   }
 
+  private request<T, M>(pending: Map<string, (message: M) => void>, id: string, timeout: number, fallback: () => T, answer: (message: M) => T): Promise<T> {
+    return new Promise(done => {
+      const t = setTimeout(() => { pending.delete(id); done(fallback()) }, timeout)
+      pending.set(id, message => { clearTimeout(t); pending.delete(id); done(answer(message)) })
+    })
+  }
+
   /** The Memory view's graph from the extension, or why not. */
   graph(): Promise<MemoryGraph | string> {
     const id = Math.random().toString(36).slice(2)
-    return new Promise(done => {
-      const t = setTimeout(() => { this.graphs.delete(id); done('The editor did not answer') }, 20_000)
-      this.graphs.set(id, m => { clearTimeout(t); this.graphs.delete(id); done(m.graph ?? m.problem ?? 'no graph') })
-      this.postToExtension({ type: 'graph-get', id })
-    })
+    const result = this.request(this.graphs, id, 20_000, () => 'The editor did not answer', m => m.graph ?? m.problem ?? 'no graph')
+    this.postToExtension({ type: 'graph-get', id })
+    return result
   }
 
   /** text cut into its separate asks; [text] when the editor is slow or unsure. */
@@ -371,41 +383,33 @@ class VSCodeBridge {
       return fetch('/hub/split', { method: 'POST', headers: { 'X-Switchboard': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ path, text }), signal: AbortSignal.timeout(15_000) })
         .then(r => (r.ok ? r.json() : null)).then(j => ok(j?.asks), () => [text])
     }
-    return new Promise(done => {
-      const t = setTimeout(() => { this.splits.delete(reqId); done([text]) }, 15_000)
-      this.splits.set(reqId, asks => { clearTimeout(t); this.splits.delete(reqId); done(Array.isArray(asks) && asks.length ? asks : [text]) })
-      this.sendHub({ type: 'hub-split', reqId, path, text })
-    })
+    const result = this.request(this.splits, reqId, 15_000, () => [text], asks => Array.isArray(asks) && asks.length ? asks : [text])
+    this.sendHub({ type: 'hub-split', reqId, path, text })
+    return result
   }
 
   /** cwd's Flow map from the extension, or why not. A big project's first build can take a while. */
   flowMap(cwd: string): Promise<FlowMap | string> {
     const id = Math.random().toString(36).slice(2)
-    return new Promise(done => {
-      const t = setTimeout(() => { this.flowMaps.delete(id); done('The editor did not answer') }, 60_000)
-      this.flowMaps.set(id, m => { clearTimeout(t); this.flowMaps.delete(id); done(m.map ?? m.problem ?? 'no map') })
-      this.postToExtension({ type: 'flowmap-get', id, cwd })
-    })
+    const result = this.request(this.flowMaps, id, 60_000, () => 'The editor did not answer', m => m.map ?? m.problem ?? 'no map')
+    this.postToExtension({ type: 'flowmap-get', id, cwd })
+    return result
   }
 
   /** A role's runs in a chat, for the node drawer, or why not. */
   runs(sessionId: string, role: string): Promise<RunDetail[] | string> {
     const id = Math.random().toString(36).slice(2)
-    return new Promise(done => {
-      const t = setTimeout(() => { this.runLists.delete(id); done('The editor did not answer') }, 20_000)
-      this.runLists.set(id, m => { clearTimeout(t); this.runLists.delete(id); done(m.runs ?? m.problem ?? 'no runs') })
-      this.postToExtension({ type: 'runs-get', id, sessionId, role })
-    })
+    const result = this.request(this.runLists, id, 20_000, () => 'The editor did not answer', m => m.runs ?? m.problem ?? 'no runs')
+    this.postToExtension({ type: 'runs-get', id, sessionId, role })
+    return result
   }
 
   /** A chat's outputs, a transcript page or one screenshot, for the chat view. */
   chat(sessionId: string, what: 'outputs' | 'transcript' | 'shot', ask: ChatAsk = {}): Promise<ChatAnswer> {
     const id = Math.random().toString(36).slice(2)
-    return new Promise(done => {
-      const t = setTimeout(() => { this.chatReads.delete(id); done({ problem: 'The editor did not answer' }) }, 30_000)
-      this.chatReads.set(id, m => { clearTimeout(t); this.chatReads.delete(id); done(m) })
-      this.postToExtension({ type: 'chat-get', id, sessionId, what, ...ask })
-    })
+    const result = this.request<ChatAnswer, ChatAnswer>(this.chatReads, id, 30_000, () => ({ problem: 'The editor did not answer' }), m => m)
+    this.postToExtension({ type: 'chat-get', id, sessionId, what, ...ask })
+    return result
   }
 
   private postToExtension(message: Record<string, unknown>): void {

@@ -6,6 +6,7 @@ import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { readJsonOr } from '../fs-utils'
 
 export const PUSH_DIR = path.join(os.homedir(), '.claude', 'switchboard')
 
@@ -14,19 +15,18 @@ type Vapid = { publicKey: string; privateKey: string }
 type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: Buffer }) => Promise<{ status: number }>
 
 const b64 = (s: string) => Buffer.from(s, 'base64url')
-const readJson = (file: string): unknown => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return undefined } }
-const subs = (dir: string): Sub[] => { const v = readJson(path.join(dir, 'push.json')); return Array.isArray(v) ? v : [] }
+const subs = (dir: string): Sub[] => { const v = readJsonOr(path.join(dir, 'push.json')); return Array.isArray(v) ? v : [] }
 const saveSubs = (dir: string, list: Sub[]) => fs.writeFileSync(path.join(dir, 'push.json'), JSON.stringify(list, null, 2) + '\n', { mode: 0o600 })
 
 /** P-256 keys made once; wx so two windows racing keep the first. */
 export function vapidKeys(dir = PUSH_DIR): Vapid {
   const file = path.join(dir, 'vapid.json')
-  const have = readJson(file) as Vapid | undefined
+  const have = readJsonOr(file) as Vapid | undefined
   if (have?.publicKey && have.privateKey) return have
   const e = crypto.createECDH('prime256v1'); e.generateKeys()
   const keys = { publicKey: e.getPublicKey('base64url'), privateKey: e.getPrivateKey('base64url') }
   fs.mkdirSync(dir, { recursive: true })
-  try { fs.writeFileSync(file, JSON.stringify(keys) + '\n', { mode: 0o600, flag: 'wx' }) } catch { return readJson(file) as Vapid }
+  try { fs.writeFileSync(file, JSON.stringify(keys) + '\n', { mode: 0o600, flag: 'wx' }) } catch { return readJsonOr(file) as Vapid }
   return keys
 }
 

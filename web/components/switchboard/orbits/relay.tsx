@@ -2,10 +2,10 @@
 // Relay: the chat as a pipeline, you to lead to each role to the commit. Wires light once work has
 // passed along them, a packet runs down a wire when work moves, and qa sending work back shows as a loop tag.
 import { useEffect, useRef, useState } from 'react'
-import { ORDER, almostDone } from '../look'
+import { ORDER, almostDone } from '@/lib/look'
 import { loopsOf, teamOf, type TeamRole } from '@/lib/orbit-views'
 import { Glyph, LABEL, Legend, NAME, Reveal, leadLine, leadState, nodeProps, useLive, type ViewProps } from './parts'
-import { describe } from '../orbit'
+import { describe } from './orbit'
 import { CommitText } from '../commit-text'
 
 type Station = { k: string; s: string; name: string; small: string; now?: string; role?: TeamRole }

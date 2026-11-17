@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.21.85
+
+- Set up installs the ui-sdk skill from vercel-labs/ui (UI SDK: keyboard, focus, popups, drag and drop and ARIA as behaviors for React, Vue, Svelte, Solid and web components), for Claude and Codex
+- Designer and engineer kits name ui-sdk for those behaviors, and pin a page with no build step to jsDelivr @ui-sdk/web@<version>, never the unpinned ui-sdk.dev/web.js; credited in Settings, the README and both NOTICE files
+- A chat started or handed off in a project with @ui-sdk/* in package.json (root or web, app, frontend, client, site or ui) is told to invoke the ui-sdk skill and name it in UI briefs; without it a smoke run hand-rolled role= markup, with it the run built from ui-sdk components and passed the agent test
+
+## 0.21.84
+
+- Second untangle pass: unused code and test-only exports removed, one isRecord and readPal, isTempDir imported from its own module
+
+## 0.21.83
+
+- Hub message cases for sweep, dev servers and sign-ins live with their own panel parts
+- Web: Next 16.4.5 (fixes GHSA-mfr8-8qww-v76h and GHSA-vc7v-qv4w-wrv8)
+
+## 0.21.82
+
+- Set up installs the untangle-codebase skill (caldoai/skills, MIT): /untangle-codebase lists hidden links, needless links and surplus in a repo, then fixes them
+- Untangle pass, no behavior change: hub-panel split into state, sweep, dev, sign-ins and Codex parts; one kit path; shared deadline and JSON read helpers; one to-do fetch
+- Web: shared dialog, flash, storage, frame-loop and duration helpers; orbit views in one folder; unused Sheet and skin registry removed
+- Contract tests tie the standup and Approve text to the kit rules and the hook rule copies to setup and uninstall
+
 ## 0.21.80
 
 - A worktree kept by Merge back is removed once no chat has run in it for 10 minutes, if its branch is merged and the tree is clean (no force); case twins count as one folder

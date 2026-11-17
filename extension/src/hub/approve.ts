@@ -30,7 +30,7 @@ export function approvedFields(sessionId: string, commit?: string, now = Date.no
 
 /** The kit rule's closing question (claude-mods kit/rules.md); any other Approve answer is not this. */
 export const APPROVE_QUESTION = 'Approve this chat as finished'
-const APPROVE_OPTIONS = ['Approve', 'Send back'] as const
+export const APPROVE_OPTIONS = ['Approve', 'Send back'] as const
 
 // A subagent killed without SubagentStop (a 429) stays in running up to RUNNING_CAP_MS; past this it no longer holds approval.
 export const LIVE_SUB_MS = 10 * 60 * 1000
@@ -104,10 +104,6 @@ const isClosing = (question: unknown, labels: unknown[]) => typeof question === 
 export const stampedChats = (progress: ChatProgress[]) => progress.filter(p => p.state === 'done'
   || (p.state === 'needs-you' && p.ask?.kind === 'question' && !p.ask.sub && !!p.ask.questions?.some(q => isClosing(q.question, q.options)))).map(p => p.sessionId)
 
-/** The closing question came back Approve and nothing live is left. The question itself puts the chat in needs-you. */
-export const approvedAnswer = (payload: Record<string, unknown>, chat?: ChatProgress, now = Date.now()) => closingApprove(payload) && !approvalBlock(chat, now)
-
-export { isTempDir } from './temp'
 
 /** By name, for callers without the owner map (terminals.ts): actions.ts names chat terminals `Claude Code: ...` or `Codex: ...`. */
 export const ourTerminal = (t: { name: string }) => CHAT_PREFIX.test(t.name)

@@ -3,11 +3,12 @@
 // outer ring otherwise. A change is one eased move along that bearing, so nothing wobbles or crosses.
 // The frame loop runs only while something moves and the picture can be seen; reduced motion draws still frames.
 import { useEffect, useRef } from 'react'
-import { almostDone } from '../look'
+import { almostDone } from '@/lib/look'
 import { approach, TAU as TW } from '@/lib/orbit-motion'
 import { ringHeight, rings, teamOf } from '@/lib/orbit-views'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import { describe, MAX_DPR, type OrbitChat } from '../orbit'
+import { MAX_DPR, frameLoop } from '@/lib/frame-loop'
+import { describe, readPal, type OrbitChat } from './orbit'
 import { LABEL, Legend, NAME, NodeButtons, Reveal, glyphOf, leadLine, placeNodes, type Hit, type ViewProps } from './parts'
 import { CommitText } from '../commit-text'
 
@@ -17,10 +18,6 @@ const TAU = Math.PI * 2
 const POP_MS = 1600
 const rgba = (hex: string, a: number) => { const n = parseInt(hex.replace('#', ''), 16) || 0; return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})` }
 const inOut = (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2)
-function readPal(el: Element): Pal {
-  const s = getComputedStyle(el), v = (k: string) => s.getPropertyValue(`--hub-${k}`).trim().replace(/^#(\w)(\w)(\w)$/, '#$1$1$2$2$3$3')
-  return { ...Object.fromEntries(KEYS.map(k => [k, v(k) || '#888888'])), sans: v('sans') || 'sans-serif', mono: v('mono') || 'monospace' } as Pal
-}
 
 /** Eased values by key, satellites still fading out, tool labels by role, and the call keys already seen. */
 type Scene = { v: Map<string, number>; seen: Set<string>; moving: boolean; snap: boolean; dt: number; sats: Map<string, { role: string; slot: number }>; pops: Map<string, { tool: string; born: number }>; calls: Set<string> | null; hits: Map<string, Hit> }
@@ -203,11 +200,11 @@ export function Constellation(props: ViewProps) {
   useEffect(() => {
     const el = canvas.current!, box = stage.current!, ctx = el.getContext('2d')!
     const motion = matchMedia('(prefers-reduced-motion: reduce)'), light = matchMedia('(prefers-color-scheme: light)')
-    let pal = readPal(el), W = 0, H = 0, raf = 0, onScreen = true, last = 0
+    let pal = readPal(el), W = 0, H = 0, onScreen = true
     const t0 = performance.now()
     const frame = (now: number, dt: number) => {
       const S = scene.current
-      S.dt = Math.min(50, Math.max(0, dt)); last = now
+      S.dt = Math.min(50, Math.max(0, dt))
       // The stage's height follows its width and team size; a change lands at once.
       const want = ringHeight(W, teamOf(shown.current.progress).length)
       if (W && Math.abs(want - H) > 1) { box.style.height = `${want}px`; return }
@@ -220,8 +217,7 @@ export function Constellation(props: ViewProps) {
       return S.moving || S.pops.size > 0 || c.state === 'working' || c.state === 'needs-you' || (c.progress?.roles ?? []).some(r => r.state === 'active')
     }
     const run = () => !motion.matches && onScreen && !document.hidden && vscodeBridge?.shown !== false && moves()
-    const loop = (now: number) => { frame(now, now - last); raf = run() ? requestAnimationFrame(loop) : 0 }
-    const wake = () => { if (raf) return; const now = performance.now(); frame(now, 16); if (run()) raf = requestAnimationFrame(loop) }
+    const { wake, stop } = frameLoop(frame, run)
     redraw.current = wake
     const size = () => {
       // client sizes, not the bounding rect: the fade-in's transform would make them fractional.
@@ -240,7 +236,7 @@ export function Constellation(props: ViewProps) {
     void document.fonts?.ready.then(theme)
     stamp(shown.current); wake()
     return () => {
-      cancelAnimationFrame(raf); raf = 0; redraw.current = () => {}
+      stop(); redraw.current = () => {}
       ro.disconnect(); io.disconnect(); mo.disconnect(); offShown?.()
       light.removeEventListener('change', theme); motion.removeEventListener('change', wake); document.removeEventListener('visibilitychange', wake)
     }

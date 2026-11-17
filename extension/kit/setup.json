@@ -41,7 +41,8 @@
     { "repo": "cathrynlavery/diagram-design", "names": ["diagram-design"] },
     { "repo": "vercel-labs/skills", "names": ["find-skills"] },
     { "repo": "JuliusBrussee/caveman", "names": ["caveman"] },
-    { "repo": "caldoai/skills", "names": ["untangle-codebase"] }
+    { "repo": "caldoai/skills", "names": ["untangle-codebase"] },
+    { "repo": "vercel-labs/ui", "path": "packages/core/skills", "names": ["ui-sdk"] }
   ],
   "tools": [
     { "uv": "scrapling[ai]", "skill": { "repo": "D4Vinci/Scrapling", "path": "agent-skill", "name": "scrapling-official" }, "mcp": { "name": "scrapling", "command": "scrapling-mcp" } },

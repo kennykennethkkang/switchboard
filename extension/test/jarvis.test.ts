@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { jarvis, jarvisLocal, jarvisStart } from '../src/hub/jarvis'
+import { jarvis, jarvisLocal } from '../src/hub/jarvis'
 import { emptyHub } from '../src/hub/hub-service'
 import { commandProblem } from '../src/hub/routes'
 import type { ChatProgress, HubState } from '../src/hub/types'
@@ -68,72 +68,6 @@ describe('jarvis local answers', () => {
   it('takes the curly apostrophe a phone keyboard types', () => {
     for (const q of ['what\u2019s running?', 'today\u2019s standup', 'what\u2019s done today?'])
       assert.ok(jarvisLocal(hub(), q, NOW), q)
-  })
-})
-
-describe('jarvis start proposals', () => {
-  it('turns "start a chat to" into the open project and the goal', () => {
-    assert.deepEqual(jarvisStart(hub(), 'start a chat to fix the login redirect'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix the login redirect' })
-  })
-
-  it('takes a project named in the text', () => {
-    assert.deepEqual(jarvisStart(hub(), 'Start a new chat in armasu to add a size chart'), { folder: '/w/Armasu', project: 'Armasu', goal: 'add a size chart' })
-  })
-
-  it('keeps a run <skill> instruction whole as the goal', () => {
-    assert.deepEqual(jarvisStart(hub(), 'run superpowers:brainstorming on the cache in Armasu'), { folder: '/w/Armasu', project: 'Armasu', goal: 'run superpowers:brainstorming on the cache in Armasu' })
-  })
-
-  it('ignores questions and an empty goal', () => {
-    assert.equal(jarvisStart(hub(), 'what is running'), undefined)
-    assert.equal(jarvisStart(hub(), 'start a chat'), undefined)
-  })
-
-  it('keeps an unknown "for/on X" in the goal on the open project', () => {
-    assert.deepEqual(jarvisStart(hub(), 'start a chat for fixing the login'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'for fixing the login' })
-    assert.equal(jarvisStart(hub(), 'start a chat on the cache bug')?.goal, 'on the cache bug')
-    assert.equal(jarvisStart(hub(), 'start a chat for Armasu to add a size chart')?.project, 'Armasu')
-  })
-
-  it('matches a multi-word project name in any case', () => {
-    const s = hub({ projects: [...hub().projects, { name: 'My App', path: '/w/My App', kind: 'project', isOpen: false }] })
-    assert.deepEqual(jarvisStart(s, 'start a chat in my app to add login'), { folder: '/w/My App', project: 'My App', goal: 'add login' })
-  })
-
-  it('matches a project name heard without its spaces or hyphens', () => {
-    for (const q of ['start a chat in ClaudeMods to fix it', 'start a chat in claude mods to fix it'])
-      assert.deepEqual(jarvisStart(hub(), q), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix it' }, q)
-  })
-
-  it('drops a comma before the goal', () => {
-    assert.equal(jarvisStart(hub(), 'start a chat in Armasu, to add a size chart')?.goal, 'add a size chart')
-  })
-
-  it('takes a project only right after the start phrase, not from inside the goal', () => {
-    const s = hub({ projects: [...hub().projects, { name: 'a', path: '/w/a', kind: 'repo', isOpen: false }, { name: 'web', path: '/w/web', kind: 'repo', isOpen: false }] })
-    assert.deepEqual(jarvisStart(s, 'start a chat to work on a bug'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'work on a bug' })
-    assert.deepEqual(jarvisStart(s, 'start a chat to fix login on web'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix login on web' })
-    assert.equal(jarvisStart(s, 'start a chat in web to fix login')?.project, 'web')
-  })
-
-  it('takes a closing "in X" on a start and drops it from the goal', () => {
-    const s = hub({ projects: [{ name: 'Armasu', path: '/w/Armasu', kind: 'repo', isOpen: true }, { name: 'claude-mods', path: '/w/claude-mods', kind: 'repo', isOpen: false }] })
-    assert.deepEqual(jarvisStart(s, 'start a chat to fix the tests in claude-mods'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix the tests' })
-    assert.deepEqual(jarvisStart(s, 'Start a chat to fix the tests in ClaudeMods.'), { folder: '/w/claude-mods', project: 'claude-mods', goal: 'fix the tests' })
-    assert.equal(jarvisStart(s, 'start a chat to fix login on claude-mods')?.project, 'Armasu')
-  })
-
-  it('takes a run project right after the skill or as a closing "in X"', () => {
-    const s = hub({ projects: [...hub().projects, { name: 'web', path: '/w/web', kind: 'repo', isOpen: false }] })
-    assert.equal(jarvisStart(s, 'run code-review on web')?.project, 'web')
-    assert.equal(jarvisStart(s, 'run code-review on the diff for web')?.project, 'claude-mods')
-    assert.equal(jarvisStart(s, 'run code-review on the diff in web')?.project, 'web')
-  })
-
-  it('treats run as a start only for an installed skill', () => {
-    assert.equal(jarvisStart(hub(), 'run me through what got done today'), undefined)
-    assert.equal(jarvisStart(hub(), 'run code-review on the diff')?.goal, 'run code-review on the diff')
-    assert.equal(jarvisStart(hub(), 'run brainstorming on the cache')?.project, 'claude-mods')
   })
 })
 

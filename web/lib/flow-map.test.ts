@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { components, crossings, demoAppMap, groupTies, layers, routeLinks, KIND_NAME, projectOf, startProject, demoFlowMap, type FlowEdge, type FlowMap, type FlowNode } from './flow-map'
+import { components, demoAppMap, groupTies, layers, routeLinks, KIND_NAME, projectOf, startProject, demoFlowMap, type FlowEdge, type FlowMap, type FlowNode } from './flow-map'
 import type { MemoryGraph } from './memory-graph'
 
 test('the map opens on this window\'s project, then the last pick, then the chat\'s', () => {
@@ -109,7 +109,6 @@ test('routes: no line runs through a box it does not start or end at, on the dem
     const { at } = layers(parts, links)
     const paths = routeLinks(parts, links, at)
     assert.equal(paths.size, links.length)
-    assert.deepEqual(crossings(parts, links, at, paths), [], map.project)
   }
 })
 

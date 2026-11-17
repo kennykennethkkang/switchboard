@@ -1,6 +1,6 @@
 /** Board effects: wait ropes between chats, and the usage pause freeze and thaw. */
 import type { ChatLink, LimitPause } from './hub-types'
-import { baseName } from './wait-links'
+import { baseName } from './path'
 
 /** One rope per chat pair; from waits on to (the first link seen). file: an auto link's file name. */
 export type Rope = { key: string; from: string; to: string; file?: string }

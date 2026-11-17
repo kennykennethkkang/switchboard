@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import type { Changes } from '@/lib/hub-types'
-import { caps, panel, repoOf } from './look'
+import { caps, panel } from './look'
+import { baseName } from '@/lib/path'
 import { CopyCommit } from './chat-cards'
 
 const mono = { font: '400 12px/1.5 var(--hub-mono)' } as const
@@ -23,11 +24,11 @@ export function ChangesPanel({ changes, sessionId, cwd, commit, onCopy, onOpen, 
         <span>Changes{mine ? ` · ${files.length} ${files.length === 1 ? 'file' : 'files'}` : ''}</span>
         {files.length > 0 && <Counts a={files.reduce((n, f) => n + f.added, 0)} r={files.reduce((n, f) => n + f.removed, 0)} />}
       </h3>
-      {!mine && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading the changes in {repoOf(cwd)}…</p>}
+      {!mine && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading the changes in {baseName(cwd)}…</p>}
       {mine?.problem && <p role="alert" style={{ margin: 0, color: 'var(--hub-red)', fontSize: 13 }}>{mine.problem}</p>}
-      {mine && !mine.problem && !files.length && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No uncommitted changes in {repoOf(cwd)}.</p>}
+      {mine && !mine.problem && !files.length && <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>No uncommitted changes in {baseName(cwd)}.</p>}
       {files.length > 0 && <>
-        <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 12 }}>Uncommitted in {repoOf(cwd)}: other chats in this folder may have made some of these.</p>
+        <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 12 }}>Uncommitted in {baseName(cwd)}: other chats in this folder may have made some of these.</p>
         <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
           {files.map(f => {
             const on = open === f.path

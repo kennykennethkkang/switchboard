@@ -1,7 +1,7 @@
 'use client'
 // Deck: one card per role, working ones open. A click opens or closes a card and that choice sticks for this chat.
 import { useRef, useState } from 'react'
-import { almostDone } from '../look'
+import { almostDone } from '@/lib/look'
 import { teamOf, timeline, type TeamRole } from '@/lib/orbit-views'
 import type { ToolCall } from '@/lib/hub-types'
 import { say } from '@/lib/eta'

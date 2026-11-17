@@ -11,7 +11,7 @@ import { editorName } from '@/lib/editor'
 import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import { projectName } from '@/lib/archive'
 import { focusBack } from '@/lib/focus-back'
-import { repoOf } from './look'
+import { baseName } from '@/lib/path'
 import { Pick } from './gear'
 import './sign-ins.css'
 
@@ -186,7 +186,7 @@ function Add({ title, open, children }: { title: string; open?: boolean; childre
 function Uses({ hub, send, folder, here }: { hub: HubState; send: Send; folder: string; here: boolean }) {
   const si = hub.signIns
   const uses = si?.links?.[folder] ?? {}
-  const repo = repoOf(folder)
+  const repo = baseName(folder)
   const profile = profileFor(si?.projects ?? {}, folder)
   // Optional, like a web app: no pick means no AWS_PROFILE and no sign-in nag.
   const p = profile ? hub.aws.find(a => a.name === profile) : undefined
@@ -267,7 +267,7 @@ function ThisProject({ hub, send }: { hub: HubState; send: Send }) {
       <p className="si-help">Which accounts this project's chats and terminals use, and where their sign-ins open.</p>
       {here
         ? <div className="si-card">
-            <header><strong title={here}>{repoOf(here)}</strong><span title={here}>{home(here)}</span></header>
+            <header><strong title={here}>{baseName(here)}</strong><span title={here}>{home(here)}</span></header>
             <Uses hub={hub} send={send} folder={here} here={!!si?.window && norm(si.window) === norm(here)} />
           </div>
         : <p className="si-empty">Open a project folder in this window to pick its accounts.</p>}
@@ -299,7 +299,7 @@ function Others({ hub, send }: { hub: HubState; send: Send }) {
         <details key={f} className="hub-fold-list si-other">
           <summary>
             <b aria-hidden>›</b>
-            <span style={{ color: 'var(--hub-ink)', flex: '0 0 auto' }}>{repoOf(f)}</span>
+            <span style={{ color: 'var(--hub-ink)', flex: '0 0 auto' }}>{baseName(f)}</span>
             <span>{sum(f)}</span>
           </summary>
           <div style={{ marginLeft: 22 }}><Uses hub={hub} send={send} folder={f} here={false} /></div>

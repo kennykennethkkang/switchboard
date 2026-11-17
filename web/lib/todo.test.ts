@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { aiPath, autopilot, busiestTodo, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, openElsewhere, ordered, runCount, runIds, runLanded, runTargets, withHome } from './todo'
+import { aiPath, autopilot, busiestTodo, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, withHome } from './todo'
 import { demoHub } from './hub-demo'
 import type { ChatRow, TodoItem, TodoList } from './hub-types'
 
@@ -36,16 +36,8 @@ describe('todo panel helpers', () => {
     assert.deepEqual(rows.map(r => [r.t.id, r.depth]), [['a', 0], ['pp', 2], ['p', 1], ['b', 0], ['q', 0]])
     assert.deepEqual(ordered([t('x', 'y'), t('y', 'x')]).map(r => r.t.id).sort(), ['x', 'y'])
   })
-  it('counts what a run does: the picked items and their open prerequisites', () => {
-    const list = [t('a'), t('b'), t('p', 'b'), t('pp', 'p')]
-    assert.equal(runCount(list, ['b']), 3)
-    assert.equal(runCount(list, ['a', 'p']), 3)
-    assert.equal(runCount(list, ['gone']), 0)
-  })
-  it('counts open items in other projects, leaving out hand steps that show under Finish up', () => {
+  it('counts open items, leaving out hand steps that show under Finish up', () => {
     const you: TodoItem = { ...t('y'), why: 'you' }
-    assert.equal(openElsewhere({ '/a': { todo: [t('1'), t('2'), you] }, '/b': { todo: [t('3')] }, '/c': { todo: [] } }, '/b'), 2)
-    assert.equal(openElsewhere(undefined, '/b'), 0)
     assert.equal(openCount({ todo: [t('1'), you] }), 1)
     assert.equal(openCount(undefined), 0)
   })
@@ -72,7 +64,6 @@ describe('run landed', () => {
   it('runs the picked items with their open prerequisites', () => {
     const list: TodoItem[] = [{ id: 'a', text: 'A', at: 1 }, { id: 'p', text: 'P', at: 1, before: 'a' }, { id: 'pp', text: 'PP', at: 1, before: 'p' }, { id: 'x', text: 'X', at: 1 }]
     assert.deepEqual([...runIds(list, ['a', 'gone'])].sort(), ['a', 'p', 'pp'])
-    assert.equal(runCount(list, ['a']), 3)
   })
 })
 

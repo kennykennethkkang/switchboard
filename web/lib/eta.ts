@@ -1,5 +1,6 @@
 /** How far a chat is through its task list, and roughly how long the rest takes at its own pace so far. */
 import type { ChatProgress, TaskRow } from './hub-types'
+import { formatDuration } from './duration'
 
 export type Eta = { done: number; total: number; current?: TaskRow; elapsedMs: number; perTaskMs?: number; leftMs?: number }
 
@@ -20,11 +21,7 @@ export function eta(p: ChatProgress, now: number): Eta {
 
 /** "under a minute", "about 4 min", "about 1 h 20 min". */
 export function say(ms: number): string {
-  const m = Math.round(ms / 60e3)
-  if (m < 1) return 'under a minute'
-  if (m < 60) return `about ${m} min`
-  const five = Math.round(m / 5) * 5, h = Math.floor(five / 60), r = five % 60
-  return `about ${h} h${r ? ` ${r} min` : ''}`
+  return formatDuration(ms, 'eta')
 }
 
 const MIN = 60e3

@@ -4,6 +4,7 @@
  */
 import * as fs from 'fs'
 import * as path from 'path'
+import { withDeadline } from './deadline'
 
 export const ROUTE_MS = 8000
 /** The moved chat's first line; a prompt starting with it is never moved again. */
@@ -25,10 +26,7 @@ export async function routeProject(prompt: string, cwd: string, projects: { name
   if (!current || !others.length) return undefined
   const list = others.map((p, i) => `${i + 1}. ${p.name} (${p.path})`).join('\n')
   const q = `A coding task was typed in the folder ${cwd}. Which project is it about?\n0. ${current.name} (the folder it was typed in)\n${list}\n\nAnswer 0 unless the task clearly names or is about one of the other projects. Answer with the number only.\n\nTask: ${text.slice(0, 1500)}`
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<undefined>(r => { timer = setTimeout(() => r(undefined), ms) })
-  const answer = await Promise.race([ask(q, ms).catch(() => undefined), timeout])
-  clearTimeout(timer)
+  const answer = await withDeadline(() => ask(q, ms), ms)
   const n = Number(answer?.trim().match(/^\d+/)?.[0])
   return n >= 1 ? others[n - 1]?.path : undefined
 }

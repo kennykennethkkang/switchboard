@@ -1,4 +1,3 @@
-// The to-do panel's pure parts.
 import type { AiId, ArchivedChat, ChatRow, TodoItem, TodoList } from './hub-types'
 
 // Windows paths (a drive letter first): either slash, either case.
@@ -45,10 +44,6 @@ export function ordered(todo: TodoItem[]): Array<{ t: TodoItem; depth: number }>
 /** Items the to-do list shows: hand steps (why 'you') show under Finish up instead. */
 export const openCount = (l?: TodoList) => l?.todo.filter(t => t.why !== 'you').length ?? 0
 
-/** Open items in every project but this one. */
-export const openElsewhere = (todos: Record<string, TodoList> | undefined, folder: string) =>
-  Object.entries(todos ?? {}).reduce((n, [f, l]) => n + (f === folder ? 0 : openCount(l)), 0)
-
 /** Running chats in the project that the panel can send a message to. */
 export const runTargets = (chats: ChatRow[], folder: string) => chats.filter(c => c.live && c.takes && inside(folder, c.cwd))
 
@@ -61,7 +56,6 @@ export function runIds(todo: TodoItem[], ids: string[]): Set<string> {
   }
   return s
 }
-export const runCount = (todo: TodoItem[], ids: string[]) => runIds(todo, ids).size
 
 /** Whether a run shows in the list: each picked item gone or in the chat it went to (to), else in a chat other than the one it had (was). */
 export const runLanded = (todo: TodoItem[], ids: string[], was: Map<string, string | undefined>, to?: string) =>

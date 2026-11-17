@@ -22,7 +22,6 @@ export class JsonlEventSource implements vscode.Disposable {
 
   start(): void {
     if (!fs.existsSync(this.filePath)) {
-      // Create the file if it doesn't exist
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true })
       fs.writeFileSync(this.filePath, '')
     }

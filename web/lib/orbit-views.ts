@@ -1,7 +1,7 @@
 /** Pure parts of the center picture's other styles: Relay, Lanes, Constellation and Deck. */
 import type { ChatProgress, RoleStep, ToolCall } from './hub-types'
 import { groupRoles } from './orbit-motion'
-import { ORDER } from '../components/switchboard/look'
+import { ORDER } from './look'
 
 export const VIEWS = ['orbit', 'relay', 'lanes', 'constellation', 'deck'] as const
 export type View = (typeof VIEWS)[number]

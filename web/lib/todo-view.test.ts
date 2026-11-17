@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import type { TodoList } from './hub-types'
-import { filedBy, isLong, shortSha, projectsWithWork, recentDone, shippedOf, shownProjects, counts } from './todo-view'
+import { isLong, shortSha, projectsWithWork, recentDone, shippedOf, shownProjects, counts } from './todo-view'
 
 const DAY = 864e5, now = 100 * DAY
 const lists: Record<string, TodoList> = {
@@ -56,13 +56,7 @@ describe('shippedOf', () => {
   })
 })
 
-describe('filedBy and isLong', () => {
-  it('names you, the chat name, or a fallback', () => {
-    assert.equal(filedBy({}), 'you')
-    assert.equal(filedBy({ from: 'c1', name: 'Login fix' }), 'Login fix')
-    assert.equal(filedBy({ from: 'c1' }, 'Now name'), 'Now name')
-    assert.equal(filedBy({ from: 'c1' }), 'a chat')
-  })
+describe('isLong', () => {
   it('folds long or many-line text', () => {
     assert.equal(isLong('short'), false)
     assert.equal(isLong('x'.repeat(181)), true)

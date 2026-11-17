@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { laneRow, type Day } from '@/lib/now'
 import type { ArchivedChat } from '@/lib/hub-types'
 import { plural, type Card } from './chat-cards'
-import { ago } from './look'
+import { ago } from '@/lib/look'
 import './layout.css'
 
 type Tone = 'red' | 'blue' | 'green'

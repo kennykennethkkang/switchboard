@@ -7,6 +7,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { approve, digest, held, intakePlugin, intakeSkill, needsApproval, readSweep, repoOf, symlinkIn, sweepOne, type SweepRecord } from '../../kit/sweep.mjs'
+import { readJsonOr } from '../fs-utils'
 import type { Installed } from './types'
 
 export { readSweep, repoOf, held }
@@ -99,7 +100,6 @@ export function fixBrief(name: string, rec: SweepRecord | undefined): string {
 }
 
 const git = (args: string[]) => new Promise<string>(resolve => execFile('git', args, { timeout: 120_000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (err, _o, stderr) => resolve(err ? (String(stderr).trim().split('\n').at(-1) || err.message) : '')))
-const readJson = (f: string) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')) as Record<string, unknown> } catch { return undefined } }
 const skillName = (dir: string) => /^name:\s*["']?([^"'\s]+)/m.exec(fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8'))?.[1]
 /** One tool's outcome as a line, for the panel and the sweep tool. */
 export const line = (n: string, r: SweepRecord | undefined) => !r ? `${n}: added, not found to sweep`
@@ -120,7 +120,7 @@ export async function addRepo(input: string, d: SweepDeps, clone: (repo: string,
     // A link can point anywhere on this machine; nothing with one comes in.
     const link = symlinkIn(dir)
     if (link) throw new Error(`${repo} holds a symlink (${link}), refused`)
-    const market = readJson(path.join(dir, '.claude-plugin', 'marketplace.json'))
+    const market = readJsonOr(path.join(dir, '.claude-plugin', 'marketplace.json')) as Record<string, unknown> | undefined
     if (market) {
       const name = typeof market.name === 'string' ? market.name : ''
       const ids = (Array.isArray(market.plugins) ? market.plugins : []).map(p => (p as { name?: unknown }).name).filter((n): n is string => typeof n === 'string' && /^[\w.-]+$/.test(n)).map(n => `${n}@${name}`)

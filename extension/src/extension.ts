@@ -6,7 +6,9 @@ import { startClaudeRuntime } from './claude-runtime'
 import { startCodexRuntime } from './codex-runtime'
 import { promptHookSetupIfNeeded, configureClaudeHooks, isDisable1MContext } from './hooks-config'
 import { createLogger } from './logger'
-import { startHub, addHubPoster, handleHubMessage, bindStatusBar, hubViewShown, resendHubState, KIT_DIR } from './hub/hub-panel'
+import { startHub, addHubPoster, handleHubMessage, bindStatusBar, hubViewShown, resendHubState }
+from './hub/hub-panel'
+import { kitDir } from './constants'
 import { startSelfUpdate } from './hub/self-update'
 import { watchCloseForMove } from './close-for-move'
 import type { AgentRuntime, AgentRuntimeMode } from './session-runtime'
@@ -65,7 +67,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // The hub and the Activity Bar view first: a click on the Switchboard icon resolves the view at once,
   // without waiting for the session runtimes below to start.
   startHub(context)
-  startSelfUpdate(context, KIT_DIR)
+  startSelfUpdate(context, kitDir())
   watchCloseForMove(context)
 
   // Activity Bar icon: VS Code can only open a sidebar view from it, so the view opens Switchboard as an

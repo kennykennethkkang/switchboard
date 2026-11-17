@@ -102,6 +102,24 @@ export function toolsNote(p: ChatProfile, held?: Set<string>): string {
     refs.length ? `Before any UI, styling or web design work, read these design references first: ${refs.join(', ')}.` : ''].filter(Boolean).join(' ')
 }
 
+const usesUiSdk = (file: string) => {
+  try {
+    const p = JSON.parse(fs.readFileSync(file, 'utf8'))
+    return Object.keys({ ...p.dependencies, ...p.devDependencies, ...p.peerDependencies }).some(k => k.startsWith('@ui-sdk/'))
+  } catch { return false }
+}
+
+// The usual app folders only: any subfolder would flag a folder of sibling repos.
+const APP_DIRS = ['', 'web', 'app', 'frontend', 'client', 'site', 'ui']
+
+/** For a project with @ui-sdk/* in package.json, at its root or in an app folder (web/, app/): the ui-sdk skill only says "use whenever installed", and a smoke run skipped it. */
+// ponytail: fixed folder list; apps/*/ monorepos need a workspace glob if one shows up.
+export function uiSdkNote(folder: string): string | undefined {
+  return APP_DIRS.some(d => usesUiSdk(path.join(folder, d, 'package.json')))
+    ? 'This project uses ui-sdk (@ui-sdk/* in package.json): invoke the ui-sdk skill before writing or reviewing UI, build controls from its components instead of hand-rolled role= markup, and name ui-sdk in every designer, engineer and qa brief that touches UI.'
+    : undefined
+}
+
 // Read per write, so the Ask before actions switch reaches the next start or resume.
 // Asking also drops the .mcp.json auto-trust: a cloned repo's server runs its own commands.
 // LISTING rides here so a resume rewrites old settings files with it too.

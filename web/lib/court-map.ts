@@ -2,7 +2,7 @@
  * When VS Code windows are known, each window gets its own island on the ring and its chats fan out from it instead. Pure, so it is tested. */
 import type { ChatProgress, HubState, WindowColor } from './hub-types'
 import { byWindow } from './windows'
-import { ORDER, almostDone, missedCount } from '../components/switchboard/look'
+import { ORDER, almostDone, missedCount } from './look'
 import type { MemoryGraph } from './memory-graph'
 import { limitTag } from './budget-ui'
 import { chatRun, raiseLine, raisesFor, stageView } from './stages-ui'

@@ -181,6 +181,7 @@ Installed by Set up from their own repos (not bundled):
 - [find-skills](https://github.com/vercel-labs/skills) by Vercel
 - [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache-2.0
 - [untangle-codebase](https://github.com/caldoai/skills) by Maze (caldoai), MIT; /untangle-codebase lists every hidden link, needless link and bit of surplus in a repo, then fixes the list
+- [ui-sdk](https://github.com/vercel-labs/ui) by Vercel Labs, Apache 2.0; the UI SDK skill, so designer and engineer build keyboard, focus, popup and drag and drop behaviors from @ui-sdk/core instead of hand-rolled ARIA
 - [Scrapling](https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause
 - [Agent Reach](https://github.com/Panniantong/Agent-Reach) by Panniantong
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs, Apache 2.0; npm install -g, then agent-browser install for its browser, skipped when already on PATH

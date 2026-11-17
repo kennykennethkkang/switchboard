@@ -226,6 +226,18 @@ describe('setup steps', () => {
     assert.ok(KIT.skills?.some(k => k.repo === 'caldoai/skills' && k.names.includes('untangle-codebase')))
   })
 
+  it('installs ui-sdk from vercel-labs/ui, where it lives under packages/core/skills', () => {
+    assert.ok(KIT.skills?.some(k => k.repo === 'vercel-labs/ui' && k.path === 'packages/core/skills' && k.names.includes('ui-sdk')))
+  })
+
+  it('designer and engineer pin ui-sdk web bundles, since the skill says the unpinned ui-sdk.dev/web.js', () => {
+    for (const role of ['designer', 'engineer']) {
+      const md = fs.readFileSync(path.join(__dirname, '..', 'kit', 'agents', `${role}.md`), 'utf8')
+      assert.match(md, /cdn\.jsdelivr\.net\/npm\/@ui-sdk\/web@<exact version>\/browser\/web\.js/, role)
+      assert.match(md, /never the unpinned ui-sdk\.dev\/web\.js/, role)
+    }
+  })
+
   it('installs caveman as a skill, not as a plugin with hooks', () => {
     assert.ok(KIT.skills?.some(k => k.repo === 'JuliusBrussee/caveman' && k.names.includes('caveman')))
     assert.ok(!KIT.plugins.some(p => p.startsWith('caveman')))

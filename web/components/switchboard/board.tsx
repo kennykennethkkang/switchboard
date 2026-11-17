@@ -1,7 +1,9 @@
 'use client'
 // Board: the Celestial Court. Council in the middle, a pavilion per AI, a courtyard per chat, a desk per role.
 // Sprites and islands are drawn in code. Animated agents: idea from Pixel Agents (pablodelucca/pixel-agents, MIT), no code taken.
+import { useDialog } from '@/hooks/use-dialog'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { readStore, writeStore } from '@/lib/store'
 import { flushSync } from 'react-dom'
 import type { Ask, Choice, HubState, TaskRow } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
@@ -12,11 +14,11 @@ import { PLACES, PLATE, buildCourt, markSpot, courtSummary, forcedSpot, freeSpot
 import { askChoice } from '@/lib/ask'
 import { END_S, THAW_S, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
 import { BASKET, CARP, pixCanvas } from '@/lib/sprites/carp'
-import { MODE_KEY, SKINS, SKIN_KEY, lookOf, readPick, skinOf, type CourtColors as C, type Mode } from '@/lib/skins'
+import { MODE_KEY, SKIN_KEY, journeyWest, lookOf, readPick, type CourtColors as C, type Mode } from '@/lib/skins'
 import { BoardTools, beltCounts } from './board-tools'
 import { SummaryFold } from './chat-cards'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import { MAX_DPR } from './orbit'
+import { MAX_DPR, frameLoop } from '@/lib/frame-loop'
 import './board.css'
 
 type View = { x: number; y: number; z: number }
@@ -1169,9 +1171,8 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     return () => { stop = true; clearInterval(i) }
   }, [isDemo])
   const court = useMemo(() => buildCourt(shown, { w: stage[0], h: stage[1] }, mem?.graph), [shown, stage, mem?.graph])
-  const [skinId, setSkinId] = useState(SKINS[0].id)
   const [mode, setMode] = useState<Mode>('day')
-  const skin = useMemo(() => lookOf(skinOf(skinId), mode), [skinId, mode])
+  const skin = useMemo(() => lookOf(journeyWest, mode), [mode])
   const [picked, setPicked] = useState<string>()
   const [sent, setSent] = useState<Record<string, string>>({})
   const canvas = useRef<HTMLCanvasElement>(null), dlg = useRef<HTMLDialogElement>(null)
@@ -1186,19 +1187,14 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     setPicked(id)
   }
   useEffect(() => { st.current.go = go })
-  const [was] = useState(() => (typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null))
 
   useEffect(() => {
     let skin = null, mode = null
-    try { skin = localStorage.getItem(SKIN_KEY); mode = localStorage.getItem(MODE_KEY) } catch { /* no storage */ }
+    skin = readStore(SKIN_KEY); mode = readStore(MODE_KEY)
     const p = readPick(skin, mode, matchMedia('(prefers-color-scheme: dark)').matches)
-    setSkinId(p.id); setMode(p.mode)
+    setMode(p.mode)
   }, [])
-  useEffect(() => {
-    const d = dlg.current
-    if (d && !d.open) d.showModal()
-    return () => { d?.close(); was?.focus?.() }
-  }, [was])
+  useDialog(dlg)
   // Canvas text does not pull in a web font by itself.
   useEffect(() => {
     let stop = false
@@ -1232,7 +1228,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   useEffect(() => {
     const el = canvas.current!, g = el.getContext('2d')!, s = st.current
     const motion = matchMedia('(prefers-reduced-motion: reduce)')
-    let W = 0, H = 0, dpr = 1, raf = 0, onScreen = true, tick = 0
+    let W = 0, H = 0, dpr = 1, onScreen = true, tick = 0
     const t0 = performance.now()
     // Whole device pixels per art pixel once zoomed in; quarter steps below one so the whole court still fits.
     const snap = (z: number, down = false) => {
@@ -1283,11 +1279,10 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     const live = () => fading() || awake() || s.fx.size > 0 || s.court.nodes.some(n => n.state === 'working' || n.state === 'needs')
     // Runs while something moves and can be seen; reduced motion still ticks once a second for the timers, and runs a fade through.
     const run = () => (!motion.matches || fading()) && onScreen && !document.hidden && vscodeBridge?.shown !== false && live()
-    const loop = (now: number) => { frame(now); raf = run() ? requestAnimationFrame(loop) : 0 }
-    const wake = () => { if (raf) return; frame(performance.now()); if (run()) raf = requestAnimationFrame(loop) }
+    const { wake, stop, running } = frameLoop(now => frame(now), run)
     s.wake = wake
     // Once a second also lifts the Zzz of idle sprites, so a quiet board needs no rAF.
-    tick = window.setInterval(() => { if (!raf && onScreen && !document.hidden && (live() || !!s.pause || s.court.nodes.some(n => n.kind === 'desk' && n.state === 'idle'))) frame(performance.now()) }, 1000)
+    tick = window.setInterval(() => { if (!running() && onScreen && !document.hidden && (live() || !!s.pause || s.court.nodes.some(n => n.kind === 'desk' && n.state === 'idle'))) frame(performance.now()) }, 1000)
     const size = () => {
       const r = el.getBoundingClientRect()
       dpr = Math.min(MAX_DPR, devicePixelRatio || 1)
@@ -1374,17 +1369,16 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     motion.addEventListener('change', wake); document.addEventListener('visibilitychange', wake)
     const offShown = vscodeBridge?.onShown(wake)
     return () => {
-      cancelAnimationFrame(raf); clearInterval(tick); ro.disconnect(); io.disconnect()
+      stop(); clearInterval(tick); ro.disconnect(); io.disconnect()
       motion.removeEventListener('change', wake); document.removeEventListener('visibilitychange', wake); offShown?.()
       el.removeEventListener('pointerdown', down); el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.removeEventListener('pointerleave', leave)
       el.removeEventListener('wheel', wheel)
     }
   }, [])
 
-  const pickSkin = (id: string) => { setSkinId(id); try { localStorage.setItem(SKIN_KEY, id) } catch { /* no storage */ } }
   // Day and night crossfade; the second frame lets the canvas repaint before the new snapshot.
   const flip = () => {
-    const next: Mode = mode === 'night' ? 'day' : 'night', swap = () => { setMode(next); try { localStorage.setItem(MODE_KEY, next); localStorage.setItem(SKIN_KEY, skinId) } catch { /* no storage */ } }
+    const next: Mode = mode === 'night' ? 'day' : 'night', swap = () => { setMode(next); writeStore(MODE_KEY, next); writeStore(SKIN_KEY, journeyWest.id) }
     const vt = (document as Document & { startViewTransition?: (f: () => Promise<void>) => unknown }).startViewTransition
     if (!vt || matchMedia('(prefers-reduced-motion: reduce)').matches) return swap()
     vt.call(document, () => new Promise<void>(done => { flushSync(swap); requestAnimationFrame(() => requestAnimationFrame(() => done())) }))
@@ -1419,11 +1413,6 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
         <span className="board-sub">{skin.copy.title}</span>
         <span className="board-meta"><b>{count('working')}</b> working <b>{count('waiting')}</b> waiting <b>{count('done')}</b> done <b>{yards.length}</b> chats</span>
         {needs && <button type="button" className="hub-btn board-need" aria-label={`${count('needs')} needs you`} onClick={() => open(needs, true)}><i aria-hidden />{count('needs')}<span className="board-need-word"> needs you</span></button>}
-        {SKINS.length > 1 && <label className="board-skin">Skin
-          <select value={skin.id} onChange={e => pickSkin(e.target.value)} title={skin.info}>
-            {SKINS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </label>}
         <span className="board-zoom" role="group" aria-label="Zoom">
           {/* Same order as the Code map's controls: in, out, fit. */}
           <button type="button" className="hub-btn board-z" aria-label="Zoom in" aria-keyshortcuts="+" title="Zoom in (+)" onClick={() => st.current.zoom(1)}>+</button>

@@ -2,11 +2,12 @@
 // The Agents picture in the style this viewer picked: Orbit (the default) and Lanes as tabs, Relay, Constellation and Deck under More.
 // Same props as Orbit; the pick lives in localStorage like the tool-calls switch.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { readStore, writeStore } from '@/lib/store'
 import { useDismiss } from '../use-popover'
 import { fitMenu } from '../chat-menu'
 import type { ChatProgress } from '@/lib/hub-types'
 import { VIEW_KEY, parseView, type View } from '@/lib/orbit-views'
-import { Orbit } from '../orbit'
+import { Orbit } from './orbit'
 import { Relay } from './relay'
 import { Lanes } from './lanes'
 import { Constellation } from './constellation'
@@ -59,10 +60,10 @@ export function OrbitView({ all = [], demo, links = [], onFocus, onCopy, ...prop
     return () => document.removeEventListener('keydown', esc)
   }, [picked, side])
   const pickRole = (role: string) => setPicked(r => (r === role ? undefined : role))
-  useEffect(() => { try { setView(parseView(localStorage.getItem(VIEW_KEY))) } catch { /* no storage: Orbit */ } }, [])
+  useEffect(() => { setView(parseView(readStore(VIEW_KEY))) }, [])
   const pick = (v: View) => {
     setView(v)
-    try { localStorage.setItem(VIEW_KEY, v) } catch { /* no storage */ }
+    writeStore(VIEW_KEY, v)
   }
   const Picture = view === 'orbit' ? null : PICTURE[view]
   const v = { ...props, pick: pickRole, picked }

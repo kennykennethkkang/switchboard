@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { TickedItem, TodoItem } from '@/lib/hub-types'
 import { isLong, shippedOf, shortSha } from '@/lib/todo-view'
-import { ago } from './look'
+import { ago } from '@/lib/look'
 import { Check } from './chat-cards'
 import './todo-rows.css'
 

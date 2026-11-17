@@ -10,7 +10,7 @@ import {
   TranscriptEntry, ToolUseBlock, ToolResultBlock,
   emitSubagentSpawn,
 } from './protocol'
-import { readFileBytes, completeLines } from './fs-utils'
+import { readFileBytes, completeLines, isRecord } from './fs-utils'
 import {
   PREVIEW_MAX, ARGS_MAX, RESULT_MAX, MESSAGE_MAX,
   SESSION_LABEL_MAX, SESSION_LABEL_TRUNCATED,
@@ -34,11 +34,6 @@ export interface TranscriptParserDelegate {
   getSession(sessionId: string): WatchedSession | undefined
   fireSessionLifecycle(event: { type: 'started' | 'ended' | 'updated'; sessionId: string; label: string }): void
   emitContextUpdate(agentName: string, session: WatchedSession, sessionId?: string): void
-}
-
-/** Type guard: check if a value is a non-null object */
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object'
 }
 
 /** Safely extract trimmed text from a text block */
@@ -179,7 +174,6 @@ export class TranscriptParser {
     const msg = parsed.message as TranscriptEntry['message'] | undefined
     if (!msg) { return }
 
-    // Now we know this is a valid transcript entry
     const entry: TranscriptEntry = {
       sessionId: parsed.sessionId as string,
       type: parsed.type as string,
@@ -345,7 +339,7 @@ export class TranscriptParser {
       startTime: Date.now(),
     })
 
-    // Check if this is a subagent call (Task in older Claude Code, Agent in newer versions)
+    // Task in older Claude Code, Agent in newer versions
     if (toolName === 'Task' || toolName === 'Agent') {
       const childName = resolveSubagentChildName(block.input)
       this.subagentChildNames.set(block.id, childName)
@@ -501,7 +495,6 @@ export class TranscriptParser {
     const parentToolUseID = typeof parsed.parentToolUseID === 'string' ? parsed.parentToolUseID : undefined
     if (!parentToolUseID) { return }
 
-    // Get or create per-subagent dedup state
     let subState = this.inlineSubagentState.get(parentToolUseID)
     if (!subState) {
       // Resolve agent name from the stored child name (set when the Agent tool_use was parsed)

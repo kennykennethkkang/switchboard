@@ -5,8 +5,8 @@
  *
  * When inline progress events are active for a subagent (tracked via
  * session.inlineProgressAgents), the file watcher still tracks file position
- * but skips event emission to avoid duplicates. This allows seamless fallback
- * to file-based watching on reconnection when inline progress is no longer flowing.
+ * but skips event emission to avoid duplicates, so file-based watching picks up
+ * again on reconnection when inline progress stops.
  */
 
 import * as fs from 'fs'

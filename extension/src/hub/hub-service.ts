@@ -4,7 +4,8 @@
  * Feed posts from the usage mods come through ingest(); what the extension gathers itself comes through set(). Every
  * change fires onChange, which extension.ts throttles into `hub-state`.
  */
-import { approvalBlock, closingPick, isTempDir, stampedChats } from './approve'
+import { approvalBlock, closingPick, stampedChats } from './approve'
+import { isTempDir } from './temp'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'

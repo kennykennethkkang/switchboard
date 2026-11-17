@@ -1,3 +1,4 @@
+import { readStore, writeStore } from './store'
 // Unsent text per box, kept in localStorage so a re-render, chat switch, reload or killed tab loses nothing.
 // Keys: msg:<sessionId>, newchat. Each entry carries the time it was saved, used for expiry and as its stamp.
 
@@ -11,7 +12,7 @@ type All = Record<string, Draft>
 
 function load(now: number): All {
   try {
-    const all = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    const all = JSON.parse(readStore(KEY) ?? '{}')
     if (!all || typeof all !== 'object') return {}
     const out: All = {}
     for (const [k, d] of Object.entries(all as All))
@@ -23,7 +24,7 @@ function load(now: number): All {
 function save(all: All) {
   // Oldest go first past the cap.
   const keep = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, MAX_DRAFTS)
-  try { localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(keep))) } catch { /* no storage or full */ }
+  writeStore(KEY, JSON.stringify(Object.fromEntries(keep)))
 }
 
 export function getDraft(key: string, now = Date.now()): string {

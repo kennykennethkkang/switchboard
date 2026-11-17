@@ -104,8 +104,8 @@ export function repoPlan(repo: RepoAsk, root: string, gh: string | undefined): {
 // Quoted for the shell, so git judges the rest of the name itself; only a flag, an empty name or whitespace is refused here.
 const BRANCH = /^(?!-)[^\s\x00-\x1f]+$/
 
-/** Where the Claude toggle goes for bash-approve (claude-mods), which keeps core's Bash prompt while it is on. Unset under node --test. */
-export const askMode: { file?: string } = { file: process.env.NODE_TEST_CONTEXT ? undefined : path.join(os.homedir(), '.claude', 'switchboard', 'ask-mode.json') }
+/** Where the Claude toggle goes for bash-approve (claude-mods), which keeps core's Bash prompt while it is on. Tests point file at a temp path. */
+export const askMode: { file?: string } = { file: path.join(os.homedir(), '.claude', 'switchboard', 'ask-mode.json') }
 
 let askClaude = false
 /** Settings, Ask before actions: on brings the CLI's own approval prompts back for new and resumed chats. hub-panel sets it at start and on change. */

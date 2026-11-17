@@ -10,10 +10,11 @@
 import { busyLine } from '@/lib/eta'
 import { useEffect, useRef } from 'react'
 import type { ChatProgress, ChatState, SessionLive } from '@/lib/hub-types'
-import { ALMOST, ORDER, STATE, almostDone } from './look'
+import { MAX_DPR, frameLoop } from '@/lib/frame-loop'
+import { ALMOST, ORDER, STATE, almostDone } from '@/lib/look'
 import { PILL_MS, SAT_ROW, TAU as TW, approach, groupRoles, orbitMoves, satSlot } from '@/lib/orbit-motion'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import { NodeButtons, placeNodes, type Hit, type ViewProps } from './orbits/parts'
+import { NodeButtons, placeNodes, type Hit, type ViewProps } from './parts'
 
 /** models: each role's model, drawn under its bubble. */
 export type OrbitChat = { id: string; name: string; state: ChatState; ago: string; /** "waiting on X" while it holds for another chat; never read as idle. */ wait?: string; progress?: ChatProgress; live?: SessionLive; models?: Record<string, string> }
@@ -21,7 +22,7 @@ export type OrbitChat = { id: string; name: string; state: ChatState; ago: strin
 type RoleOn = { role: string; state: 'active' | 'done' | 'waiting' | 'unused'; running: string[] }
 
 /** The ring: the roles this chat used in plan order, plus researcher, engineer and qa dimmed when unused, so it never has fewer than 3. */
-export function ringRoles(p?: ChatProgress): RoleOn[] {
+function ringRoles(p?: ChatProgress): RoleOn[] {
   const used = new Map(groupRoles(p?.roles ?? []).map(g => [g.role, g]))
   const rank = (r: string) => (ORDER.indexOf(r) + 100) % 100
   return [...new Set([...used.keys(), 'researcher', 'engineer', 'qa'])].sort((a, b) => rank(a) - rank(b)).map(role => ({
@@ -63,8 +64,6 @@ type P = { x: number; y: number }
 const SPOTS: Array<[number, number]> = [[0, 0], [0, -34], [0, 34], [-64, 0], [64, 0], [0, -68], [0, 68]]
 /** A role's own accent, drawn as an inner ring and a tint while it is not working or done. Any other role gets the plain look. */
 const ACCENT: Record<string, 'violet'> = { jev: 'violet' }
-/** The backing store never goes past 2 device pixels per CSS pixel: sharper than that costs CPU and nobody sees it. */
-export const MAX_DPR = 2
 const lum = (hex: string) => { const n = parseInt(hex.replace('#', ''), 16) || 0; return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 }
 const labelSize = new Map<string, number>()
 // The dot grid as one cached pattern, so a frame fills one rect instead of a few thousand.
@@ -84,7 +83,7 @@ function gridPattern(ctx: CanvasRenderingContext2D, d: number, color: string) {
   return pat
 }
 
-function readPal(el: Element): Pal {
+export function readPal(el: Element): Pal {
   // #fff as #ffffff: the color math reads six hex digits.
   const s = getComputedStyle(el), v = (k: string) => s.getPropertyValue(`--hub-${k}`).trim().replace(/^#(\w)(\w)(\w)$/, '#$1$1$2$2$3$3')
   return { ...Object.fromEntries(KEYS.map(k => [k, v(k) || '#888888'])), sans: v('sans') || 'sans-serif', mono: v('mono') || 'monospace' } as Pal
@@ -517,21 +516,20 @@ export function Orbit(props: ViewProps) {
   useEffect(() => {
     const el = canvas.current!, ctx = el.getContext('2d')!
     const motion = matchMedia('(prefers-reduced-motion: reduce)'), light = matchMedia('(prefers-color-scheme: light)')
-    let pal = readPal(el), W = 0, H = 0, raf = 0, onScreen = true, dpr = 1, last = 0
+    let pal = readPal(el), W = 0, H = 0, onScreen = true, dpr = 1
     const t0 = performance.now()
     stamp(shown.current, true)
     // dt: ms since the last drawn frame, capped so a frame after a pause steps, not jumps.
     const frame = (now: number, dt: number) => {
       ctx.clearRect(0, 0, W, H)
-      scene.current.dt = Math.min(50, Math.max(0, dt)); last = now
+      scene.current.dt = Math.min(50, Math.max(0, dt))
       if (W && H) draw(ctx, W, H, (now - t0) / 1000, now, shown.current, tools.current, born.current, pal, motion.matches, dpr, scene.current)
       placeNodes(stage.current, scene.current.hits)
     }
     // The loop runs only while the picture moves and can be seen; otherwise one frame is drawn and it sleeps until something changes.
     const moves = (now: number) => orbitMoves(shown.current, [...born.current.values()].map(b => now - b), tools.current, scene.current.moving)
     const run = (now: number) => !motion.matches && onScreen && !document.hidden && vscodeBridge?.shown !== false && moves(now)
-    const loop = (now: number) => { frame(now, now - last); raf = run(now) ? requestAnimationFrame(loop) : 0 }
-    const wake = () => { if (raf) return; const now = performance.now(); frame(now, 16); if (run(now)) raf = requestAnimationFrame(loop) }
+    const { wake, stop } = frameLoop(frame, run)
     redraw.current = wake
     // The backing store matches the CSS size times the device pixel ratio (capped), so nothing is scaled by the browser.
     const size = () => {
@@ -558,7 +556,7 @@ export function Orbit(props: ViewProps) {
     void document.fonts?.ready.then(theme)
     wake()
     return () => {
-      cancelAnimationFrame(raf); raf = 0; redraw.current = () => {}
+      stop(); redraw.current = () => {}
       ro.disconnect(); io.disconnect(); mo.disconnect(); offShown?.(); dprQuery?.removeEventListener('change', onDpr)
       light.removeEventListener('change', theme); motion.removeEventListener('change', wake); document.removeEventListener('visibilitychange', wake)
     }

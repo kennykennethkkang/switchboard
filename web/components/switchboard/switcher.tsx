@@ -1,7 +1,8 @@
 'use client'
+import { useDialog } from '@/hooks/use-dialog'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { rankItems, type SwitchItem } from '@/lib/switcher'
-import { ALMOST, STATE } from './look'
+import { ALMOST, STATE } from '@/lib/look'
 
 const Marked = ({ text, hits }: { text: string; hits: number[] }) => {
   const on = new Set(hits)
@@ -17,8 +18,7 @@ export function Switcher({ items, tint, onPick, onClose, jarvis, filter }: {
   items: SwitchItem[]; tint?: (item: SwitchItem) => string | undefined; onPick: (item: SwitchItem) => void; onClose: () => void
   jarvis?: (bits: AskBits) => ReactNode; filter?: ReactNode
 }) {
-  const [was] = useState(() => typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null)
-  useEffect(() => () => was?.focus(), [was])
+  useDialog()
   const [q, setQ] = useState('')
   const [at, setAt] = useState(0)
   const input = useRef<HTMLInputElement>(null)

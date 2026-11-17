@@ -4,7 +4,8 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { approvalBlock, approvedAnswer, closingPick, approvedFields, closeApproved, LIVE_SUB_MS, isTempDir, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
+import { approvalBlock, APPROVE_OPTIONS, APPROVE_QUESTION, closingPick, approvedFields, closeApproved, LIVE_SUB_MS, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
+import { isTempDir } from '../src/hub/temp'
 import { HubService } from '../src/hub/hub-service'
 import type { ChatProgress } from '../src/hub/types'
 
@@ -24,57 +25,6 @@ describe('readDoneCheck', () => {
     assert.equal(readDoneCheck('odd', dir), undefined)
     assert.equal(readDoneCheck('../etc/passwd', dir), undefined)
     fs.rmSync(dir, { recursive: true, force: true })
-  })
-})
-
-describe('approvedAnswer', () => {
-  const Q = 'Approve this chat as finished?'
-  const ask = (question = Q, options = ['Approve', 'Send back']) => ({ questions: [{ question, options: options.map(label => ({ label })) }] })
-  const post = (answers: unknown, tool = 'AskUserQuestion', event = 'PostToolUse', input: unknown = ask()) => ({ hook_event_name: event, tool_name: tool, tool_input: input, tool_response: { answers } })
-  const chat = (o: Partial<ChatProgress> = {}): ChatProgress => ({ sessionId: 's', cwd: '/p', state: 'needs-you', roles: [], tasks: [], startedAt: 0, at: 0, ...o })
-  it('is true only for the kit closing question answered Approve', () => {
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' })), true)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), chat({ state: 'done' })), true)
-  })
-  it('is false for any other Approve question', () => {
-    assert.equal(approvedAnswer(post({ 'Approve this design?': 'Approve' }, 'AskUserQuestion', 'PostToolUse', ask('Approve this design?'))), false)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }, 'AskUserQuestion', 'PostToolUse', ask(Q, ['Approve', 'Change it']))), false)
-    assert.equal(approvedAnswer(post({ [Q]: 'approve and close' })), false)
-  })
-  it('is false while the chat still works', () => {
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), chat({ state: 'working' })), false)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), chat({ running: ['a1'], roles: [{ id: 'a1', role: 'qa', state: 'active', startedAt: Date.now(), at: Date.now() }] })), false)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), chat({ tasks: [{ id: '1', subject: 'x', status: 'in_progress' }] })), false)
-  })
-  it('a subagent quiet past LIVE_SUB_MS (killed without SubagentStop) does not hold it', () => {
-    const now = 100 * 60 * 1000
-    const sub = (at: number) => chat({ running: ['a1'], roles: [{ id: 'a1', role: 'engineer', state: 'active', startedAt: 0, at }] })
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), sub(now - LIVE_SUB_MS - 1), now), true)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }), sub(now - 60_000), now), false)
-    assert.match(approvalBlock(sub(now - 60_000), now) ?? '', /a1/)
-  })
-  it('accepts Codex request_user_input, answers by question text or wrapped by id', () => {
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }, 'request_user_input')), true)
-    assert.equal(approvedAnswer({ hook_event_name: 'PostToolUse', tool_name: 'request_user_input', tool_input: { questions: [{ id: 'q1', question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }, tool_response: { answers: { q1: { answers: ['Approve'] } } } }), true)
-    assert.equal(approvedAnswer(post({ [Q]: 'Send back' }, 'request_user_input')), false)
-  })
-  it('accepts the Switchboard ask tool, whose reply is text lines', () => {
-    const mcp = (text: unknown, tool = 'mcp__switchboard__ask', input: unknown = ask()) => ({ hook_event_name: 'PostToolUse', tool_name: tool, tool_input: input, tool_response: text })
-    const line = `"${Q}": Approve`
-    for (const r of [line, { content: [{ type: 'text', text: line }] }, [{ type: 'text', text: line }], { text: line }]) assert.equal(approvedAnswer(mcp(r)), true)
-    assert.equal(approvedAnswer(mcp(line, 'switchboard.ask')), true)
-    assert.equal(approvedAnswer(mcp(`"${Q}": Send back`)), false)
-    assert.equal(approvedAnswer(mcp(`"${Q}": Approve; other: not yet`)), false)
-    assert.equal(approvedAnswer(mcp('The user declined to answer. Decide yourself and say what you decided.')), false)
-    assert.equal(approvedAnswer(mcp(`"Approve this design?": Approve`, 'mcp__switchboard__ask', ask('Approve this design?'))), false)
-    assert.equal(approvedAnswer(mcp(line, 'mcp__other__ask')), false)
-    assert.equal(approvedAnswer(mcp(line), chat({ state: 'working' })), false)
-  })
-  it('is false for other answers, tools and events', () => {
-    assert.equal(approvedAnswer(post({ [Q]: 'Send back' })), false)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }, 'Bash')), false)
-    assert.equal(approvedAnswer(post({ [Q]: 'Approve' }, 'AskUserQuestion', 'PreToolUse')), false)
-    assert.equal(approvedAnswer({ hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion' }), false)
   })
 })
 
@@ -324,5 +274,17 @@ describe('closingPick', () => {
   it('is undefined for other questions and answers', () => {
     assert.equal(closingPick(post({ [Q]: 'maybe' })), undefined)
     assert.equal(closingPick({ ...post({ [Q]: 'Send back' }), hook_event_name: 'PreToolUse' }), undefined)
+  })
+})
+
+describe('strings the hub parses are in the kit rules', () => {
+  const rules = fs.readFileSync(path.join(__dirname, '..', 'kit', 'rules.md'), 'utf8')
+  it('names the closing question and its options', () => {
+    assert.ok(rules.includes(`"${APPROVE_QUESTION}?"`))
+    assert.ok(rules.includes(`options exactly "${APPROVE_OPTIONS[0]}" and "${APPROVE_OPTIONS[1]}"`))
+  })
+  it('names the standup sections and the commit message headings', () => {
+    for (const s of ['For you', 'Commit message:', 'Commit message (<repo folder name>):']) assert.ok(rules.includes(s), s)
+    assert.match(rules, /standup: done, for you, left, risks/)
   })
 })

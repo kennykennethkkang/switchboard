@@ -17,6 +17,13 @@ import { SHADES, titleBar, titleBarColors, windowColors } from './colors'
 import { FLAGGED, PROFILES, cleanName, indefiniteOn, readProfiles, withLibrary } from './tools'
 import { globalOff, readSmart, watchTools } from './smart-tools'
 import { connections, ensureWeb, gitState, keepWebRetrying, installed, libraryInventory, listServers, newestPlan, newestPlanFile, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
+import { kitDir } from '../constants'
+import { newPanelState } from './hub-panel-state'
+import { refuse } from './hub-panel-shared'
+import { sweepPanel } from './hub-panel-sweep'
+import { signInsPanel } from './hub-panel-signins'
+import { codexPanel } from './hub-panel-codex'
+import { devPanel } from './hub-panel-dev'
 import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, codexExited, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, noteCheckBack } from './actions'
 import { approvedFields, closeApproved, readDoneCheck, stampedChats } from './approve'
 import { syncTerminals, tags, terminalAction, watchTerminals } from './terminals'
@@ -93,13 +100,14 @@ const CHANGES_IDLE_MS = 60 * 1000
 const REPO_ROOTS = [path.join(os.homedir(), 'Documents', 'GitHub')]
 // startHub fills it; New chat awaits it after making a repo.
 let refreshProjects = async () => {}
-export const KIT_DIR = path.join(REPO_ROOTS[0], 'claude-mods', 'kit')
 // This checkout, under its old name until the folder is moved.
 const APP_REPO = ['switchboard', 'agent-flow'].map(n => path.join(REPO_ROOTS[0], n)).find(p => fs.existsSync(p)) ?? path.join(REPO_ROOTS[0], 'switchboard')
 // The kit's one-row status line; the Controls switch writes this command.
-const STATUS_LINE = path.join(KIT_DIR, 'statusline.mjs')
+const STATUS_LINE = path.join(kitDir(), 'statusline.mjs')
 const statusLineCommand = () => (fs.existsSync(STATUS_LINE) ? `node "${STATUS_LINE.replace(/\\/g, '/')}"` : undefined)
 
+// Mutable state of this window's hub; startHub makes a fresh one.
+let S = newPanelState()
 const posters = new Posters<ExtensionToWebviewMessage>()
 // Set in startHub; the bundled browser app lives under it.
 let extensionPath = ''
@@ -127,26 +135,21 @@ const TABS_KEY = 'switchboard.oneWindow'
 const HANDED_KEY = 'switchboard.codexHandedOff'
 // The kit hash last synced and what that sync found, so activation writes once per kit change.
 const RULES_KEY = 'switchboard.rulesSync'
-const handedOff = new Set<string>()
 // Handed-off Codex chats still open: each is closed once it is idle. Not kept across reloads: such a chat stays open (but in History) after one.
-const closingCodex = new Set<string>()
 // When each full Codex chat was first seen mid-turn; its handoff waits on the turn for at most 30 minutes.
-const codexBusySince = new Map<string, number>()
 let envs: vscode.GlobalEnvironmentVariableCollection | undefined
-let awsAt = -Infinity
 let statusBar: vscode.StatusBarItem | undefined
 // This window's colored folder name, left of the Switchboard button; the title bar keys Switchboard wrote, per workspace.
 let windowItem: vscode.StatusBarItem | undefined
 let windowStore: vscode.Memento | undefined
 const TITLE_KEY = 'switchboard.titleBar'
-let pending: NodeJS.Timeout | undefined
 const workspace = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 // openExternal lands in Chrome's last used profile, not the folder's pick.
 const openPage = (url: string) => openLogin(url, undefined, browserFor(readPrefs().browsers, workspace() ?? ''))
+const { keys, awsCommand, loginCommand, keyCommand, browserCommand, handle: signInsHandle } = signInsPanel({ refreshAws: f => refreshAws(f), refreshCli: f => refreshCli(f), projectBrowser: () => projectBrowser(), readSignIns: () => readSignIns(), workspace })
+const { served, devFolders, refreshDev, runDev, devRequest, stopServer, handle: devHandle } = devPanel(() => refreshHub())
+const { sweepState, runClaude, sweepJob, sweepOneTool, sweepEverything, approveOne, sweepCall, sweepFix, toggle, handle: sweepHandle } = sweepPanel(() => refreshHub(), workspace)
 const refreshers: Array<(again?: boolean) => Promise<void>> = []
-let webAt = -Infinity
-let changesAt = 0
-let nearAt = 0
 let onShown = () => {}
 
 /** fn, one run at a time: a call mid-run shares that run, and with again one more run follows it, so a change made mid-run is read. */
@@ -203,12 +206,13 @@ export function refreshWeb(): void {
 }
 
 export function startHub(context: vscode.ExtensionContext): void {
+  S = newPanelState()
   editor.name = shortEditor(vscode.env.appName)
   hub.set({ editor: editor.name })
   hub.startMirofish()
   context.subscriptions.push({ dispose: () => hub.stopMirofish() })
   store = context.globalState
-  for (const id of store.get<string[]>(HANDED_KEY) ?? []) handedOff.add(id)
+  for (const id of store.get<string[]>(HANDED_KEY) ?? []) S.handedOff.add(id)
   hub.runner = c => handleHubMessage(c as WebviewToExtensionMessage)
   hub.sweep = sweepCall
   hub.voiceClip = b => voice ? voice.clip(b) : Promise.reject(new Error('Voice is not running in this window.'))
@@ -292,13 +296,13 @@ export function startHub(context: vscode.ExtensionContext): void {
   refreshProjects().catch(err => log.warn('Projects failed:', err))
   addRefresher(() => refreshAws())
   async function refreshNear() {
-    nearAt = Date.now()
+    S.nearAt = Date.now()
     readSettings()
     refreshWindows()
     const ws = workspace()
     const stars = readStarred()
-    const webDue = Date.now() - webAt >= WEB_EVERY_MS
-    if (webDue) webAt = Date.now()
+    const webDue = Date.now() - S.webAt >= WEB_EVERY_MS
+    if (webDue) S.webAt = Date.now()
     const [plan, git, servers, notes, web] = await Promise.all([
       newestPlan(ws), gitState(ws), listServers(), newestNotes(stars.map(s => s.sessionId)), webDue ? webUrl() : hub.get().webUrl, refreshChats(),
     ])
@@ -312,7 +316,7 @@ export function startHub(context: vscode.ExtensionContext): void {
     hub.set({ jevProjects: Object.fromEntries(todoFolders(ws).map(f => [f, jevProject(f)])) })
   }
   const near = () => nearOnce().catch(err => log.warn('Plan, git or servers failed:', err))
-  onShown = () => { if (Date.now() - nearAt >= LIVE_EVERY_MS) void near() }
+  onShown = () => { if (Date.now() - S.nearAt >= LIVE_EVERY_MS) void near() }
   const slow = setInterval(() => { if (posters.shown) refreshHub() }, HISTORY_EVERY_MS)
   // Also while the standalone app reads /hub/state with no panel shown, so its chats stay current.
   // Otherwise only the chats, even with no view open, so handoffs, closing and holds still work.
@@ -326,13 +330,13 @@ export function startHub(context: vscode.ExtensionContext): void {
   const heads = setInterval(awsHeadsUp, 5 * 60 * 1000)
   context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); if (stuck) clearInterval(stuck) } })
   const sub = hub.onChange(() => {
-    if (pending || !posters.shown) return
-    pending = setTimeout(() => {
-      pending = undefined
+    if (S.pending || !posters.shown) return
+    S.pending = setTimeout(() => {
+      S.pending = undefined
       postState()
     }, PUSH_MS)
   })
-  context.subscriptions.push({ dispose: () => { sub.dispose(); if (pending) clearTimeout(pending) } })
+  context.subscriptions.push({ dispose: () => { sub.dispose(); if (S.pending) clearTimeout(S.pending) } })
   // Runs with or without a panel open: the hook server takes the feed either way.
   context.subscriptions.push(hub.onHandoff(h => { void continueInFreshChat(h, workspace()) }))
   context.subscriptions.push(hub.onIndefiniteDone(d => { indefiniteDone(d.sessionId); notifyIndefiniteDone(d.sessionId, d.usage, d.reason) }))
@@ -438,8 +442,8 @@ function syncKit(force = false): void {
 /** AWS statuses at most every ten minutes (each is an STS call), unless forced after a change; Chrome profiles and picks every time. */
 async function refreshAws(force = false): Promise<void> {
   readSignIns()
-  if (!force && Date.now() - awsAt < AWS_EVERY_MS) return
-  awsAt = Date.now()
+  if (!force && Date.now() - S.awsAt < AWS_EVERY_MS) return
+  S.awsAt = Date.now()
   const rows = await awsProfiles()
   const was = readSessions(), s = trackSessions(was, rows, Date.now(), cacheTimes(parseAwsConfig(readAwsConfig())))
   if (JSON.stringify(s) !== JSON.stringify(was)) writeSessions(s)
@@ -543,354 +547,6 @@ function applyWindowAws(projects: Record<string, string>, browsers: Record<strin
   }
 }
 
-/** The Sign-ins panel's commands; a string is why one was refused. */
-function awsCommand(m: Extract<WebviewToExtensionMessage, { type: `hub-aws-${string}` }>): string | undefined {
-  const known = (p: string) => validProfileName(p) && parseAwsConfig(readAwsConfig()).some(s => s.name === p)
-  const after = () => { void refreshAws(true) }
-  switch (m.type) {
-    case 'hub-aws-check': after(); return undefined
-    case 'hub-aws-login':
-      if (!known(m.profile)) return `no AWS profile named ${m.profile}`
-      return awsLogin(m.profile, m.chrome, after, projectBrowser())
-    case 'hub-aws-add': {
-      // A name already there is a retry: new region, same login lines, and it never folds into a twin.
-      const was = known(m.profile)
-      return addAwsProfile(m.profile, m.region, m.chrome, hub.get().signIns.chrome.map(c => c.dir)) ?? awsLogin(m.profile, m.chrome, after, projectBrowser(), !was)
-    }
-    case 'hub-aws-rename': {
-      if (!known(m.profile)) return `no AWS profile named ${m.profile}`
-      const problem = renameAwsProfile(m.profile, m.to)
-      if (problem) return problem
-      writePrefs(moveProfile(readPrefs(), m.profile, m.to))
-      const labels = renameLabel(readLabels(), m.profile, m.to)
-      if (labels) writeLabels(labels)
-      const { [m.profile]: s, ...sessions } = readSessions()
-      if (s) writeSessions({ ...sessions, [m.to]: s })
-      readSignIns()
-      hub.set({ aws: hub.get().aws.map(a => (a.name === m.profile ? { ...a, name: m.to } : a)) })
-      after()
-      return undefined
-    }
-    case 'hub-aws-label': {
-      const row = hub.get().aws.find(a => a.name === m.profile)
-      if (!row || !known(m.profile)) return `no AWS profile named ${m.profile}`
-      const key = row.account ?? `profile:${row.name}`
-      const label = m.label.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 80)
-      const { [key]: _old, ...rest } = readLabels()
-      writeLabels(label ? { ...rest, [key]: label } : rest)
-      hub.set({ aws: hub.get().aws.map(a => (a.account ?? `profile:${a.name}`) === key ? { ...a, label: label || undefined } : a) })
-      return undefined
-    }
-    case 'hub-aws-delete': {
-      if (!known(m.profile)) return `no AWS profile named ${m.profile}`
-      const problem = deleteAwsProfile(m.profile)
-      if (problem) return problem
-      // Projects that picked it go to Not used.
-      const prefs = readPrefs()
-      const { [m.profile]: _c, ...chrome } = prefs.chrome
-      writePrefs({ ...prefs, chrome, projects: Object.fromEntries(Object.entries(prefs.projects).filter(([, p]) => p !== m.profile)) })
-      readSignIns()
-      hub.set({ aws: hub.get().aws.filter(a => a.name !== m.profile) })
-      after()
-      return undefined
-    }
-    case 'hub-aws-window': {
-      const ws = workspace()
-      if (!ws) return 'this window has no folder open'
-      if (m.profile !== null && !known(m.profile)) return `no AWS profile named ${m.profile}`
-      const prefs = readPrefs()
-      const { [ws]: _was, ...rest } = prefs.projects
-      writePrefs({ ...prefs, projects: m.profile === null ? rest : { ...rest, [ws]: m.profile } })
-      readSignIns()
-      return undefined
-    }
-  }
-}
-
-/** Saved web logins: the change is written to logins.json; Sign in then opens the login in its Chrome profile. */
-function loginCommand(m: LoginCommand | LinkCommand): string | undefined {
-  const apps = readLogins(), links = readLinks(LOGINS, apps)
-  if (m.type === 'hub-login-link') {
-    const folders = [...hub.get().projects.map(p => p.path), ...(vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)]
-    const next = applyLink(apps, links, m, folders)
-    if (typeof next === 'string') return next
-    writeLogins(apps, LOGINS, next)
-    hub.set({ signIns: { ...hub.get().signIns, links: next } })
-    return undefined
-  }
-  // Sign in with no id opens the project's pick for the app.
-  const app = m.type === 'hub-login-open' && m.id === undefined ? apps.find(a => a.id === m.app) : undefined
-  const c = app && m.type === 'hub-login-open' ? { ...m, id: loginFor(app, links, m.folder) } : m
-  // A CLI app with no tenant yet: the login itself adds them.
-  if (c.type === 'hub-login-open' && CLI_APPS[c.app] && !apps.find(a => a.id === c.app)?.logins.some(l => l.id === c.id)) {
-    return cliLogin(c.app, c.chrome, browserFor(readPrefs().browsers, c.folder ?? workspace() ?? ''), `login:${c.app}:new`, () => { void refreshCli(true) })
-  }
-  const known = hub.get().signIns.chrome.map(x => x.dir)
-  // A pick of a Chrome profile since deleted is dropped from the login, then skipped with a note when it opens.
-  const dead = c.type === 'hub-login-open' && !!c.chrome && known.length > 0 && !known.includes(c.chrome) ? c.chrome : undefined
-  const next = applyLogin(apps, dead && c.type === 'hub-login-open' ? { ...c, chrome: '' } : c, undefined, known)
-  if (typeof next === 'string') return next
-  writeLogins(next, LOGINS, links)
-  hub.set({ signIns: { ...hub.get().signIns, apps: next, links: pruneLinks(links, next) } })
-  if (c.type !== 'hub-login-open') return undefined
-  const row = next.find(a => a.id === c.app)?.logins.find(l => l.id === c.id)
-  // The login's own Chrome profile holds its account; without one, the project's browser ('' counts as none).
-  if (!row) return 'no such login'
-  const project = browserFor(readPrefs().browsers, c.folder ?? workspace() ?? '')
-  return CLI_APPS[c.app]
-    ? cliLogin(c.app, dead ?? row.chrome, project, `login:${c.app}:${row.id}`, () => { void refreshCli(true) })
-    : openLogin(row.url, dead ?? row.chrome, project, `login:${c.app}:${row.id}`)
-}
-
-const keys = keyStore()
-
-/** Save, test or remove an API key; save tests it too. Only keyStatus (last four, last test) reaches the hub. */
-async function keyCommand(m: Extract<WebviewToExtensionMessage, { type: `hub-key-${string}` }>): Promise<string | undefined> {
-  const show = () => hub.set({ signIns: { ...hub.get().signIns, keys: keyStatus() } })
-  if (m.type === 'hub-key-remove') { removeKey(keys, m.name); show(); return undefined }
-  if (m.type === 'hub-key-save') {
-    const problem = saveKey(keys, m.name, m.value)
-    if (problem) return problem
-    show()
-    // MiroFish and other recipe projects get the new key in their .env; set values stay.
-    const filled = fillRecipes(hub.get().projects.map(p => p.path), m.name, keys).filter(r => !('error' in r)).at(-1)
-    if (filled && !('error' in filled)) hub.set({ signIns: { ...hub.get().signIns, envSetup: filled } })
-  }
-  const key = keys.get(m.name)
-  if (!key) return `no ${m.name} saved`
-  keyTest(m.name, await testKey(m.name, key))
-  show()
-  return undefined
-}
-
-/** The browser a project's links and terminal sign-ins open in; null forgets it. */
-function browserCommand(m: Extract<WebviewToExtensionMessage, { type: 'hub-browser' }>): string | undefined {
-  const folders = [...hub.get().projects.map(p => p.path), ...(vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)]
-  if (!folders.includes(m.folder)) return 'that folder is not in the project list'
-  if (m.chrome && !hub.get().signIns.chrome.some(c => c.dir === m.chrome)) return 'That Chrome profile is not in Chrome\'s list'
-  const prefs = readPrefs()
-  const { [m.folder]: _was, ...rest } = prefs.browsers
-  writePrefs({ ...prefs, browsers: m.chrome === null ? rest : { ...rest, [m.folder]: m.chrome } })
-  readSignIns()
-  return undefined
-}
-
-/** The chats (every AI), and what follows from them: Codex terminals, closing handed-off Codex chats, Codex handoffs. */
-async function refreshChats(): Promise<void> {
-  const { chats, ais } = await readAis()
-  bindCodexTerminals(chats, Date.now(), (id, on) => pendingWaits.set(id, { on, at: Date.now() }))
-  void rememberChats(chats).catch(err => log.warn('Chat processes failed:', err))
-  const doneChecks = Object.fromEntries(stampedChats(hub.get().progress).flatMap(id => { const d = readDoneCheck(id); return d ? [[id, d]] : [] }))
-  const groups = readGroups()
-  const now = Date.now(), profiles = hub.get().tools?.chats ?? {}
-  hub.set({ chats: chats.map(c => {
-    const p = hub.get().progress.find(x => x.sessionId === c.sessionId), cost = hub.get().live.find(x => x.sessionId === c.sessionId)?.costUsd, prof = profiles[c.sessionId]
-    return { ...c, project: projectName(c.cwd), takes: hub.takes(c, codexTied(c.sessionId)), ...(groups[c.sessionId] ? { group: groups[c.sessionId] } : {}),
-      ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
-  }), ais, doneChecks })
-  startWaits()
-  for (const w of endedWorktrees(wtSeen, chats)) void cleanWorktree(w).catch(err => log.warn('Worktree cleanup failed:', err))
-  refreshStages(chats)
-  void syncTerminals(chats).catch(err => log.warn('Terminal list failed:', err))
-  const ended = endedCodex(chats, codexTied, codexExited).filter(c => !hub.get().archive.some(a => a.sessionId === c.sessionId))
-  for (const c of ended) {
-    try { recordArchive(archiveRow(c, undefined, true)) } catch (err) { log.warn('Archive failed:', err) }
-    codexExited.delete(c.sessionId)
-  }
-  if (ended.length) hub.set({ archive: readArchive() })
-  const back = backAgain(hub.get().archive, chats)
-  if (back.length) { for (const id of back) removeArchive(id); hub.set({ archive: readArchive() }) }
-  void clearGoneChats([...hub.retryIds(), ...resumedIds()]).then(keepGoing).catch(err => log.warn('To-do lists failed:', err))
-  for (const c of idleHandedOff(chats, closingCodex)) {
-    closingCodex.delete(c.sessionId)
-    if (!closeCodexChat(c.sessionId)) log.info(`No terminal is tied to the handed-off Codex chat ${c.sessionId.slice(0, 8)}; it stays open`)
-  }
-  void indefiniteRounds(chats).catch(err => log.warn('Run indefinitely failed:', err))
-  void checkBacks().catch(err => log.warn('Check-back failed:', err))
-  await codexHandoffs(chats)
-}
-
-// Run indefinitely for Codex chats this window holds: the usage-meter mod does it for Claude (Stop block), Codex has no such hook.
-const roundSent = new Map<string, number>()
-async function indefiniteRounds(chats: ChatRow[]): Promise<void> {
-  for (const c of chats) {
-    if (c.ai !== 'codex' || c.status !== 'idle' || !codexTied(c.sessionId)) continue
-    const on = indefiniteOn(c.sessionId)
-    if (on === undefined) continue
-    const file = codexFiles.get(c.sessionId)
-    const turn = file && c.updatedAt !== undefined ? lastCodexTurn(await rolloutLines(file, c.updatedAt)) : { aborted: false, answer: undefined }
-    const held = closingCodex.has(c.sessionId) || !!hub.get().pause || hub.get().archive.some(a => a.sessionId === c.sessionId)
-    const act = codexRound(c, hub.get().progress.find(p => p.sessionId === c.sessionId), { on, held, ...turn }, roundSent)
-    // A goal Check must pass too: the done line alone sends it through the gate.
-    const goalGate = act === 'done' && !readProfiles([c.sessionId])[c.sessionId]?.budget?.gate && goalCheck(goalFor(c.cwd, c.sessionId)?.text ?? '')
-    if (act === 'done' && !goalGate) finishCodexRun(c, on)
-    else if (act === 'send' || goalGate) {
-      roundSent.set(c.sessionId, c.updatedAt!)
-      void codexNextRound(c, on)
-    }
-  }
-}
-
-// Ends a Codex run through the same path the mod's finish uses: the flag off, then the notice with the usage line.
-function finishCodexRun(c: ChatRow, on: number, reason?: string): void {
-  indefiniteDone(c.sessionId)
-  notifyIndefiniteDone(c.sessionId, usageLine(on, Date.now(), c.costUsd), reason)
-}
-
-const sh: GateExec = (cmd, cwd, timeout) => new Promise(resolve =>
-  execFile('/bin/sh', ['-c', cmd], { cwd, timeout, maxBuffer: 4_000_000, windowsHide: true }, (err, stdout, stderr) => {
-    const code = err ? (typeof (err as { code?: unknown }).code === 'number' ? (err as { code: number }).code : 1) : 0
-    resolve({ code, out: `${stdout}\n${stderr}${err && code === 1 && !stdout && !stderr ? err.message : ''}` })
-  }))
-
-// The gate runs async, one at a time per chat; a pass or a spent budget ends the run, a failure rides into the next round.
-const gating = new Set<string>()
-async function codexNextRound(c: ChatRow, on: number): Promise<void> {
-  // Mid-gate: forget the send so a later poll tries this turn again.
-  if (gating.has(c.sessionId)) { roundSent.delete(c.sessionId); return }
-  gating.add(c.sessionId)
-  try {
-    const budget = readProfiles([c.sessionId])[c.sessionId]?.budget
-    let failed = ''
-    const goal = goalFor(c.cwd, c.sessionId)
-    const check = budget?.gate ? undefined : goal && goalCheck(goal.text)
-    const gate = budget?.gate ?? check
-    if (gate) {
-      const g = await runGate(gate, check ? goal!.dir : c.cwd, sh)
-      if (g.ok) { finishCodexRun(c, on, `gate passed: ${gate}`); return }
-      failed = g.out
-    }
-    if (budget?.maxCostUsd !== undefined && c.costUsd === undefined) log.info(`Run indefinitely: no cost known for ${c.sessionId.slice(0, 8)}, cost cap skipped`)
-    const end = budgetEnd(budget, on, Date.now(), c.costUsd)
-    if (end) { finishCodexRun(c, on, end); return }
-    const problem = await sendToCodex(c, roundText(gate, failed, goal?.file))
-    if (problem) { roundSent.delete(c.sessionId); log.warn(`Run indefinitely round not sent to ${c.sessionId.slice(0, 8)}: ${problem}`) }
-  } catch (err) {
-    roundSent.delete(c.sessionId)
-    log.warn(`Run indefinitely round failed for ${c.sessionId.slice(0, 8)}: ${(err as Error).message}`)
-  } finally { gating.delete(c.sessionId) }
-}
-
-// Check-back: one owner per chat, the window whose hub takes its messages (hub.takes), so no two windows both send.
-// The profile on disk holds the setting and count; noteCheckBack writes before the send, so a slow send is not repeated.
-async function checkBacks(): Promise<void> {
-  const s = hub.get(), mine = s.chats.filter(c => c.takes)
-  const settings = readProfiles(mine.map(c => c.sessionId))
-  const cb = Object.fromEntries(Object.entries(settings).flatMap(([id, p]) => (p.checkBack ? [[id, p.checkBack]] : [])))
-  const view = mine.map(c => ({ sessionId: c.sessionId, status: c.status, updatedAt: c.updatedAt, takes: c.takes, open: hasOpenWork(s.progress.find(p => p.sessionId === c.sessionId)), stopped: s.archive.some(a => a.sessionId === c.sessionId) }))
-  for (const id of dueCheckBacks(Date.now(), view, cb)) {
-    noteCheckBack(id)
-    const sent = await sendToChat(id, CHECK_BACK_TEXT)
-    if (sent !== true) { noteCheckBack(id, Date.now(), -1); log.warn(`Check-back not sent to ${id.slice(0, 8)}: ${sent}`) }
-  }
-  // Approved or ended chats drop the setting.
-  for (const c of mine) if (cb[c.sessionId] && s.archive.some(a => a.sessionId === c.sessionId)) void setCheckBack(c.sessionId, null).catch(() => undefined)
-}
-
-// Worktree folders with a live chat, so one that ends is cleaned up.
-const wtSeen = new Map<string, number | undefined>()
-
-// To-do items started in this window (auto or Run), never auto-started again: a chat that keeps failing to start would loop.
-const autoTried = new Set<string>()
-let autoBusy = false
-// Chats resumed after a usage limit, by session id: their project counts as busy, and their items stay theirs, until live or past the grace.
-const resumed = new Map<string, { at: number; folder: string }>()
-// When a folder's last auto claim failed (offline, origin rejecting, taken): autoStartPlan waits SYNC_MS, a success clears it.
-const claimFailed = new Map<string, number>()
-const resumedIds = (now = Date.now()) => {
-  for (const [id, r] of resumed) if (now - r.at > START_GRACE_MS) resumed.delete(id)
-  return [...resumed.keys()]
-}
-
-/** Chats that ended on a usage limit come back once it resets; with Auto-start on, an idle project starts its next to-do item. */
-async function keepGoing(): Promise<void> {
-  const s = hub.get()
-  const live = (id: string) => s.chats.some(c => c.sessionId === id && c.live)
-  hub.pauseTick()
-  void learnTick()
-  for (const r of hub.goneDue(live)) {
-    resumed.set(r.sessionId, { at: Date.now(), folder: projectOf(r.cwd) })
-    void resumeChat(r.sessionId, 'claude', (r.paused ? pauseText : continueText)(r.agents), r.cwd).then(problem => { if (problem) log.warn(`Could not resume ${r.sessionId.slice(0, 8)} after its usage limit: ${problem}`) })
-  }
-  // Read fresh: another window may have turned it off since this one started.
-  const on = store?.get<{ autoStart?: boolean }>(CONTROLS_KEY)?.autoStart !== false
-  if (on !== s.controls.switchboard.autoStart) hub.set({ controls: { ...s.controls, switchboard: { ...s.controls.switchboard, autoStart: on } } })
-  const ws = workspace()
-  if (autoBusy || !ws) return
-  const folder = projectOf(ws)
-  // newChat refuses a folder the project list does not have yet; wait for it rather than burn the item.
-  if (folder === os.homedir() || folder === path.parse(folder).root || !s.projects.some(p => p.path === folder)) return
-  autoBusy = true
-  try {
-    if (!s.todos?.[folder]) await loadTodos([folder])
-    const list = hub.get().todos?.[folder]
-    const plan = autoStartPlan({
-      // The project's own pilot wins over the global switch; other chats in the project no longer hold it.
-      on, pilot: list?.pilot, folder, todo: list?.todo ?? [], tried: autoTried, now: Date.now(),
-      busy: false, live: new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId)),
-      // Same hold as Learn: a pause, a retry, or at pauseAt; a window with no chats of its own must not start one mid-pause.
-      limited: !usageOk({ windows: hub.get().live.flatMap(l => l.limits), pauseAt: hub.get().controls.switchboard.pauseAt, paused: !!hub.get().pause, retrying: hub.retrying() }),
-      resumed: Math.max(-Infinity, ...[...resumed.values()].filter(r => r.folder === folder).map(r => r.at)),
-      failedAt: claimFailed.get(folder),
-    })
-    if (!plan) return
-    log.info(`Auto-start in ${folder}: ${plan.items.map(t => t.id).join(', ')}`)
-    if (await runInNewChat(plan.folder, plan.items)) claimFailed.delete(folder)
-    else claimFailed.set(folder, Date.now())
-  } finally { autoBusy = false }
-}
-
-/**
- * Claims the items for a fresh chat id on the stored list before it starts, so two windows or taps cannot both start
- * them; false when they were taken meanwhile. manual: the Run button (claimItems). A chat that cannot start frees them.
- */
-async function runInNewChat(folder: string, items: TodoItem[], manual = false): Promise<boolean> {
-  const sessionId = randomUUID()
-  const live = new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId))
-  if (!await claimTodo(folder, items.map(t => t.id), sessionId, live, manual, undefined, autoTried)) return false
-  const unmark = () => changeTodo(folder, d => items.reduce((out, t) => (d.todo.find(x => x.id === t.id)?.chat === sessionId ? startTodo(out, t.id, undefined) : out), d))
-  // The claim gave them a run number; read them back for the chat's label.
-  const fresh = hub.get().todos?.[folder]?.todo ?? []
-  const label = runLabel(items.map(t => fresh.find(x => x.id === t.id) ?? t), folder)
-  void newChat(folder, runMessage(items), false, undefined, 'claude', undefined, sessionId, true, label).then(problem => {
-    if (!problem) return
-    refuse(problem)
-    void unmark().catch(() => {})
-  })
-  return true
-}
-
-/**
- * A full Codex chat has no usage mod to write its note: Switchboard writes one (folder,
- * branch, plan, last prompt) and starts the next Codex chat on it, once per chat.
- */
-async function codexHandoffs(chats: ChatRow[]): Promise<void> {
-  const ws = workspace()
-  const due = dueForHandoff(chats, handedOff, ws, Date.now(), codexBusySince)
-  const held = fullCodex(chats, handedOff, ws).filter(c => !due.includes(c))
-  hub.setCodexWaits(held.map(c => ({ sessionId: c.sessionId, tasks: 1, next: `v${chainVersion(c.name) + 1}`, since: codexBusySince.get(c.sessionId) ?? Date.now() })))
-  for (const c of due) {
-    codexBusySince.delete(c.sessionId)
-    handedOff.add(c.sessionId)
-    void store?.update(HANDED_KEY, [...handedOff].slice(-200))
-    const project = projectName(c.cwd)
-    const plan = await newestPlanFile(c.cwd)
-    const file = codexFiles.get(c.sessionId)
-    const prompt = file ? lastCodexPrompt(await rolloutLines(file)) : undefined
-    const note = path.join(os.homedir(), '.claude', 'handoffs', project, handoffFile(project, planLabel(plan), c.sessionId))
-    try {
-      await fs.promises.mkdir(path.dirname(note), { recursive: true })
-      const goal = goalFor(c.cwd, c.sessionId)
-      await fs.promises.writeFile(note, codexNote({ project, cwd: c.cwd, branch: headBranch(c.cwd) ?? 'unknown', plan, prompt }) + (goal ? `\n${goalHandoffLine(goal)}\n` : ''))
-    } catch (err) {
-      // Unmarked, so the next refresh tries again.
-      handedOff.delete(c.sessionId)
-      log.warn('A Codex handoff note could not be written:', err)
-      continue
-    }
-    if (await continueInFreshChat({ sessionId: c.sessionId, cwd: c.cwd, note, plan, name: c.name, ai: 'codex' }, ws)) closingCodex.add(c.sessionId)
-  }
-}
 
 // The chat whose changes a panel asked for: one for all views, the last asked wins. Make it per view if two views ever disagree.
 let watched: string | undefined
@@ -905,8 +561,8 @@ async function refreshChanges(onTick = false): Promise<void> {
     if (hub.get().changes?.sessionId !== id || hub.get().changes?.problem !== problem) hub.set({ changes: { sessionId: id, cwd: chat.cwd ?? '', files: [], at: Date.now(), problem } })
     return
   }
-  if (onTick && chat.status === 'idle' && hub.get().changes?.sessionId === id && Date.now() - changesAt < CHANGES_IDLE_MS) return
-  changesAt = Date.now()
+  if (onTick && chat.status === 'idle' && hub.get().changes?.sessionId === id && Date.now() - S.changesAt < CHANGES_IDLE_MS) return
+  S.changesAt = Date.now()
   const root = await repoRoot(chat.cwd)
   let problem: string | undefined
   const [files, repo] = await Promise.all([readChanges(chat.cwd).catch(err => { problem = `Git could not read the changes: ${err instanceof Error ? err.message : String(err)}`; return [] }), root ? readRepo(root, await ghPath()) : undefined])
@@ -1184,11 +840,6 @@ function approveChat(id: string): true | string {
   return true
 }
 
-function refuse(problem: string): string {
-  void vscode.window.showWarningMessage(`Switchboard: ${problem}.`)
-  return problem
-}
-
 function snoozeEverywhere(id: string): void {
   hub.snooze(id)
   for (const w of readWindows()) if (w.pid !== process.pid) void postWindow(w, { kind: 'stuck-snooze', id })
@@ -1265,6 +916,8 @@ function waitFor(from: string, to: string): true | string | Promise<true | strin
 
 /** Handles the panel's hub messages; false for anything else, a string for why it was refused. */
 export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string | Promise<boolean | string> {
+  const taken = sweepHandle(m) ?? devHandle(m) ?? signInsHandle(m)
+  if (taken !== undefined) return taken
   switch (m.type) {
     case 'hub-send':
       touch()
@@ -1318,11 +971,6 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
         keepAccessNote()
         if (!m.phone) openPage(r.url)
       })
-      return true
-    case 'hub-toggle':
-      // A held tool turns on only through Approve's modal.
-      if (needsApprove(m.kind, m.name, m.enabled, readSweep(), hub.get().installed)) void approveOne(m.name).catch(err => refuse((err as Error).message))
-      else void toggle(m.kind, m.name, m.enabled)
       return true
     case 'hub-setting':
       writeSetting(m.key, m.value)
@@ -1518,46 +1166,6 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-voice':
       voice?.toggle(m.on)
       return true
-    case 'hub-aws-login':
-    case 'hub-aws-add':
-    case 'hub-aws-rename':
-    case 'hub-aws-label':
-    case 'hub-aws-window':
-    case 'hub-aws-delete':
-    case 'hub-aws-check': {
-      let problem: string | undefined
-      try { problem = awsCommand(m) } catch (err) { problem = `could not change the AWS config (${(err as Error).message})` }
-      return problem ? refuse(problem) : true
-    }
-    case 'hub-login-app-add':
-    case 'hub-login-add':
-    case 'hub-login-open':
-    case 'hub-login-active':
-    case 'hub-login-rename':
-    case 'hub-login-delete':
-    case 'hub-login-app-delete':
-    case 'hub-login-link': {
-      let problem: string | undefined
-      try { problem = loginCommand(m) } catch (err) { problem = `could not save the login (${(err as Error).message})` }
-      return problem ? refuse(problem) : true
-    }
-    case 'hub-key-save':
-    case 'hub-key-test':
-    case 'hub-key-remove':
-      return keyCommand(m).then(p => (p ? refuse(p) : true), () => refuse(`could not change ${m.name}`))
-    case 'hub-env-setup': {
-      // Names and filled/missing only reach the hub.
-      if (!hub.get().projects.some(p => p.path === m.folder) && !(vscode.workspace.workspaceFolders ?? []).some(f => f.uri.fsPath === m.folder)) return refuse('that folder is not in the project list')
-      const r = envSetup(m.folder, keys)
-      if ('error' in r) return refuse(r.error)
-      hub.set({ signIns: { ...hub.get().signIns, envSetup: r } })
-      return true
-    }
-    case 'hub-browser': {
-      let problem: string | undefined
-      try { problem = browserCommand(m) } catch (err) { problem = `could not save the browser (${(err as Error).message})` }
-      return problem ? refuse(problem) : true
-    }
     case 'hub-kit-export': {
       const problem = exportKit(REPO_ROOTS[0])
       return problem ? refuse(problem) : true
@@ -1600,9 +1208,6 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-handoff':
       hub.handoffNow(m.sessionId)
       return true
-    case 'hub-sweep':
-      void (m.name ? sweepOneTool(m.name) : sweepEverything()).catch(err => refuse((err as Error).message))
-      return true
     case 'hub-spend':
       try { setSpend(m.key, m.mode, m.monthlyUsd); hub.set({ spend: readSpend() }) } catch (err) { refuse((err as Error).message) }
       return true
@@ -1612,46 +1217,12 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-summary':
       void showSummary(m.sessionId, m.refresh)
       return true
-    case 'hub-sweep-approve':
-      // An unknown name is ignored: no modal for something not installed.
-      if (!hub.get().installed.some(i => i.name === m.name && (i.kind === 'plugin' || i.kind === 'skill'))) return true
-      void approveOne(m.name).catch(err => refuse((err as Error).message))
-      return true
-    case 'hub-sweep-fix':
-      void sweepFix(m.name).then(problem => { if (problem) refuse(problem) })
-      return true
-    case 'hub-tool-add':
-      void sweepJob(() => addRepo(m.repo, { claude: runClaude })).then(note => void vscode.window.showInformationMessage(`Switchboard: ${note.replace(/\n/g, '; ')}`), err => refuse((err as Error).message))
-      return true
-    case 'hub-dev-start': {
-      const row = devRequest(m.folder)
-      if (!row) return refuse('that folder is not a project with a dev script')
-      const home = devHome(readWindows(), row.folder, process.pid)
-      // The window holding the project runs it; when that window does not answer, this one does.
-      if (home) void postWindow(home, { kind: 'dev-start', folder: row.folder }).then(ok => { if (!ok) runDev(row) })
-      else runDev(row)
-      return true
-    }
     case 'hub-window-tab': {
       if (!hub.get().windowTabs?.live) return refuse(`One window is off: turn it on in Settings, then quit and reopen ${editor.name}`)
       const t = tabTargets(readWindows(), process.pid, m.op, m.workspace)
       if (!t.here && !t.send.length) return refuse(`No open window for ${m.workspace ?? 'that'}`)
       if (t.here) void vscode.commands.executeCommand(TAB_COMMANDS[m.op])
       for (const w of t.send) void postWindow(w, { kind: 'window-tab', command: TAB_COMMANDS[m.op] })
-      return true
-    }
-    case 'hub-dev-stop': {
-      const row = devRequest(m.folder)
-      if (!row) return refuse('that folder is not a project with a dev script')
-      stopDev(row.project)
-      for (const w of readWindows()) if (w.pid !== process.pid) void postWindow(w, { kind: 'dev-stop', folder: row.folder })
-      // A server started by hand has no terminal anywhere: once the terminals had their chance, stop it by pid (the Mac asks first).
-      setTimeout(async () => {
-        const port = devRows([row.folder], () => row, await listServers(), null)[0]?.port
-        const pid = hub.get().servers.find(s => s.port === port)?.pid
-        if (pid) void stopServer(pid)
-        else refreshHub()
-      }, 3000)
       return true
     }
     case 'hub-awake':
@@ -1730,34 +1301,6 @@ async function answerDevice(id: string, allow: boolean): Promise<boolean | strin
 }
 
 // Dev terminals this window started and the tailscale serve each got, by terminal name; turned off when either ends.
-// Lost on reload, so an entry outlives a reload until the same port is served again.
-const served = new Map<string, { port: number; https: boolean }>()
-const DEV_WAIT_MS = 60_000
-const devFolders = () => [...readWindows().map(w => w.workspace), ...hub.get().chats.map(c => c.cwd)]
-
-/** Dev rows for every device, Keep awake, and serve entries whose server has stopped turned off. */
-async function refreshDev(servers: Awaited<ReturnType<typeof listServers>>): Promise<void> {
-  for (const [name, s] of served) if (!servers.some(x => x.port === s.port)) { served.delete(name); await serve(s.port, s.https, false) }
-  const [ts, awake] = await Promise.all([tailnet(), awakePid()])
-  hub.set({ dev: devRows(devFolders(), readDev, servers, ts), tailscale: !!ts, awake: !!awake })
-}
-
-/** Starts the terminal here, then serves its port on the tailnet once it listens (within a minute). */
-function runDev(row: { folder: string; project: string; command: string }): void {
-  if (!startDev(row.folder, row.project, row.command)) return
-  const name = `Dev: ${row.project}`
-  const until = Date.now() + DEV_WAIT_MS
-  const look = async () => {
-    const terminal = vscode.window.terminals.find(t => t.name === name && t.exitStatus === undefined)
-    if (!terminal || Date.now() > until) return
-    const port = devRows([row.folder], () => row, await listServers(), null)[0]?.port
-    if (!port) return void setTimeout(look, 2000)
-    const ts = await tailnet()
-    if (ts) { await serve(port, ts.https, true); served.set(name, { port, https: ts.https }) }
-    refreshHub()
-  }
-  setTimeout(look, 2000)
-}
 
 /** A chat opens in the window that has its folder open, so each project's chats stay in its own window.
  * False when that is this window, no window holds the folder, or it did not take the command. */
@@ -1809,83 +1352,6 @@ export async function smartSwitch(payload: Record<string, unknown>): Promise<voi
   void vscode.window.showInformationMessage(`Switchboard: that chat was about ${projectName(to)}, so it moved there from ${from}. Your prompt is also on the clipboard.`)
 }
 
-/** The folder of a dev command a request names: only a listed project's. */
-const devRequest = (folder: string) => knownDev(hub.get().dev, folder) ?? knownDev(devRows(devFolders(), readDev, [], null), folder)
-
-async function stopServer(pid: number): Promise<void> {
-  const server = hub.get().servers.find(s => s.pid === pid)
-  if (!server) return
-  const pick = await vscode.window.showWarningMessage(`Stop ${server.command} on :${server.port}${server.folder ? ` (${server.folder})` : ''}?`, { modal: true }, 'Stop it')
-  if (pick !== 'Stop it') return
-  try { process.kill(pid) } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not stop it (${(err as Error).message}).`) }
-  setTimeout(refreshHub, 800)
-}
-
-let sweeping = false
-const sweepState = (note?: string) => ({ busy: sweeping, tools: readSweep(), note: note ?? hub.get().sweep?.note })
-const runClaude = (args: string[]) => new Promise<boolean>(resolve => {
-  const c = claudeCall(args)
-  execFile(c.cmd, c.args, { timeout: 180_000, shell: c.shell, windowsHide: true }, err => resolve(!err))
-})
-
-/** One sweep job at a time: a rescan, Sweep all or an add; the panel shows busy until it ends, then its note. */
-async function sweepJob(job: () => Promise<string>): Promise<string> {
-  if (sweeping) throw new Error('a sweep is already running')
-  sweeping = true
-  hub.set({ sweep: sweepState() })
-  let note = ''
-  try { note = await job(); return note } catch (err) { note = (err as Error).message; throw err } finally {
-    sweeping = false
-    hub.set({ sweep: sweepState(note) })
-    refreshHub()
-  }
-}
-
-const sweepOneTool = (name: string) => sweepJob(async () => line(name, await rescan(name, hub.get().installed)))
-const sweepEverything = () => sweepJob(async () => {
-  // Records and badges only; nothing installed is turned off. Async scans, so the panel keeps working meanwhile.
-  const all = await sweepAll(hub.get().installed, { onEach: (done, total) => hub.set({ sweep: { ...sweepState(), progress: { done, total } } }) })
-  const n = Object.values(all).filter(held).length
-  return `Swept ${Object.keys(all).length} plugins and skills; ${n} need${n === 1 ? 's' : ''} review.`
-})
-const askApprove = async (q: string) => (await vscode.window.showWarningMessage(q, { modal: true }, 'Approve')) === 'Approve'
-const approveOne = (name: string) => sweepJob(async () => (await confirmApprove(name, hub.get().installed, askApprove, (kind, n) => toggle(kind, n, true))) ? `${name} approved and on.` : `${name} left off.`)
-
-/** The sweep tool's call: rescan one, or start Sweep all and answer at once. Approve is only the panel's button. */
-function sweepCall(name: string | undefined): Promise<string> {
-  if (name) return sweepOneTool(name)
-  if (sweeping) return Promise.reject(new Error('a sweep is already running'))
-  void sweepEverything().catch(err => log.warn('Sweep failed:', err))
-  return Promise.resolve('Sweep all started. Results show in Switchboard, Settings, Installed, and in ~/.claude/switchboard/sweep.json.')
-}
-
-/** Fix in a chat: a new chat in this window's project (else the first one) with the skill-inspector brief. */
-async function sweepFix(name: string): Promise<string | undefined> {
-  const projects = hub.get().projects
-  const folder = projects.find(p => p.path === workspace())?.path ?? projects[0]?.path
-  if (!folder) return 'no project to start the chat in'
-  return newChat(folder, fixBrief(name, readSweep()[name]), false, undefined)
-}
-
-/** Plugins and mods through the claude CLI; skills by moving their folder in or out of the archive. */
-async function toggle(kind: 'mod' | 'plugin' | 'skill', name: string, enabled: boolean): Promise<void> {
-  if (kind === 'skill') {
-    const claude = path.join(os.homedir(), '.claude')
-    const [from, to] = enabled ? ['skills-archive', 'skills'] : ['skills', 'skills-archive']
-    if (!/^[\w.-]+$/.test(name)) return
-    try {
-      await fs.promises.mkdir(path.join(claude, to), { recursive: true })
-      await fs.promises.rename(path.join(claude, from, name), path.join(claude, to, name))
-    } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not move ${name} (${(err as Error).message}).`) }
-  } else {
-    if (!/^[\w.@-]+$/.test(name)) return
-    await new Promise<void>(resolve => execFile(claudeBinary(), ['plugin', enabled ? 'enable' : 'disable', name], { timeout: 30000 }, err => {
-      if (err) void vscode.window.showWarningMessage(`Switchboard: claude plugin ${enabled ? 'enable' : 'disable'} ${name} failed.`)
-      resolve()
-    }))
-  }
-  refreshHub()
-}
 
 /** New chat in a repo made first: gh repo create or git clone under ~/Documents/GitHub. A string is why not. */
 async function startInNewRepo(repo: RepoAsk, m: Extract<WebviewToExtensionMessage, { type: 'hub-new-chat' }>): Promise<string | undefined> {
@@ -1908,3 +1374,8 @@ async function startInNewRepo(repo: RepoAsk, m: Extract<WebviewToExtensionMessag
   return startChat(plan.folder, m)
 }
 const NEW_WINDOW_MS = 60_000
+
+// After every function it takes, so the consts it reads are set when it is built.
+const { refreshChats, runInNewChat } = codexPanel({
+  state: () => S, store: () => store, workspace, pendingWaits, refuse, sendToChat, startWaits, refreshStages, controlsKey: CONTROLS_KEY, handedKey: HANDED_KEY,
+})

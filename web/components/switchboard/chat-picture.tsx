@@ -1,5 +1,6 @@
 'use client'
 import type { LinkChip } from '@/lib/wait-links'
+import { readStore, writeStore } from '@/lib/store'
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import type { Ask, ChatProfile, Choice, DoneCheck, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, TaskRow } from '@/lib/hub-types'
 import { askChoice } from '@/lib/ask'
@@ -7,7 +8,7 @@ import { hookNotes, limitLine, testsPrompt } from '@/lib/checks'
 import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
 import { projectName } from '@/lib/archive'
 import { INDEFINITE_LABEL, indefiniteHint, indefiniteOn } from '@/lib/indefinite'
-import { ago, almostDone, coverage } from './look'
+import { ago, almostDone, coverage } from '@/lib/look'
 import { OrbitView } from './orbits'
 import { Switch } from './gear'
 import { Check, CopyCommit, Receipt, chipOf, finishedLine, hhmm, plural, stillRunning } from './chat-cards'
@@ -173,14 +174,14 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
   place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode | ((tools: ReactNode) => ReactNode); note?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void; /** Its wait links, for the Orbit arcs and the waiting word. */ links?: LinkChip[]
 }) {
   const [showTools, setShowTools] = useState(true)
-  useEffect(() => { try { if (localStorage.getItem(TOOLS_KEY) === 'off') setShowTools(false) } catch { /* no storage: keep on */ } }, [])
+  useEffect(() => { if (readStore(TOOLS_KEY) === 'off') setShowTools(false) }, [])
   // Durations move with the clock, not only with hook events.
   const [, tick] = useReducer((n: number) => n + 1, 0)
   useEffect(() => { const t = setInterval(tick, 30e3); return () => clearInterval(t) }, [])
   // Off the Mac (phone, LAN) the button can only raise the terminal on the Mac. Read after mount so SSR matches.
   const [remote, setRemote] = useState(false)
   useEffect(() => setRemote(!vscodeBridge?.isVSCode && !onMac()), [])
-  const toggle = (on: boolean) => { setShowTools(on); try { localStorage.setItem(TOOLS_KEY, on ? 'on' : 'off') } catch { /* no storage */ } }
+  const toggle = (on: boolean) => { setShowTools(on); writeStore(TOOLS_KEY, on ? 'on' : 'off') }
 
   const state = progress?.state ?? 'idle', s = chipOf(progress), name = chat.name ?? projectName(chat)
   const since = ago(progress?.at ?? chat.updatedAt ?? Date.now())

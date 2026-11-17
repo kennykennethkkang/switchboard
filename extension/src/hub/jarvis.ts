@@ -108,12 +108,6 @@ function startOf(s: HubState, q: string): Parsed | undefined {
   return { start: { folder: p.path, project: p.name, goal } }
 }
 
-/** A start proposal for the Confirm tap; never starts anything itself. */
-export function jarvisStart(s: HubState, q: string): JarvisStart | undefined {
-  const r = startOf(s, q)
-  return r && 'start' in r ? r.start : undefined
-}
-
 /** One box question: local, then a start proposal, then the brain on the open project's board. */
 export async function jarvis(s: HubState, q: string, gone: Server[], ask = askBrain, now = Date.now()): Promise<JarvisReply> {
   const st = startOf(s, q)

@@ -42,9 +42,4 @@ export function inFlight(minMs = 300, now = () => Date.now(), later: (f: () => v
   }
 }
 
-// Commands VS Code runs for a while; their state (repo.busy, sweep.busy, jarvis, voice) keeps the bar up too.
-const LONG = new Set(['hub-git', 'hub-sweep', 'hub-sweep-fix', 'hub-sweep-approve', 'hub-jarvis', 'hub-voice', 'hub-harden', 'hub-key-test', 'hub-aws-check', 'hub-setup', 'hub-rules-sync', 'hub-todo-sync', 'hub-search', 'hub-changes', 'hub-kit-export'])
-/** How long a VS Code command with no answer stays pending when no hub state comes back first. */
-export const noAnswerMs = (type: string) => (LONG.has(type) ? 8000 : 1200)
-
 export const pending = inFlight()

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useFlash } from '@/hooks/use-flash'
 import type { Ask, Choice, DoneCheck, LearnReady, StuckItem } from '@/lib/hub-types'
 import { CheckStamp } from './approve'
 import type { HubCommand } from '@/lib/vscode-bridge'
@@ -32,7 +33,7 @@ export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [],
   useEffect(() => () => { if (last.current.peek) last.current.onDiff?.() }, [])
   useEffect(() => { if (peek && !approvals.includes(peek)) { setPeek(undefined); onDiff?.() } }, [peek, approvals, onDiff])
   const rule = (id: string) => { const c = tint?.(id); return c ? { borderLeftColor: c } as const : undefined }
-  const [copied, setCopied] = useState<string>()
+  const [copied, setCopied] = useFlash<string | undefined>(undefined, 1400)
   const n = stuck.length + needs.length + fails.length + learning.length + (approve ? approvals.length : 0)
   if (!n) return null
   const now = Date.now()
@@ -97,7 +98,7 @@ export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [],
         {stuck.map(i => {
           const tone = stuckTone([i], i.sessionId)
           const meta = [`for ${forHow(i, now)}`, usage(i), i.pid && `pid ${i.pid}`].filter(Boolean).join(' · ')
-          const copy = async () => { if (await onCopy(diagnosis(i, name(i.sessionId), now))) { setCopied(i.id); setTimeout(() => setCopied(c => (c === i.id ? undefined : c)), 1400) } }
+          const copy = async () => { if (await onCopy(diagnosis(i, name(i.sessionId), now))) setCopied(i.id) }
           return (
             <li key={i.id} data-tone={tone} style={rule(i.sessionId)}>
               <i aria-hidden />

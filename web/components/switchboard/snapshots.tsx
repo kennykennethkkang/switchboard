@@ -4,7 +4,8 @@
 import { useState } from 'react'
 import type { HubState } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
-import { ago, caps } from './look'
+import { caps } from './look'
+import { ago } from '@/lib/look'
 
 export function Snapshots({ hub, send }: { hub: Pick<HubState, 'snapshots'>; send: (c: HubCommand) => void }) {
   const [open, setOpen] = useState(false)

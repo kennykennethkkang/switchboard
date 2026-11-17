@@ -8,7 +8,7 @@ import * as path from 'path'
 import assert from 'node:assert/strict'
 import { HubService } from '../src/hub/hub-service'
 import { handleHub, type HubReply } from '../src/hub/routes'
-import { KIT_MODS, addLine, assemble, buildFlowMap, flowCacheSize, flowChatDirs, flowLabels, flowRoots, headerOf, newWork, parseImports, readmeLine, resolveImport, scanCode, serverOf, slugOf } from '../src/hub/flowmap'
+import { KIT_MODS, addLine, assemble, buildFlowMap, flowChatDirs, flowLabels, flowRoots, headerOf, newWork, parseImports, readmeLine, resolveImport, scanCode, serverOf, slugOf } from '../src/hub/flowmap'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'flowmap-'))
 const put = (root: string, rel: string, text: string) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text) }
@@ -169,13 +169,6 @@ describe('qa fixes', () => {
     try { assert.equal((await scanCode(root, 1)).cut, true) } finally { (fs.promises as { readdir: unknown }).readdir = real }
     assert.ok(calls <= 4, `readdir ran ${calls} times`)
     fs.rmSync(root, { recursive: true, force: true })
-  })
-
-  it('keeps at most 10 projects cached', async () => {
-    const home = tmp(), dirs = Array.from({ length: 12 }, () => tmp())
-    for (const d of dirs) await buildFlowMap(d, {}, dirs, home)
-    assert.ok(flowCacheSize() <= 10)
-    for (const d of [home, ...dirs]) fs.rmSync(d, { recursive: true, force: true })
   })
 
   it('redacts header and README text', () => {

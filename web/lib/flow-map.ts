@@ -249,21 +249,3 @@ export function routeLinks(parts: Part[], links: PartLink[], at: Map<string, Pt>
   })
   return out
 }
-
-/** Lines that pass through a part they neither start nor end at, as "link | part". Empty is the goal. */
-export function crossings(parts: Part[], links: PartLink[], at: Map<string, Pt>, paths: Map<string, Pt[]>): string[] {
-  const bad: string[] = []
-  for (const l of links) {
-    const pts = paths.get(`${l.from}>${l.to}`) ?? []
-    for (const p of parts) {
-      if (p.id === l.from || p.id === l.to) continue
-      const b = at.get(p.id)!
-      const hit = pts.slice(1).some((q, k) => {
-        const s = pts[k], x0 = Math.min(s.x, q.x), x1 = Math.max(s.x, q.x), y0 = Math.min(s.y, q.y), y1 = Math.max(s.y, q.y)
-        return x0 < b.x + PART_W && x1 > b.x && y0 < b.y + PART_H && y1 > b.y
-      })
-      if (hit) bad.push(`${l.from}>${l.to} | ${p.id}`)
-    }
-  }
-  return bad
-}

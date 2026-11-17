@@ -1,7 +1,8 @@
 'use client'
 import type { JevProject } from '@/lib/hub-types'
 import { jevView, setupPrompt } from '@/lib/jev'
-import { caps, label, panel, repoOf } from './look'
+import { caps, label, panel } from './look'
+import { baseName } from '@/lib/path'
 
 type Send = (m: { type: 'hub-new-chat'; path: string; text: string; remote: boolean }) => void
 
@@ -9,7 +10,7 @@ type Send = (m: { type: 'hub-new-chat'; path: string; text: string; remote: bool
 export function JevCard({ folder, jev, send }: { folder: string; jev?: JevProject; send: Send }) {
   const v = jevView(jev)
   return (
-    <section aria-label={`Jev for ${repoOf(folder)}`} style={panel}>
+    <section aria-label={`Jev for ${baseName(folder)}`} style={panel}>
       <h2 style={caps}><span>Jev</span>{v.runs.length > 0 && <span title="What the runs listed here cost">{v.cost}</span>}</h2>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {v.jobs.map(j => (

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { inFlight, noAnswerMs } from './in-flight'
+import { inFlight } from './in-flight'
+import { commandWait } from '../lib/vscode-bridge'
 
 const clock = () => {
   let t = 0
@@ -76,7 +77,8 @@ test('endAll settles every command the VS Code bridge cannot answer', () => {
 })
 
 test('VS Code fallback: a quick command lets go in ~1.2 s, a known long one waits up to 8 s', () => {
-  assert.equal(noAnswerMs('hub-focus-chat'), 1200)
-  assert.equal(noAnswerMs('hub-star'), 1200)
-  for (const t of ['hub-git', 'hub-sweep', 'hub-sweep-fix', 'hub-jarvis', 'hub-voice', 'hub-harden']) assert.equal(noAnswerMs(t), 8000, t)
+  assert.equal(commandWait({ type: 'hub-focus-chat', sessionId: 's' }), 1200)
+  assert.equal(commandWait({ type: 'hub-star', sessionId: 's', ai: 'claude', on: true }), 1200)
+  assert.equal(commandWait({ type: 'hub-sweep' }), 8000)
+  assert.equal(commandWait({ type: 'hub-git', sessionId: 's', op: 'sync' }), 8000)
 })

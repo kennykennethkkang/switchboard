@@ -96,6 +96,11 @@ export function withLock<T>(lock: string, fn: () => T, waitMs = 100): T {
   try { return fn() } finally { release?.() }
 }
 
+/** Parsed JSON from file, or fallback when it is missing or broken. */
+export function readJsonOr(file: string, fallback?: unknown): unknown {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback }
+}
+
 /** Write JSON via temp file + rename so a crash mid-write can't truncate the file. */
 export function writeJsonAtomic(target: string, value: unknown): void {
   // Write through a symlink (dotfiles) and keep the mode, or rename replaces both; a new file is owner-only
@@ -107,4 +112,8 @@ export function writeJsonAtomic(target: string, value: unknown): void {
   fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2) + '\n', { mode })
   fs.chmodSync(tmpPath, mode)
   fs.renameSync(tmpPath, filePath)
+}
+
+export function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object'
 }

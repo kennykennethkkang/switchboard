@@ -1,6 +1,6 @@
 /** The Jev card's words: a project's jobs from Set up Jev, its newest runs and their cost. */
 import type { JevProject } from './hub-types'
-import { ago } from '../components/switchboard/look'
+import { ago } from './look'
 
 const JOBS = [['done', 'Done-check'], ['gate', 'Risky commands'], ['tells', 'AI-tell check'], ['route', 'Roles']] as const
 const TIP: Record<string, string> = {

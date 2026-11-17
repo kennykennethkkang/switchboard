@@ -7,6 +7,7 @@ import { createHash } from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { readJsonOr } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
 import { redact } from './brain'
 import type { AwsProfile, AwsStatus, ChromeProfile } from './types'
@@ -238,7 +239,8 @@ export const dueHeadsUps = (s: AwsSessions, now: number) =>
 // ─── Files ───────────────────────────────────────────────────────────────────
 
 const readJson = (file: string): Record<string, unknown> => {
-  try { const v = JSON.parse(fs.readFileSync(file, 'utf8')); return v && typeof v === 'object' && !Array.isArray(v) ? v : {} } catch { return {} }
+  const v = readJsonOr(file)
+  return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
 }
 const strings = (v: unknown): Record<string, string> =>
   Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([, x]) => typeof x === 'string')) as Record<string, string>

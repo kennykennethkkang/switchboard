@@ -3,11 +3,11 @@
 // Overlapping runs of a role are one bar with a count; tool calls are faint ticks with detail on hover;
 // a loop back is one marker. Unused roles fold into a line below. Timings are derived, see timeline().
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
-import { almostDone } from '../look'
+import { almostDone } from '@/lib/look'
 import { axisTicks, laneBars, loopBacks, teamOf, timeline, trackWidth, type LaneBar } from '@/lib/orbit-views'
 import type { ToolCall } from '@/lib/hub-types'
 import { Glyph, NAME, Reveal, nodeProps, useLive, type ViewProps } from './parts'
-import { describe } from '../orbit'
+import { describe } from './orbit'
 import { say } from '@/lib/eta'
 
 const pct = (u: number) => `${(Math.min(1, Math.max(0, u)) * 100).toFixed(3)}%`

@@ -42,6 +42,7 @@ Kit skills that ship in claude-mods/kit/skills and are copied with their LICENSE
 - web-design-guidelines names Vercel as its author; claude-x-jev and jev-setup-project name Charles J Dove (Jev, TypeSafe). skill-inspector runs NVIDIA SkillSpector, which is not bundled.
 - caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0, is fetched by Set up into ~/.claude/skills; not bundled.
 - untangle-codebase (https://github.com/caldoai/skills) by Maze (caldoai), MIT License, is fetched by Set up into ~/.claude/skills; not bundled.
+- ui-sdk (https://github.com/vercel-labs/ui) by Vercel Labs, Apache License 2.0, is fetched by Set up into ~/.claude/skills; not bundled.
 
 The Git panel's invisible character cleanup on commit is an idea from watermarks-remover (https://github.com/guillaumemeyer/watermarks-remover) by Guillaume Meyer, MIT License; no code is copied.
 

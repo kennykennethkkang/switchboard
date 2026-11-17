@@ -3,9 +3,9 @@
 import { busyLine } from '@/lib/eta'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { RoleState } from '@/lib/orbit-views'
-import { almostDone } from '../look'
+import { almostDone } from '@/lib/look'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import type { OrbitChat } from '../orbit'
+import type { OrbitChat } from './orbit'
 
 /** pick: a role node (or the lead) was pressed, open its drawer; picked: the role the drawer shows. */
 export type ViewProps = { chat: OrbitChat; showTools: boolean; instant?: boolean; pick?: (role: string) => void; picked?: string }

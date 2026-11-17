@@ -5,7 +5,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { spawnSync } from 'child_process'
-import { GUARD_MARK, installGuard, removeGuard } from '../src/hub/git-guard'
+import { GUARD_MARK, installGuard } from '../src/hub/git-guard'
 import { gitEnv } from '../src/hub/git'
 
 // No chat markers, so the setup commits below aren't refused themselves.
@@ -108,18 +108,5 @@ describe('gitEnv', () => {
     assert.equal(env.PATH, '/bin')
     for (const k of ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'SWITCHBOARD_CHAT']) assert.equal(env[k], undefined)
     assert.equal(env.GIT_TERMINAL_PROMPT, '0')
-  })
-})
-
-describe('removeGuard', () => {
-  it('deletes only hooks carrying the marker', async () => {
-    const dir = repo()
-    try {
-      await installGuard(dir)
-      fs.writeFileSync(hook(dir, 'pre-commit'), '#!/bin/sh\nexit 0\n')
-      await removeGuard(dir)
-      assert.ok(fs.existsSync(hook(dir, 'pre-commit')))
-      assert.ok(!fs.existsSync(hook(dir, 'pre-push')))
-    } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   })
 })

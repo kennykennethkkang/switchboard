@@ -30,9 +30,10 @@ import { heldLabel, moveTodoChat, projectOf, todoEnv, type RunLabel } from './to
 import { trustFolder, trustedWindowRoots } from './trust'
 import { openChatTerminal, tags } from './terminals'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
-import { FLAGGED, chatSettings, cleanProfile, clearIndefinite, defaultProfile, handoffSettings, indefiniteOn, nameNote, saveProfile, savedProfile, startProfile, syncIndefinite, toolsNote } from './tools'
+import { FLAGGED, chatSettings, cleanProfile, clearIndefinite, defaultProfile, handoffSettings, indefiniteOn, nameNote, saveProfile, savedProfile, startProfile, syncIndefinite, toolsNote, uiSdkNote } from './tools'
 import { withGoal } from './smart-tools'
 import { editor } from '../editor'
+import { kitDir } from '../constants'
 
 // A window opened by `code` from inside a chat inherits Claude's child marker, and a chat started
 // under it saves no transcript (no --resume, no handoff). Chat terminals drop it; null unsets.
@@ -166,7 +167,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   const profile = start && !tools ? withGoal(start, text ?? '', inv) : start
   // Codex has no hook to read the brief from, so it rides in front of the first message.
   // Codex has no --append-system-prompt: Claude's system notes ride in the brief's block, which the row name skips (ais.ts withoutBrief).
-  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
+  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? '', uiSdkNote(folder) ?? ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
   const lead = [withBrief(hub.get(), folder, undefined), notes && `Switchboard notes: ${notes}`].filter(Boolean).join('\n')
   const first = withPointer(ai === 'claude' ? '' : [lead, text].filter(Boolean).join('\n\n'), rulesState.ready[ai], rulesState.kit)
   if (ai === 'codex') {
@@ -188,7 +189,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, worktree: worktree && repoTop(folder) ? worktreeName(title) : undefined, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, worktree: worktree && repoTop(folder) ? worktreeName(title) : undefined, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? '', uiSdkNote(folder) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
@@ -488,7 +489,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
   if (carried?.indefinite && freshId) {
     try { setChatProfile(freshId, carried); indefiniteDone(h.sessionId) } catch { /* the flag stays with the old chat */ }
   }
-  const system = [settings && carried ? toolsNote(carried) : '', myName()].filter(Boolean).join(' ') || undefined
+  const system = [settings && carried ? toolsNote(carried) : '', myName(), uiSdkNote(h.cwd) ?? ''].filter(Boolean).join(' ') || undefined
   const tools = { ...(settings ? { settings } : {}), system }
   const claude = (branch?: string) => newChatCommand({ textFile: messageFile(text), name: fresh, remote: hub.get().rc.atStartup && !off ? fresh : undefined, branch, sessionId: freshId, ...tools }, SHELL)
   let command = ''
@@ -531,7 +532,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
 
 /** Refreshes the portable kit from this machine, in a terminal so the result shows. Answers why it could not. */
 export function exportKit(root: string): string | undefined {
-  const setup = path.join(root, 'claude-mods', 'kit', 'setup.mjs')
+  const setup = path.join(kitDir(root), 'setup.mjs')
   if (!fs.existsSync(setup)) return `no kit at ${setup}`
   freshTerminal('Kit: export', path.dirname(setup)).sendText(`node "${setup}" --export`)
   return undefined

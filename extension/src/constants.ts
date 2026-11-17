@@ -1,3 +1,6 @@
+import * as os from 'os'
+import * as path from 'path'
+
 /**
  * Shared constants for the extension.
  * Centralizes magic numbers and strings scattered across modules.
@@ -24,7 +27,7 @@ export const PERMISSION_DETECT_MS = 5000
  *  at discovery time. Must be longer than INACTIVITY_TIMEOUT_MS to avoid
  *  dropping sessions during long thinking pauses.
  *
- *  Filter is discovery-time only — stale sessions that receive new writes
+ *  Filter is discovery-time only: stale sessions that receive new writes
  *  refresh their mtime and are picked up by the next scan tick
  *  (SCAN_INTERVAL_MS). A user resuming a long-idle session should see it
  *  attach within ~1s of their next message. */
@@ -45,7 +48,7 @@ export const DEFAULT_DEV_PORT = 3002
 /** Default SSE relay port (used by dev relay, standalone app, and webview build) */
 export const DEFAULT_RELAY_PORT = 3001
 
-/** Accept CORS requests from any localhost origin during dev — Next.js falls
+/** Accept CORS requests from any localhost origin during dev; Next.js falls
  *  back to a higher port when 3000 is taken, so a single hard-coded value
  *  would silently break dev. The relay binds to 127.0.0.1 already, so this
  *  pattern is safe (no external origin can reach it). */
@@ -77,7 +80,7 @@ export const NONCE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 
 // ─── Webview Colors ─────────────────────────────────────────────────────────
 
-/** Void background color — matches the web COLORS.void value */
+/** Void background color, matches the web COLORS.void value */
 export const WEBVIEW_BG_COLOR = '#050510'
 
 /** Loading screen text color (dev mode only) */
@@ -182,7 +185,7 @@ export const PATTERN_TOOLS = ['Glob', 'Grep'] as const
 export const SUBAGENT_ID_SUFFIX_LENGTH = 6
 
 /** Generate a consistent fallback name for a subagent when no explicit name is available.
- *  @param id  An identifier string (e.g. agent_id or a timestamp) — the last chars are used.
+ *  @param id  An identifier string (e.g. agent_id or a timestamp); the last chars are used.
  *  @param index  A 1-based index for sequential numbering. */
 export function generateSubagentFallbackName(id: string, index: number): string {
   return `subagent-${id.length > SUBAGENT_ID_SUFFIX_LENGTH ? id.slice(-SUBAGENT_ID_SUFFIX_LENGTH) : index}`
@@ -213,3 +216,6 @@ export const SYSTEM_CONTENT_PREFIXES = [
   '<local-command-stdout',
   '<local-command-caveat',
 ] as const
+
+/** The kit source in the claude-mods clone beside this checkout. */
+export const kitDir = (root = path.join(os.homedir(), 'Documents', 'GitHub')) => path.join(root, 'claude-mods', 'kit')
