@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.86
+
+- Worktrees left behind after a window reload, or by a chat that moved into one after it started, are now found on disk and removed after 10 idle minutes when their branch is already in the main checkout and nothing is uncommitted
+
 ## 0.21.85
 
 - Set up installs the ui-sdk skill from vercel-labs/ui (UI SDK: keyboard, focus, popups, drag and drop and ARIA as behaviors for React, Vue, Svelte, Solid and web components), for Claude and Codex

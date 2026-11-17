@@ -6,7 +6,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { newChatCommand, repoTop } from '../src/hub/projects'
-import { cleanWorktree, endedWorktrees, gitOp, readRepo } from '../src/hub/git'
+import { cleanWorktree, endedWorktrees, gitOp, readRepo, worktreeDirs } from '../src/hub/git'
 import { excludeWorktrees } from '../src/hub/advanced'
 import { commandProblem } from '../src/hub/routes'
 
@@ -144,6 +144,19 @@ describe('kept worktree cleanup', () => {
     assert.deepEqual(endedWorktrees(seen, [], 18 * MIN), [])
     assert.deepEqual(endedWorktrees(seen, [], 19 * MIN), [wt])
     assert.deepEqual(endedWorktrees(seen, [], 40 * MIN), [])
+  })
+
+  it('picks up a worktree found on disk that no live chat was seen in, as after a reload', () => {
+    const seen = new Map<string, number | undefined>()
+    const wt = path.join(main, '.claude', 'worktrees', 'left')
+    fs.mkdirSync(wt, { recursive: true })
+    const MIN = 60_000
+    assert.deepEqual(worktreeDirs([main, path.join(main, '.claude', 'worktrees', 'other', 'sub')]).includes(wt), true)
+    assert.deepEqual(endedWorktrees(seen, [], 0, [wt]), [])
+    assert.deepEqual(endedWorktrees(seen, [{ live: true, cwd: wt }], 5 * MIN, [wt]), [])
+    assert.deepEqual(endedWorktrees(seen, [], 6 * MIN, [wt]), [])
+    assert.deepEqual(endedWorktrees(seen, [], 16 * MIN, [wt]), [fs.realpathSync.native(wt)])
+    fs.rmSync(wt, { recursive: true })
   })
 
   it('treats case twins of one worktree as one', () => {

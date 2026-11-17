@@ -18,7 +18,7 @@ import { execFile } from 'child_process'
 import * as fs from 'fs'
 import { readGroups } from './split'
 import { held, line } from './sweep'
-import { cleanWorktree, endedWorktrees } from './git'
+import { cleanWorktree, endedWorktrees, worktreeDirs } from './git'
 import { learnTick, usageOk } from './learn'
 import { rememberChats } from './reap'
 import { autoStartPlan, changeTodo, claimTodo, START_GRACE_MS, clearGoneChats, loadTodos, runLabel, runMessage, projectOf, startTodo } from './todo'
@@ -50,7 +50,7 @@ export function codexPanel(d: {
         ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
     }), ais, doneChecks })
     startWaits()
-    for (const w of endedWorktrees(wtSeen, chats)) void cleanWorktree(w).catch(err => log.warn('Worktree cleanup failed:', err))
+    for (const w of endedWorktrees(wtSeen, chats, Date.now(), worktreeDirs(chats.map(c => c.cwd)))) void cleanWorktree(w).catch(err => log.warn('Worktree cleanup failed:', err))
     refreshStages(chats)
     void syncTerminals(chats).catch(err => log.warn('Terminal list failed:', err))
     const ended = endedCodex(chats, codexTied, codexExited).filter(c => !hub.get().archive.some(a => a.sessionId === c.sessionId))

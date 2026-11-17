@@ -421,8 +421,10 @@ const realOf = (p: string) => { try { return fs.realpathSync.native(p) } catch {
  * Worktree folders that have had no live chat for 10 minutes straight. seen carries the state between calls:
  * a worktree maps to when it was first seen without a live chat, or undefined while one is live. Keys are real paths.
  */
-export function endedWorktrees(seen: Map<string, number | undefined>, chats: { live: boolean; cwd: string }[], now = Date.now()): string[] {
+export function endedWorktrees(seen: Map<string, number | undefined>, chats: { live: boolean; cwd: string }[], now = Date.now(), onDisk: string[] = []): string[] {
   const live = new Set(chats.flatMap(c => { const w = c.live ? WT_DIR.exec(c.cwd)?.[1] : undefined; return w ? [realOf(w)] : [] }))
+  // Left over from before a reload, or from a chat that moved in after starting: start its clock now.
+  for (const w of onDisk.map(realOf)) if (!live.has(w) && !seen.has(w)) seen.set(w, now)
   const ended: string[] = []
   for (const [w, since] of seen) {
     if (live.has(w)) continue
@@ -431,6 +433,12 @@ export function endedWorktrees(seen: Map<string, number | undefined>, chats: { l
   }
   for (const w of live) seen.set(w, undefined)
   return ended
+}
+
+/** Folders under <repo>/.claude/worktrees for the repos these chats run in. */
+export function worktreeDirs(cwds: string[]): string[] {
+  const roots = new Set(cwds.map(c => WT_DIR.exec(c)?.[1].replace(/[\\/]\.claude[\\/]worktrees[\\/][^\\/]+$/, '') ?? c))
+  return [...roots].flatMap(r => { const d = path.join(r, '.claude', 'worktrees'); try { return fs.readdirSync(d).map(n => path.join(d, n)) } catch { return [] } })
 }
 
 /** Removes a worktree whose branch is already in the main checkout's HEAD and has no changes; anything else stays. Never forced. */
