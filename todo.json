@@ -1,6 +1,13 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "ebcfb494",
+   "text": "Kit fix proposal (aar, Armasu session 77071046): in claude-mods/kit/rules.md, Finishing bullet (line 64, \"Finish only after the checks ran...\"), after \"Kenneth approves finished chats:\" add the sentence \"If the standup still offers a choice (\"unless you want\", \"if you want\", \"optional\"), ask it as its own question and do the work before the Approve question.\" Why: Approve was asked 4 times on 2026-11-17 and Kenneth sent it back 3 times through its free text because Yo's GCP billing close was left as an optional line.",
+   "at": 1794942646945,
+   "from": "232cf8ef-f843-4349-bf6c-d14d30528c97"
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -436,12 +443,12 @@
   {
    "id": "ec2c21a3",
    "text": "Proposed kit rule (aar 2026-11-16): add to claude-mods/kit/agents/engineer.md and qa.md: \"Never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use git show HEAD:<path> or git worktree add <scratch>/base HEAD.\" (a stash in the iceberg chat lost two edits of a parallel engineer)",
+   "at": 1794857368705,
+   "by": "476535e0-ab88-4ee0-9414-5182c1813347",
    "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
    "name": "Instagram Reel Switchboard Planning",
    "run": 67,
-   "auto": true,
-   "at": 1794857368705,
-   "by": "476535e0-ab88-4ee0-9414-5182c1813347"
+   "auto": true
   },
   {
    "id": "bb6dac7e",
