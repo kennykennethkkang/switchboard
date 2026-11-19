@@ -14,9 +14,13 @@
   {
    "id": "cfc0e61f",
    "text": "Release the Tailscale phone 403 fix (extension/src/hub/lan.ts afterRead, keeps the tailnet name when a tailscale status read fails) once branch worktree-fix-tailscale-phone-viewing-35ab is merged back: bump past 0.21.95, package, install, so the phone app on 3131 restarts with it",
-   "at": 1795085756856,
+   "at": 1795085757889,
    "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
-   "name": "Fix Tailscale phone viewing"
+   "name": "Fix Tailscale phone viewing",
+   "chat": "96a33c11-5cf6-4e9d-8152-c0651c33f863",
+   "host": "62903adf5e340f87",
+   "run": 70,
+   "auto": true
   }
  ],
  "removed": {
@@ -450,7 +454,7 @@
   "ec2c21a3": 1794857368705,
   "ebcfb494": 1794942688168
  },
- "seq": 69,
+ "seq": 70,
  "streak": 69,
  "ticked": [
   {
