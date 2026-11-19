@@ -44,7 +44,8 @@ export function digest(dir) {
   const h = createHash('sha256')
   const walk = rel => {
     for (const n of readdirSync(join(dir, rel)).sort()) {
-      if (n === '.git') continue
+      // .in_use holds claude's per-session lock files; they change with every chat
+      if (n === '.git' || n === '.in_use') continue
       const r = rel ? `${rel}/${n}` : n, st = lstatSync(join(dir, r))
       if (st.isSymbolicLink()) h.update(`${r}\0link\0${readlinkSync(join(dir, r))}\0`)
       else if (st.isDirectory()) walk(r)

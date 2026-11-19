@@ -360,6 +360,14 @@ describe('qa fixes', () => {
     assert.notEqual(digest(d), one)
   })
 
+  it('digest ignores the session locks claude drops in .in_use', () => {
+    const d = tmp()
+    fs.writeFileSync(path.join(d, 'SKILL.md'), 'x')
+    const one = digest(d)
+    fs.mkdirSync(path.join(d, '.in_use')); fs.writeFileSync(path.join(d, '.in_use', '84488'), '')
+    assert.equal(digest(d), one)
+  })
+
   it('fails closed on a GitHub add that could not be scanned; a kit skill stays on', async () => {
     const home = tmp()
     const unscanned = async () => ({ state: 'unscanned' as const, reason: 'skillspector is not installed' })
