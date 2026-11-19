@@ -1,6 +1,14 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "a680b391",
+   "text": "Proposed fix (needs Kenneth's OK): in Switchboard extension/src/hub/sweep.ts fixBrief, replace \"ask them to press Approve in Switchboard, Settings, Installed, if they agree\" with \"then open the Approve modal for them with the switchboard ask server (POST /hub/command {type:'hub-sweep-approve', name}) so they only click Yes\". Reason: review chats sat idle looking broken on 2026-11-18.",
+   "at": 1795054421428,
+   "from": "1374c031-9409-4e1e-97b5-067381a550fd",
+   "name": "Fix Zellizard chat approvals"
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
