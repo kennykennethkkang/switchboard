@@ -4,11 +4,10 @@
   {
    "id": "08f52f1f",
    "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1795113256065,
-   "chat": "e7749655-2db1-4436-a8a7-57fbef2e9829",
-   "host": "62903adf5e340f87",
+   "at": 1795113378998,
    "run": 74,
-   "auto": true
+   "auto": true,
+   "stopped": true
   }
  ],
  "removed": {
