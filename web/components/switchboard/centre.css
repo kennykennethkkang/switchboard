@@ -9,6 +9,16 @@
 .cp-sub > span:empty { display: none; }
 .cp-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
 .cp-acts { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.cp-back { display: none; }
+/* Phone: the actions get their own rows (switch, then buttons) and no label is cut. */
+@container (max-width: 560px) {
+  .cp-head > .cp-acts { width: 100%; flex-wrap: wrap; }
+  .cp-acts > .cp-loop { flex: 1 0 100%; }
+  .cp-head .cp-acts > .hub-btn { flex: none; overflow: visible; }
+}
+@media (max-width: 760px) {
+  .cp-back { display: inline-flex; align-items: center; justify-self: start; margin: 12px 0 0 16px; min-height: 44px; }
+}
 .cp-note { margin: -10px 0 0; font-size: 13px; line-height: 1.5; color: var(--hub-mute); }
 
 .cp-card, .cp-panel { border: 1px solid var(--hub-hair); border-radius: var(--hub-r-panel, 10px); background: var(--hub-elev); min-width: 0; display: grid; align-content: start; }

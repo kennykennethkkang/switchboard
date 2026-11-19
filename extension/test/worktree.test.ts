@@ -6,18 +6,15 @@ import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { newChatCommand, repoTop } from '../src/hub/projects'
-import { cleanWorktree, endedWorktrees, gitOp, readRepo, worktreeDirs } from '../src/hub/git'
+import { addWorktree, cleanWorktree, endedWorktrees, gitOp, readRepo, worktreeDirs } from '../src/hub/git'
 import { excludeWorktrees } from '../src/hub/advanced'
 import { commandProblem } from '../src/hub/routes'
 
 const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
 describe('worktree start', () => {
-  it('adds --worktree after the name', () => {
-    assert.equal(newChatCommand({ name: 'Fix it', worktree: 'fix-it' }, 'posix'), "claude --name 'Fix it' --worktree 'fix-it'")
-  })
-  it('refuses a name that is not a slug', () => {
-    assert.throws(() => newChatCommand({ worktree: '../x' }, 'posix'))
+  it('never passes --worktree to claude', () => {
+    assert.equal(newChatCommand({ name: 'Fix it' }, 'posix'), "claude --name 'Fix it'")
   })
   it('accepts worktree on hub-new-chat', () => {
     assert.equal(commandProblem({ type: 'hub-new-chat', path: '/x', remote: false, worktree: true }), undefined)
@@ -168,5 +165,104 @@ describe('kept worktree cleanup', () => {
     endedWorktrees(seen, [{ live: true, cwd: wt }], 0)
     endedWorktrees(seen, [{ live: true, cwd: twin }], 1)
     assert.equal(seen.size, 1)
+  })
+})
+
+describe('own worktree creation', () => {
+  let tmp = '', main = ''
+  before(() => {
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-wta-')))
+    main = path.join(tmp, 'repo')
+    fs.mkdirSync(main)
+    sh(main, 'init', '-q', '-b', 'main')
+    sh(main, 'config', 'user.email', 't@t'); sh(main, 'config', 'user.name', 'T'); sh(main, 'config', 'commit.gpgsign', 'false')
+    fs.writeFileSync(path.join(main, 'a.txt'), '1\n'); sh(main, 'add', '.'); sh(main, 'commit', '-qm', 'init')
+  })
+  after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+
+  it('adds repo/.claude/worktrees/<slug> on worktree-<slug> from HEAD and excludes the folder', async () => {
+    const r = await addWorktree(main, 'fix-it-ab12')
+    assert.equal(r.ok, true)
+    const dir = path.join(main, '.claude', 'worktrees', 'fix-it-ab12')
+    assert.equal(r.ok && r.dir, dir)
+    assert.equal(sh(dir, 'rev-parse', '--abbrev-ref', 'HEAD'), 'worktree-fix-it-ab12')
+    assert.equal(sh(dir, 'rev-parse', 'HEAD'), sh(main, 'rev-parse', 'HEAD'))
+    assert.equal(sh(main, 'status', '--porcelain'), '')
+    assert.equal(repoTop(dir), main)
+  })
+  it('says why when git refuses, and rejects a bad name', async () => {
+    const again = await addWorktree(main, 'fix-it-ab12')
+    assert.equal(again.ok, false)
+    assert.equal(again.ok === false && again.error.length > 0, true)
+    assert.equal((await addWorktree(main, '../x')).ok, false)
+  })
+})
+
+describe('merged worktree cleanup', () => {
+  let tmp = '', main = ''
+  const add = (name: string) => { const wt = path.join(main, '.claude', 'worktrees', name); sh(main, 'worktree', 'add', '-q', '-b', `worktree-${name}`, wt); return wt }
+  const commit = (wt: string, f: string) => { fs.writeFileSync(path.join(wt, f), f); sh(wt, 'add', '.'); sh(wt, 'commit', '-qm', f) }
+  const merged = async () => 'MERGED'
+  const open = async () => 'OPEN'
+  before(() => {
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-wtm-')))
+    main = path.join(tmp, 'repo')
+    fs.mkdirSync(main)
+    sh(main, 'init', '-q', '-b', 'main')
+    sh(main, 'config', 'user.email', 't@t'); sh(main, 'config', 'user.name', 'T'); sh(main, 'config', 'commit.gpgsign', 'false')
+    fs.writeFileSync(path.join(main, 'a.txt'), '1\n'); sh(main, 'add', '.'); sh(main, 'commit', '-qm', 'init')
+  })
+  after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+
+  it('removes a squash-merged worktree with branch -D when its PR is merged', async () => {
+    const wt = add('squash'); commit(wt, 's.txt')
+    assert.equal(await cleanWorktree(wt, async (_r, b, sha) => (b === 'worktree-squash' && sha === sh(wt, 'rev-parse', 'HEAD') ? 'MERGED' : 'OPEN')), true)
+    assert.equal(fs.existsSync(wt), false)
+    assert.equal(sh(main, 'branch', '--list', 'worktree-squash'), '')
+  })
+  it('keeps unmerged work when the PR is open or absent', async () => {
+    const wt = add('openpr'); commit(wt, 'o.txt')
+    assert.equal(await cleanWorktree(wt, open), false)
+    assert.equal(await cleanWorktree(wt, async () => undefined), false)
+    assert.ok(fs.existsSync(wt))
+  })
+  it('keeps a merged PR worktree that is dirty', async () => {
+    const wt = add('squashdirty'); commit(wt, 'd.txt'); fs.writeFileSync(path.join(wt, 'x.txt'), 'x')
+    assert.equal(await cleanWorktree(wt, merged), false)
+    assert.ok(fs.existsSync(wt))
+  })
+  it('unlocks a lock left by a process that is gone, then removes', async () => {
+    const wt = add('stale')
+    const gone = require('child_process').spawnSync('true').pid
+    sh(main, 'worktree', 'lock', '--reason', `claude session stale (pid ${gone} host x)`, wt)
+    assert.equal(await cleanWorktree(wt, open), true)
+    assert.equal(fs.existsSync(wt), false)
+  })
+  it('keeps a worktree locked by a live pid', async () => {
+    const wt = add('livelock')
+    sh(main, 'worktree', 'lock', '--reason', `claude session x (pid ${process.pid} host x)`, wt)
+    assert.equal(await cleanWorktree(wt, open), false)
+    assert.ok(fs.existsSync(wt))
+  })
+  it('scans repos with no chat when given the project roots', () => {
+    const wt = add('scanned')
+    assert.equal(worktreeDirs([], [main]).includes(wt), true)
+  })
+  it('names a worktree its chat left only after 2 minutes, not on a live-flag blip', () => {
+    const MIN = 60_000, seen = new Map<string, number | undefined>(), fast: string[] = []
+    const w = path.join(main, '.claude', 'worktrees', 'chatty')
+    fs.mkdirSync(w, { recursive: true })
+    const real = fs.realpathSync.native(w)
+    endedWorktrees(seen, [{ live: true, cwd: w }], 0, [], fast)
+    endedWorktrees(seen, [], 1000, [], fast)
+    endedWorktrees(seen, [{ live: true, cwd: w }], 15_000, [], fast)
+    endedWorktrees(seen, [], 30_000, [], fast)
+    endedWorktrees(seen, [], 30_000 + 1.5 * MIN, [], fast)
+    assert.deepEqual(fast, [])
+    endedWorktrees(seen, [], 30_000 + 2 * MIN, [], fast)
+    assert.deepEqual(fast, [real])
+    endedWorktrees(seen, [], 30_000 + 3 * MIN, [], fast)
+    assert.deepEqual(fast, [real])
+    fs.rmSync(w, { recursive: true })
   })
 })

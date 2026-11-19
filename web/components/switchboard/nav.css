@@ -77,6 +77,10 @@
   .nav-n[data-hot] { min-width: 16px; padding: 2px 4px; }
   /* room for the New chat pill so the last row clears it */
   .hub-col { padding-bottom: calc(var(--nav-h) + 104px + env(safe-area-inset-bottom)); }
+  /* tap targets: at least 32px on the small controls */
+  .hub-wait-x, .hub-more-btn { min-width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; }
+  .hub-fold, .hub-page .hub-link, .sb-toggle, .hub-filter > button, .hub-set-nav button, [aria-label=Jarvis] .hub-btn { min-height: 32px; }
+  .hub-fold, .hub-page .hub-link, .sb-toggle { display: inline-flex; align-items: center; }
   .nav .nav-brand, .nav .nav-find { display: none; }
   .hub-top .hub-top-find { display: inline-flex; }
   .hub-page .hub-filter { flex-wrap: nowrap !important; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
@@ -87,4 +91,11 @@
   .hub-chats { grid-template-columns: minmax(0, 1fr); margin: -16px; }
 }
 @media (pointer: coarse) { .nav-find, .nav-item { min-height: 44px; } }
+/* after the 760 block so its 32px floors lose; status bar is 48px here, so the pill and the last row sit higher */
+@media (max-width: 760px) and (pointer: coarse) {
+  .hub-col { padding-bottom: calc(var(--nav-h) + 120px + env(safe-area-inset-bottom)); }
+  .hub-wait-x, .hub-more-btn { min-width: 44px; min-height: 44px; }
+  .hub-fold, .hub-page .hub-link, .sb-toggle, .hub-filter > button { min-height: 44px; }
+  .hub-fold { min-width: 44px; }
+}
 @media (prefers-reduced-motion: reduce) { .nav-find, .nav-item, .map-modes button { transition: none; } }

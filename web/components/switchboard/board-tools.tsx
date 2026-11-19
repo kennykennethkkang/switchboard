@@ -78,7 +78,7 @@ export function BoardTools({ skin, on, counts = {}, night = false }: { skin: Ski
             {n !== undefined && n !== 0 && <span className="bt-badge" aria-hidden>{n}</span>}
             <span className="bt-tip" aria-hidden>
               <b>{item}</b>
-              <span>{idle ? 'Nobody needs you right now' : id === 'limits' && counts.usage ? counts.usage : id === 'todo' && counts.todoAll !== undefined ? `${n ?? 0} here, ${counts.todoAll} in all projects` : hint}</span>
+              <span>{idle ? 'Nobody needs you right now' : id === 'mode' ? (night ? 'Click to bring the day back' : 'Click to switch the court to night') : id === 'limits' && counts.usage ? counts.usage : id === 'todo' && counts.todoAll !== undefined ? `${n ?? 0} here, ${counts.todoAll} in all projects` : hint}</span>
             </span>
           </button>
         )

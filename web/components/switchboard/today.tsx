@@ -9,7 +9,7 @@ import { TaskBar } from './chat-cards'
 const lab = { ...label, lineHeight: 1.6 } as const
 
 /** One card on top: what is next, what got approved today, what runs, and what today cost. tasks: summed over the open chats. next: the project's top hand step and first Up next item. */
-export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?: TaskTotals; next?: { you?: string; up?: string }; trend?: DailyTrend }) {
+export function TodayCard({ today, tasks, next, trend, needsCount }: { today: Today; tasks?: TaskTotals; next?: { you?: string; up?: string }; trend?: DailyTrend; needsCount?: number }) {
   const sum = [today.tokens !== undefined ? `${tokenText(today.tokens)} tokens today` : '', today.openCostUsd !== undefined ? `open chats $${today.openCostUsd.toFixed(2)}` : ''].filter(Boolean).join(' · ')
   const jev = today.jev, needs = needsLines(today, next?.you)
   return (
@@ -21,7 +21,7 @@ export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?:
       </div>}
       <dl style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: '6px 16px', alignItems: 'baseline', margin: 0 }}>
         {needs.length > 0 && <>
-          <dt style={{ ...lab, color: 'var(--hub-yellow)' }}>Your moves {needs.length}</dt>
+          <dt style={{ ...lab, color: 'var(--hub-yellow)' }}>Your moves {needsCount ?? needs.length}</dt>
           <dd style={{ margin: 0, color: 'var(--hub-ink)' }}>
             <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2 }}>{needs.map((n, i) => <li key={i} style={{ overflowWrap: 'anywhere' }}>{n}</li>)}</ul>
           </dd>
@@ -40,9 +40,9 @@ export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?:
         </>}
         {trend && <>
           <dt style={lab} title="Yesterday, with the change from the day before and the same weekday last week">Yesterday</dt>
-          <dd className="hub-num" style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '2px 14px', color: 'var(--hub-body)', fontSize: 13 }}>
+          <dd className="hub-num" style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: 6, color: 'var(--hub-body)', fontSize: 13 }}>
             {([['chats', trend.chats], ['cost', trend.costUsd, true], ['approved', trend.approved], ['sent back', trend.sentBack]] as const).map(([name, v, usd]) =>
-              <span key={name}>{name} {trendText(v, usd)}</span>)}
+              <span key={name} style={{ maxWidth: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', padding: '1px 8px', border: '1px solid var(--hub-hair)', borderRadius: 6 }}><span style={{ color: 'var(--hub-ash)' }}>{name}</span> {trendText(v, usd)}</span>)}
           </dd>
         </>}
         {today.working.length > 0 && <>

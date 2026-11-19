@@ -7,7 +7,7 @@ import type { HubCommand } from '@/lib/vscode-bridge'
 import { diagnosis, forHow, stuckTone, usage } from '@/lib/stuck'
 
 /** A chat waiting on you. ask: the terminal prompt, answered here when it is one plain pick. check: the done-check stamp, sent only for the closing question. */
-export type NeedRow = { sessionId: string; question?: string; ask?: Ask; check?: DoneCheck }
+export type NeedRow = { sessionId: string; question?: string; ask?: Ask; check?: DoneCheck; /** Why the extension would refuse an Approve now (approveBlock). */ block?: string }
 /** A red check on the shown repo: failed CI or tests. */
 export type FailRow = { sessionId: string; what: string; url?: string }
 
@@ -49,10 +49,11 @@ export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [],
               <span className="hub-stuck-who">{r.ask?.sub ? 'A subagent in ' : ''}<b>{name(r.sessionId)}</b> {r.ask?.kind === 'permission' ? 'asks to run' : 'asks'}</span>
               <span className="hub-stuck-q">{r.question || r.ask?.questions?.[0]?.question || r.ask?.tool || 'Waiting for you'}{(r.ask?.questions?.length ?? 0) > 1 && <span className="hub-stuck-meta"> · and {r.ask!.questions!.length - 1} more</span>}</span>
               <CheckStamp check={r.check} wrap />
+              {r.block && oneClick(r.ask).includes('Approve') && <span className="hub-stuck-meta" role="status" style={{ color: 'var(--hub-red)' }}>Approve is held: {r.block}.</span>}
               {r.ask?.preview && <span className="hub-stuck-meta"><code>{r.ask.preview}</code></span>}
             </span>
             <span className="hub-stuck-acts">
-              {oneClick(r.ask).map((o, i) => <button key={i} type="button" className="hub-btn sm hub-stuck-opt" onClick={() => onAnswer(r.sessionId, r.ask!.id, [i])}>{o}</button>)}
+              {oneClick(r.ask).map((o, i) => <button key={i} type="button" className="hub-btn sm hub-stuck-opt" disabled={o === 'Approve' && !!r.block} onClick={() => onAnswer(r.sessionId, r.ask!.id, [i])}>{o}</button>)}
               {jump(r.sessionId, oneClick(r.ask).length ? 'Other or open chat' : 'Answer')}
             </span>
           </li>

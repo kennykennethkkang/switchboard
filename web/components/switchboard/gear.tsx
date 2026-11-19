@@ -5,11 +5,11 @@
  * Claude Code rows go through the extension's whitelist into ~/.claude/settings.json, so new chats pick them up.
  * Search runs across every section; installed lists sit in folds apart from the switches.
  */
-import { useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { useFlash } from '@/hooks/use-flash'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
 import { editorName } from '@/lib/editor'
-import { benchPrompt, gearRows, keywordHit, sweepBadge, sweptNow } from '@/lib/gear-rows'
+import { benchPrompt, blockHits, gearRows, pauseValue, sweepBadge, sweptNow } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
 import { Credits } from './credits'
@@ -30,9 +30,9 @@ export function Switch({ on, onChange, label, text }: { on: boolean; onChange: (
 }
 
 /** A native select in the hub's look; long option text truncates in the box. */
-export function Pick({ options, value, onChange, label, muted }: { options: Array<[string, string]>; value: string; onChange: (v: string) => void; label: string; muted?: boolean }) {
+export function Pick({ options, value, onChange, label, muted, disabled }: { options: Array<[string, string]>; value: string; onChange: (v: string) => void; label: string; muted?: boolean; disabled?: boolean }) {
   return (
-    <select className="hub-select" aria-label={label} value={value} onChange={e => onChange(e.target.value)} style={muted ? { color: 'var(--hub-mute)' } : undefined}>
+    <select className="hub-select" aria-label={label} value={value} disabled={disabled} onChange={e => onChange(e.target.value)} style={muted ? { color: 'var(--hub-mute)' } : undefined}>
       {options.map(([v, text]) => <option key={v} value={v}>{text}</option>)}
     </select>
   )
@@ -45,6 +45,7 @@ type CodexModel = Extract<HubCommand, { type: 'hub-role-codex' }>['model']
 type CodexEffort = Extract<HubCommand, { type: 'hub-role-codex' }>['effort']
 const CODEX_MODELS: Array<[string, string]> = [['default', 'Default (config.toml)'], ['gpt-6-luna', 'gpt-6-luna'], ['gpt-5.6-terra', 'gpt-5.6-terra'], ['gpt-5.6-luna', 'gpt-5.6-luna']]
 const CLAUDE_MODES: Array<[string, string]> = [['bypass', 'Bypass'], ['ask', 'Ask'], ['auto', 'Auto']]
+const NOTICE_SPOTS: Array<[string, string]> = [['top-right', 'Top right'], ['bottom-left', 'Bottom left'], ['bottom-right', 'Bottom right']]
 const CODEX_EFFORTS: Array<[string, string]> = [['default', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const EFFORTS: Array<[string, string]> = [['default', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const IDLE: Array<[string, string]> = [['5', 'After 5 min'], ['15', 'After 15 min'], ['30', 'After 30 min'], ['60', 'After 1 h'], ['never', 'Never']]
@@ -52,15 +53,29 @@ const IDLE: Array<[string, string]> = [['5', 'After 5 min'], ['15', 'After 15 mi
 const SECTIONS = ['Chats', 'Models', 'Accounts', 'Integrations', 'Installed'] as const
 export type Section = typeof SECTIONS[number]
 // group: rows the panel sets apart under their own heading.
-type Row = { label: string; control: ReactNode; hint?: string; section: Section; group?: 'advanced' }
+// sub: the Chats heading the row sits under. group: advanced rows sit under their own heading; roles and tail split the Models pane.
+type Row = { label: string; control: ReactNode; hint?: string; section: Section; group?: 'advanced' | 'roles' | 'tail' }
+const SUBS: Array<[string, string[]]> = [
+  ['Usage limits', ['Continue at usage limit', 'Pause near the limit', 'Auto-start chats']],
+  ['Notices', ['Chat notices', 'Where pop-ups show', 'Push to your phone', 'Notify when a chat needs input']],
+  ['Phone', ['Phone mode', 'Phone alerts', 'Keep phone access in Apple Notes']],
+  ['Permissions', ['Claude chat permissions', 'Ask before actions (Codex)']],
+  ['Upkeep', ['Fix stuck items', 'Learn automatically', 'Stop a chat\'s dev servers when it ends', 'Fresh branch for new chats', 'Brief for new chats', 'Test anti-copy hardening (experimental)']],
+  ['Look', ['Your name', 'Hide done chats']],
+  ['Windows', ['Show agent browsers', 'One window', 'Keep Switchboard app running']],
+]
+/** The Chats rows grouped under their headings; a row in no list (Advanced mode for one project) joins Upkeep. */
+const subbed = (rows: Row[]) => SUBS.map(([head, labels]) => [head, rows.filter(r => labels.includes(r.label) || (head === 'Upkeep' && !SUBS.some(([, l]) => l.includes(r.label))))] as const).filter(([, r]) => r.length)
 
-function Line({ row }: { row: Row }) {
+/** pane: the settings page a search hit lives on, shown as a small label. */
+function Line({ row, pane }: { row: Row; pane?: string }) {
   // A switch or a pick saves at once, so the row says so for a moment.
   const [saved, setSaved] = useFlash(0, 2000)
   const flash = () => setSaved(Date.now())
   return (
     <div className="hub-set-row">
       <span style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+        {pane && <span style={{ fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--hub-ash)' }}>{pane}</span>}
         <span style={{ color: 'var(--hub-ink)' }}>{row.label}<span role="status" style={{ marginLeft: 8, fontSize: 12, color: 'var(--hub-green)' }}>{saved ? 'Saved' : ''}</span></span>
         {row.hint && <span style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--hub-ash)' }}>{row.hint}</span>}
       </span>
@@ -126,6 +141,18 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
   const set = (key: SettingKey, value: boolean | string | null) => send({ type: 'hub-setting', key, value })
   const own = (key: SwitchboardKey, value: boolean | number | string | null) => send({ type: 'hub-switchboard', key, value })
   const query = q.trim().toLowerCase()
+  // The last pause % survives the switch being off, and a reload, in this browser.
+  const [lastPause, setLastPause] = useState<number | undefined>(() => { try { return Number(localStorage.getItem('sb-pause-at')) || undefined } catch { return undefined } })
+  useEffect(() => {
+    if (typeof sb.pauseAt !== 'number') return
+    setLastPause(sb.pauseAt)
+    try { localStorage.setItem('sb-pause-at', String(sb.pauseAt)) } catch { /* private window */ }
+  }, [sb.pauseAt])
+  const noCodex = hub.ais?.find(a => a.id === 'codex')?.installed === false
+  // Codex pickers stay put but off, with a way to the Accounts page where the install is shown.
+  const codexGate = (pickers: ReactNode) => noCodex
+    ? <span className="hub-set-ctl" style={{ gap: 8 }}><button type="button" className="hub-link" onClick={() => { setAt('Accounts'); setQ('') }}>Codex not installed</button>{pickers}</span>
+    : pickers
   const lead = c.model ?? 'default'
   const alerts = phoneAlertsShown()
   const smart = sb.smartModelSwitch !== false
@@ -145,16 +172,17 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} /> },
     { section: 'Chats', label: 'Hide done chats', hint: 'A done chat quiet this long leaves the list; idle chats always stay. Find still has it.',
       control: <Pick label="Hide done chats" options={IDLE} value={sb.idleMinutes === null ? 'never' : String(sb.idleMinutes)} onChange={v => own('idleMinutes', v === 'never' ? null : Number(v))} /> },
-    { section: 'Chats', label: 'Continue at usage limit', hint: 'When a usage limit resets, Claude picks the chat up again by itself.',
+    { section: 'Chats', label: 'Continue at usage limit', hint: 'Claude Code\'s own setting: a chat that hits a limit goes on by itself when it resets. Off, Switchboard sends the continue message instead. Either way the chat comes back.',
       control: <Switch label="Continue at usage limit" on={hub.keep.autoContinue} onChange={next => set('autoContinueAtUsageLimit', next)} /> },
-    { section: 'Chats', label: 'Pause near the limit', hint: 'When the 5-hour or weekly limit reaches this %, every chat is told to stop and wait; Switchboard resumes them in order a minute after it resets. Terminals stay open.',
+    { section: 'Chats', label: 'Pause near the limit', hint: 'When the 5-hour or weekly limit reaches this %, every chat is told to stop and wait; Switchboard resumes them in order a minute after it resets. Applies to the 5-hour and weekly limits alike. Terminals stay open.',
       control: <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-        <Switch label="Pause near the limit" on={sb.pauseAt !== null} onChange={next => own('pauseAt', next ? 99 : null)} />
+        <Switch label="Pause near the limit" on={sb.pauseAt !== null} onChange={next => own('pauseAt', pauseValue(next, lastPause))} />
         {sb.pauseAt !== null && <input key={sb.pauseAt ?? 99} type="number" min={50} max={100} className="hub-select" aria-label="Pause chats at %" defaultValue={sb.pauseAt ?? 99} style={{ width: 64, cursor: 'text' }}
           onBlur={e => { const v = Math.round(Number(e.target.value)); if (v >= 50 && v <= 100 && v !== (sb.pauseAt ?? 99)) own('pauseAt', v) }}
           onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} />}
+        {sb.pauseAt !== null && <span aria-hidden style={{ color: 'var(--hub-ash)' }}>%</span>}
       </span> },
-    { section: 'Chats', label: 'Auto-start chats', hint: 'When nothing runs in this window\'s project, a chat starts on the next to-do item. A chat stopped by a usage limit comes back when it resets.',
+    { section: 'Chats', label: 'Auto-start chats', hint: 'When nothing runs in this window\'s project, a chat starts on the next to-do item. Never while a usage limit is used up or a pause is on.',
       control: <Switch label="Auto-start chats" on={sb.autoStart !== false} onChange={next => own('autoStart', next)} /> },
     { section: 'Chats', label: 'Fix stuck items', hint: 'Something stuck for twice its limit gets Fix once: a quiet subagent is checked on, a stuck job or process is stopped and the chat told. A chat waiting on you is paused instead.',
       control: <Switch label="Fix stuck items" on={sb.autoFix !== false} onChange={next => own('autoFix', next)} /> },
@@ -164,8 +192,10 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Stop a chat's dev servers when it ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
     { section: 'Chats', label: 'Show agent browsers', hint: 'Browsers agents drive through Playwright open in a window you can see. Off runs them headless, so nothing lands on your screen. Applies to chats started after the change.',
       control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
-    { section: 'Chats', label: `Pop-up notices in ${ed}`, hint: `Done, question, stuck and AWS sign-in notices pop up in ${ed} with a button. Off shows them in the status bar; the Mac notice, the Needs you strip and the phone push still come.`,
-      control: <Switch label={`Pop-up notices in ${ed}`} on={sb.toasts === true} onChange={next => own('toasts', next)} /> },
+    { section: 'Chats', label: 'Chat notices', hint: `Done, question, stuck and AWS sign-in notices. System sends them to the Mac or Windows notification center only, where they fade on their own. ${ed} pop-up adds one with a Show button, gone after about 10 seconds once ${ed} has focus. Status bar adds a line there for 20 seconds. The Needs you strip always shows them.`,
+      control: <Pick label="Chat notices" options={[['system', 'System'], ['toast', `${ed} pop-up`], ['status', 'Status bar']]} value={sb.notices ?? (sb.toasts === true ? 'toast' : 'system')} onChange={v => own('notices', v)} /> },
+    { section: 'Chats', label: 'Where pop-ups show', hint: `Where ${ed} puts every pop-up, from Switchboard and other extensions. Top right keeps them clear of the terminal and chat input.`,
+      control: <Pick label="Where pop-ups show" options={NOTICE_SPOTS} value={sb.noticeSpot ?? 'top-right'} onChange={v => own('noticeSpot', v)} /> },
     { section: 'Chats', label: 'Claude chat permissions', hint: 'Bypass runs commands and tools without asking and trusts project MCP servers. Ask brings the approval prompts back. Auto lets a classifier approve each call and block risky ones beyond the task; after 3 blocks in a row it asks you. Applies to chats started or resumed after the change. Chats you reach from the Claude app (Remote Control) pick it up the next time Remote Control restarts.',
       control: <Pick label="Claude chat permissions" options={CLAUDE_MODES} value={sb.claudeMode ?? (sb.askClaude ? 'ask' : 'bypass')} onChange={v => own('claudeMode', v)} /> },
     { section: 'Chats', label: 'Ask before actions (Codex)', hint: 'Codex chats ask before running commands, inside its sandbox. Off runs them without asking or a sandbox. Applies to chats started or resumed after the change.',
@@ -182,7 +212,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Brief for new chats" on={sb.brief} onChange={next => own('brief', next)} /> },
     { section: 'Chats', label: 'Phone mode', hint: 'Call me instead of asking in chats: questions, stuck and finished chats, and usage pauses and resumes ring your phone.',
       control: <Switch label="Phone mode" on={sb.phone === true} onChange={next => own('phone', next)} /> },
-    { section: 'Chats', label: 'Push to your phone', hint: 'When a chat finishes.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
+    { section: 'Chats', label: 'Push to your phone', hint: 'Claude Code sends a push to your phone when a chat finishes.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
     ...(alerts ? [{ section: 'Chats' as const, label: 'Phone alerts', hint: alerts === 'https'
       ? 'Needs HTTPS: turn on HTTPS Certificates on the DNS page of the Tailscale admin console, then open the https link.'
       : alerts === 'hint'
@@ -192,16 +222,16 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
     { section: 'Chats', label: 'Keep phone access in Apple Notes', hint: 'One private note, "Switchboard access", with the code and links; updated when they change. Off stops updates.',
       control: <Switch label="Keep phone access in Apple Notes" on={sb.accessNote} onChange={next => own('accessNote', next)} /> },
     ...advanced,
-    { section: 'Chats', label: 'Notify when a chat needs input', hint: 'When a chat stops to ask you something.', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
+    { section: 'Chats', label: 'Notify when a chat needs input', hint: 'Claude Code sends a push to your phone when a chat stops to ask you something.', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
 
     { section: 'Models', label: 'Lead model', hint: 'The main chat, and every role set to Inherit.',
       control: <Pick label="Lead model" options={MODELS} value={lead} onChange={v => set('model', v === 'default' ? null : v)} /> },
     { section: 'Models', label: 'Lead effort', hint: 'The main chat, and every role set to Inherit.',
       control: <Pick label="Lead effort" options={EFFORTS} value={c.effortLevel ?? 'default'} onChange={v => set('effortLevel', v === 'default' ? null : v)} /> },
     { section: 'Models', label: 'Codex chat model', hint: 'New and resumed Codex chats. Default leaves it to ~/.codex/config.toml.',
-      control: <Pick label="Codex chat model" options={CODEX_MODELS} value={sb.codexModel ?? 'default'} muted={!sb.codexModel} onChange={v => own('codexModel', v === 'default' ? null : v)} /> },
+      control: codexGate(<Pick label="Codex chat model" options={CODEX_MODELS} value={sb.codexModel ?? 'default'} muted={!sb.codexModel} disabled={noCodex} onChange={v => own('codexModel', v === 'default' ? null : v)} />) },
     { section: 'Models', label: 'Codex chat effort', hint: 'New and resumed Codex chats. Default leaves it to ~/.codex/config.toml.',
-      control: <Pick label="Codex chat effort" options={CODEX_EFFORTS} value={sb.codexEffort ?? 'default'} muted={!sb.codexEffort} onChange={v => own('codexEffort', v === 'default' ? null : v)} /> },
+      control: codexGate(<Pick label="Codex chat effort" options={CODEX_EFFORTS} value={sb.codexEffort ?? 'default'} muted={!sb.codexEffort} disabled={noCodex} onChange={v => own('codexEffort', v === 'default' ? null : v)} />) },
     { section: 'Models', label: 'Smart model switch', hint: 'When a role keeps redoing the same part, its next run there gets the next model up. Debugging never counts. Off keeps each role on its own model.',
       control: <Switch label="Smart model switch" on={smart} onChange={next => own('smartModelSwitch', next)} /> },
     ...hub.installed.filter(i => i.kind === 'role').map((r): Row => {
@@ -210,11 +240,11 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         const effort = r.codexEffort ?? 'default'
         const options = CODEX_MODELS.some(o => o[0] === model) ? CODEX_MODELS : [...CODEX_MODELS, [model, model] as [string, string]]
         const pick = (m: string, e: string) => send({ type: 'hub-role-codex', role: r.name, model: m as CodexModel, effort: e as CodexEffort })
-        return { section: 'Models', label: r.name, hint: 'Runs on Codex; the Claude relay stays on Sonnet.',
-          control: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Pick label={`${r.name} Codex model`} options={options} value={model} muted={model === 'default'} onChange={v => { if (v !== model) pick(v, effort) }} />
-            <Pick label={`${r.name} Codex effort`} options={CODEX_EFFORTS} value={effort} muted={effort === 'default'} onChange={v => { if (v !== effort) pick(model, v) }} />
-          </span> }
+        return { section: 'Models', group: 'roles', label: r.name, hint: noCodex ? 'Needs Codex, which is not installed.' : 'Runs on Codex; the Claude relay stays on Sonnet.',
+          control: codexGate(<span className="hub-set-ctl">
+            <Pick label={`${r.name} Codex model`} options={options} value={model} muted={model === 'default'} disabled={noCodex} onChange={v => { if (v !== model) pick(v, effort) }} />
+            <Pick label={`${r.name} Codex effort`} options={CODEX_EFFORTS} value={effort} muted={effort === 'default'} disabled={noCodex} onChange={v => { if (v !== effort) pick(model, v) }} />
+          </span>) }
       }
       const value = r.model && r.model !== 'inherit' ? r.model : 'inherit'
       const options: Array<[string, string]> = [['inherit', `Inherit (${lead})`], ...ROLE_MODELS]
@@ -223,11 +253,11 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       const pick = <Pick label={`${r.name} model`} options={options} value={value} muted={value === 'inherit'} onChange={v => { if (v !== value) send({ type: 'hub-role-model', role: r.name, model: v as RoleModel }) }} />
       // A raise rides in the role's own row, with Reset beside the pick.
       const up = raises[r.name]
-      return { section: 'Models', label: r.name, hint: up && `R${raiseLine(up).slice(r.name.length + 2)}, from ${up.from}.`,
+      return { section: 'Models', group: 'roles', label: r.name, hint: up && `R${raiseLine(up).slice(r.name.length + 2)}, from ${up.from}.`,
         control: up ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><button type="button" className="hub-link hub-reset" aria-label={`Reset ${r.name} to its own model`} onClick={() => send({ type: 'hub-escalation-reset', project: up.project, role: up.role, files: up.files })}>Reset</button>{pick}</span> : pick }
     }),
     // folder: the project the To-do and Jev card follow; no project, no button.
-    ...(folder ? [{ section: 'Models', label: 'Test models', hint: 'Runs each role on every model and suggests the best value.',
+    ...(folder ? [{ section: 'Models', group: 'tail', label: 'Test models', hint: 'Runs each role on every model and suggests the best value.',
       control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-new-chat', path: folder, text: benchPrompt, remote: false })}>Test models</button> }] satisfies Row[] : []),
 
     { section: 'Integrations', label: 'Hooks', hint: 'Claude Code reports each chat\'s progress to Switchboard. Off removes the hooks from ~/.claude/settings.json.',
@@ -250,7 +280,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
 
   const lists = gearRows(hub, query)
   const hits = query ? rows.filter(row => `${row.label} ${row.hint ?? ''} ${row.section}`.toLowerCase().includes(query)) : []
-  const accountsHit = keywordHit('accounts sign-ins logins aws web apps chrome projects', query)
+  const blocks = blockHits(query)
   const listHits = query ? lists.filter(l => l.match) : []
 
   const installed = (only = lists) => (
@@ -284,7 +314,17 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         {installed()}
       </>
     )
-    const all = rows.filter(r => r.section === s), mine = all.filter(r => !r.group), grouped = all.filter(r => r.group)
+    const all = rows.filter(r => r.section === s), mine = all.filter(r => !r.group), grouped = all.filter(r => r.group === 'advanced'), roles = all.filter(r => r.group === 'roles')
+    if (s === 'Chats') return (
+      <>
+        {subbed(mine).map(([head, rs]) => <Fragment key={head}><h4 style={sub}>{head}</h4>{rs.map(r => <Line key={r.label} row={r} />)}</Fragment>)}
+        {grouped.length > 0 && <>
+          <h4 style={sub}>Advanced mode</h4>
+          <p style={{ margin: '0 0 4px', fontSize: 12, lineHeight: 1.45, color: 'var(--hub-ash)' }}>{ADVANCED_HINT} Per project.</p>
+          {grouped.map(r => <Line key={r.label} row={r} />)}
+        </>}
+      </>
+    )
     if (s !== 'Models') return (
       <>
         {mine.map(r => <Line key={r.label} row={r} />)}
@@ -297,9 +337,10 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
     )
     return (
       <>
-        {mine.slice(0, 3).map(r => <Line key={r.label} row={r} />)}
-        {mine.length > 3 && <h4 style={sub}>Roles</h4>}
-        {mine.slice(3).map(r => <Line key={r.label} row={r} />)}
+        {mine.map(r => <Line key={r.label} row={r} />)}
+        {roles.length > 0 && <h4 style={sub}>Roles</h4>}
+        {roles.map(r => <Line key={r.label} row={r} />)}
+        {all.filter(r => r.group === 'tail').map(r => <Line key={r.label} row={r} />)}
       </>
     )
   }
@@ -317,11 +358,11 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       <div role="region" aria-label={query ? 'Search results' : at} className="hub-set-panel" style={{ minWidth: 0 }}>
         {query
           ? <>
-              {hits.map(r => <Line key={r.label} row={{ ...r, hint: [r.section, r.hint].filter(Boolean).join('. ') }} />)}
-              {accountsHit && <Line row={{ section: 'Accounts', label: 'Accounts', hint: 'AWS profiles, web app logins, and which ones each project uses.',
-                control: <button type="button" className="hub-btn" onClick={() => { setAt('Accounts'); setQ('') }}>Open</button> }} />}
+              {hits.map(r => <Line key={r.label} row={r} pane={r.section} />)}
+              {blocks.map(b => <Line key={b.label} row={{ section: b.to ?? 'Chats', label: b.label, hint: b.hint,
+                control: b.to ? <button type="button" className="hub-btn" onClick={() => { setAt(b.to!); setQ('') }}>Open</button> : null }} />)}
               {listHits.length > 0 && <><h4 style={sub}>Installed</h4>{installed(listHits)}</>}
-              {!hits.length && !accountsHit && !listHits.length && <p style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>Nothing matches.</p>}
+              {!hits.length && !blocks.length && !listHits.length && <p style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>Nothing matches.</p>}
             </>
           : body(at)}
         {!query && at === 'Integrations' && <SpendLimits hub={hub} send={send} />}

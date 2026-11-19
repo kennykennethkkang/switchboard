@@ -14,6 +14,8 @@ Narrow width: at 380px, report the top y (`getBoundingClientRect().top`) of the 
 
 Shared tree: never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use `git show HEAD:<path>` or `git worktree add <scratch>/base HEAD`.
 
+Browser and crowd-test work: batch agent-browser steps into few calls, and wait on long runs (crowd-ab, MiroFish, test suites) with one foreground perl wait loop, not repeated short checks.
+
 Usual kit: code-review, superpowers:verification-before-completion, ponytail:ponytail-review, security-review for anything that touches input, files, hooks or secrets, run plus playwright or claude-in-chrome to try the change like a person, web-design-guidelines and accessibility for UI, click-path-audit when a button or flow misbehaves, e2e-testing for Playwright suites.
 
 <!-- switchboard generic copy -->

@@ -74,7 +74,7 @@ describe('macOnly', () => {
   })
   it('keeps keys, sign-ins, AWS, setup, links, dev servers and pushes on the Mac', () => {
     for (const type of ['hub-key-save', 'hub-key-remove', 'hub-key-test', 'hub-login-add', 'hub-login-open', 'hub-login-delete', 'hub-aws-add', 'hub-aws-login', 'hub-aws-delete',
-      'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser']) assert.equal(macOnly(JSON.stringify({ type })), true, type)
+      'hub-open-url', 'hub-mirofish-open', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser']) assert.equal(macOnly(JSON.stringify({ type })), true, type)
     for (const op of ['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch']) assert.equal(macOnly(JSON.stringify({ type: 'hub-git', sessionId: 's', op })), true, op)
   })
   it('lets the phone chat, answer, read, upload and keep to-dos', () => {

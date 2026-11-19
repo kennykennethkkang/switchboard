@@ -146,6 +146,8 @@ const RELOAD_MS = 20_000
 
 /** Call right before reloadWindow. */
 export function markReloading(dir = DIR, pid = process.pid): void {
+  // old markers are otherwise only cleared while a chat waits on a reload
+  reloading(dir)
   const w = readWindows(dir).find(x => x.pid === pid)
   if (w) try { fs.writeFileSync(path.join(dir, `${pid}.reloading`), w.workspace) } catch { /* then it just opens here */ }
 }

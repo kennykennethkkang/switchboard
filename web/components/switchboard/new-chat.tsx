@@ -37,6 +37,9 @@ function Related({ text, chats, project, texts, onSend }: { text: string; chats:
 
 export function NewChat({ hub, send, upload, split, onDone }: { hub: HubState; send: (c: HubCommand) => void; upload: Upload; split?: SplitAsks; onDone: () => void }) {
   useDialog()
+  // autoFocus loses to the click that opened the panel, so focus once it has settled.
+  const goalRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => { const t = setTimeout(() => goalRef.current?.focus(), 0); return () => clearTimeout(t) }, [])
   const open = hub.projects.find(p => p.isOpen) ?? hub.projects[0]
   const [path, setPath] = useState(open?.path ?? '')
   // New GitHub repo or Clone: the folder is made on Start, so Tools waits and files go under the open project.
@@ -143,12 +146,11 @@ export function NewChat({ hub, send, upload, split, onDone }: { hub: HubState; s
     </form>
   )
   return (
-    <form onSubmit={e => { e.preventDefault(); start() }} {...files.drop} style={{ display: 'grid', gap: 10, padding: 16, border: '1px solid var(--hub-hair)', background: 'var(--hub-elev)', ...dropStyle(files.over), borderRadius: 10 }}>
+    <form onSubmit={e => { e.preventDefault(); start() }} onKeyDown={e => { if (e.key === 'Escape') onDone() }} {...files.drop} style={{ display: 'grid', gap: 10, padding: 16, border: '1px solid var(--hub-hair)', background: 'var(--hub-elev)', ...dropStyle(files.over), borderRadius: 10 }}>
       <label htmlFor="goal" style={{ fontWeight: 500, color: 'var(--hub-ink)' }}>What should this chat do?</label>
-      <textarea id="goal" autoFocus rows={3} value={text} onChange={e => setText(e.target.value)} onPaste={files.onPaste}
+      <textarea id="goal" ref={goalRef} autoFocus rows={3} value={text} onChange={e => setText(e.target.value)} onPaste={files.onPaste}
         onKeyDown={e => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); start() }
-          else if (e.key === 'Escape') onDone()
         }} style={{ font: 'inherit', padding: 10, borderRadius: 8, resize: 'vertical', background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />
       <AttachChips items={files.items} onRemove={files.remove} />
       {!making && goal && <Related text={text} chats={hub.chats} project={project} texts={texts} onSend={id => sendTo(id, msg)} />}

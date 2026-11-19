@@ -28,6 +28,9 @@ export type HubCommand =
   | { type: 'hub-answer'; sessionId: string; askId: string; choice: Choice }
   | { type: 'hub-rc'; on: boolean; sessionId?: string }
   | { type: 'hub-open-url'; url: string }
+  | { type: 'hub-mirofish-open'; simId?: string }
+  | { type: 'hub-mirofish-report'; simId: string }
+  | { type: 'hub-live-dismiss'; kind: 'mirofish' | 'crowd'; id: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }

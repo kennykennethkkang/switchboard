@@ -4,7 +4,7 @@
  */
 import * as fs from 'fs'
 import * as path from 'path'
-import { writeJsonAtomic } from '../fs-utils'
+import { saveMerged } from '../fs-utils'
 import { otherText } from './progress'
 import type { Ask, Choice } from './types'
 
@@ -15,11 +15,12 @@ const POLLED_MS = 2 * 60_000
 type Open = { sessionId: string; ask: Ask; at: number; seen: number; choice?: Choice; wake?: (c: Choice | undefined) => void }
 const open = new Map<string, Open>()
 
-// Kept on disk so a window reload does not drop the cards; one file per window.
+// Kept on disk so a window reload does not drop the cards; windows on one workspace share the file, so a save merges (held: keys at its last load or save).
 let file: string | undefined
+const held = new Set<string>()
 const save = () => {
   if (!file) return
-  try { writeJsonAtomic(file, Object.fromEntries([...open].map(([id, q]) => [id, { sessionId: q.sessionId, ask: q.ask, at: q.at, ...(q.choice ? { choice: q.choice } : {}) }]))) } catch { /* best effort */ }
+  try { for (const id of saveMerged(file, Object.fromEntries([...open].map(([id, q]) => [id, { sessionId: q.sessionId, ask: q.ask, at: q.at, ...(q.choice ? { choice: q.choice } : {}) }])), held)) open.delete(id) } catch { /* best effort */ }
 }
 
 /** Loads the questions a reload left in file, then keeps it current. */
@@ -27,6 +28,7 @@ export function keepQuestions(f: string, now = Date.now()): void {
   file = f
   try {
     for (const [id, v] of Object.entries(JSON.parse(fs.readFileSync(f, 'utf8')) as Record<string, unknown>)) {
+      held.add(id)
       const q = v as Partial<Open> | null
       if (open.has(id) || typeof q?.sessionId !== 'string' || !q.ask || typeof q.at !== 'number' || now - q.at > EXPIRE_MS) continue
       open.set(id, { sessionId: q.sessionId, ask: q.ask, at: q.at, seen: now, ...(q.choice ? { choice: q.choice } : {}) })

@@ -56,10 +56,9 @@
   border-radius: 10px; padding: 12px 14px; gap: 8px 10px;
 }
 .now-lane .hub-stuck li > i { display: none; }
-/* Answer chips: one row, scrolls sideways. */
-.now-lane .hub-stuck-acts { flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-snap-type: x proximity; }
-.now-lane .hub-stuck-acts::-webkit-scrollbar { display: none; }
-.now-lane .hub-stuck .hub-stuck-opt { flex: none; white-space: nowrap; max-width: none; scroll-snap-align: start; }
+/* Answer chips wrap, so a long option shows whole. */
+.now-lane .hub-stuck-acts { flex-basis: 100%; }
+.now-lane .hub-stuck .hub-stuck-opt { max-width: 100%; white-space: normal; text-align: left; }
 
 /* Status bar: sticky at the bottom, clear of the home indicator. */
 .sb {
@@ -94,7 +93,8 @@
 .sb-dev { font-family: var(--hub-mono); }
 .sb-dev > i { width: 6px; height: 6px; border-radius: 50%; background: var(--hub-ash); }
 .sb-dev[data-on] > i { background: var(--hub-green); }
-.sb-toggle[aria-pressed='true'] { color: var(--hub-green); }
+.sb-toggle[aria-pressed='true'] { color: var(--hub-green); border-color: var(--hub-green); }
+.sb-toggle[aria-pressed='true']::before { content: ''; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--hub-green); }
 
 /* Narrow: one line, meters plus the toggles as chips. */
 .sb[data-narrow] { gap: 10px; padding-inline: 12px; }

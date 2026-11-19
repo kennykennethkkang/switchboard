@@ -41,6 +41,7 @@
 .fm .react-flow__edge-textbg { fill: var(--hub-surface); }
 .fm-edge .react-flow__edge-path { stroke: var(--hub-mute); stroke-opacity: 0.55; transition: stroke 160ms var(--hub-ease-out), stroke-opacity 160ms var(--hub-ease-out); }
 .fm-flow[data-focus] .react-flow__node:not(.fm-lane-n) { opacity: 0.2; }
+.fm .react-flow__node.fm-off, .fm .react-flow__edge.fm-off { opacity: 0.18; }
 .fm-flow[data-focus] .react-flow__edge { opacity: 0.06; }
 .fm-flow[data-focus] .react-flow__edge .react-flow__edge-path { stroke-opacity: 1; }
 

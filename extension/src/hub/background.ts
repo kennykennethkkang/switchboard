@@ -24,5 +24,18 @@ export function applyAgentBrowsers(show: boolean | undefined, file = SETTINGS): 
   return undefined
 }
 
-/** Agent and timer notices: a VS Code toast only when Kenneth turned toasts on, else the status bar. */
-export const noticeKind = (sb: { toasts?: boolean }): 'toast' | 'status' => (sb.toasts === true ? 'toast' : 'status')
+/** Agent and timer notices: the Mac or Windows notification center unless Kenneth picks a VS Code pop-up or the status bar. An old toasts: true reads as a pop-up. */
+export const NOTICE_KINDS = ['system', 'toast', 'status'] as const
+export type NoticeKind = (typeof NOTICE_KINDS)[number]
+export const noticeKind = (sb: { toasts?: boolean; notices?: NoticeKind }): NoticeKind => sb.notices ?? (sb.toasts === true ? 'toast' : 'system')
+
+/** Toast text: VS Code already names Switchboard as the source, so the prefix goes; one line, cut at 140. */
+export function noticeText(text: string): string {
+  const t = text.replace(/^Switchboard:\s*/, '').replace(/\s+/g, ' ').trim()
+  return t.length > 140 ? t.slice(0, 139).trimEnd() + '…' : t
+}
+
+/** Where VS Code puts toasts (workbench.notifications.position). Top right unless Kenneth picks another. */
+export const NOTICE_SPOTS = ['top-right', 'bottom-left', 'bottom-right'] as const
+export type NoticeSpot = (typeof NOTICE_SPOTS)[number]
+export const noticeSpot = (sb: { noticeSpot?: NoticeSpot }): NoticeSpot => sb.noticeSpot ?? 'top-right'

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { components, demoAppMap, groupTies, layers, routeLinks, KIND_NAME, projectOf, startProject, demoFlowMap, type FlowEdge, type FlowMap, type FlowNode } from './flow-map'
+import { colName, components, demoAppMap, groupTies, layers, routeLinks, KIND_NAME, projectOf, startProject, demoFlowMap, type FlowEdge, type FlowMap, type FlowNode } from './flow-map'
 import type { MemoryGraph } from './memory-graph'
 
 test('the map opens on this window\'s project, then the last pick, then the chat\'s', () => {
@@ -129,4 +129,11 @@ test('groupTies: chat nodes of one group, chained', () => {
   assert.deepEqual(groupTies(m), [{ from: 'chat:a', to: 'chat:b', group: m.nodes.find(n => n.id === 'chat:a')!.group }])
   assert.ok(m.nodes.find(n => n.id === 'chat:a')!.group)
   assert.deepEqual(groupTies({ ...m, nodes: m.nodes.map(n => ({ ...n, group: undefined })) }), [])
+})
+
+test('colName: columns say how far they are from the entry', () => {
+  assert.equal(colName(0), 'Entry')
+  assert.equal(colName(1), 'Called by entry')
+  assert.equal(colName(2), '2 steps from entry')
+  assert.equal(colName(3, true), 'No imports')
 })

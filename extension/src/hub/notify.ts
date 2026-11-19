@@ -11,7 +11,7 @@ import * as path from 'path'
 import { hub } from './hub-service'
 import { readArchive, trendOf } from './chains'
 import { focusChat } from './actions'
-import { noticeKind } from './background'
+import { noticeKind, noticeText } from './background'
 import { phoneChange } from './phone'
 import { sendPush } from './web-push'
 import { desktopNotice, doneText, fillDraftBox, fillRepos, notifyStep, indefiniteText, todayText, trendText, type Box } from './progress'
@@ -24,9 +24,12 @@ function mac(title: string, text: string): void {
   if (n) execFile(n.cmd, n.args, { env: { ...process.env, ...n.env }, windowsHide: true, timeout: 15_000 }, () => {})
 }
 
-/** A VS Code toast with its button when Kenneth turned toasts on; otherwise a status bar line that takes no focus. */
+/** The VS Code side of a notice: a pop-up with its button, a status bar line, or nothing when the system notice every caller sends is enough. */
 function toast(warn: boolean, text: string, button?: string, act?: () => void): void {
-  if (noticeKind(hub.get().controls.switchboard) === 'status') { vscode.window.setStatusBarMessage(text, 20_000); return }
+  text = noticeText(text)
+  const kind = noticeKind(hub.get().controls.switchboard)
+  if (kind === 'system') return
+  if (kind === 'status') { vscode.window.setStatusBarMessage(`$(bell) ${text}`, 20_000); return }
   const b = button ? [button] : []
   void (warn ? vscode.window.showWarningMessage(text, ...b) : vscode.window.showInformationMessage(text, ...b)).then(c => { if (c && act) act() })
 }
@@ -83,15 +86,17 @@ export function notifyStuck(i: StuckItem, now = Date.now(), how: 'stuck' | 'fixe
   toast(true, `Switchboard: ${title}: ${text}.`, 'Show', () => focusChat(i.sessionId))
 }
 
-/** A chat with stuck items waiting on Kenneth: nothing is fixed until he answers. VS Code only; the needs-you notice already reached the Mac. */
+/** A chat with stuck items waiting on Kenneth: nothing is fixed until he answers. */
 export function notifyPaused(sessionId: string, why: string): void {
   const title = hub.get().chats.find(c => c.sessionId === sessionId)?.name ?? 'A chat'
+  mac(title, `Paused, waiting on you for ${why}`)
   toast(true, `Switchboard: ${title}: paused, waiting on you for ${why}.`, 'Show', () => focusChat(sessionId))
 }
 
 /** Run indefinitely ended; the mod's usage and reason ride along. */
 export function notifyIndefiniteDone(sessionId: string, usage?: string, reason?: string): void {
   const title = hub.get().chats.find(c => c.sessionId === sessionId)?.name ?? 'A chat'
+  mac(title, indefiniteText(title, usage, reason))
   toast(false, indefiniteText(title, usage, reason), 'Show', () => focusChat(sessionId))
 }
 

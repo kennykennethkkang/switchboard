@@ -63,6 +63,8 @@ const text = (body: string): HubReply => ({ status: 200, body, contentType: 'tex
 type Check = (v: unknown) => boolean
 type HubCommand = Extract<WebviewToExtensionMessage, { type: `hub-${string}` }>
 const str: Check = v => typeof v === 'string'
+// Run and sim ids end up in file names.
+const slug: Check = v => typeof v === 'string' && /^[\w-]{1,80}$/.test(v)
 const bool: Check = v => typeof v === 'boolean'
 const num: Check = v => typeof v === 'number' && Number.isFinite(v)
 const opt = (f: Check): Check => v => v === undefined || f(v)
@@ -85,7 +87,7 @@ const SPLIT_MAX = 8000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -93,6 +95,9 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-answer': { sessionId: str, askId: str, choice: picks },
   'hub-rc': { on: bool, sessionId: opt(str) },
   'hub-open-url': { url: str },
+  'hub-mirofish-open': { simId: opt(str) },
+  'hub-mirofish-report': { simId: str },
+  'hub-live-dismiss': { kind: oneOf('mirofish', 'crowd'), id: slug },
   'hub-web': { phone: bool },
   'hub-toggle': { kind: oneOf('mod', 'plugin', 'skill'), name: str, enabled: bool },
   'hub-setting': { key: oneOf(...SETTING_KEYS), value: any(bool, num, str, oneOf(null)) },

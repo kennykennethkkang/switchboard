@@ -54,6 +54,12 @@ describe('hub-remote', () => {
     assert.deepEqual(await fetchHubWhy(ok), { hub: { chats: [] } })
   })
 
+  it('flags a 404 as no hub at all, not a window that is closed', async () => {
+    const f = (s: number) => (async () => new Response('', { status: s })) as typeof fetch
+    assert.equal((await fetchHubWhy(f(404))).noHub, true)
+    assert.equal((await fetchHubWhy(f(502))).noHub, undefined)
+  })
+
   it('sends back the last ETag and keeps the state it had on a 304', async () => {
     const sent: Array<string | undefined> = []
     let reply = () => new Response('{"chats":[],"n":1}', { status: 200, headers: { ETag: '"a"' } })

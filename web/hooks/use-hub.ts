@@ -6,6 +6,7 @@
  * with no window behind that either, the dev build answers sample data; the phone app never does,
  * it keeps the last real state and says why it is not live.
  */
+import { useFlash } from './use-flash'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { commandWait, vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import type { HubState } from '@/lib/hub-types'
@@ -24,7 +25,9 @@ let pressed: HTMLElement | undefined
 const DEMO_OK = process.env.NEXT_PUBLIC_DEMO !== '0'
 
 /** down: why the standalone app is not live right now, while it shows the last state it had (or nothing). */
-export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isVSCode: boolean; send: (c: HubCommand) => void; upload: Upload; problem: { text: string; at: number; for?: HubCommand } | null; down?: string } {
+const LOAD_FETCH = new Set(['hub-trend', 'hub-changes', 'hub-pipelines'])
+
+export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isVSCode: boolean; send: (c: HubCommand) => void; upload: Upload; problem: { text: string; at: number; for?: HubCommand } | null; down?: string; /** The demo took a click that changes nothing here; set for a few seconds. */ inert: boolean } {
   const [hub, setHub] = useState<HubState | null>(null)
   const [isVSCode, setIsVSCode] = useState(false)
   const [remote, setRemote] = useState<HubState | null>(null)
@@ -33,6 +36,9 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   remoteRef.current = remote
   const [tried, setTried] = useState(false)
   const [demo, setDemo] = useState<HubState>(() => demoHub())
+  const demoRef = useRef(demo)
+  demoRef.current = demo
+  const [inert, setInert] = useFlash(0, 4000)
   const [problem, setProblem] = useState<{ text: string; at: number; for?: HubCommand } | null>(null)
   const [down, setDown] = useState<string>()
 
@@ -62,7 +68,7 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
       if (vscodeBridge?.isVSCode) return
       // A hidden tab asks nothing; it looks again within 2 s of being shown.
       if (document.hidden) { t = setTimeout(tick, POLL_MS); return }
-      const { hub: got, why } = await fetchHubWhy()
+      const { hub: got, why, noHub } = await fetchHubWhy()
       if (stop) return
       // A failed poll keeps the last real state on screen; only the dev build falls back to the demo.
       // A 304 hands back the same object as last time: nothing to compare.
@@ -71,6 +77,8 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
       raw = got
       setDown(got ? undefined : why)
       setTried(true)
+      // Nothing serves /hub (plain demo): stop asking. A real app's proxy answers 502, not 404, when no window is open.
+      if (noHub && DEMO_OK) return
       t = setTimeout(tick, got ? POLL_MS : DEMO_OK ? IDLE_POLL_MS : POLL_MS)
     }
     void tick()
@@ -85,7 +93,12 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
     return () => clearInterval(t)
   }, [isDemo])
   const send = useCallback((c: HubCommand) => {
-    if (isDemo) { const end = pending.start(pressed); setDemo(d => demoApply(d, c)); end() }
+    if (isDemo) {
+      // demoApply returns the same object for a command it does not act on.
+      // data fetches sent on load are not clicks; only clicks get the "only in VS Code" flash
+      if (!LOAD_FETCH.has(c.type) && demoApply(demoRef.current, c) === demoRef.current) setInert(Date.now())
+      const end = pending.start(pressed); setDemo(d => demoApply(d, c)); end()
+    }
     else if (!isVSCode && remoteRef.current) {
       const end = pending.start(pressed)
       void postCommand(c).then(why => {
@@ -116,5 +129,5 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   // The extension's own long ops keep the busy bar up too.
   const extBusy = !!(live?.sweep?.busy || live?.jarvis?.busy || live?.repo?.busy || live?.voice === 'transcribing')
   useEffect(() => pending.setExt(extBusy), [extBusy])
-  return { hub: live ?? (isDemo ? demo : empty), isLive: live !== null && !down, isDemo, isVSCode, send, upload, problem, down: isVSCode ? undefined : down }
+  return { hub: live ?? (isDemo ? demo : empty), isLive: live !== null && !down, isDemo, isVSCode, send, upload, problem, down: isVSCode ? undefined : down, inert: !!inert }
 }

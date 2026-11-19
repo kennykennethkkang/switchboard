@@ -66,8 +66,26 @@ export function roleModels(installed: Installed[], lead?: string): Record<string
   return Object.fromEntries(installed.filter(i => i.kind === 'role').map(i => [i.name, i.codex ? i.codexModel ?? 'codex default' : !i.model || i.model === 'inherit' ? lead ?? 'inherit' : i.model]))
 }
 
-/** Whether a settings search hits one of the words: whole keywords by their start, so one letter does not match everything. */
-export const keywordHit = (words: string, q: string) => !!q && words.split(/\s+/).some(w => w.startsWith(q))
+/** Whether a settings search hits one of the words: whole keywords by their start, so one letter does not match everything. A phrase matches word starts in a row. */
+export const keywordHit = (words: string, q: string) => !!q && ` ${words}`.includes(` ${q}`)
+
+/** Settings blocks that are not rows, so search has to know them by name. to: the section to open; none, it sits under every page. */
+export const BLOCKS: Array<{ label: string; hint: string; to?: 'Accounts' | 'Installed' | 'Integrations' | 'Chats'; words: string }> = [
+  { label: 'Accounts', to: 'Accounts', hint: 'AWS profiles, web app logins, and which ones each project uses.', words: 'accounts sign-ins sign in signin logins login aws web apps chrome projects' },
+  { label: 'API keys', to: 'Accounts', hint: 'Keys kept in a project\'s env file, and the AI sign-ins.', words: 'api keys key openrouter env secrets ai sign-ins sign in' },
+  { label: 'Sweep', to: 'Installed', hint: 'Scans plugins and skills; Fix in a chat, Rescan and Approve for the flagged ones.', words: 'sweep scan skillspector review flagged approve rescan safety' },
+  { label: 'Set up', to: 'Installed', hint: 'Installs the plugins, mods, MCP servers, rules and roles Switchboard works with.', words: 'set up setup install kit' },
+  { label: 'Export kit', to: 'Installed', hint: 'Roles, skills, plugins and mods as one folder to copy to another Mac.', words: 'export kit copy folder another mac' },
+  { label: 'Add a plugin or skill', to: 'Installed', hint: 'A GitHub repo, swept before it is added.', words: 'add plugin skill github repo install' },
+  { label: 'Spend limits', to: 'Integrations', hint: 'Monthly caps on paid tools.', words: 'spend limits cap monthly paid dollars budget' },
+  { label: 'Check health', to: 'Chats', hint: 'Hook server, kit version, mods, CLIs, hub port and MCP config.', words: 'check health doctor fix hooks diagnose' },
+  { label: 'About and credits', hint: 'At the bottom of every settings page.', words: 'about credits licenses license thanks' },
+]
+/** The blocks a settings search q (lower case) hits. */
+export const blockHits = (q: string) => BLOCKS.filter(b => keywordHit(`${b.label.toLowerCase()} ${b.words}`, q))
 
 /** What Models > Test models types into its new chat. */
 export const benchPrompt = 'Run the model-bench skill: benchmark each role on the current Claude models, then show me the results and a recommended model per role.'
+
+/** The pause-at value a switch sets: on brings back the last % (50 to 100), else 99; off is null. */
+export const pauseValue = (on: boolean, last?: number) => (on ? (last !== undefined && last >= 50 && last <= 100 ? last : 99) : null)

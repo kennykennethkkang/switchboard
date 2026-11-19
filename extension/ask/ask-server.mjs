@@ -52,8 +52,8 @@ const TODO_TOOLS = [
   },
   {
     name: 'sweep',
-    description: 'The SkillSpector sweep of installed plugins and skills. With name: rescan that one and answer its verdict. With nothing: start a sweep of everything installed; results show in Switchboard. It never approves: only the user turns a flagged tool on, with Approve in Switchboard.',
-    inputSchema: { type: 'object', properties: { name: { type: 'string' } } },
+    description: 'The SkillSpector sweep of installed plugins and skills. With name: rescan that one and answer its verdict. With nothing: start a sweep of everything installed; results show in Switchboard. It never approves: only the user turns a flagged tool on. With name and offer_approve: true, after the rescan it opens the Approve dialog in Switchboard for the user to answer Yes or No; use it when your review is done instead of telling them where to click.',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' }, offer_approve: { type: 'boolean' } } },
   },
 ]
 
@@ -251,7 +251,11 @@ async function sweep(msg) {
   if (!win) return reply(msg.id, 'Switchboard is not running here, so nothing was swept.', true)
   const r = await fetch(`http://127.0.0.1:${win.port}/hub/sweep?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ name }), signal: AbortSignal.timeout(660_000) })
   const text = await r.text()
-  return r.ok ? reply(msg.id, text) : reply(msg.id, `Not swept: ${text || `status ${r.status}`}`, true)
+  if (!r.ok) return reply(msg.id, `Not swept: ${text || `status ${r.status}`}`, true)
+  if (!name || a.offer_approve !== true) return reply(msg.id, text)
+  // Opens the same modal as the panel's Approve; only the user's Yes approves.
+  const c = await fetch(`http://127.0.0.1:${win.port}/hub/command?token=${encodeURIComponent(win.hubToken)}`, { method: 'POST', body: JSON.stringify({ type: 'hub-sweep-approve', name }), signal: AbortSignal.timeout(5000) }).catch(() => undefined)
+  return reply(msg.id, c?.ok ? `${text}\nThe Approve dialog is open in Switchboard; the user answers it. Tell them your verdict.` : `${text}\nCould not open the Approve dialog; tell the user to use Approve under Settings, Installed.`)
 }
 
 /** todo_add or todo_done, through the window's /hub/todo. */

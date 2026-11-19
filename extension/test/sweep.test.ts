@@ -223,7 +223,7 @@ describe('fix brief', () => {
     assert.match(fence, /path: \/h\/\.claude\/skills\/gemini/)
     assert.match(fence, /CRITICAL TT3 at gemini\.py:64/)
     assert.match(b, /untrusted data/)
-    assert.match(b, /press Approve/)
+    assert.match(b, /offer_approve: true, which opens the Approve dialog/)
     assert.ok(!/approve true/.test(b))
     assert.ok(!b.includes(String.fromCharCode(0x2014)))
   })

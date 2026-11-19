@@ -64,8 +64,8 @@ test('defaultCommands: pages always, conditional Do commands only when they appl
   const h = demoHub(0)
   const cards = liveChats(h.chats, h.archive).map(chat => ({ chat, progress: h.progress.find(p => p.sessionId === chat.sessionId) }))
   const base = defaultCommands({ cards: [], repoChanges: false, vscode: false })
-  assert.deepEqual(base.map(c => c.id), ['go:now', 'go:chats', 'go:plan', 'go:ship', 'go:map-board', 'go:map-flow', 'go:map-memory', 'go:settings', 'do:new', 'do:awake', 'do:calls'])
-  assert.deepEqual(base.filter(c => c.id.startsWith('go:')).map(c => c.label), ['Now', 'Chats', 'Plan', 'Ship', 'Map: Agents', 'Map: Code', 'Map: Memory', 'Settings'])
+  assert.deepEqual(base.map(c => c.id), ['go:now', 'go:chats', 'go:plan', 'go:live', 'go:ship', 'go:map-board', 'go:map-flow', 'go:map-memory', 'go:settings', 'do:new', 'do:awake', 'do:calls'])
+  assert.deepEqual(base.filter(c => c.id.startsWith('go:')).map(c => c.label), ['Now', 'Chats', 'Plan', 'Live', 'Ship', 'Map: Agents', 'Map: Code', 'Map: Memory', 'Settings'])
   assert.ok(base.every(c => c.group === (c.id.startsWith('go:') ? 'Go to' : 'Do')))
 
   const all = defaultCommands({ cards, repoChanges: true, vscode: true, awake: true, calls: false })

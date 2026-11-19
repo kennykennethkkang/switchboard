@@ -102,6 +102,13 @@ test('Gemini shows with its key saved, Jev with runs', () => {
   assert.equal(c.nodes.find(n => n.id === 'ai:gemini')!.runs, undefined)
 })
 
+test('a live crowd-ab run puts Jev on the map with its count', () => {
+  const crowdAb = { run: 'r', startedAt: NOW, lastAt: NOW, items: 20, done: 7, ended: false, votes: [], noPreference: 0, feed: [] }
+  assert.equal(buildCourt(hub({ crowdAb })).nodes.find(n => n.id === 'ai:jev')!.task, 'Crowd A/B 7/20')
+  assert.equal(buildCourt(hub({ crowdAb: { ...crowdAb, ended: true } })).nodes.find(n => n.id === 'ai:jev')!.task, undefined)
+  assert.equal(buildCourt(hub({ crowdAb: { ...crowdAb, stopped: true } })).nodes.find(n => n.id === 'ai:jev')!.task, 'Crowd A/B stopped at 7/20')
+})
+
 test('desks carry runs, shipped, since and task from the hub; unknowns stay undefined', () => {
   const c = buildCourt(hub({
     chats: [chat('a')],
@@ -521,6 +528,8 @@ test('Fit on a phone fills the stage instead of shrinking to fit 220px plaques',
 test('council summary counts only AIs that have chats, pluralized', () => {
   const h = hub({ chats: [chat('a')], progress: [prog({ sessionId: 'a', roles: [] })] })
   assert.equal(courtSummary(buildCourt(h)), '1 AI · 1 chat · 1 agent')
+  const two = hub({ chats: [chat('a'), { ...chat('b'), ai: 'codex' }], progress: [prog({ sessionId: 'a', roles: [] }), prog({ sessionId: 'b', roles: [] })] })
+  assert.match(courtSummary(buildCourt(two)), /^2 AI · 2 chats/)
 })
 
 test('Advanced mode: the yard and lead show the stage line, a raised role desk its model', () => {

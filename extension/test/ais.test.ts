@@ -37,7 +37,7 @@ describe('ais', () => {
   it('archives an ended Codex row only with no running terminal and an exit or long silence', () => {
     const now = 10 * 3_600_000
     const row = (sessionId: string, updatedAt: number, live = false) => ({ ai: 'codex', sessionId, updatedAt, live } as never)
-    const none = () => false
+    const none = (_id: string) => false
     const ids = (cs: unknown[], tied = none, exited = new Set<string>()) => endedCodex(cs as never, tied, exited, now).map(c => c.sessionId)
     assert.deepEqual(ids([row('exit', now - 60_000)], none, new Set(['exit'])), ['exit'])
     assert.deepEqual(ids([row('old', now - 3 * 3_600_000)]), ['old'])

@@ -196,6 +196,7 @@ export function demoAppMap(): FlowMap {
   const f = (label: string, about?: string): FlowNode => ({ id: `f:${label}`, kind: 'file', label, folder: `d:${label.slice(0, label.lastIndexOf('/'))}`, ...(about ? { about } : {}) })
   const imp = (a: string, b: string, n = 1): FlowEdge => ({ from: `f:${a}`, to: `f:${b}`, kind: 'import', n })
   m.nodes.push(
+    { id: 'd:extension/test', kind: 'folder', label: 'extension/test', about: 'Tests for the editor side.' },
     f('web/app/page.tsx', 'The page the hub app serves.'), f('web/components/switchboard/flow-map.tsx', 'The Code view.'), f('web/lib/flow-map.ts'), f('web/lib/hub-remote.ts', 'Talks to the hub over HTTP.'),
     f('extension/src/extension.ts', 'Where VS Code starts the extension.'), f('extension/src/hub/hub-service.ts', 'Keeps the hub state.'), f('extension/src/hub/flowmap.ts', 'Builds the flow map.'),
     f('extension/test/graph.test.ts'), f('app/src/server.ts', 'Serves the hub outside VS Code.'),
@@ -249,3 +250,6 @@ export function routeLinks(parts: Part[], links: PartLink[], at: Map<string, Pt>
   })
   return out
 }
+
+/** A flow column's heading: its distance from the entry, in plain words. */
+export const colName = (i: number, alone = false) => alone ? 'No imports' : i === 0 ? 'Entry' : i === 1 ? 'Called by entry' : `${i} steps from entry`

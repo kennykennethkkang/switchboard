@@ -175,7 +175,7 @@ describe('ask-server', () => {
     } finally { s.child.kill(); srv.close() }
   })
 
-  it('sweep posts only the name to the window and has no approve', T, async () => {
+  it('sweep posts only the name, never approves, and offer_approve only opens the dialog', T, async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-'))
     const { srv, seen } = await fakeWindow(home, home, status(200))
     const s = start(home, home)
@@ -184,7 +184,7 @@ describe('ask-server', () => {
       await s.next(m => m.id === 1)
       s.send({ id: 9, method: 'tools/list' })
       const tool = (await s.next(m => m.id === 9)).result.tools.find((t: { name: string }) => t.name === 'sweep')
-      assert.deepEqual(Object.keys(tool.inputSchema.properties), ['name'])
+      assert.deepEqual(Object.keys(tool.inputSchema.properties), ['name', 'offer_approve'])
       s.send({ id: 2, method: 'tools/call', params: { name: 'sweep', arguments: { name: 'gemini', approve: true } } })
       assert.notEqual((await s.next(m => m.id === 2)).result.isError, true)
       const posts = () => seen.filter(r => r.url?.startsWith('/hub/sweep'))
@@ -193,6 +193,20 @@ describe('ask-server', () => {
       s.send({ id: 3, method: 'tools/call', params: { name: 'sweep', arguments: {} } })
       await s.next(m => m.id === 3)
       assert.deepEqual(JSON.parse(posts()[1].body), {})
+      // approve: true never reaches the window as a command
+      assert.equal(seen.filter(r => r.url?.startsWith('/hub/command')).length, 0)
+      // offer_approve opens Kenneth's Approve dialog after the rescan; the chat cannot click it
+      s.send({ id: 4, method: 'tools/call', params: { name: 'sweep', arguments: { name: 'gemini', offer_approve: true } } })
+      assert.match((await s.next(m => m.id === 4)).result.content[0].text, /Approve dialog/)
+      assert.deepEqual(JSON.parse(posts()[2].body), { name: 'gemini' })
+      const cmd = seen.filter(r => r.url?.startsWith('/hub/command'))
+      assert.equal(cmd.length, 1)
+      assert.equal(cmd[0].url, '/hub/command?token=tok')
+      assert.deepEqual(JSON.parse(cmd[0].body), { type: 'hub-sweep-approve', name: 'gemini' })
+      // no name, no dialog
+      s.send({ id: 5, method: 'tools/call', params: { name: 'sweep', arguments: { offer_approve: true } } })
+      await s.next(m => m.id === 5)
+      assert.equal(seen.filter(r => r.url?.startsWith('/hub/command')).length, 1)
     } finally { s.child.kill(); srv.close() }
   })
 

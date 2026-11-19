@@ -5,6 +5,6 @@ export type HubReply = boolean | string | Promise<boolean | string>
 
 /** Warns on the Mac and returns the problem, so a refusal reads the same everywhere. */
 export function refuse(problem: string): string {
-  void vscode.window.showWarningMessage(`Switchboard: ${problem}.`)
+  void vscode.window.showWarningMessage(`${problem}.`)
   return problem
 }

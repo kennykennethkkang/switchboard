@@ -4,5 +4,12 @@
         "titleBar.activeForeground": "#f4f4f6",
         "titleBar.inactiveBackground": "#2d2647",
         "titleBar.inactiveForeground": "#f4f4f699"
-    }
+    },
+    "tailwindCSS.files.exclude": [
+        "**/.git/**",
+        "**/node_modules/**",
+        "**/.hg/**",
+        "**/.svn/**",
+        "**/kit/mods/**"
+    ]
 }

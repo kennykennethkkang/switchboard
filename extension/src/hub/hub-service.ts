@@ -19,9 +19,10 @@ import { fixDue, snoozed, waitsOnUser } from './stuck'
 import { FLAGGED } from './tools'
 import { createLogger } from '../logger'
 import { recordSentBack } from './chains'
-import { foldPathCase } from '../fs-utils'
+import { foldPathCase, saveMerged } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
 import { MirofishPoller } from './mirofish'
+import { crowdLive, dismissCrowd } from './crowd-live'
 import type { AiId, Ask, CacheKeep, ChatLink, ChatUnlink, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, KeptLimits, Limit, LimitPause, Server, SessionLive, StuckItem } from './types'
 import { isTabCommand } from './window-tabs'
 
@@ -32,6 +33,27 @@ const LIVE_STALE_MS = 10 * 60 * 1000
 const PROGRESS_STALE_MS = 24 * 60 * 60 * 1000
 const MAX_INBOX = 20
 // A chat's mod polls its inbox every 2 seconds; quiet longer than this, a message would sit unread.
+/** The folder a session ran in: the first cwd in its transcript, wherever under the projects folder it sits. */
+function cwdFromTranscript(projects: string, sessionId: string): string | undefined {
+  if (!/^[\w-]+$/.test(sessionId)) return undefined
+  try {
+    for (const d of fs.readdirSync(projects)) {
+      const file = path.join(projects, d, `${sessionId}.jsonl`)
+      if (!fs.existsSync(file)) continue
+      const fd = fs.openSync(file, 'r')
+      try {
+        const buf = Buffer.alloc(65_536)
+        for (const line of buf.toString('utf8', 0, fs.readSync(fd, buf, 0, buf.length, 0)).split('\n')) {
+          const cwd = (() => { try { return (JSON.parse(line) as { cwd?: unknown }).cwd } catch { return undefined } })()
+          if (typeof cwd === 'string' && cwd) return cwd
+        }
+      } finally { fs.closeSync(fd) }
+    }
+  } catch { /* no transcripts */ }
+  return undefined
+}
+
+const PENDING_CLOSE_MS = 30 * 60_000
 const POLL_GONE_MS = 10_000
 // A stopped dev server stays a suggestion this long, or until it is back.
 const GONE_MS = 10 * 60 * 1000
@@ -208,19 +230,24 @@ export class HubService {
   private readonly owned = new Set<string>()
 
   private retriesFile?: string
+  // The retry keys at this window's last load or save, so a save drops its own removals and another window's.
+  private readonly retryKeys = new Set<string>()
   private linksFile?: string
   private keptLinks: unknown[] = []
   private linksAt = 0
   /** One file per workspace, so only this window's own chats load back and no other window sends them. None: memory only. */
-  keepRetries(file: string): void {
+  keepRetries(file: string, projects = path.join(os.homedir(), '.claude', 'projects')): void {
     this.retriesFile = file
     try {
       // One overdue by more than a day is for a chat that ended while no window listened.
       // One from an older window (a bare due time, no folder) cannot be resumed, and would hold auto-start: dropped.
       for (const [id, v] of Object.entries(JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>)) {
+        this.retryKeys.add(id)
         const r = (v ?? {}) as { due?: unknown; cwd?: unknown; agents?: unknown; paused?: unknown; at?: unknown }
         const agents = Array.isArray(r.agents) ? (r.agents as CutAgent[]).filter(a => typeof a?.id === 'string') : []
-        if (typeof r.due === 'number' && typeof r.cwd === 'string' && Date.now() - r.due < PROGRESS_STALE_MS) this.retries.set(id, { due: r.due, cwd: r.cwd, ...(agents.length ? { agents } : {}), ...(r.paused === true ? { paused: true, at: num(r.at) ?? r.due } : {}) })
+        // A retry saved with no folder gets it from the chat's transcript; with none found it is dropped, and the chat's History row has Resume.
+        const cwd = typeof r.cwd === 'string' ? r.cwd : cwdFromTranscript(projects, id)
+        if (typeof r.due === 'number' && cwd && Date.now() - r.due < PROGRESS_STALE_MS) this.retries.set(id, { due: r.due, cwd, ...(agents.length ? { agents } : {}), ...(r.paused === true ? { paused: true, at: num(r.at) ?? r.due } : {}) })
       }
     } catch { /* none yet, or broken: start empty */ }
     // Links and Kenneth's unlinks beside it, so a reload does not read as an unlink to a waiting chat.
@@ -371,22 +398,45 @@ export class HubService {
 
   private saveRetries(): void {
     if (!this.retriesFile) return
-    try { writeJsonAtomic(this.retriesFile, Object.fromEntries(this.retries)) } catch (err) { log.warn('Retries not kept:', err) }
+    try { for (const id of saveMerged(this.retriesFile, Object.fromEntries(this.retries), this.retryKeys)) this.retries.delete(id) } catch (err) { log.warn('Retries not kept:', err) }
   }
 
   get(): HubState {
     return this.state
   }
 
-  startMirofish(): void {
+  startMirofish(translate?: (text: string) => Promise<string>): void {
     if (this.mirofish) return
-    this.mirofish = new MirofishPoller()
-    this.mirofish.start(mirofish => this.set({ mirofish }))
+    this.mirofish = new MirofishPoller({ translate })
+    const poller = this.mirofish
+    poller.start(mirofish => this.set({ mirofish, mirofishReports: poller.reports() }))
+  }
+
+  /** Hides a stalled MiroFish sim or a stopped crowd-ab run from the Live page. */
+  dismissLive(kind: 'mirofish' | 'crowd', id: string): void {
+    if (kind === 'mirofish') { this.mirofish?.dismiss(id); this.set({ mirofish: undefined }) } else { dismissCrowd(id); this.set({ crowdAb: undefined }) }
   }
 
   stopMirofish(): void {
     this.mirofish?.dispose()
     this.mirofish = undefined
+    if (this.crowd) clearInterval(this.crowd)
+    this.crowd = undefined
+  }
+
+  // crowd-ab runs take a minute or two, so the card reads Jev's run files every 2s and only pushes a change.
+  private crowd?: ReturnType<typeof setInterval>
+  startCrowd(read = () => crowdLive()): void {
+    if (this.crowd) return
+    let last = ''
+    const tick = () => {
+      let next
+      try { next = read() } catch { return }
+      const key = JSON.stringify(next ?? null)
+      if (key !== last) { last = key; this.set({ crowdAb: next }) }
+    }
+    tick()
+    this.crowd = setInterval(tick, 2000)
   }
 
   /** Sessions a headless learn run reported; the Flow tabs skip them too. */
@@ -531,6 +581,8 @@ export class HubService {
         if (isTempDir(next.cwd)) return true
         this.state = { ...this.state, live: [next, ...this.state.live.filter(s => s.sessionId !== sessionId)] }
         // Only a session's first post is the fresh chat; one already open in the folder is not.
+        // A fresh chat that never posts leaves the old one in the list to close by hand.
+        this.pendingClose = this.pendingClose.filter(p => now - p.at < PENDING_CLOSE_MS)
         const ready = was ? [] : this.pendingClose.filter(p => p.sessionId !== sessionId && p.cwd === pathKey(next.cwd) && now > p.at)
         this.closing = [...this.closing, ...ready.map(p => ({ sessionId: p.sessionId, at: now }))]
         if (ready.length) this.pendingClose = this.pendingClose.filter(p => !ready.includes(p))

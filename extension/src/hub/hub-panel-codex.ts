@@ -50,7 +50,12 @@ export function codexPanel(d: {
         ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
     }), ais, doneChecks })
     startWaits()
-    for (const w of endedWorktrees(wtSeen, chats, Date.now(), worktreeDirs(chats.map(c => c.cwd)))) void cleanWorktree(w).catch(err => log.warn('Worktree cleanup failed:', err))
+    // Every known repo is scanned, a chat or not; a worktree whose chat just ended goes at once, others after 10 idle minutes.
+    const fast: string[] = []
+    const roots = hub.get().projects.map(p => p.path)
+    for (const w of [...endedWorktrees(wtSeen, chats, Date.now(), worktreeDirs(chats.map(c => c.cwd), roots), fast), ...fast]) {
+      void cleanWorktree(w).then(gone => { if (gone) log.info(`Removed merged worktree ${w}`) }).catch(err => log.warn('Worktree cleanup failed:', err))
+    }
     refreshStages(chats)
     void syncTerminals(chats).catch(err => log.warn('Terminal list failed:', err))
     const ended = endedCodex(chats, codexTied, codexExited).filter(c => !hub.get().archive.some(a => a.sessionId === c.sessionId))

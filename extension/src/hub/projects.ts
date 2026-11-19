@@ -134,17 +134,13 @@ export const codexArgs = (args: string[]) => args[0] === 'resume' ? ['resume', .
  * textFile, when given, carries the message instead: a line typed into a starting shell
  * is cut at 1024 bytes on macOS, which left long messages at a `quote>` prompt.
  */
-export function newChatCommand(o: { text?: string; textFile?: string; remote?: string; branch?: string; name?: string; sessionId?: string; settings?: string; system?: string; worktree?: string }, shell: Shell): string {
+export function newChatCommand(o: { text?: string; textFile?: string; remote?: string; branch?: string; name?: string; sessionId?: string; settings?: string; system?: string }, shell: Shell): string {
   const quote = (s: string) => shellQuote(s, shell)
   let claude = 'claude'
   if (o.name) claude += ` --name ${quote(o.name)}`
   if (o.sessionId !== undefined) {
     if (!/^[0-9a-f-]{36}$/i.test(o.sessionId)) throw new Error('Not a session id')
     claude += ` --session-id ${o.sessionId}`
-  }
-  if (o.worktree !== undefined) {
-    if (!/^[a-z0-9][a-z0-9-]{0,60}$/.test(o.worktree)) throw new Error('Not a usable worktree name')
-    claude += ` --worktree ${quote(o.worktree)}`
   }
   if (o.settings) claude += ` --settings ${quote(o.settings)}`
   if (o.system) claude += ` --append-system-prompt ${quote(o.system)}`

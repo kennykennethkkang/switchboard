@@ -204,6 +204,18 @@ describe('window posts', () => {
 })
 
 describe('sendHome', () => {
+  it('markReloading clears markers older than the reload wait', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-win-'))
+    const old = path.join(dir, '111.reloading')
+    fs.writeFileSync(old, '/r/Gone')
+    const t = new Date(Date.now() - 60_000)
+    fs.utimesSync(old, t, t)
+    fs.writeFileSync(path.join(dir, `abc-${process.pid}.json`), JSON.stringify({ pid: process.pid, port: 1, hubToken: 't', workspace: '/r/Armasu' }))
+    markReloading(dir, process.pid)
+    assert.deepEqual(fs.readdirSync(dir).filter(n => n.endsWith('.reloading')), [`${process.pid}.reloading`])
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
   it('waits for a window that is mid-reload instead of opening the chat here', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-win-'))
     const seen: string[] = []

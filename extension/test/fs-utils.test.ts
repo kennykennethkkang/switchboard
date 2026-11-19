@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { readNewFileLines, readFileBytes, readJsonOr, tryLock, upperDrive, withLock } from '../src/fs-utils'
+import { readNewFileLines, readFileBytes, readJsonOr, saveMerged, tryLock, upperDrive, withLock } from '../src/fs-utils'
 
 describe('upperDrive', () => {
   it('gives one spelling to c:\\ and C:\\, leaving other paths alone', () => {
@@ -175,4 +175,17 @@ it('readJsonOr parses a file and falls back when it is missing or broken', () =>
     assert.equal(readJsonOr(f, 'x'), 'x')
     assert.equal(readJsonOr(path.join(dir, 'none.json')), undefined)
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+describe('saveMerged', () => {
+  it('drops a key another window deleted since the last save, keeps its new ones and says what it dropped', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-merge-')), 'm.json')
+    const seen = new Set<string>()
+    assert.deepEqual(saveMerged(file, { a: 1, b: 2 }, seen), [])
+    fs.writeFileSync(file, JSON.stringify({ b: 2, theirs: 3 }))
+    assert.deepEqual(saveMerged(file, { a: 1, b: 2, c: 4 }, seen), ['a'])
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { b: 2, c: 4, theirs: 3 })
+    assert.deepEqual(saveMerged(file, { c: 4 }, seen), [])
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { c: 4, theirs: 3 })
+  })
 })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { benchPrompt, gearRows, keywordHit, roleModels, sweepBadge, sweepTip, sweptNow } from './gear-rows'
+import { benchPrompt, blockHits, pauseValue, gearRows, keywordHit, roleModels, sweepBadge, sweepTip, sweptNow } from './gear-rows'
 import type { Connection, Installed, SweepRecord } from './hub-types'
 import { demoHub } from './hub-demo'
 
@@ -121,4 +121,28 @@ test('sweptNow: drops records for uninstalled tools and older plugin versions', 
   ]
   const tools = { 'sg@m': rec('/c/sg/2.0.18'), 'ok@m': rec('/c/ok/1.0.0'), gemini: { ...rec('/s/gemini'), kind: 'skill' } as SweepRecord, 'gone@m': rec('/c/gone/1') }
   assert.deepEqual(sweptNow({ installed, sweep: { busy: false, tools } }).map(([n]) => n), ['ok@m', 'gemini'])
+})
+
+test('keywordHit matches a phrase by word starts', () => {
+  assert.equal(keywordHit('sign-ins sign in logins', 'sign in'), true)
+  assert.equal(keywordHit('sign-ins sign in logins', 'gn in'), false)
+})
+
+test('settings blocks that are not rows are found by their words', () => {
+  const labels = (q: string) => blockHits(q).map(b => b.label)
+  assert.deepEqual(labels('sweep'), ['Sweep'])
+  assert.ok(labels('export').includes('Export kit'))
+  assert.ok(labels('set up').includes('Set up'))
+  assert.ok(labels('sign in').includes('Accounts'))
+  assert.ok(labels('api key').includes('API keys'))
+  assert.ok(labels('credits').includes('About and credits'))
+  assert.deepEqual(blockHits('zzz'), [])
+  assert.deepEqual(blockHits(''), [])
+})
+
+test('pauseValue: on brings back the last value, else 99; off is null', () => {
+  assert.equal(pauseValue(true, 90), 90)
+  assert.equal(pauseValue(true, undefined), 99)
+  assert.equal(pauseValue(true, 40), 99)
+  assert.equal(pauseValue(false, 90), null)
 })

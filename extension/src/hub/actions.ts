@@ -21,11 +21,11 @@ import { CLI_APPS, cliBinary, cliBusy, deviceUrl, endCli, startCli } from './cli
 import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
 import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, repoTop, stillRunning } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
+import { addWorktree } from './git'
 import { saveGroup } from './split'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
 import { titleFor } from './title'
-import { excludeWorktrees } from './advanced'
 import { heldLabel, moveTodoChat, projectOf, todoEnv, type RunLabel } from './todo'
 import { trustFolder, trustedWindowRoots } from './trust'
 import { openChatTerminal, tags } from './terminals'
@@ -155,7 +155,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   const project = hub.get().projects.find(p => p.path === folder)
   if (!project) return `${folder} is not in the project list yet; open Switchboard once and try again`
   const { ai, reason } = await resolveAi(want, text, folder)
-  if (reason) void vscode.window.showInformationMessage(`Switchboard: ${reason}`)
+  if (reason) void vscode.window.showInformationMessage(`${reason}`)
   const goal = text?.trim()
   const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(folder) : []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
@@ -185,18 +185,25 @@ export async function newChat(folder: string, text: string | undefined, remote: 
     return undefined
   }
   let command: string
+  // Own worktree: made here, then a plain claude starts in it (claude --worktree makes Claude Code's guard refuse compound Bash).
+  let cwd = folder
+  const top = worktree ? repoTop(folder) : undefined
+  if (top) {
+    const made = await addWorktree(top, worktreeName(title))
+    if (!made.ok) return made.error
+    cwd = made.dir
+  }
   const sessionId = id ?? (profile ? crypto.randomUUID() : undefined)
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, worktree: worktree && repoTop(folder) ? worktreeName(title) : undefined, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? '', uiSdkNote(folder) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? '', uiSdkNote(folder) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
   trustHere(folder)
-  if (worktree && repoTop(folder)) excludeWorktrees(folder)
   if (group && sessionId) saveGroup(sessionId, group)
-  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd: folder, env: { ...chatEnv(folder), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
+  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd, env: { ...chatEnv(folder), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
   t.show(true)
   t.sendText(typed(command))
   return undefined
@@ -474,7 +481,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
       branch: h.branch || headBranch(h.cwd) || 'unknown', plan: h.plan ? path.relative(h.cwd, h.plan) : 'none',
     }))
     recordChain(h.sessionId, base)
-  } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not label the handoff note (${(err as Error).message}).`) }
+  } catch (err) { void vscode.window.showWarningMessage(`Could not label the handoff note (${(err as Error).message}).`) }
   const text = withPointer(freshPrompt(h.note), rulesState.ready[ai], rulesState.kit)
   const codex = ai === 'codex'
   // The fresh chat keeps the old one's tool set; one started outside Switchboard gets the defaults.
@@ -500,11 +507,11 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
       try { command = claude(branch) } catch {
         // A branch the shell line cannot carry: the fresh chat starts on the current branch instead, and says so.
         command = claude()
-        void vscode.window.showWarningMessage(`Switchboard: ${fresh} starts on the current branch; "${h.branch}" is not a usable branch name.`)
+        void vscode.window.showWarningMessage(`${fresh} starts on the current branch; "${h.branch}" is not a usable branch name.`)
       }
     }
   } catch (err) {
-    void vscode.window.showWarningMessage(`Switchboard: ${(err as Error).message}.`)
+    void vscode.window.showWarningMessage(`${(err as Error).message}.`)
     return false
   }
   if (!codex) trustHere(h.cwd)
@@ -512,7 +519,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
     ? await codexTerminal(`Codex: ${fresh}`, h.cwd, [withBrief(hub.get(), h.cwd, text)])
     : openChatTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: { ...chatEnv(h.cwd), ...heldEnv(h.cwd, [h.sessionId]) } }, 'Claude', freshId)
   if (typeof t === 'string') {
-    void vscode.window.showWarningMessage(`Switchboard: ${t}.`)
+    void vscode.window.showWarningMessage(`${t}.`)
     return false
   }
   t.show(true)
@@ -524,7 +531,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
       sessionId: h.sessionId, ai, name: h.name || base, origin: base, version: chainVersion(fresh) - 1, cwd: h.cwd, project: name,
       note: h.note, startedAt: hub.get().progress.find(p => p.sessionId === h.sessionId)?.startedAt, archivedAt: Date.now(),
     })
-  } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not move the old chat to History (${(err as Error).message}).`) }
+  } catch (err) { void vscode.window.showWarningMessage(`Could not move the old chat to History (${(err as Error).message}).`) }
   if (!codex) hub.closeAfterFresh(h.sessionId, h.cwd)
   if (freshId) void moveTodoChat(h.cwd, h.sessionId, freshId).catch(() => {})
   return true
@@ -642,14 +649,14 @@ export function awsLogin(profile: string, chrome: string | undefined, done: () =
         const { [profile]: _gone, ...sessions } = readSessions()
         writeSessions({ ...(kept === profile ? readSessions() : sessions), [kept]: { at: Date.now() } })
       } catch (err) { signInNote(key, `Signed in, but Switchboard could not update its own files: ${(err as Error).message}`) }
-      void vscode.window.showInformationMessage(kept === profile ? `Switchboard: signed in to AWS as ${profile}.` : `Switchboard: signed in to AWS as ${kept}; ${profile} was the same login, so it was folded into ${kept}.`)
+      void vscode.window.showInformationMessage(kept === profile ? `Signed in to AWS as ${profile}.` : `Signed in to AWS as ${kept}; ${profile} was the same login, so it was folded into ${kept}.`)
       // The row's name and email follow whoever just signed in.
       void refreshIdentity(kept).catch(() => undefined).finally(done)
       return
     } else {
       const why = code === null ? `No sign-in within ${LOGIN_MS / 60_000} minutes, so aws login was stopped.` : loginError(out) || `aws login exited with code ${code}.`
       signInError(key, why)
-      void vscode.window.showWarningMessage(`Switchboard: aws login --profile ${profile} did not finish: ${why.split('\n').pop()}`)
+      void vscode.window.showWarningMessage(`aws login --profile ${profile} did not finish: ${why.split('\n').pop()}`)
     }
     done()
   })
@@ -714,7 +721,7 @@ export function openLogin(url: string, own: string | undefined, project: string 
     if (!err) return
     const why = `Could not open Chrome: ${loginError(String(stderr)) || err.message}`
     if (key) signInError(key, why)
-    else void vscode.window.showWarningMessage(`Switchboard: ${why}`)
+    else void vscode.window.showWarningMessage(`${why}`)
   })
   return undefined
 }

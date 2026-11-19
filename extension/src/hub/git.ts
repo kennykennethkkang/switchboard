@@ -6,6 +6,7 @@ import { execFile } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 import { cliPath } from './ais'
+import { excludeWorktrees } from './advanced'
 import { cleanInvisible } from './clean-text'
 import { hold } from './idle'
 import { insideCwd } from './local'
@@ -415,42 +416,84 @@ async function worktreeOf(root: string): Promise<{ wt: string; main: string } | 
 const WT_DIR = /^(.*[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)/
 
 const WT_IDLE_MS = 10 * 60_000
+const WT_FAST_MS = 2 * 60_000
+const wasLive = new WeakMap<Map<string, number | undefined>, Set<string>>()
 const realOf = (p: string) => { try { return fs.realpathSync.native(p) } catch { return p } }
 
 /**
  * Worktree folders that have had no live chat for 10 minutes straight. seen carries the state between calls:
  * a worktree maps to when it was first seen without a live chat, or undefined while one is live. Keys are real paths.
+ * fast collects the ones a chat was seen live in that have had none for 2 minutes, so a live flag that blinks off for a refresh
+ * or two never removes a folder under a running chat. Never seen live: the 10 minutes.
  */
-export function endedWorktrees(seen: Map<string, number | undefined>, chats: { live: boolean; cwd: string }[], now = Date.now(), onDisk: string[] = []): string[] {
+export function endedWorktrees(seen: Map<string, number | undefined>, chats: { live: boolean; cwd: string }[], now = Date.now(), onDisk: string[] = [], fast: string[] = []): string[] {
   const live = new Set(chats.flatMap(c => { const w = c.live ? WT_DIR.exec(c.cwd)?.[1] : undefined; return w ? [realOf(w)] : [] }))
   // Left over from before a reload, or from a chat that moved in after starting: start its clock now.
   for (const w of onDisk.map(realOf)) if (!live.has(w) && !seen.has(w)) seen.set(w, now)
   const ended: string[] = []
   for (const [w, since] of seen) {
     if (live.has(w)) continue
-    if (since === undefined) seen.set(w, now)
-    else if (now - since >= WT_IDLE_MS) { ended.push(w); seen.delete(w) }
+    const had = wasLive.get(seen) ?? wasLive.set(seen, new Set()).get(seen)!
+    if (since === undefined) { seen.set(w, now); had.add(w) }
+    else if (now - since >= WT_IDLE_MS) { ended.push(w); seen.delete(w); had.delete(w) }
+    else if (had.has(w) && now - since >= WT_FAST_MS) { fast.push(w); had.delete(w) }
   }
   for (const w of live) seen.set(w, undefined)
   return ended
 }
 
-/** Folders under <repo>/.claude/worktrees for the repos these chats run in. */
-export function worktreeDirs(cwds: string[]): string[] {
-  const roots = new Set(cwds.map(c => WT_DIR.exec(c)?.[1].replace(/[\\/]\.claude[\\/]worktrees[\\/][^\\/]+$/, '') ?? c))
+/** Folders under <repo>/.claude/worktrees for the repos these chats run in, plus any other repo roots given (every known project). */
+export function worktreeDirs(cwds: string[], extra: string[] = []): string[] {
+  const roots = new Set([...cwds.map(c => WT_DIR.exec(c)?.[1].replace(/[\\/]\.claude[\\/]worktrees[\\/][^\\/]+$/, '') ?? c), ...extra])
   return [...roots].flatMap(r => { const d = path.join(r, '.claude', 'worktrees'); try { return fs.readdirSync(d).map(n => path.join(d, n)) } catch { return [] } })
 }
 
-/** Removes a worktree whose branch is already in the main checkout's HEAD and has no changes; anything else stays. Never forced. */
-export async function cleanWorktree(wt: string): Promise<boolean> {
+/** repo/.claude/worktrees/<slug> on branch worktree-<slug>, from the repo's HEAD, so the chat starts in it as a plain checkout. */
+export async function addWorktree(repo: string, slug: string): Promise<{ ok: true; dir: string } | { ok: false; error: string }> {
+  if (!/^[a-z0-9][a-z0-9-]{0,60}$/.test(slug)) return { ok: false, error: 'Not a usable worktree name' }
+  const dir = path.join(repo, '.claude', 'worktrees', slug)
+  const r = await git(repo, ['worktree', 'add', '-q', '-b', `worktree-${slug}`, dir, 'HEAD'], SLOW)
+  if (!r.ok) return { ok: false, error: `Could not create the worktree: ${why(r)}` }
+  excludeWorktrees(repo)
+  return { ok: true, dir }
+}
+
+/** The branch's PR state on GitHub when its head is exactly this commit; undefined with no gh, no GitHub remote or another head. */
+async function prState(main: string, branch: string, sha: string): Promise<string | undefined> {
+  const gh = await ghPath()
+  const repo = githubRepo((await git(main, ['remote', 'get-url', 'origin'])).out)
+  if (!gh || !repo) return undefined
+  const r = await exec(gh, ['pr', 'view', branch, '--repo', repo.replace('https://github.com/', ''), '--json', 'state,headRefOid'], QUICK, main)
+  try { const j = JSON.parse(r.out); return j.headRefOid === sha ? String(j.state) : undefined } catch { return undefined }
+}
+
+const pidAlive = (pid: number) => { try { process.kill(pid, 0); return true } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } }
+
+/** Unlocks a worktree whose lock names a pid that is no longer running (Claude Code locks its own). False while it stays locked. */
+async function unlockStale(main: string, wt: string): Promise<boolean> {
+  const block = (await git(main, ['worktree', 'list', '--porcelain'])).out.split('\n\n').find(b => b.split('\n')[0] === `worktree ${wt}`)
+  const lock = block?.split('\n').find(l => l === 'locked' || l.startsWith('locked '))
+  if (lock === undefined) return true
+  const pid = /\bpid (\d+)/.exec(lock)?.[1]
+  if (!pid || pidAlive(Number(pid))) return false
+  return (await git(main, ['worktree', 'unlock', wt])).ok
+}
+
+/**
+ * Removes a worktree with no changes once its work is merged: its branch is in the main checkout's HEAD, or its PR is merged
+ * on GitHub with that very head (a squash never makes an ancestor, so the branch goes with -D). Anything else stays. Never forced.
+ */
+export async function cleanWorktree(wt: string, pr: (main: string, branch: string, sha: string) => Promise<string | undefined> = prState): Promise<boolean> {
   const w = await worktreeOf(wt)
   if (!w || !fs.existsSync(wt)) return false
   const branch = (await git(wt, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
   if (!branch || branch === 'HEAD') return false
   if ((await status(wt)).files.length) return false
-  if (!(await git(w.main, ['merge-base', '--is-ancestor', branch, 'HEAD'])).ok) return false
+  const ancestor = (await git(w.main, ['merge-base', '--is-ancestor', branch, 'HEAD'])).ok
+  if (!ancestor && await pr(w.main, branch, (await git(wt, ['rev-parse', 'HEAD'])).out.trim()) !== 'MERGED') return false
+  if (!(await unlockStale(w.main, w.wt))) return false
   if (!(await git(w.main, ['worktree', 'remove', w.wt])).ok) return false
-  await git(w.main, ['branch', '-d', branch])
+  await git(w.main, ['branch', ancestor ? '-d' : '-D', branch])
   return true
 }
 
@@ -725,6 +768,7 @@ async function runOp(root: string, c: GitCmd, gh?: string, inUse = false): Promi
       // A chat still running there would lose its cwd, so the worktree and branch stay until it ends.
       if (inUse) return { ok: true, text: `Merged; worktree kept while the chat runs. ${s.branch} went into ${head}, nothing was pushed` }
       // Never forced: a worktree git will not remove stays, with the merge already done.
+      await unlockStale(w.main, w.wt)
       const rm = await git(w.main, ['worktree', 'remove', w.wt])
       if (!rm.ok) return { ok: true, text: `Merged ${s.branch} into ${head}, but the worktree stayed: ${why(rm)}` }
       await git(w.main, ['branch', '-d', s.branch])

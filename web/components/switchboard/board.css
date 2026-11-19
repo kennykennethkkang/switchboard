@@ -23,7 +23,7 @@
 .board-cast summary::-webkit-details-marker { display: none; }
 .board-cast summary:hover, .board-cast details[open] summary { background: rgba(255, 255, 255, 0.08); }
 .board-cast summary:focus-visible { outline: 2px solid var(--b-gold); outline-offset: 1px; }
-.board-cast dl { position: absolute; z-index: 3; left: 0; bottom: calc(100% + 8px); display: grid; grid-template-columns: auto auto; gap: 4px 14px; width: max-content; max-width: calc(100vw - 24px); max-height: min(60dvh, 420px); overflow-y: auto; margin: 0; padding: 10px 12px; background: rgba(12, 10, 24, 0.94); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; }
+.board-cast dl { position: absolute; z-index: 3; left: 88px; bottom: calc(100% + 8px); display: grid; grid-template-columns: auto auto; gap: 4px 14px; width: max-content; max-width: calc(100vw - 112px); max-height: min(60dvh, 420px); overflow-y: auto; margin: 0; padding: 10px 12px; background: rgba(12, 10, 24, 0.94); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; }
 .board-cast dl div { display: contents; }
 .board-cast dt { font-weight: 600; color: #f4f1ea; }
 .board-cast dd { margin: 0; color: #a29cae; }
@@ -42,6 +42,8 @@
 .board-keys kbd { min-width: 16px; padding: 2px 4px; box-sizing: border-box; border: 1px solid var(--hub-hair); border-radius: 4px; font: 400 11px/1 var(--hub-mono); text-align: center; }
 @media (pointer: coarse) { .board-keys { display: none; } }
 @media (pointer: coarse) { .board-head .hub-btn, .board-skin select { min-height: 44px; min-width: 44px; } }
+/* Touch: the stack sits in the header row, so it never covers a label on the court. */
+@media (pointer: coarse) { .board-zoom, .board:has(.bp) .board-zoom { position: static; flex-direction: row; margin-left: auto; } .board:has(.bp) .board-zoom { display: none; } .board-zoom .hub-btn { min-height: 44px; min-width: 44px; } .board-zoom .hub-btn + .hub-btn { border-top: 0; border-left: 1px solid var(--hub-hair); } }
 @media (max-width: 760px) { .board-zoom { bottom: 150px; right: 10px; } .board:has(.bp) .board-zoom { display: none; } }
 @media (max-width: 600px) { .board-sub, .board-skin { display: none; } .board-head { gap: 4px 8px; flex-wrap: wrap; } .board-meta { order: 9; flex: 1 0 100%; flex-wrap: nowrap; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 11px; } .board-head h2 { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; letter-spacing: 0; } .board-head .hub-btn { white-space: nowrap; } .board-need-word { display: none; } }
 
@@ -92,6 +94,8 @@
   .bp { top: auto; left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); width: auto; max-height: 72%; }
   @media (prefers-reduced-motion: no-preference) { .bp { animation-name: bp-up; } }
   .board-legend { gap: 2px 8px; padding: 4px 8px; font-size: 11px; }
+  /* The belt is a row above the legend here: the cast opens above it. */
+  .board-cast dl { left: 0; bottom: calc(100% + 124px); max-width: calc(100vw - 24px); }
 }
 @keyframes bp-up { from { transform: translateY(24px); opacity: 0; } }
 /* Short landscape: the belt turns into a row along the top, so the note drops below it. */

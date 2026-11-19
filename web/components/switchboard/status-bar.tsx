@@ -34,9 +34,9 @@ export function StatusBar({ meters, dev, onDev, awake, onAwake, calls, onCalls, 
         {ship && <span className="sb-slot">{ship}</span>}
         {awake !== undefined && <button type="button" className="sb-btn sb-toggle" aria-pressed={awake} onClick={() => onAwake(!awake)}
           title="Keeps this Mac awake so Switchboard and dev servers answer from anywhere. With the lid closed, only while on power.">
-          {awake ? 'Awake' : 'Keep awake'}</button>}
+          Keep awake</button>}
         <button type="button" className="sb-btn sb-toggle" aria-pressed={calls} onClick={() => onCalls(!calls)} title="Phone mode: call me instead of asking in chats">
-          {calls ? 'Calls on' : 'Call me'}</button>
+          Call me</button>
         {phone && <span className="sb-slot">{phone}</span>}
       </span>
     </footer>

@@ -21,6 +21,30 @@ function chat(hub: HubService, sessionId = 's1') {
 const post = (hub: HubService, body: object, token = hub.token) => handleHub(hub, 'POST', `/hub/question?token=${token}`, JSON.stringify(body)) as HubReply
 
 describe('question store', () => {
+  it('a question another window answered and removed is not written back', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-q-')), 'questions.json')
+    keepQuestions(file)
+    const gone = fresh(), next = fresh()
+    openQuestion(gone, 's1', { id: gone, kind: 'question', tool: 'ask', options: [] })
+    fs.writeFileSync(file, '{}')
+    openQuestion(next, 's1', { id: next, kind: 'question', tool: 'ask', options: [] })
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8'))), [next])
+    assert.equal(questionOf(gone), undefined)
+    closeQuestion(next)
+  })
+  it('a save keeps a question another window wrote to the same file', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-q-')), 'questions.json')
+    keepQuestions(file)
+    const mine = fresh(), theirs = fresh()
+    openQuestion(mine, 's1', { id: mine, kind: 'question', tool: 'ask', options: [] })
+    const ask = { id: theirs, kind: 'question', tool: 'ask', options: [] }
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), [theirs]: { sessionId: 's2', ask, at: Date.now() } }))
+    const next = fresh()
+    openQuestion(next, 's1', { id: next, kind: 'question', tool: 'ask', options: [] })
+    closeQuestion(mine)
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8'))).sort(), [next, theirs].sort())
+    closeQuestion(next)
+  })
   it('open questions outlive a window reload: kept in a file and loaded at start', () => {
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-q-')), 'questions.json')
     keepQuestions(file)

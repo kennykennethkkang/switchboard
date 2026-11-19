@@ -96,7 +96,7 @@ function Missed({ p }: { p: ChatProgress }) {
 }
 
 /** The terminal's prompt with its options as buttons; several questions, a multiSelect one or Other text are filled in first, then sent together. */
-function AskButtons({ ask, onAnswer }: { ask: Ask; onAnswer: (askId: string, choice: Choice) => void }) {
+function AskButtons({ ask, onAnswer, block }: { ask: Ask; onAnswer: (askId: string, choice: Choice) => void; /** Why Approve is held (approveBlock); the Approve option is disabled with this reason. */ block?: string }) {
   const [picks, setPicks] = useState<Array<number | number[] | undefined>>([])
   const [others, setOthers] = useState<Record<number, string>>({})
   useEffect(() => { setPicks([]); setOthers({}) }, [ask.id])
@@ -123,13 +123,14 @@ function AskButtons({ ask, onAnswer }: { ask: Ask; onAnswer: (askId: string, cho
     if (!qs[n].multiSelect) { const next = [...picks]; next[n] = undefined; setPicks(next) }
   }
   const choice = askChoice(qs, picks, others)
+  const held = (o: string) => o === 'Approve' && !!block
   return <>
     {qs.map((q, n) => (
       <div key={n} role="group" aria-label={q.header ?? q.question} style={{ display: 'grid', gap: 6 }}>
         {qs.length > 1 && <p className="cp-subq">{q.header && <span className="cp-role">{q.header} · </span>}{q.question}</p>}
         {q.multiSelect && <span className="cp-hint">Pick any that apply</span>}
         <div style={row}>
-          {q.options.map((o, i) => <button key={i} type="button" className="hub-btn hub-opt" aria-pressed={together ? picked(n).includes(i) : undefined} onClick={() => pick(n, i)}>{o}{q.details?.[i] ? <span className="hub-opt-d">{q.details[i]}</span> : null}</button>)}
+          {q.options.map((o, i) => <button key={i} type="button" className="hub-btn hub-opt" aria-pressed={together ? picked(n).includes(i) : undefined} disabled={held(o)} onClick={() => pick(n, i)}>{o}{q.details?.[i] ? <span className="hub-opt-d">{q.details[i]}</span> : null}</button>)}
           <button type="button" className="hub-btn hub-opt cp-other" aria-pressed={n in others} onClick={() => toggleOther(n)}>Other</button>
         </div>
         {n in others && <input type="text" autoFocus maxLength={200} style={field} aria-label={`Other answer for ${q.header ?? q.question}`} placeholder="Type your answer"
@@ -137,6 +138,7 @@ function AskButtons({ ask, onAnswer }: { ask: Ask; onAnswer: (askId: string, cho
           onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229 && choice) onAnswer(ask.id, choice) }} />}
       </div>
     ))}
+    {block && qs.some(q => q.options.includes('Approve')) && <p role="status" className="cp-hint" style={{ color: 'var(--hub-red)' }}>Approve is held: {block}.</p>}
     {together && <div><button type="button" className="hub-btn primary" disabled={!choice} onClick={() => choice && onAnswer(ask.id, choice)}>{qs.length > 1 ? 'Send answers' : 'Send answer'}</button></div>}
   </>
 }
@@ -168,9 +170,9 @@ const NO_MODELS: Record<string, string> = {}
 /** profile: the chat's own plugins and skills, when Switchboard started it with a set; onProfile saves a change. */
 /** limits and autoContinue: for the usage-limit note; onSend: queues a message to this chat. note: an extra mute line under the head (a pause). */
 /** place: the VS Code window holding the chat. menu: Outputs and the more menu. message: the message box; given a function, it gets the Tools popover body. */
-export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onIndefinite, onCommand, onFocus, onAnswer, onCopy, onSend, approve, check, links = [] }: {
+export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onIndefinite, onCommand, onFocus, onAnswer, onCopy, onSend, approve, block, check, links = [] }: {
   chat: ChatRow; progress?: ChatProgress; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
-  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onIndefinite?: (on: boolean) => void; onCommand?: (c: HubCommand) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode; /** The done-check stamp under the closing question. */ check?: DoneCheck
+  profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onIndefinite?: (on: boolean) => void; onCommand?: (c: HubCommand) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode; /** Why an Approve answer is held (approveBlock). */ block?: string; /** The done-check stamp under the closing question. */ check?: DoneCheck
   place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode | ((tools: ReactNode) => ReactNode); note?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void; /** Its wait links, for the Orbit arcs and the waiting word. */ links?: LinkChip[]
 }) {
   const [showTools, setShowTools] = useState(true)
@@ -204,7 +206,7 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
         <span className="cp-label">{progress?.limited ? 'Usage limit' : `${progress?.ask?.sub ? 'A subagent in ' : ''}${name} asks`}</span>
         <p id="cp-q" className="cp-q">{(progress?.ask?.questions?.length ?? 0) > 1 ? `${progress!.ask!.questions!.length} questions` : progress?.question ?? 'This chat is waiting on you.'}</p>
         <CheckStamp check={check} wrap />
-        {progress?.ask && onAnswer && chat.ai !== 'codex' && <AskButtons ask={progress.ask} onAnswer={onAnswer} />}
+        {progress?.ask && onAnswer && chat.ai !== 'codex' && <AskButtons ask={progress.ask} onAnswer={onAnswer} block={block} />}
         <div className="cp-alt"><button type="button" className={progress?.ask && onAnswer ? 'hub-btn sm' : 'hub-btn primary'} onClick={onFocus}>{remote ? 'Open terminal on Mac' : 'Answer in terminal'}</button></div>
       </section>
     : state === 'done' && progress
@@ -265,7 +267,7 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
           </p>
         </div>
         <div className="hub-pic-acts cp-acts">
-          {onIndefinite && <span title={indefiniteHint(profile, now)}><Switch on={indefiniteOn(profile)} onChange={onIndefinite} label={INDEFINITE_LABEL} text={INDEFINITE_LABEL} /></span>}
+          {onIndefinite && <span className="cp-loop" title={indefiniteHint(profile, now, chat.budget ?? profile?.budget)}><Switch on={indefiniteOn(profile)} onChange={onIndefinite} label={INDEFINITE_LABEL} text={INDEFINITE_LABEL} /></span>}
           <button type="button" className="hub-btn" onClick={onFocus} title={remote ? 'Brings up its terminal on the Mac' : "Brings up this chat's terminal"}>{remote ? 'Terminal on Mac' : 'Terminal'}</button>
           {menu}
         </div>

@@ -1,5 +1,101 @@
 # Changelog
 
+## 0.21.103
+
+- Phone: the floating New chat button steps aside while you scroll down and comes back when you scroll up, so it no longer covers what you are reading
+
+## 0.21.102
+
+- Phone: Settings > Models no longer scrolls sideways; the Settings tabs sit in one row that scrolls; switches, tabs and link pills are easier to tap
+- Phone: Ship's Create pull request, Open on GitHub and Undo last commit are full-size buttons
+- Phone: the New chat button clears the status bar and tab bar
+- Phone: picking a chat lands on its details with a Back to chats button; the chat header wraps instead of cutting off Terminal and Outputs; small controls on Chats are 44px on touch
+- Now on a phone: the "N need you" chip shows once Your call has scrolled out of view
+
+## 0.21.101
+
+- Sweep review chats open the Approve dialog for you when their review is done (switchboard sweep tool, offer_approve), instead of telling you where to click; only your Yes approves
+- Approve is greyed out with its reason on every Approve button, the Chats view included
+- New chat: the box takes focus when it opens, and Esc closes it
+- Settings search: each result names its pane on its own line; Pause near the limit reads on its own and shows %
+- Now on a phone: a sticky "N need you" chip jumps to the next card that needs you
+- Map on touch: places and zoom buttons are at least 44px and the buttons no longer cover labels; a near miss picks the closest place
+- Plan's Yesterday row: one chip per number, wrapping on a phone without running off the card
+- Ship: one Push button instead of three; Keep awake and Call me show when they are on
+- Demo: stops asking for /hub/state once it is clearly a demo, and no longer flashes "Only works inside VS Code" on load
+- Code map columns say how far they are from the entry instead of Layer 2, Layer 3
+- Reload markers older than 20 seconds are cleared on the next reload instead of piling up
+
+## 0.21.100
+
+- Memory 3D view (?mem=3d): a tap picks the dot under your finger after a zoom, instead of a bigger dot nearby or a hidden one; first load names only the projects, with room between labels; on a phone the details sheet takes at most 40% of the screen and the Health chips hide while a note is open, so the graph keeps more height
+
+## 0.21.99
+
+- Approve says why it is held: when a chat still has open tasks, live subagents or is still working, its Approve button is greyed out with the reason next to it, instead of a click that silently does nothing
+- A to-do you start leaves Up next and shows in Cooking with its full title
+- On a phone the Your call lane shows 3 cards and a Show more row
+- Memory map: clicking a dot picks it; Fit centres the whole map; Fit, Close details and Esc clear a Health highlight; the 3D view has zoom and fit buttons too
+
+## 0.21.98
+
+- Now is a pass board by default: Your call (questions, approvals, stuck items, each with its button), Cooking (each chat with its stage chips, its own cost and time, and a red Stuck row with Fix), Up next and Done today. On a phone Up next and Done today fold to one count row. The old page is at ?layout=classic
+- Map > Memory is a flat cluster map by default: one cluster per project plus Shared, a fixed layout that does not drift, labels that do not flicker, hover or pick dims the rest, zoom buttons and + / - / 0, light and dark. A Health list names broken links, contradictions and other issues; clicking one opens the note. The calmer 3D view is at ?mem=3d; the old spinning glow view is gone
+- The Map's Jev pavilion says when a Crowd A/B run stopped
+- crowd-ab names a winner only when Jev agrees in both option orders and the haiku panel agrees (checked on two rounds of screens with a known better side: 7 of 8 right, no wrong winners); MiroFish is for written doubts, not the verdict
+
+## 0.21.97
+
+- Nothing stays stuck: a handoff whose fresh chat never posts gives up after 30 minutes and leaves the old chat in the list; Approve on a chat waiting on you closes it (a live question or permission prompt is never killed) and a close that fails is retried, then a notice says to close it by hand
+- MiroFish and Crowd A/B cards say Stalled (no progress for 30 minutes) or Stopped (no new ratings for 5 minutes) with a Dismiss button instead of Running forever; a dismissed sim still gets its report, and a stopped run comes back if new ratings arrive
+- Two VS Code windows no longer overwrite each other's saved usage retries and open questions, and an answered question never comes back; two windows never start or save the same MiroFish report twice
+- A usage-limit retry saved without its folder finds it from the chat's transcript instead of being dropped
+- Settings: search finds every block (Sweep, Set up, Export kit, API keys, sign in, spend, health); the Chats pane is split into Usage limits, Notices, Phone, Permissions, Upkeep, Look and Windows; usage-limit and notice wording matches what they do; Pause near the limit keeps your value; Codex pickers are greyed out with a link when Codex is not installed; the Roles heading sits above the role pickers
+- Now shows Stuck on stuck chats; Plan's Up next skips the item already running; Now, Plan, the Map header and the Council count needs you, working and done today the same way
+- Map: Usage opens a Usage and limits dialog; Esc after jumping to a card fits the board again; the Cast legend no longer covers the tool belt; the Night button says what it does; Code search dims non-matches and keeps layers, links and counts right
+- Phone: room under the last row for the New chat button, 32px tap targets on small controls, answer options wrap instead of running off screen
+- Run indefinitely's tooltip says "No limit set" when it has no hours, cost or gate
+- New layouts to try, the current ones stay the default: Now as a pass board (?layout=line) or a list with a detail pane (?layout=focus); Memory as a flat cluster map (?mem=a) or a calm 3D view (?mem=b), both following the light or dark theme with a Health list
+
+## 0.21.96
+
+- Phone viewing over Tailscale keeps working when a `tailscale status` read hangs or fails: Switchboard keeps the last tailnet name instead of dropping it (which refused the phone with a 403), and while it has no name it tries again every 10 seconds
+- Own worktree chats start in a worktree Switchboard makes itself (git worktree add) instead of claude --worktree, so Claude Code's worktree guard stops refusing ordinary shell commands in them
+- A chat's worktree is removed on its own once its branch is merged into main or its pull request is merged, right after its chat ends; every project is checked, not only ones with an open chat, and a lock left by an ended chat no longer blocks removal. Uncommitted or unmerged work is never removed
+- A chat's worktree is removed only after its chat has been gone for 2 minutes, so a brief hiccup never pulls the folder out from under a running chat
+- Two unused settings (agentVisualizer.eventLogPath, agentVisualizer.autoOpen) are gone
+
+## 0.21.95
+
+- Live page is tidier: a MiroFish section (status beside agent activity, then a report reader with the list on the left and the picked report on the right) and a Crowd A/B section (votes beside the newest ratings); everything stacks on a phone
+- MiroFish reports come out in English: Switchboard asks MiroFish for English, and reports already saved in Chinese get an English copy (<simId>.en.md) made once in the background, shown as translated from Chinese. A failed translation waits 10 minutes before the next try
+- Chinese agent posts in the activity feed show in English a few at a time
+- Switchboard checks once more right before asking for a report, so two windows do not start the same one
+
+## 0.21.94
+
+- MiroFish card shows its stage as a three step tracker (Rounds, Report, Saved) with one plain line on what is happening now: running round 7 of 10, writing the report, finished and saved, or what went wrong
+- Switchboard makes sure every finished sim gets a report: two minutes after the rounds end with no report, it ends the idle runner and asks MiroFish to write one; a stalled or failed report is redone, at most 3 tries 5 minutes apart, then the card asks you to look
+- Finished reports are saved in ~/.claude/switchboard/mirofish and shown on the Live page: the newest in full, older ones open in VS Code
+
+## 0.21.93
+
+- New Live page in the sidebar (and the phone tab bar) for MiroFish sims and crowd-ab runs, side by side, with a count of runs still going; the cards left Plan. With nothing running it says so
+- Feeds show the newest 12 agent actions and persona ratings
+- Open MiroFish works: it starts MiroFish's web app when it is down (found from the running backend, npm looked up even when VS Code was opened from the Dock) and opens the running sim's page; a problem shows instead of a dead tab. Mac only, like other links
+
+## 0.21.92
+
+- MiroFish card shows a live feed of the newest agent actions (who posted, commented or liked, on which platform, and what they wrote) while the rounds run
+- New Crowd A/B card on the Plan tab follows a crowd-ab run live: ratings in so far, running vote share per option, no-preference count and the newest persona ratings, for Jev runs and the haiku panel alike; the map's Jev pavilion shows the count while it runs
+- crowd-ab tags its items with the option label and a call id, so the card names options and joins the pilot to the main run
+
+## 0.21.91
+
+- Chat notices (done, question, stuck, paused, AWS sign-in) go to the Mac or Windows notification center by default and fade on their own; Settings > Chats > Chat notices can add a VS Code pop-up (gone after about 10 seconds once VS Code has focus) or a status bar line instead. An old "Pop-up notices" on still reads as VS Code pop-up
+- VS Code pop-ups move to the top right by default, out of the way of the terminal and chat input; Settings > Chats > Where pop-ups show picks top right, bottom left or bottom right, and a pick from VS Code's own bell menu sticks
+- Switchboard pop-ups are shorter: no "Switchboard:" prefix (VS Code already names the source), one line, cut at 140 characters; status bar notices get a bell icon
+
 ## 0.21.87
 
 - Design library in Tools has All and None, like the other groups; with a search typed they act on the matching looks only

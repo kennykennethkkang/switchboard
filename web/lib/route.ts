@@ -1,5 +1,5 @@
 /** The shell's page lives in the URL hash; the old ?board link still opens the Board. */
-export const PAGES = ['now', 'chats', 'plan', 'ship', 'map-board', 'map-flow', 'map-memory', 'settings'] as const
+export const PAGES = ['now', 'chats', 'plan', 'live', 'ship', 'map-board', 'map-flow', 'map-memory', 'settings'] as const
 export type Page = typeof PAGES[number]
 
 export const isMap = (p: Page) => p.startsWith('map-')

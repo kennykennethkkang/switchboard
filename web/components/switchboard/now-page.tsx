@@ -1,7 +1,8 @@
 'use client'
 import type { ReactNode } from 'react'
 import { laneRow, type Day } from '@/lib/now'
-import type { ArchivedChat } from '@/lib/hub-types'
+import type { ArchivedChat, StuckItem } from '@/lib/hub-types'
+import { stuckTone } from '@/lib/stuck'
 import { plural, type Card } from './chat-cards'
 import { ago } from '@/lib/look'
 import './layout.css'
@@ -21,8 +22,9 @@ function Lane({ tone, title, count, empty, children }: { tone: Tone; title: stri
   )
 }
 
-function Row({ card, tint, onOpen }: { card: Card; tint?: (c: Card) => string | undefined; onOpen: (id: string) => void }) {
+function Row({ card, tint, stuck, onOpen }: { card: Card; tint?: (c: Card) => string | undefined; stuck?: StuckItem[]; onOpen: (id: string) => void }) {
   const r = laneRow(card)
+  const tone = stuckTone(stuck, r.id)
   return (
     <li>
       <button type="button" className="now-row" onClick={() => onOpen(r.id)} title={`Open ${r.name} in Chats`}>
@@ -30,6 +32,7 @@ function Row({ card, tint, onOpen }: { card: Card; tint?: (c: Card) => string | 
         <span className="now-meta">
           <i aria-hidden style={{ background: tint?.(card) ?? 'var(--hub-mute)' }} />
           <span className="sr-only">{r.project}, </span>
+          {tone && <span title="Something in this chat looks stuck: see Needs you" style={{ color: `var(--hub-${tone})`, fontWeight: 500 }}>Stuck{r.role || r.total ? ' · ' : ''}</span>}
           {[r.role, r.total ? `${r.done} of ${r.total}` : ''].filter(Boolean).join(' · ') || r.project}
           {r.total > 0 && <span className="now-bar" aria-hidden><b style={{ transform: `scaleX(${r.done / r.total})` }} /></span>}
         </span>
@@ -60,9 +63,9 @@ function DoneRow({ a, tint, onOpen, now }: { a: ArchivedChat; tint?: (cwd: strin
  * done: chats approved today, from the archive; onDone opens one in History.
  * tint: a folder's project color for a row's dot.
  */
-export function NowPage({ day, needs, needsCount, working, done, onOpen, onDone, jarvis, filter, tint, now = Date.now() }: {
+export function NowPage({ day, needs, needsCount, working, done, onOpen, onDone, jarvis, filter, tint, stuck, now = Date.now() }: {
   day: Day; needs: ReactNode; needsCount?: number; working: Card[]; done: ArchivedChat[]; onOpen: (id: string) => void; onDone: (a: ArchivedChat) => void
-  jarvis?: ReactNode; filter?: ReactNode; tint?: (cwd: string) => string | undefined; now?: number
+  jarvis?: ReactNode; filter?: ReactNode; tint?: (cwd: string) => string | undefined; stuck?: StuckItem[]; now?: number
 }) {
   const cost = day.jev ? `$${day.jev.costUsd.toFixed(2)}` : '$0'
   return (
@@ -77,7 +80,7 @@ export function NowPage({ day, needs, needsCount, working, done, onOpen, onDone,
       {filter}
       <div className="now-lanes">
         <Lane tone="red" title="Needs you" count={needsCount} empty="Nothing needs you right now.">{needs}</Lane>
-        <Lane tone="blue" title="Working" count={working.length} empty="No chat is working.">{working.length > 0 && <ul className="now-rows">{working.map(c => <Row key={c.chat.sessionId} card={c} tint={c => tint?.(c.chat.cwd)} onOpen={onOpen} />)}</ul>}</Lane>
+        <Lane tone="blue" title="Working" count={working.length} empty="No chat is working.">{working.length > 0 && <ul className="now-rows">{working.map(c => <Row key={c.chat.sessionId} card={c} stuck={stuck} tint={c => tint?.(c.chat.cwd)} onOpen={onOpen} />)}</ul>}</Lane>
         <Lane tone="green" title="Done today" count={done.length} empty="Nothing finished yet today.">{done.length > 0 && <ul className="now-rows">{done.map(a => <DoneRow key={a.sessionId} a={a} tint={tint} onOpen={onDone} now={now} />)}</ul>}</Lane>
       </div>
     </div>

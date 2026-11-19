@@ -116,6 +116,16 @@ export async function closeApproved<T extends Term>(pids: number[], terminals: r
   return done.filter(Boolean).length
 }
 
+/** Approve leaves the chat running: it works mid-turn, or a question or permission prompt still waits, which a stale click must not kill. */
+export const staysOpenOnApprove = (p: ChatProgress | undefined) =>
+  !!p && ((p.state === 'working' && !p.waiting) || (p.state === 'needs-you' && (!!p.ask || !!p.asks?.length)))
+
+/** closeApproved again while a chat is still running, up to tries; true once every chat's terminal closed. */
+export async function closeApprovedRetry<T extends Term>(pids: number[], terminals: readonly T[], o?: Parameters<typeof closeChatTerminal>[2], isOurs: (t: T) => boolean = ourTerminal, tries = 3): Promise<boolean> {
+  for (let i = 0; i < tries; i++) if (await closeApproved(pids, terminals, o, isOurs) >= pids.length) return true
+  return false
+}
+
 export const CLOSING_DENY = 'Run the aar skill and print the standup (done, for you, left, risks) before the Approve question.'
 // Enough for a long closing turn; older entries only matter for the no-edits skip.
 const GATE_TAIL = 4 * 1024 * 1024

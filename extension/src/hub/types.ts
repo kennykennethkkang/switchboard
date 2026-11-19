@@ -1,5 +1,5 @@
 /**
- * The Hub tab's data, shared word for word with web/lib/hub-types.ts.
+ * The Hub tab's data, shared word for word between extension/src/hub/types.ts and web/lib/hub-types.ts.
  *
  * Live arrives from each Claude Code session's usage mod (POST /hub); the rest
  * the extension gathers itself.
@@ -59,7 +59,15 @@ export type SignIns = { chrome: ChromeProfile[]; projects: Record<string, string
 export type JevRun = { sessionId?: string; preset?: string; items: number; costUsd: number; seconds: number; at: number }
 /** Set up Jev's jobs for one project, its newest runs (gate: one command each) and what those runs cost. */
 export type JevProject = { project: string; jobs: { done: boolean; gate: boolean; tells: boolean; route: boolean }; runs: { job: string; at: number; items: number; costUsd: number; result?: string }[]; costUsd: number }
-export type MirofishState = { simId: string; step: 'rounds' | 'report' | 'done'; round: number; rounds: number; percent: number; startedAt?: string; elapsedMs?: number; etaMs?: number; reportReady: boolean; reportExcerpt?: string }
+/** One agent action from a MiroFish sim, newest first in the feed. */
+export type MirofishPost = { at: string; who: string; platform: string; action: string; text?: string; /** text is Switchboard's English of a non-English post. */ translated?: boolean }
+export type MirofishState = { simId: string; step: 'rounds' | 'report' | 'done'; round: number; rounds: number; percent: number; startedAt?: string; elapsedMs?: number; etaMs?: number; reportReady: boolean; reportExcerpt?: string; feed?: MirofishPost[]; /** While the report is written: percent and sections done. */ reportPercent?: number; reportSections?: number; reportError?: string; /** Switchboard stopped retrying the report. */ reportGaveUp?: boolean; reportId?: string; /** The report is saved in ~/.claude/switchboard/mirofish. */ saved?: boolean; /** The rounds have not moved for 30 minutes. */ stalled?: boolean }
+/** A MiroFish report Switchboard saved; only the newest carries its markdown. */
+export type MirofishReport = { simId: string; reportId?: string; title: string; at: string; summary?: string; requirement?: string; file: string; markdown?: string; /** markdown is Switchboard's English of a non-English report. */ translated?: boolean }
+/** One synthetic user's rating or pick in a crowd-ab run. */
+export type CrowdVote = { at: number; who: string; option: string; appeal?: number; reason?: string; why?: string }
+/** The newest crowd-ab run, read live from Jev's run files (crowd-live.ts). votes: personas decided so far per option label. */
+export type CrowdLive = { run: string; startedAt: number; lastAt: number; items: number; done: number; ended: boolean; /** No new rating for 5 minutes and no end row. */ stopped?: boolean; votes: { label: string; n: number }[]; noPreference: number; feed: CrowdVote[] }
 /** A full chat whose handoff waits on its running subagents (Claude) or open turn (Codex). next: the fresh chat's version, like v2. */
 export type HandoffWait = { sessionId: string; tasks: number; next: string; since: number }
 /** One chat waiting on others (chat-wait mod or a card). auto: an edit clash, reason is the file path; since: epoch ms. */
@@ -215,6 +223,10 @@ export type HubState = {
   /** Jev per project folder (jev-project.ts); an older extension sends none. */
   jevProjects?: Record<string, JevProject>
   mirofish?: MirofishState
+  /** Saved MiroFish reports, newest first (mirofish.ts); an older extension sends none. */
+  mirofishReports?: MirofishReport[]
+  /** The newest crowd-ab run while fresh; an older extension sends none. */
+  crowdAb?: CrowdLive
   /** Agents, jobs and processes that look stuck (stuck.ts), snoozed ones left out; an older extension sends none. */
   stuck?: StuckItem[]
 }
@@ -271,7 +283,7 @@ export type KeepSetting = 'autoCompactEnabled' | 'autoCompactWindow' | 'autoCont
 export type SettingKey = KeepSetting | 'remoteControlAtStartup' | 'agentPushNotifEnabled' | 'inputNeededNotifEnabled' | 'model' | 'effortLevel' | 'tui' | 'statusLine'
 export type ClaudeControls = { model?: 'fable' | 'opus' | 'sonnet' | 'haiku'; effortLevel?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; tui: 'default' | 'fullscreen'; statusLine: boolean; push: boolean; needInput: boolean }
 /** Switchboard's own switches, kept in VS Code's globalState. idleMinutes null: never hide. */
-export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; /** Claude chat permissions: bypass (default), ask or auto; unset reads askClaude. */ claudeMode?: 'bypass' | 'ask' | 'auto'; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. */ toasts?: boolean; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string }
+export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; /** Claude chat permissions: bypass (default), ask or auto; unset reads askClaude. */ claudeMode?: 'bypass' | 'ask' | 'auto'; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. Read only when notices is unset. */ toasts?: boolean; /** Where agent notices go: the Mac or Windows notification center (unset), a VS Code pop-up, or the status bar. */ notices?: 'system' | 'toast' | 'status'; /** Where VS Code toasts show (workbench.notifications.position); unset is top right. */ noticeSpot?: 'top-right' | 'bottom-left' | 'bottom-right'; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string }
 export type SwitchboardKey = keyof SwitchboardControls
 /** rulesNote: what the last rules and roles sync did, one line. */
 export type Controls = { claude: ClaudeControls; switchboard: SwitchboardControls; statusLineReady: boolean; rulesNote?: string }

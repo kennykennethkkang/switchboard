@@ -43,16 +43,18 @@ export function macNamesOf(json: string | undefined): MacNames {
   return { tailscale: tailscaleName(json!), https: Array.isArray(certs) && certs.length > 0 }
 }
 const out = (bin: string, args: string[]) => new Promise<string>(done => execFile(bin, args, { timeout: 5000 }, (err, stdout) => done(err ? '' : String(stdout))))
+/** json '' is a failed or timed-out read: `tailscale status` hangs now and then, and losing the name would refuse the phone. */
+export const afterRead = (last: MacNames, json: string | undefined) => json === '' && last.tailscale ? last : macNamesOf(json)
 export async function readMacNames(): Promise<MacNames> {
   const ts = tailscaleBin()
-  return macNamesOf(ts ? await out(ts, ['status', '--self', '--json']) : undefined)
+  return afterRead(names, ts ? await out(ts, ['status', '--self', '--json']) : undefined)
 }
 let names: MacNames = {}
 let namesAt = -Infinity
 let reading: Promise<MacNames> = Promise.resolve(names)
-/** This Mac's MagicDNS name as last read. A read older than 3 minutes starts a new one in the background, so no caller waits on tailscale. */
+/** This Mac's MagicDNS name as last read. A read older than 3 minutes (10 s while there is no name) starts a new one in the background, so no caller waits on tailscale. */
 export function macNames(now = Date.now()): MacNames {
-  if (now - namesAt >= 3 * 60_000) { namesAt = now; reading = readMacNames().then(n => (names = n)) }
+  if (now - namesAt >= (names.tailscale ? 3 * 60_000 : 10_000)) { namesAt = now; reading = readMacNames().then(n => (names = n)) }
   return names
 }
 /** The read macNames last started; the app awaits the first one before it listens. */

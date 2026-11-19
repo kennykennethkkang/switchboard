@@ -148,7 +148,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   const head = r.log[0]
   const createPr = r.github && r.upstream && !MAIN.test(t.name) && (isVSCode
     ? <button type="button" className="hub-btn sm" disabled={busy} onClick={() => run({ op: 'pr' })} title="gh pr create --fill --web, or the compare page">Create pull request</button>
-    : compare && <a className="hub-btn sm" style={{ textDecoration: 'none' }} href={compare} target="_blank" rel="noopener noreferrer">Create pull request ↗</a>)
+    : compare && <a className="hub-btn sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href={compare} target="_blank" rel="noopener noreferrer">Create pull request ↗</a>)
   // The chat itself merges and fixes; a chat that cannot take a message gets a new one in its folder.
   const resolve = () => {
     if (!r.merge || !chat) return
@@ -160,7 +160,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
     <section aria-label="Git" aria-busy={busy} style={panel}>
       <h3 style={caps}>
         <span>Git · {r.name}</span>
-        {r.github && <button type="button" className="hub-link" style={{ padding: '2px 4px', font: 'inherit', textTransform: 'none' }}
+        {r.github && <button type="button" className="hub-link git-gh" style={{ padding: '2px 4px', font: 'inherit', textTransform: 'none' }}
           onClick={() => open(r.branch && r.upstream ? branchUrl(r.github!, 'tree', t.name) : r.github!)}>Open on GitHub ↗</button>}
       </h3>
 
@@ -171,7 +171,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
         </button>
         <span style={{ font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-ash)' }}
           title={r.upstream ? `Against ${r.upstream}` : 'No upstream yet'}>{r.upstream ? `↑${r.ahead} ↓${r.behind}` : 'not published'}</span>
-        {may('sync') && <button type="button" className="hub-btn sm" style={{ marginLeft: 'auto' }} disabled={busy || !r.branch} onClick={sync}
+        {may('sync') && !(canPush && (r.sync.kind === 'push' || r.sync.kind === 'publish')) && <button type="button" className="hub-btn sm" style={{ marginLeft: 'auto' }} disabled={busy || !r.branch} onClick={sync}
           title={r.sync.kind === 'publish' ? `git push -u origin ${r.branch}` : `git ${r.sync.kind}`}>{r.busy === 'sync' ? 'Working…' : r.sync.label}</button>}
 
       {menu && <div role="group" aria-label="Branches" style={{ flexBasis: '100%', display: 'grid', gap: 6, padding: 10, borderRadius: 8, border: '1px solid var(--hub-hair)', background: 'var(--hub-canvas)' }}>
@@ -262,7 +262,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
         title={`Fast-forward ${r.branch} to ${t.remote}/${t.name}, never forced`}>{r.busy === 'push' ? 'Pushing…' : `Push to ${t.remote}/${t.name}`}</button>}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginLeft: -8 }}>
-        {head && (!r.upstream || r.ahead > 0) && <button type="button" className="hub-link" disabled={busy} title="git reset --soft HEAD~1: the commit's changes stay, staged"
+        {head && (!r.upstream || r.ahead > 0) && <button type="button" className="hub-link git-undo" disabled={busy} title="git reset --soft HEAD~1: the commit's changes stay, staged"
           onClick={() => setAsk({ text: `Undo the last commit, "${head.subject}"? Its changes stay as staged files.`, yes: 'Undo', danger: true, cmd: { op: 'undo', confirmed: true } })}>Undo last commit</button>}
         {r.files.length > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'stash' })} title="git stash push -u">Stash</button>}
         {r.worktree && may('merge-back') && <button type="button" className="hub-link" disabled={busy} title="git merge into the main checkout, then remove this worktree. Never pushes."

@@ -17,3 +17,12 @@ test('the hint says how long it has been on', () => {
   assert.match(indefiniteHint(p(now - 12 * 60_000), now), /12 min ago/)
   assert.match(indefiniteHint(p(now - 3 * 3_600_000), now), /3 h ago/)
 })
+
+test('the hint says No limit set while it is on with no hours, cost or gate', () => {
+  const now = 10_000_000, on = p(now - 5_000)
+  assert.match(indefiniteHint(on, now), /No limit set/)
+  assert.match(indefiniteHint(on, now, {}), /No limit set/)
+  assert.doesNotMatch(indefiniteHint(on, now, { maxHours: 2 }), /No limit set/)
+  assert.doesNotMatch(indefiniteHint(on, now, { gate: 'pnpm test' }), /No limit set/)
+  assert.doesNotMatch(indefiniteHint(p(), now), /No limit set/)
+})

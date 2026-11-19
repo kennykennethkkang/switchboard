@@ -96,6 +96,23 @@ export function withLock<T>(lock: string, fn: () => T, waitMs = 100): T {
   try { return fn() } finally { release?.() }
 }
 
+/** Saves a shared map file from several windows: under lock, rereads it, keeps keys this window never saw, then writes mine.
+ * seen is the keys this window last loaded or saved (kept current here): one missing from mine was removed on purpose, and
+ * one of mine missing from the file was removed by another window, so it is dropped, not written back; those keys are returned. */
+export function saveMerged(file: string, mine: Record<string, unknown>, seen: Set<string>): string[] {
+  return withLock(`${file}.lock`, () => {
+    const disk = readJsonOr(file, {}) as Record<string, unknown>
+    const theirs = isRecord(disk) ? disk : {}
+    const dropped = Object.keys(mine).filter(k => seen.has(k) && !(k in theirs))
+    const out = Object.fromEntries(Object.entries(theirs).filter(([k]) => !seen.has(k)))
+    for (const [k, v] of Object.entries(mine)) if (!dropped.includes(k)) out[k] = v
+    writeJsonAtomic(file, out)
+    seen.clear()
+    for (const k of Object.keys(mine)) if (!dropped.includes(k)) seen.add(k)
+    return dropped
+  })
+}
+
 /** Parsed JSON from file, or fallback when it is missing or broken. */
 export function readJsonOr(file: string, fallback?: unknown): unknown {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback }

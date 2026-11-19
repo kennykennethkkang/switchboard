@@ -21,14 +21,15 @@ export function CheckStamp({ check, wrap }: { check?: DoneCheck; wrap?: boolean 
 }
 
 /** Ready for your OK: the done-check verdict, Approve and Send back. */
-export function ApproveBar({ sessionId, check, send, small, noLabel }: { sessionId: string; check?: DoneCheck; send: (c: HubCommand) => void; small?: boolean; noLabel?: boolean }) {
+export function ApproveBar({ sessionId, check, block, send, small, noLabel }: { sessionId: string; check?: DoneCheck; block?: string; send: (c: HubCommand) => void; small?: boolean; noLabel?: boolean }) {
   const sm = small ? ' sm' : ''
   return (
     <div className="hub-approve" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 13 }}>
       {!noLabel && <span style={{ color: 'var(--hub-yellow)' }}>Ready for your OK</span>}
       <CheckStamp check={check} />
+      {block && <span role="status" style={{ color: 'var(--hub-red)', flexBasis: '100%' }}>Approve is held: {block}.</span>}
       <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
-        <button type="button" className={`hub-btn primary${sm}`} onClick={() => send({ type: 'hub-approve', sessionId })}>Approve</button>
+        <button type="button" className={`hub-btn primary${sm}`} disabled={!!block} onClick={() => send({ type: 'hub-approve', sessionId })}>Approve</button>
         <button type="button" className={`hub-btn${sm}`} onClick={() => send({ type: 'hub-send', sessionId, text: sendBackText(check) })}>Send back</button>
       </span>
     </div>

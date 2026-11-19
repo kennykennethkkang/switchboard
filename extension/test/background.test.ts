@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { applyAgentBrowsers, headlessEnv, noticeKind } from '../src/hub/background'
+import { applyAgentBrowsers, headlessEnv, noticeKind, noticeSpot, noticeText } from '../src/hub/background'
 
 describe('headlessEnv', () => {
   it('adds PLAYWRIGHT_MCP_HEADLESS by default and keeps other vars', () => {
@@ -32,9 +32,31 @@ describe('applyAgentBrowsers', () => {
 })
 
 describe('noticeKind', () => {
-  it('uses the status bar unless toasts are turned on', () => {
-    assert.equal(noticeKind({}), 'status')
-    assert.equal(noticeKind({ toasts: false }), 'status')
+  it('uses system notifications unless Kenneth picks another', () => {
+    assert.equal(noticeKind({}), 'system')
+    assert.equal(noticeKind({ toasts: false }), 'system')
     assert.equal(noticeKind({ toasts: true }), 'toast')
+    assert.equal(noticeKind({ toasts: true, notices: 'status' }), 'status')
+    assert.equal(noticeKind({ notices: 'system' }), 'system')
+  })
+})
+
+describe('noticeText', () => {
+  it('drops the Switchboard prefix VS Code already shows as the source', () => {
+    assert.equal(noticeText('Switchboard: Fix login: done.'), 'Fix login: done.')
+  })
+  it('folds whitespace and cuts long text', () => {
+    assert.equal(noticeText('a\n\n  b'), 'a b')
+    const t = noticeText('x'.repeat(300))
+    assert.equal(t.length, 140)
+    assert.ok(t.endsWith('…'))
+  })
+})
+
+describe('noticeSpot', () => {
+  it('moves notices out of the bottom right unless Kenneth picks it', () => {
+    assert.equal(noticeSpot({}), 'top-right')
+    assert.equal(noticeSpot({ noticeSpot: 'bottom-left' }), 'bottom-left')
+    assert.equal(noticeSpot({ noticeSpot: 'bottom-right' }), 'bottom-right')
   })
 })

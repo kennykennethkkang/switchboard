@@ -1,8 +1,8 @@
 /** The Now page: lanes, the day's numbers and each lane row. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dayNumbers, laneRow, nowLanes, picked } from './now'
-import type { ArchivedChat, ChatProgress, ChatRow, ChatState } from './hub-types'
+import { dayNumbers, hubCounts, laneRow, nowLanes, picked } from './now'
+import type { ArchivedChat, ChatProgress, ChatRow, ChatState, HubState } from './hub-types'
 
 const now = new Date(2026, 10, 9, 15).getTime()
 const H = 3600_000
@@ -42,4 +42,12 @@ test('picked: keeps items whose chat is in a picked project, and ones no chat ma
   const items = [{ sessionId: 'a' }, { sessionId: 'b' }, { sessionId: 'gone' }]
   assert.deepEqual(picked(items, [a, b], ['armasu']).map(i => i.sessionId), ['a', 'gone'])
   assert.equal(picked(items, [a, b], []), items)
+})
+
+test('hubCounts: one rule for needs you, working and done today', () => {
+  const arch: ArchivedChat = { sessionId: 'a1', ai: 'claude', name: 'a1', origin: 'a1', version: 1, cwd: '/x/switchboard', project: 'switchboard', archivedAt: now - H, approvedAt: now - H }
+  const cs = [card('w', 'working'), card('n', 'needs-you'), card('d', 'done'), card('i', 'idle')]
+  const hub = { chats: cs.map(c => c.chat), progress: cs.flatMap(c => c.progress ? [c.progress] : []), archive: [arch], stuck: [{}], learnReady: [{}, {}] } as unknown as HubState
+  assert.deepEqual(hubCounts(hub, [], now), { needs: 5, working: 1, done: 1 })
+  assert.deepEqual(hubCounts(hub, ['other'], now), { needs: 3, working: 0, done: 0 })
 })

@@ -82,7 +82,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
   // Claude and Codex run chats so they always show; the rest only when the hub has them.
   const ids = ['claude', 'codex', ...h.ais.filter(a => a.installed || a.chats).map(a => a.id), ...live.map(c => c.ai ?? 'claude')]
   if (h.signIns.keys?.some(k => k.name === 'GEMINI_API_KEY' && k.saved)) ids.push('gemini')
-  if (h.jev.length || Object.keys(h.jevProjects ?? {}).length) ids.push('jev')
+  if (h.jev.length || Object.keys(h.jevProjects ?? {}).length || h.crowdAb) ids.push('jev')
   // Research pseudo-island: always on the ring, launches a deep-research chat.
   ids.push('research')
   const ais = [...new Set(ids)]
@@ -113,6 +113,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const i = realms.length + j
     const n: CourtNode = { ...box(`ai:${ai}`, 'pavilion', spot(at(i), R), ISLE, h.ais.find(a => a.id === ai)?.name ?? NAMES[ai] ?? ai), ai, parent: 'council' }
     if (ai === 'jev' && h.jev.length) n.runs = h.jev.length
+    if (ai === 'jev' && h.crowdAb && !h.crowdAb.ended) n.task = `Crowd A/B ${h.crowdAb.stopped ? 'stopped at ' : ''}${h.crowdAb.done}/${h.crowdAb.items}`
     pav.set(ai, n); homes.set(`ai:${ai}`, { n, a: at(i) }); nodes.push(n); link(council, n)
   })
   const busy = new Set(live.flatMap(c => progress.get(c.sessionId)?.roles.filter(r => r.state === 'active').map(r => r.role) ?? []))
@@ -337,7 +338,8 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 /** The Council's line, plaque and card alike: AIs that have chats, chats, agents. */
 export function courtSummary(c: Court) {
   const yards = c.nodes.filter(n => n.kind === 'courtyard')
-  return `${plural(new Set(yards.map(y => y.ai)).size, 'AI')} · ${plural(yards.length, 'chat')} · ${plural(c.nodes.filter(n => n.kind === 'desk').length, 'agent')}`
+  // No plural on AI: the pixel font draws a lowercase l and a capital I alike, so "AIs" read "Als".
+  return `${new Set(yards.map(y => y.ai)).size} AI · ${plural(yards.length, 'chat')} · ${plural(c.nodes.filter(n => n.kind === 'desk').length, 'agent')}`
 }
 
 /** The chat a node opens: its own, else the nearest parent's. */

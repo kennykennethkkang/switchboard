@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { aiPath, autopilot, busiestTodo, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, withHome } from './todo'
+import { aiPath, autopilot, busiestTodo, upNext, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, withHome } from './todo'
 import { demoHub } from './hub-demo'
 import type { ChatRow, TodoItem, TodoList } from './hub-types'
 
@@ -166,5 +166,14 @@ describe('autopilot', () => {
   })
   it('lanes skip projects with nothing in them', () => {
     assert.deepEqual(pilotLanes({ '/a': list(), '/b': { todo: [] }, '/c': { todo: [{ id: 'y', text: 'k', at: 1, why: 'you' }] } }, true, live).map(l => l.folder), ['/a'])
+  })
+})
+
+describe('upNext', () => {
+  it('skips an item already running in a live chat and your hand steps', () => {
+    const list: TodoList = { todo: [{ id: 'q1', text: 'CSV', at: 1 }, { id: 'r', text: 'Stripe', at: 1, chat: 'live', before: 'q1' }, { id: 'y', text: 'Key', at: 1, why: 'you' }] }
+    assert.equal(upNext(list, c => c === 'live')?.text, 'CSV')
+    assert.equal(upNext(list, () => false)?.text, 'Stripe')
+    assert.equal(upNext({ todo: [{ id: 'r', text: 'Stripe', at: 1, chat: 'live' }] }, c => c === 'live'), undefined)
   })
 })

@@ -11,7 +11,7 @@ import { readStore, writeStore } from '@/lib/store'
 import { BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './flow-map.css'
-import { KIND_NAME, PART_H, PART_W, components, demoAppMap, layers, loadFlowMap, routeLinks, startProject, when, type FlowKind, type FlowMap, type FlowNode, type Part, type PartLink, type Parts } from '@/lib/flow-map'
+import { KIND_NAME, colName, PART_H, PART_W, components, demoAppMap, layers, loadFlowMap, routeLinks, startProject, when, type FlowKind, type FlowMap, type FlowNode, type Part, type PartLink, type Parts } from '@/lib/flow-map'
 import type { HubState } from '@/lib/hub-types'
 import { limitText } from '@/lib/budget-ui'
 import { chatRun, raiseLine, raisesFor, stageView } from '@/lib/stages-ui'
@@ -81,7 +81,7 @@ function focusCss(id: string | undefined, idx: Map<string, number>, links: PartL
   return rules.join('')
 }
 
-function Canvas({ parts, links, picked, onPick, still }: { parts: Part[]; links: PartLink[]; picked?: string; onPick: (id?: string) => void; still: boolean }) {
+function Canvas({ parts, links, match, picked, onPick, still }: { parts: Part[]; links: PartLink[]; match?: Set<string>; picked?: string; onPick: (id?: string) => void; still: boolean }) {
   const wrap = useRef<HTMLDivElement>(null)
   const style = useRef<HTMLStyleElement>(null)
   const rf = useReactFlow()
@@ -89,21 +89,21 @@ function Canvas({ parts, links, picked, onPick, still }: { parts: Part[]; links:
   const lay = useMemo(() => {
     const { at } = layers(parts, links)
     const xs = [...new Set(parts.map(p => p.depth))].sort((a, b) => a - b)
-    const cols = xs.map((d, i) => ({ name: parts.some(p => p.depth === d && p.alone) ? 'No imports' : i === 0 ? 'Entry' : `Layer ${i + 1}`, x: i * (PART_W + 120) }))
+    const cols = xs.map((d, i) => ({ name: colName(i, parts.some(p => p.depth === d && p.alone)), x: i * (PART_W + 120) }))
     return { at, cols, paths: routeLinks(parts, links, at) }
   }, [parts, links])
   const hasIn = useMemo(() => new Set(links.map(l => l.to)), [links])
 
   const nodes = useMemo(() => {
     const out: Node[] = lay.cols.map((c, i) => ({ id: `col:${i}`, type: 'col', position: { x: c.x, y: -40 }, data: { name: c.name }, selectable: false, className: 'fm-lane-n' }))
-    parts.forEach((p, i) => out.push({ id: p.id, type: 'part', position: lay.at.get(p.id) ?? { x: 0, y: 0 }, data: { p, entry: !p.alone && !hasIn.has(p.id) && links.length > 0 }, width: PART_W, height: PART_H, className: `n${i}` }))
+    parts.forEach((p, i) => out.push({ id: p.id, type: 'part', position: lay.at.get(p.id) ?? { x: 0, y: 0 }, data: { p, entry: !p.alone && !hasIn.has(p.id) && links.length > 0 }, width: PART_W, height: PART_H, className: `n${i}${match && !match.has(p.id) ? ' fm-off' : ''}` }))
     return out
-  }, [parts, lay, hasIn, links.length])
+  }, [parts, lay, hasIn, links.length, match])
   const edges: Edge[] = useMemo(() => links.map(l => ({
     id: `${l.from}>${l.to}`, source: l.from, target: l.to, type: 'routed', data: { pts: lay.paths.get(`${l.from}>${l.to}`) ?? [] },
-    className: `fm-edge s${idx.get(l.from)} t${idx.get(l.to)}`, style: { strokeWidth: Math.min(4.5, 1.25 + Math.log2(l.n)) },
+    className: `fm-edge s${idx.get(l.from)} t${idx.get(l.to)}${match && !match.has(l.from) && !match.has(l.to) ? ' fm-off' : ''}`, style: { strokeWidth: Math.min(4.5, 1.25 + Math.log2(l.n)) },
     markerEnd: { type: MarkerType.ArrowClosed, width: 10, height: 10 }, label: plural(l.n, 'import'),
-  })), [links, lay, idx])
+  })), [links, lay, idx, match])
 
   const hovered = useRef<string>(undefined)
   const pickedRef = useRef(picked)
@@ -227,7 +227,7 @@ export function FlowMapView({ isDemo, cwds, here, cwd: chatCwd, hub, onClose }: 
     if (!s) return all
     const parts = all.parts.filter(p => p.path.toLowerCase().includes(s) || p.files.some(f => f.toLowerCase().includes(s)) || p.tools.some(t => t.label.toLowerCase().includes(s)))
     const ids = new Set(parts.map(p => p.id))
-    return { ...all, parts, links: all.links.filter(l => ids.has(l.from) && ids.has(l.to)) }
+    return { ...all, parts, links: all.links.filter(l => ids.has(l.from) || ids.has(l.to)), match: ids }
   }, [all, q])
   const part = all?.parts.find(p => p.id === picked)
   const chats = map?.nodes.filter(n => n.kind === 'chat').length ?? 0
@@ -261,7 +261,7 @@ export function FlowMapView({ isDemo, cwds, here, cwd: chatCwd, hub, onClose }: 
           : !shown ? <p className="fm-note">Reading the code and the chats...</p>
           : !shown.parts.length ? <p className="fm-note">{q ? `Nothing matches "${q}".` : 'No code files found.'}</p>
           : narrow ? <List all={shown} picked={picked} onPick={setPicked} />
-          : <ReactFlowProvider><Canvas parts={shown.parts} links={shown.links} picked={picked} onPick={setPicked} still={still} /></ReactFlowProvider>}
+          : <ReactFlowProvider><Canvas parts={all!.parts} links={all!.links} match={'match' in shown ? shown.match : undefined} picked={picked} onPick={setPicked} still={still} /></ReactFlowProvider>}
       </main>
 
       {all && <footer className="fm-under">
@@ -270,7 +270,7 @@ export function FlowMapView({ isDemo, cwds, here, cwd: chatCwd, hub, onClose }: 
           <li><svg aria-hidden width="26" height="10"><path d="M1 5h22" className="out" /></svg>Out of the hovered part</li>
           <li><svg aria-hidden width="26" height="10"><path d="M1 5h22" className="in" /></svg>Into it</li>
         </ul>
-        <p className="fm-foot">{plural(all.parts.length, 'part')}, {plural(all.links.length, 'link')}, {plural(chats, 'chat')}{map?.cut ? ', stopped at 1500 files' : ''}. Click a part for its files, chats, tools and notes.</p>
+        <p className="fm-foot">{plural((shown ?? all).parts.length, 'part')}, {plural((shown ?? all).links.length, 'link')}, {plural(chats, 'chat')}{map?.cut ? ', stopped at 1500 files' : ''}. Click a part for its files, chats, tools and notes.</p>
       </footer>}
 
       {part && all && <Panel key={part.id} p={part} all={all} hub={hub} cwd={cwd} chatNodes={map?.nodes.filter(n => n.kind === 'chat') ?? []} onPick={setPicked} onClose={() => setPicked(undefined)} />}
@@ -286,7 +286,7 @@ function List({ all, picked, onPick }: { all: Parts; picked?: string; onPick: (i
         const of = all.parts.filter(p => p.depth === d)
         return (
           <section key={d}>
-            <h4>{of.some(p => p.alone) ? 'No imports' : i === 0 ? 'Entry' : `Layer ${i + 1}`} <b>{of.length}</b></h4>
+            <h4>{colName(i, of.some(p => p.alone))} <b>{of.length}</b></h4>
             <ul>{of.map(p => (
               <li key={p.id}>
                 <button type="button" aria-pressed={p.id === picked} onClick={() => onPick(p.id)}>

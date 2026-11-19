@@ -2,7 +2,7 @@
   "name": "switchboard",
   "displayName": "Switchboard",
   "description": "Claude Code sessions, usage, timeline and controls in one panel. Based on Agent Flow.",
-  "version": "0.21.88",
+  "version": "0.21.103",
   "publisher": "kennykennethkkang",
   "license": "Apache-2.0",
   "icon": "media/icon.png",
@@ -100,16 +100,6 @@
           "type": "number",
           "default": 0,
           "description": "Port for the development server. Set to 0 (default) for production mode, or 3002 for development."
-        },
-        "agentVisualizer.eventLogPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to JSONL event log file to watch for agent events"
-        },
-        "agentVisualizer.autoOpen": {
-          "type": "boolean",
-          "default": false,
-          "description": "Automatically open the visualizer when an agent session starts"
         },
         "switchboard.colorTitleBar": {
           "type": "boolean",

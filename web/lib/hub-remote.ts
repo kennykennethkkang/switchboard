@@ -16,11 +16,11 @@ export const downReason = (status: number | undefined) =>
 // The proxy answers 304 when the state has not changed since this ETag; no-store keeps the browser cache out of it.
 let last: { etag: string; hub: HubState } | undefined
 
-export async function fetchHubWhy(f: typeof fetch = fetch): Promise<{ hub: HubState | null; why?: string }> {
+export async function fetchHubWhy(f: typeof fetch = fetch): Promise<{ hub: HubState | null; why?: string; /** 404: nothing serves /hub here (the demo build), so asking again is pointless. */ noHub?: true }> {
   try {
     const r = await f('/hub/state', { headers: { ...HEADERS, ...(last ? { 'If-None-Match': last.etag } : {}) }, cache: 'no-store' })
     if (r.status === 304 && last) return { hub: last.hub }
-    if (!r.ok) return { hub: null, why: downReason(r.status) }
+    if (!r.ok) return { hub: null, why: downReason(r.status), ...(r.status === 404 ? { noHub: true as const } : {}) }
     const hub = (await r.json()) as HubState
     const etag = r.headers.get('ETag')
     last = etag ? { etag, hub } : undefined

@@ -47,7 +47,7 @@ export function devPanel(refresh: () => void) {
     if (!server) return
     const pick = await vscode.window.showWarningMessage(`Stop ${server.command} on :${server.port}${server.folder ? ` (${server.folder})` : ''}?`, { modal: true }, 'Stop it')
     if (pick !== 'Stop it') return
-    try { process.kill(pid) } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not stop it (${(err as Error).message}).`) }
+    try { process.kill(pid) } catch (err) { void vscode.window.showWarningMessage(`Could not stop it (${(err as Error).message}).`) }
     setTimeout(refresh, 800)
   }
   /** Its share of the hub messages; undefined for any other type. */

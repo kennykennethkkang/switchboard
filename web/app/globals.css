@@ -694,7 +694,6 @@ button.hub-done:active > span { transform: scale(0.9); }
 .mem-canvas canvas { display: block; outline: none; }
 .mem-list { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; display: grid; align-content: start; gap: 24px; scrollbar-width: thin; scrollbar-color: var(--hub-hair) transparent; }
 .mem-list > section { width: 100%; max-width: 720px; margin: 0 auto; }
-.mem-health { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 12px; box-sizing: border-box; font: 400 13px/1.4 var(--hub-sans); color: var(--hub-mute); font-variant-numeric: tabular-nums; }
 .mem-list h3 { padding: 0 12px; }
 .mem-list h3 span, .mem-side h4 span { color: var(--hub-ash); font-variant-numeric: tabular-nums; }
 .mem-list ul { border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-surface); overflow: hidden; }
@@ -719,9 +718,6 @@ button.hub-done:active > span { transform: scale(0.9); }
 .mem-sup { display: inline-block; flex-shrink: 0; margin-left: 6px; padding: 2px 6px; border-radius: 4px; font: 500 11px/1.3 var(--hub-sans); font-style: normal; letter-spacing: 0.2px; color: var(--hub-mute); background: var(--hub-elev); vertical-align: 1px; }
 .mem-hits button[data-sup] > span, .mem-near button[data-sup] > span, .mem-list button[data-sup] > span { color: var(--hub-mute); text-decoration: line-through; text-decoration-color: var(--hub-hair-strong); }
 .mem-side-h p .mem-sup { margin-left: 4px; }
-.mem-list .mem-health button { display: inline; width: auto; min-height: 0; padding: 0; border-radius: 4px; font: inherit; color: var(--hub-blue); text-decoration: underline dotted; text-underline-offset: 3px; }
-.mem-list .mem-health button[aria-pressed='true'] { background: none; box-shadow: none; color: var(--hub-ink); text-decoration-style: solid; }
-.mem-list .mem-health .mem-clear { margin-left: 4px; text-decoration: none; }
 .mem-missing { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .mem-missing code { font: 400 12px/1 var(--hub-mono); padding: 5px 8px; border-radius: 6px; background: var(--hub-yellow-soft); color: var(--hub-yellow); }
 .mem-near { margin: 0 -8px !important; }
@@ -735,7 +731,9 @@ button.hub-done:active > span { transform: scale(0.9); }
 @media (max-width: 760px) {
   .mem[open], .mem[open][data-picked] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   /* The sheet takes a row, not an overlay, so the canvas shrinks and the flown-to node stays in view. */
-  .mem[open][data-picked] { grid-template-rows: auto minmax(120px, 1fr) auto; }
+  .mem[open][data-picked] { grid-template-rows: auto minmax(200px, 1fr) auto; }
+  /* the health chips come back once the sheet closes; with a pick they cost the graph two rows */
+  .mem[data-picked] .mem-issues { display: none; }
   .mem-rail { gap: 10px; padding: 12px 16px 8px; border-right: 0; border-bottom: 1px solid var(--hub-hair); overflow: visible; }
   .mem-head { display: flex; align-items: baseline; gap: 10px; }
   .mem-head p { margin: 0; }
@@ -750,12 +748,13 @@ button.hub-done:active > span { transform: scale(0.9); }
   .mem-filters [role='group'] button, .mem-all { width: auto; flex-shrink: 0; white-space: nowrap; padding: 7px 10px; gap: 7px; }
   .mem-all { margin-left: 8px; }
   .mem-list { padding: 16px; gap: 20px; }
-  .mem-side { position: relative; z-index: 3; max-height: 58dvh; gap: 16px; border-left: 0; border-top: 1px solid var(--hub-hair-strong); border-radius: 14px 14px 0 0; box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.55); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .mem-side { position: relative; z-index: 3; max-height: 40dvh; gap: 16px; border-left: 0; border-top: 1px solid var(--hub-hair-strong); border-radius: 14px 14px 0 0; box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.55); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 }
 /* a phone keeps the chips to one sideways row, so the graph keeps its height; padding lets the last chip scroll fully in */
 @media (max-width: 420px) {
   .mem-filters, .mem-filters > section, .mem-filters [role='group'] { flex-wrap: nowrap; }
-  .mem-filters { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; scroll-padding-inline: 16px; }
+  /* relative: the hidden set titles are absolute and would escape the scroll clip, widening the dialog */
+  .mem-filters { position: relative; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; scroll-padding-inline: 16px; }
   .mem-filters::-webkit-scrollbar { display: none; }
   .mem-filters > section, .mem-filters [role='group'] { flex: none; }
   .mem-filters::after { content: ''; flex: 0 0 1px; }
@@ -766,6 +765,44 @@ button.hub-done:active > span { transform: scale(0.9); }
   .mem .hub-btn.icon { width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .mem button { transition: none; } }
+/* Memory: the flat map by default, the calm 3D canvas at ?mem=3d. Both follow the hub theme. */
+.mem[data-opt] .mem-filters button[aria-pressed='false'] > i { box-shadow: inset 0 0 0 1.5px var(--hub-ash); }
+.mem-atlas { position: absolute; inset: 0; touch-action: none; cursor: grab; background: var(--hub-canvas); -webkit-user-select: none; user-select: none; }
+.mem-atlas[data-drag] { cursor: grabbing; }
+.mem-atlas svg { display: block; overflow: hidden; }
+.mem-atlas :is(.mem-atlas-world, .mem-atlas-text) { transform-origin: 0 0; }
+.mem-cluster circle { fill: var(--hub-surface); stroke: var(--hub-hair); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.mem-cluster[data-on] circle { stroke: var(--hub-hair-strong); }
+.mem-cluster, .mem-dot, .mem-name, .mem-atlas path { transition: opacity 160ms ease; }
+.mem-dot, .mem-cluster, .mem-cluster-name { cursor: pointer; }
+.mem-cluster-name { font: 500 13px/1 var(--hub-sans); letter-spacing: 0.2px; fill: var(--hub-ink); }
+.mem-cluster-name tspan { font-weight: 400; fill: var(--hub-mute); font-variant-numeric: tabular-nums; }
+/* A canvas-colored halo under each name keeps it legible over lines. */
+.mem-name { font-family: var(--hub-sans); font-weight: 400; fill: var(--hub-body); paint-order: stroke; stroke: var(--hub-canvas); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.mem-name[data-on] { font-weight: 500; fill: var(--hub-ink); }
+.mem-zoom { position: absolute; right: 16px; bottom: 16px; z-index: 2; display: grid; gap: 1px; padding: 3px; border-radius: 10px; border: 1px solid var(--hub-hair); background: var(--hub-surface); box-shadow: var(--hub-shadow-pop); }
+.mem-zoom .hub-btn.icon { border: 0; background: none; color: var(--hub-mute); }
+@media (hover: hover) and (pointer: fine) { .mem-zoom .hub-btn.icon:hover { background: var(--hub-elev); color: var(--hub-ink); } }
+.mem-issues ul { display: grid; gap: 1px; }
+.mem-issues h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font: 500 12px/1.5 var(--hub-sans); letter-spacing: 0.4px; color: var(--hub-mute); }
+.mem-issues button { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; text-align: left; font: 400 13px/1.35 var(--hub-sans); color: var(--hub-body); background: none; border: 0; border-radius: 6px; padding: 7px 8px; cursor: pointer; transition: background-color 160ms ease, color 160ms ease; font-variant-numeric: tabular-nums; }
+.mem-issues button > svg { flex-shrink: 0; color: var(--hub-yellow); }
+.mem-issues button[data-bad] > svg { color: var(--hub-red); }
+.mem-issues button[aria-pressed='true'] { background: var(--hub-elev); color: var(--hub-ink); box-shadow: inset 0 0 0 1px var(--hub-hair-strong); }
+.mem-issues button:focus-visible, .mem-zoom button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .mem-issues button:hover { background: var(--hub-elev); color: var(--hub-ink); } }
+@media (max-width: 760px) {
+  .mem-issues h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  /* chips wrap so every issue stays readable */
+  .mem-issues ul { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+  .mem-issues button { width: auto; white-space: nowrap; padding: 6px 8px; gap: 6px; }
+  .mem[data-opt] .mem-side { box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.18); }
+  .mem-zoom { right: 12px; bottom: 12px; grid-auto-flow: column; }
+  /* the details sheet leaves a short map; pinch covers zoom there */
+  .mem[data-picked] .mem-zoom { display: none; }
+}
+@media (pointer: coarse) { .mem-issues button { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .mem-cluster, .mem-dot, .mem-name, .mem-atlas path, .mem-issues button { transition: none; } }
 
 /* Busy: a 2px bar up top while a command is out, and a pulse on the button that sent it. */
 .hub-busy-bar {
@@ -892,11 +929,19 @@ button.hub-done:active > span { transform: scale(0.9); }
   .hub-top .hub-btn:not(.primary) { padding: 0; width: 44px; justify-content: center; display: inline-flex; align-items: center; }
   .hub-top .hub-limits { order: 9; width: 100%; margin-left: 0; }
   /* New chat as a thumb pill above the usage strip */
-  .hub-top .hub-new { position: fixed; right: 16px; bottom: calc(var(--nav-h, 52px) + 44px + env(safe-area-inset-bottom)); z-index: 7; min-height: 48px; padding-inline: 18px; border-radius: 99px; box-shadow: var(--hub-shadow-pop); }
+  .hub-top .hub-new { position: fixed; right: 16px; bottom: calc(var(--nav-h, 52px) + 46px + env(safe-area-inset-bottom)); z-index: 7; min-height: 48px; padding-inline: 18px; border-radius: 99px; box-shadow: var(--hub-shadow-pop); }
   .hub-stuck { padding: 8px 12px; }
   .hub-stuck-acts, .hub-stuck .hub-approve { flex-basis: 100%; }
   .hub-stuck .hub-approve > span:last-child { margin-left: 0 !important; }
 }
+/* status bar is 48px on touch: clear it by 12px */
+@media (max-width: 760px) and (pointer: coarse) { .hub-top .hub-new { bottom: calc(var(--nav-h, 52px) + 60px + env(safe-area-inset-bottom)); } }
+@media (max-width: 760px) {
+  .hub-top .hub-new { transition: transform 200ms ease, opacity 200ms ease; }
+  /* tucked below the tab bar while scrolling down; focus brings it back */
+  .hub-top .hub-new[data-tuck]:not(:focus-visible) { transform: translateY(calc(100% + var(--nav-h, 52px) + 80px)); opacity: 0; pointer-events: none; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) { .hub-top .hub-new { transition: none; } }
 
 /* New chat footer: Tools by Project, Start pushed right. */
 .nc-start { margin-left: auto; min-height: 44px; padding-inline: 18px; }
@@ -943,3 +988,25 @@ button.hub-done:active > span { transform: scale(0.9); }
 @keyframes hub-pulse { 50% { opacity: 0.3; } }
 @media (pointer: coarse) { .hub-related .hub-btn, .hub-split-x, .hub-split-acts > .hub-btn { min-height: 44px; min-width: 44px; } }
 @media (prefers-reduced-motion: reduce) { .hub-checking > i { animation: none; } }
+.hub-feed-new { animation: hub-feed-in 240ms var(--hub-ease-out, ease-out); }
+@keyframes hub-feed-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .hub-feed-new { animation: none; } }
+.hub-live { display: grid; gap: 32px; }
+.hub-live-sec { display: grid; gap: 12px; min-width: 0; }
+.hub-live-head { display: grid; gap: 2px; }
+.hub-live-head h2 { margin: 0; font: 600 16px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.hub-live-head p { margin: 0; font-size: 13px; color: var(--hub-ash); }
+.hub-live-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; align-items: start; }
+.hub-reports { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0; padding: 0; overflow: hidden; }
+.hub-reports-list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 2px; align-content: start; border-right: 1px solid var(--hub-hair); }
+.hub-reports-list button { all: unset; box-sizing: border-box; display: grid; gap: 2px; width: 100%; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.hub-reports-list button:hover { background: var(--hub-hair); }
+.hub-reports-list button[aria-current="true"] { background: var(--hub-hair); box-shadow: inset 2px 0 0 var(--hub-blue); }
+.hub-reports-list button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
+.hub-report-read { display: grid; gap: 10px; padding: 16px 20px 20px; min-width: 0; align-content: start; }
+.hub-report-read > * { max-width: 72ch; }
+@media (max-width: 760px) {
+  .hub-reports { grid-template-columns: minmax(0, 1fr); }
+  .hub-reports-list { border-right: 0; border-bottom: 1px solid var(--hub-hair); }
+  .hub-report-read { padding: 14px; }
+}

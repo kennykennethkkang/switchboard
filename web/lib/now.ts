@@ -1,8 +1,8 @@
 /** The Now page's lanes, its row of day numbers and each lane row. */
-import type { ArchivedChat, ChatProgress, ChatRow } from './hub-types'
+import type { ArchivedChat, ChatProgress, ChatRow, HubState } from './hub-types'
 import type { Today } from './today'
 import type { TaskTotals } from './progress'
-import { inProjects, projectName } from './archive'
+import { inProjects, liveChats, projectName } from './archive'
 import { busyLine } from './eta'
 
 type Card = { chat: ChatRow; progress?: ChatProgress }
@@ -42,4 +42,17 @@ export function laneRow({ chat, progress: p }: Card): LaneRow {
     done: tasks.filter(t => t.status === 'completed').length, total: tasks.length,
     step: tasks.find(t => t.status === 'in_progress')?.subject ?? busyLine(p),
   }
+}
+
+/**
+ * The one count of needs you, working and done today: Now, the nav, the Agents header, the council panel and Plan all read it.
+ * Needs you is a question, a finished chat waiting on Approve, a failed CI run, a stuck item or a learn proposal; done is approved today.
+ */
+export function hubCounts(hub: HubState, projects: string[] = [], now = Date.now()): { needs: number; working: number; done: number } {
+  const cards = liveChats(hub.chats, hub.archive ?? []).map(chat => ({ chat, progress: hub.progress.find(p => p.sessionId === chat.sessionId) })).filter(c => inProjects(c.chat, projects))
+  const ci = hub.repo?.ci
+  const fails = ci?.conclusion === 'failure' && hub.repo ? picked([{ sessionId: hub.repo.sessionId }], cards, projects).length : 0
+  const { working, done } = nowLanes(cards, (hub.archive ?? []).filter(a => inProjects(a, projects)), now)
+  const needs = cards.filter(c => c.progress?.state === 'needs-you' || c.progress?.state === 'done').length
+  return { needs: needs + fails + picked(hub.stuck ?? [], cards, projects).length + (hub.learnReady?.length ?? 0), working: working.length, done: done.length }
 }

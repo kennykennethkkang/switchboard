@@ -70,11 +70,11 @@ export function sweepPanel(refresh: () => void, workspace: () => string | undefi
       try {
         await fs.promises.mkdir(path.join(claude, to), { recursive: true })
         await fs.promises.rename(path.join(claude, from, name), path.join(claude, to, name))
-      } catch (err) { void vscode.window.showWarningMessage(`Switchboard: could not move ${name} (${(err as Error).message}).`) }
+      } catch (err) { void vscode.window.showWarningMessage(`Could not move ${name} (${(err as Error).message}).`) }
     } else {
       if (!/^[\w.@-]+$/.test(name)) return
       await new Promise<void>(resolve => execFile(claudeBinary(), ['plugin', enabled ? 'enable' : 'disable', name], { timeout: 30000 }, err => {
-        if (err) void vscode.window.showWarningMessage(`Switchboard: claude plugin ${enabled ? 'enable' : 'disable'} ${name} failed.`)
+        if (err) void vscode.window.showWarningMessage(`claude plugin ${enabled ? 'enable' : 'disable'} ${name} failed.`)
         resolve()
       }))
     }
@@ -100,7 +100,7 @@ export function sweepPanel(refresh: () => void, workspace: () => string | undefi
         void sweepFix(m.name).then(problem => { if (problem) refuse(problem) })
         return true
       case 'hub-tool-add':
-        void sweepJob(() => addRepo(m.repo, { claude: runClaude })).then(note => void vscode.window.showInformationMessage(`Switchboard: ${note.replace(/\n/g, '; ')}`), err => refuse((err as Error).message))
+        void sweepJob(() => addRepo(m.repo, { claude: runClaude })).then(note => void vscode.window.showInformationMessage(`${note.replace(/\n/g, '; ')}`), err => refuse((err as Error).message))
         return true
       default:
         return undefined

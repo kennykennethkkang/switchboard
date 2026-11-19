@@ -41,6 +41,9 @@ export function ordered(todo: TodoItem[]): Array<{ t: TodoItem; depth: number }>
   return out
 }
 
+/** The first item still waiting, in list order: not a hand step and not already running in a live chat. */
+export const upNext = (list: TodoList, live: (chat?: string) => boolean) => ordered(list.todo.filter(t => t.why !== 'you')).map(r => r.t).find(t => !live(t.chat))
+
 /** Items the to-do list shows: hand steps (why 'you') show under Finish up instead. */
 export const openCount = (l?: TodoList) => l?.todo.filter(t => t.why !== 'you').length ?? 0
 

@@ -48,6 +48,7 @@ export function defaultCommands(o: { cards: Cards; repoChanges: boolean; vscode:
     go('now', 'Now', 'home today needs'),
     go('chats', 'Chats', 'sessions history'),
     go('plan', 'Plan', 'todo to-do jev'),
+    go('live', 'Live', 'mirofish crowd ab crowd-ab simulation feed'),
     go('ship', 'Ship', 'git dev servers terminals ci'),
     go('map-board', 'Map: Agents', 'board'),
     go('map-flow', 'Map: Code', 'flow'),

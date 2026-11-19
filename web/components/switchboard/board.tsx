@@ -1,6 +1,7 @@
 'use client'
 // Board: the Celestial Court. Council in the middle, a pavilion per AI, a courtyard per chat, a desk per role.
 // Sprites and islands are drawn in code. Animated agents: idea from Pixel Agents (pablodelucca/pixel-agents, MIT), no code taken.
+import { pickHit } from '../../lib/board-hit'
 import { useDialog } from '@/hooks/use-dialog'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { readStore, writeStore } from '@/lib/store'
@@ -10,6 +11,7 @@ import type { HubCommand } from '@/lib/vscode-bridge'
 import { demoGraph, healthLine, loadGraph, relations, type MemoryGraph } from '@/lib/memory-graph'
 import { keepGraph, memoryTally, todoRef, withDemoLearn, type GraphHold, type Item } from '@/lib/court-places'
 import { replyBox } from '@/lib/message-box'
+import { hubCounts } from '@/lib/now'
 import { PLACES, PLATE, buildCourt, markSpot, courtSummary, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
 import { askChoice } from '@/lib/ask'
 import { END_S, THAW_S, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
@@ -1054,8 +1056,8 @@ function Library({ g, onMemory }: { g: MemoryGraph; onMemory?: () => void }) {
   </>
 }
 
-function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, onSummary, onCopy, mem, send, ways }: {
-  node: CourtNode; court: Court; hub: HubState; colors: C; sent: Record<string, string>; onSummary?: BoardWays['onSummary']; onCopy?: BoardWays['onCopy']
+function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, onClose, onSummary, onCopy, mem, send, ways }: {
+  node: CourtNode; court: Court; hub: HubState; shared: ReturnType<typeof hubCounts>; colors: C; sent: Record<string, string>; onSummary?: BoardWays['onSummary']; onCopy?: BoardWays['onCopy']
   mem?: GraphHold; send: Send; ways: Pick<BoardWays, 'onMemory' | 'onFlow' | 'onTodo'>
   onPick: (id: string) => void; onAnswer: (sessionId: string, ask: Ask, choice: Choice, said: string) => void; onClose: () => void
 }) {
@@ -1086,7 +1088,7 @@ function Panel({ node, court, hub, colors: c, sent, onPick, onAnswer, onClose, o
   const sibs = node.kind === 'courtyard' && node.group ? court.nodes.filter(m => m.kind === 'courtyard' && m.group === node.group && m.id !== node.id).map(m => m.label) : []
   const ties = [sibs.length ? `Split with ${sibs.join(', ')}` : '', node.kind === 'courtyard' && node.waitsOn?.length ? `Waiting on ${node.waitsOn.join(', ')}` : ''].filter(Boolean)
   const stats: Array<[string, string, boolean?]> = node.kind === 'desk' ? [[timer(node, now), 'status', node.state === 'needs'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'done']]
-    : node.kind === 'council' ? [[`${count('working')}`, 'working'], [`${count('needs')}`, 'need you', count('needs') > 0], [`${count('done')}`, 'done']]
+    : node.kind === 'council' ? [[`${shared.working}`, 'working'], [`${shared.needs}`, 'need you', shared.needs > 0], [`${shared.done}`, 'done today']]
     : node.kind === 'window' ? [[`${kids.length}`, 'chats'], [`${kids.filter(k => k.state === 'needs').length}`, 'need you', kids.some(k => k.state === 'needs')], [`${kids.filter(k => k.state === 'done').length}`, 'done']]
     : node.kind === 'pavilion' ? [[`${kids.length}`, 'chats'], [`${node.runs ?? 0}`, 'runs'], [`${node.shipped ?? 0}`, 'done']]
     : node.kind === 'realm' ? [[timer(node, now), 'status'], [`${node.runs ?? 0}`, 'runs'], [`${kids.length}`, 'desks']] : []
@@ -1176,6 +1178,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   const [picked, setPicked] = useState<string>()
   const [sent, setSent] = useState<Record<string, string>>({})
   const canvas = useRef<HTMLCanvasElement>(null), dlg = useRef<HTMLDialogElement>(null)
+  const zoomed = useRef(false)
   const st = useRef<St & { fit: boolean; stage: string; wake: () => void; zoom: (dir: number) => void; refit: () => void; show: (id: string, close?: boolean) => void; go: (id: string) => void }>({
     court, view: { x: 0, y: 0, z: 0.5 }, zc: 0.5, colors: skin.court.colors, bands: skin.court.bands, hits: [], fx: new Map(), fit: false, stage: '', ropes: [], ends: new Map(), waits: new Set(),
     wake: () => {}, zoom: () => {}, refit: () => {}, show: () => {}, go: () => {},
@@ -1326,10 +1329,8 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     const pts = new Map<number, { x: number; y: number }>()
     let travel = 0
     const local = (e: PointerEvent | WheelEvent) => { const r = el.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
-    const hitAt = (q: { x: number; y: number }) => {
-      for (let i = s.hits.length - 1; i >= 0; i--) { const b = s.hits[i]; if (q.x >= b.x && q.x <= b.x + b.w && q.y >= b.y && q.y <= b.y + b.h) return b.id }
-      return undefined
-    }
+    const coarse = matchMedia('(pointer: coarse)')
+    const hitAt = (q: { x: number; y: number }) => pickHit(s.hits, q, coarse.matches ? 44 : 0)
     const down = (e: PointerEvent) => { following = false; el.setPointerCapture(e.pointerId); pts.set(e.pointerId, local(e)); travel = 0 }
     const move = (e: PointerEvent) => {
       const prev = pts.get(e.pointerId)
@@ -1384,11 +1385,13 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     vt.call(document, () => new Promise<void>(done => { flushSync(swap); requestAnimationFrame(() => requestAnimationFrame(() => done())) }))
   }
   // Aimed after the panel renders, so its size is known.
-  const open = (id: string, close?: boolean) => { setPicked(id); requestAnimationFrame(() => st.current.show(id, close)) }
+  const open = (id: string, close?: boolean) => { zoomed.current = !!close; setPicked(id); requestAnimationFrame(() => st.current.show(id, close)) }
+  // Closing a card that zoomed in puts the board back to the fit view.
+  const unpick = () => { setPicked(undefined); if (zoomed.current) { zoomed.current = false; st.current.refit() } }
   const answer = (sessionId: string, ask: Ask, choice: Choice, said: string) => { send({ type: 'hub-answer', sessionId, askId: ask.id, choice }); setSent(m => ({ ...m, [ask.id]: said })) }
   const desks = court.nodes.filter(n => n.kind === 'desk'), yards = court.nodes.filter(n => n.kind === 'courtyard')
   // Header counts chats, the same unit as its chats total.
-  const count = (x: CourtState) => yards.filter(d => d.state === x).length
+  const shared = hubCounts(hub)
   const needs = court.petition?.deskId
   const note = !yards.length ? skin.copy.empty : desks.length && desks.every(d => d.state === 'done') ? skin.copy.done : undefined
   const node = picked ? court.nodes.find(n => n.id === picked) : undefined
@@ -1398,21 +1401,21 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   return (
     <dialog ref={dlg} className="hub hub-dark board" aria-label="Agents" style={{ '--b-bg': skin.court.bands[0], '--b-ink': skin.palette.ink, '--b-font': skin.font, '--b-hot': c.red_lt, '--b-gold': c.gold } as React.CSSProperties}
       // Esc is handled on keydown: Chrome only lets a dialog cancel be stopped once per user activation.
-      onCancel={e => { e.preventDefault(); if (picked) setPicked(undefined); else onClose() }}
+      onCancel={e => { e.preventDefault(); if (picked) unpick(); else onClose() }}
       onKeyDown={e => {
         if (e.key === 'Escape') {
           e.preventDefault()
           // Cast list first, then the card, then the board.
           const cast = (e.currentTarget as HTMLElement).querySelector<HTMLDetailsElement>('.board-cast details[open]')
-          if (cast) { cast.open = false; cast.querySelector('summary')?.focus() } else if (picked) setPicked(undefined); else onClose()
+          if (cast) { cast.open = false; cast.querySelector('summary')?.focus() } else if (picked) unpick(); else onClose()
           return
         }
         if ((e.target as HTMLElement).closest?.('input, select')) return; if (e.key === '+' || e.key === '=') st.current.zoom(1); else if (e.key === '-') st.current.zoom(-1); else if (e.key === '0') st.current.refit() }}>
       <header className="board-head">
         <h2>Agents</h2>
         <span className="board-sub">{skin.copy.title}</span>
-        <span className="board-meta"><b>{count('working')}</b> working <b>{count('waiting')}</b> waiting <b>{count('done')}</b> done <b>{yards.length}</b> chats</span>
-        {needs && <button type="button" className="hub-btn board-need" aria-label={`${count('needs')} needs you`} onClick={() => open(needs, true)}><i aria-hidden />{count('needs')}<span className="board-need-word"> needs you</span></button>}
+        <span className="board-meta"><b>{shared.working}</b> working <b>{shared.done}</b> done today <b>{yards.length}</b> chats{shared.needs > 0 && !needs && <> <b>{shared.needs}</b> need you</>}</span>
+        {needs && shared.needs > 0 && <button type="button" className="hub-btn board-need" aria-label={`${shared.needs} needs you`} onClick={() => open(needs, true)}><i aria-hidden />{shared.needs}<span className="board-need-word"> needs you</span></button>}
         <span className="board-zoom" role="group" aria-label="Zoom">
           {/* Same order as the Code map's controls: in, out, fit. */}
           <button type="button" className="hub-btn board-z" aria-label="Zoom in" aria-keyshortcuts="+" title="Zoom in (+)" onClick={() => st.current.zoom(1)}>+</button>
@@ -1431,7 +1434,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
           <li className="board-cast"><details>
             <summary>Cast</summary>
             <dl aria-label="Cast">
-              {Object.entries(ROLE_KEY).map(([r, [k]]) => <div key={r}><dt style={{ color: c[k] }}>{castOf(r).name}</dt><dd>{r === 'pilgrim' ? 'any other role' : r}</dd></div>)}
+              {Object.entries(ROLE_KEY).map(([r, [k]]) => <div key={r}><dt style={{ color: `color-mix(in srgb, ${c[k]} 55%, #fff)` }}>{castOf(r).name}</dt><dd>{r === 'pilgrim' ? 'any other role' : r}</dd></div>)}
               {(['claude', 'codex', 'kenneth'] as const).map(k => <div key={k}><dt>{ICONS[k].name}</dt><dd>{k === 'kenneth' ? 'you' : aiName(k)}</dd></div>)}
               {LEGEND.map(([k, word]) => badgeOf(k) && <div key={k}><dt>{badgeOf(k)!.name}</dt><dd>{word.toLowerCase()}</dd></div>)}
             </dl>
@@ -1446,7 +1449,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
             </button></li>
           ))}
         </ul>
-        {node && <Panel key={node.id} node={node} court={court} hub={shown} colors={c} sent={sent} onPick={open} onAnswer={answer} onClose={() => setPicked(undefined)} onSummary={onSummary} onCopy={onCopy} mem={mem} send={send} ways={{ onMemory, onFlow, onTodo }} />}
+        {node && <Panel key={node.id} node={node} court={court} hub={shown} shared={shared} colors={c} sent={sent} onPick={open} onAnswer={answer} onClose={unpick} onSummary={onSummary} onCopy={onCopy} mem={mem} send={send} ways={{ onMemory, onFlow, onTodo }} />}
       </div>
     </dialog>
   )

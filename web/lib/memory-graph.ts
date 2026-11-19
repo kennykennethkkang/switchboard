@@ -15,7 +15,7 @@ export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: s
 export type MemoryGraph = { nodes: GraphNode[]; edges: GraphEdge[]; health: GraphHealth }
 
 export type Group = 'user' | 'feedback' | 'project-memory' | 'reference' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'
-/** Fixed colors: the view is always dark. */
+/** Dark-theme colors per group; the view itself paints with hub tokens (TONE in memory-atlas.tsx). */
 export const GROUPS: { id: Group; label: string; color: string; set: 'Memory' | 'Vault' | 'Workspace' }[] = [
   { id: 'user', label: 'About you', color: '#a98bff', set: 'Memory' },
   { id: 'feedback', label: 'Feedback', color: '#59d499', set: 'Memory' },
@@ -29,7 +29,6 @@ export const GROUPS: { id: Group; label: string; color: string; set: 'Memory' | 
   { id: 'rule', label: 'CLAUDE.md files', color: '#ff7ab3', set: 'Workspace' },
 ]
 export const groupOf = (n: GraphNode): Group => n.kind === 'memory' ? (n.type === 'project' ? 'project-memory' : n.type ?? 'reference') : n.kind
-export const colorOf = (n: GraphNode) => GROUPS.find(g => g.id === groupOf(n))!.color
 
 
 export type P3 = { x: number; y: number; z: number }

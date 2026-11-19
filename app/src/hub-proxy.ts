@@ -68,7 +68,7 @@ export function commandFolder(body: string): string | undefined {
 }
 
 // The mic records the room, and a spoken reply (hub-jarvis with voice) plays in it; the rest reach keys, sign-ins, AWS, setup, links opened on the Mac, dev servers and pushes.
-const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser', 'hub-harden'])
+const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-mirofish-open', 'hub-mirofish-report', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser', 'hub-harden'])
 
 /** A command that only this Mac may send, never the phone. */
 export function macOnly(body: string): boolean {

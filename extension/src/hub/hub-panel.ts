@@ -25,7 +25,7 @@ import { signInsPanel } from './hub-panel-signins'
 import { codexPanel } from './hub-panel-codex'
 import { devPanel } from './hub-panel-dev'
 import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, codexExited, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, noteCheckBack } from './actions'
-import { approvedFields, closeApproved, readDoneCheck, stampedChats } from './approve'
+import { approvedFields, closeApprovedRetry, readDoneCheck, staysOpenOnApprove, stampedChats } from './approve'
 import { syncTerminals, tags, terminalAction, watchTerminals } from './terminals'
 import { signInTerminal } from './codex-login'
 import { AIS, chatTerminal, closeChatTerminal, codexFiles, endedCodex, lastCodexPrompt, lastCodexTurn, readAis, rolloutLines } from './ais'
@@ -53,7 +53,7 @@ import { createLogger } from '../logger'
 import { forgetAccessNote, syncAccessNote } from './access-note'
 import { Posters, tickWork } from './posters'
 import { kitHash, rulesState, syncRules, type SyncResult } from './rules'
-import { applyAgentBrowsers } from './background'
+import { applyAgentBrowsers, NOTICE_KINDS, NOTICE_SPOTS, noticeSpot, type NoticeSpot } from './background'
 import { CLI_APPS, mergeTenants, readTenants } from './cli-logins'
 import { LOGINS, applyLink, applyLogin, loginFor, pruneLinks, readLinks, readLogins, writeLogins, type LinkCommand, type LoginCommand } from './logins'
 import { CODEX_EFFORTS, CODEX_MODELS, setRoleCodex, setRoleModel } from './roles'
@@ -63,6 +63,8 @@ import { keyStatus, keyStore, keyTest, reconcileKeys, removeKey, saveKey, testKe
 import { envSetup, fillRecipes } from './env-setup'
 import { cleanWorktree, endedWorktrees, ghPath, git, gitOp, readRepo, repoRoot } from './git'
 import { jevProject } from './jev-project'
+import { mirofishPage, savedReports } from './mirofish'
+import { toEnglish } from './translate'
 import { decideLearn, learnTick, usageOk } from './learn'
 import { showSummary } from './summary'
 import { draftCommit } from './commit-draft'
@@ -209,7 +211,8 @@ export function startHub(context: vscode.ExtensionContext): void {
   S = newPanelState()
   editor.name = shortEditor(vscode.env.appName)
   hub.set({ editor: editor.name })
-  hub.startMirofish()
+  hub.startMirofish(toEnglish)
+  hub.startCrowd()
   context.subscriptions.push({ dispose: () => hub.stopMirofish() })
   store = context.globalState
   for (const id of store.get<string[]>(HANDED_KEY) ?? []) S.handedOff.add(id)
@@ -231,6 +234,16 @@ export function startHub(context: vscode.ExtensionContext): void {
   hub.set({ controls: { ...controls, switchboard: { ...controls.switchboard, ...store.get(CONTROLS_KEY) } } })
   saveCompany()
   applyAsk()
+  applyNoticeSpot()
+  // A pick from VS Code's own bell menu sticks, so the next window does not move it back.
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+    if (!e.affectsConfiguration('workbench.notifications.position')) return
+    const v = vscode.workspace.getConfiguration('workbench.notifications').inspect('position')?.globalValue
+    if (v === undefined || v === noticeSpot(hub.get().controls.switchboard)) return
+    // Only the window Kenneth used saves it; the rest just follow, so a stale window never writes its old controls back.
+    if (vscode.window.state.focused) void setSwitchboard('noticeSpot', v as string)
+    else { const c = hub.get().controls; hub.set({ controls: { ...c, switchboard: { ...c.switchboard, noticeSpot: v as NoticeSpot } } }) }
+  }))
   applyStatusBar()
   try { const why = applyAgentBrowsers(hub.get().controls.switchboard.showBrowsers); if (why) log.warn(`Agent browsers: ${why}`) } catch (e) { log.warn(`Agent browsers: ${e}`) }
   windowStore = context.workspaceState
@@ -478,7 +491,7 @@ function awsHeadsUp(): void {
   writeSessions({ ...s, ...Object.fromEntries(due.map(n => [n, { ...s[n], warned: s[n].at }])) })
   for (const name of due) notifyAwsExpiry(name, s[name].at + AWS_SESSION_MS - now, () => {
     const why = validProfileName(name) ? awsLogin(name, undefined, () => { void refreshAws(true) }, projectBrowser()) : 'Not a profile name'
-    if (why) void vscode.window.showWarningMessage(`Switchboard: could not sign in to ${name}: ${why}`)
+    if (why) void vscode.window.showWarningMessage(`Could not sign in to ${name}: ${why}`)
   })
 }
 
@@ -728,6 +741,13 @@ export function bindStatusBar(item: vscode.StatusBarItem): void {
   applyStatusBar()
 }
 
+/** Moves VS Code toasts to Kenneth's pick (top right by default); writes user settings only when it differs. */
+function applyNoticeSpot(): void {
+  const cfg = vscode.workspace.getConfiguration('workbench.notifications')
+  const want = noticeSpot(hub.get().controls.switchboard)
+  if (cfg.inspect('position')?.globalValue !== want) void Promise.resolve(cfg.update('position', want, true)).catch(e => log.warn(`Notice position: ${e}`))
+}
+
 function applyStatusBar(): void {
   if (hub.get().controls.switchboard.statusBar) statusBar?.show()
   else statusBar?.hide()
@@ -784,7 +804,7 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
     return
   }
   if (key === 'name') value = cleanName(value)
-  const valid = key === 'idleMinutes' ? value === null || [5, 15, 30, 60].includes(value as number) : key === 'pauseAt' ? value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 50 && value <= 100) : key === 'codexModel' ? value === null || (CODEX_MODELS as readonly unknown[]).includes(value) : key === 'codexEffort' ? value === null || (CODEX_EFFORTS as readonly unknown[]).includes(value) : key === 'claudeMode' ? value === 'bypass' || value === 'ask' || value === 'auto' : key === 'name' || typeof value === 'boolean'
+  const valid = key === 'idleMinutes' ? value === null || [5, 15, 30, 60].includes(value as number) : key === 'pauseAt' ? value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 50 && value <= 100) : key === 'codexModel' ? value === null || (CODEX_MODELS as readonly unknown[]).includes(value) : key === 'codexEffort' ? value === null || (CODEX_EFFORTS as readonly unknown[]).includes(value) : key === 'notices' ? (NOTICE_KINDS as readonly unknown[]).includes(value) : key === 'noticeSpot' ? (NOTICE_SPOTS as readonly unknown[]).includes(value) : key === 'claudeMode' ? value === 'bypass' || value === 'ask' || value === 'auto' : key === 'name' || typeof value === 'boolean'
   if (!valid) return
   if ((key === 'codexModel' || key === 'codexEffort') && value === null) value = undefined
   if (key === 'oneWindow') {
@@ -800,6 +820,7 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
   void store?.update(CONTROLS_KEY, kept)
   hub.set({ controls: { ...controls, switchboard } })
   if (key === 'statusBar') applyStatusBar()
+  if (key === 'noticeSpot') applyNoticeSpot()
   if (key === 'smartModelSwitch') saveCompany()
   if (key === 'askClaude' || key === 'claudeMode' || key === 'askCodex' || key === 'codexModel' || key === 'codexEffort') applyAsk()
   if (key === 'keepApp') keepApp(value !== false)
@@ -829,14 +850,16 @@ function approveChat(id: string): true | string {
   recordArchive({ ...archiveRow(chat ?? p!, p?.startedAt), ...approvedFields(id, p?.commit) })
   hub.set({ archive: readArchive() })
   void chatApproved(id, (chat ?? p!).cwd).catch(err => log.warn('Clearing the approved chat\'s missed rows failed:', err))
-  // Mid-turn it keeps running; it shows in History and is closed by hand.
+  // Mid-turn it keeps running; it shows in History and is closed by hand. A needs-you chat with a prompt waiting keeps running too; one with none closes.
   // waiting: the lead's turn ended and only background jobs or subagents keep it marked working.
-  if (p && p.state !== 'done' && p.state !== 'idle' && !p.waiting) return true
+  if (staysOpenOnApprove(p)) return true
   if (chat?.ai === 'codex') { closeCodexChat(id); return true }
   const pids = s.chats.filter(c => c.sessionId === id && c.live && c.pid).map(c => c.pid)
   if (!pids.length) return true
   hub.queue(id, { kind: 'close' })
-  void closeApproved(pids, vscode.window.terminals, undefined, t => tags.ownerOf(t) === 'switchboard').catch(err => log.warn('Closing the approved chat failed:', err))
+  void closeApprovedRetry(pids, vscode.window.terminals, undefined, t => tags.ownerOf(t) === 'switchboard')
+    .then(ok => { if (!ok) void vscode.window.showWarningMessage('Could not close the approved chat; close its terminal by hand.') })
+    .catch(err => log.warn('Closing the approved chat failed:', err))
   return true
 }
 
@@ -962,6 +985,19 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     }
     case 'hub-open-url':
       openPage(m.url)
+      return true
+    case 'hub-mirofish-report': {
+      // A saved report opens as a Markdown preview; the id names a file in the reports folder only.
+      const file = savedReports().find(r => r.simId === m.simId)?.file
+      if (!file) return refuse('That MiroFish report is not saved.')
+      void vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(file))
+      return true
+    }
+    case 'hub-live-dismiss':
+      hub.dismissLive(m.kind, m.id)
+      return true
+    case 'hub-mirofish-open':
+      void mirofishPage(m.simId).then(r => 'url' in r ? openPage(r.url) : refuse(r.problem), err => refuse(`Could not open MiroFish: ${(err as Error).message}`))
       return true
     case 'hub-web':
       // Starts the browser app (the vsix's copy, else the switchboard checkout's) when it is not running, with --lan for Phone; phone only wants the QR link.
@@ -1345,11 +1381,11 @@ export async function smartSwitch(payload: Record<string, unknown>): Promise<voi
   if (!await inHome(to, m)) {
     const problem = await newChat(to, text, remote, undefined)
     if (problem) {
-      void vscode.window.showWarningMessage(`Switchboard: that chat was about ${projectName(to)} but could not start there (${problem}). Your prompt is on the clipboard.`)
+      void vscode.window.showWarningMessage(`that chat was about ${projectName(to)} but could not start there (${problem}). Your prompt is on the clipboard.`)
       return log.warn(`Smart switch to ${to} failed: ${problem}`)
     }
   }
-  void vscode.window.showInformationMessage(`Switchboard: that chat was about ${projectName(to)}, so it moved there from ${from}. Your prompt is also on the clipboard.`)
+  void vscode.window.showInformationMessage(`that chat was about ${projectName(to)}, so it moved there from ${from}. Your prompt is also on the clipboard.`)
 }
 
 

@@ -65,7 +65,12 @@ const withPlans = (h: HubState): HubState => {
   return { ...h, todos: Object.fromEntries(Object.entries(h.todos ?? {}).map(([f, l]) => [f, { ...l, plan: demoPlan(l, live) }])) }
 }
 
-export const demoHub = (now = Date.now()): HubState => withPlans(baseHub(now))
+// ?demo=stalled shows the MiroFish sim as Stalled and the crowd-ab run as Stopped.
+export const demoHub = (now = Date.now()): HubState => {
+  const h = withPlans(baseHub(now))
+  if (typeof location === 'undefined' || !new URLSearchParams(location.search).get('demo')?.split(',').includes('stalled')) return h
+  return { ...h, mirofish: h.mirofish && { ...h.mirofish, stalled: true }, crowdAb: h.crowdAb && { ...h.crowdAb, lastAt: now - 8 * 60e3, stopped: true } }
+}
 function baseHub(now: number): HubState {
   const fx = demoFx(typeof location === 'undefined' ? '' : location.search, now)
   unlinkAt = fx.unlinkAt
@@ -110,6 +115,7 @@ function baseHub(now: number): HubState {
     ] },
     projects: [
       { name: 'Armasu', path: '/Users/k/Documents/GitHub/Armasu', kind: 'repo', isOpen: true },
+      { name: 'switchboard', path: '/Users/k/GitHub/switchboard', kind: 'repo', isOpen: false },
       { name: 'Gemini-Test', path: '/Users/k/Documents/GitHub/Gemini-Test', kind: 'repo', isOpen: false },
       { name: 'claude-mods', path: '/Users/k/Documents/GitHub/claude-mods', kind: 'repo', isOpen: false },
       { name: 'CSEN122', path: '/Users/k/Documents/CSEN122', kind: 'project', isOpen: false },
@@ -140,7 +146,23 @@ function baseHub(now: number): HubState {
         { job: 'route', at: now - 70 * 60e3, items: 8, costUsd: 0.0002 },
       ] },
     },
-    mirofish: { simId: 'sim-demo-7', step: 'rounds', round: 7, rounds: 10, percent: 70, startedAt: new Date(now - 18 * 60e3).toISOString(), elapsedMs: 18 * 60e3, etaMs: Math.round(18 * 60e3 * 3 / 7), reportReady: false },
+    mirofish: { simId: 'sim-demo-7', step: 'rounds', round: 7, rounds: 10, percent: 70, startedAt: new Date(now - 18 * 60e3).toISOString(), elapsedMs: 18 * 60e3, etaMs: Math.round(18 * 60e3 * 3 / 7), reportReady: false , feed: [
+      { at: new Date(now - 20e3).toISOString(), who: 'Priya Shah', platform: 'reddit', action: 'commented', text: 'The status dots are what I look at first. I never open the map unless something is red.', translated: true },
+      { at: new Date(now - 45e3).toISOString(), who: 'Marcus Lee', platform: 'twitter', action: 'liked', text: 'Switchboard finally shows which chat needs me without me hunting through tabs.' },
+      { at: new Date(now - 70e3).toISOString(), who: 'Dana Ortiz', platform: 'twitter', action: 'posted', text: 'Tried the phone mode today. It called me for a design pick while I was out. Weird but useful.' },
+    ] },
+    mirofishReports: [
+      { simId: 'sim-demo-6', reportId: 'report-demo-6', title: 'Status first, map second', at: new Date(now - 2 * 3600e3).toISOString(), requirement: 'Which view do people open first to see which chats need them?', file: '/Users/k/.claude/switchboard/mirofish/sim-demo-6.md',
+        markdown: '# Status first, map second\n\n> Most of the panel checked the list of status dots before anything else; the map was opened when something looked wrong.\n\n## What people did\n\n**Busy users** scanned the dots and left within seconds. **Curious users** opened the map after a red dot to see which agent was stuck.\n\n- 7 of 10 agents posted about the list first\n- 3 asked for the map to open on a red dot\n\n## What it means\n\nKeep the list as the landing view and link each red dot straight to its spot on the map.' },
+      { simId: 'sim-demo-5', title: 'Phone calls for design picks', at: new Date(now - 26 * 3600e3).toISOString(), file: '/Users/k/.claude/switchboard/mirofish/sim-demo-5.en.md', translated: true, requirement: 'Would people pick up a call from their coding agent?',
+        markdown: '# Phone calls for design picks\n\nMost agents said a call is fine for a real choice and annoying for anything the agent could settle itself.\n\n## Where it worked\n\n1. Picking between two finished designs\n2. Approving a paid step\n\n---\n\nKeep calls rare and say the choice in the first sentence.' },
+    ],
+    crowdAb: { run: 'demo-crowd', startedAt: now - 50e3, lastAt: now - 1e3, items: 2000, done: 1340, ended: false, votes: [{ label: 'List', n: 402 }, { label: 'Map', n: 188 }], noPreference: 80, feed: [
+      { at: now - 1e3, who: '65+, tablet, low vision', option: 'List', appeal: 3.4, reason: 'accessible' },
+      { at: now - 1e3, who: '65+, tablet, low vision', option: 'Map', appeal: 1.9, reason: 'none' },
+      { at: now - 2e3, who: '25-34, phone', option: 'Map', appeal: 3.1, reason: 'looks' },
+      { at: now - 2e3, who: '25-34, phone', option: 'List', appeal: 2.7, reason: 'clearer' },
+    ] },
     // Several items, one prerequisite, one in progress, one from a finished chat, one whose chat ended; switchboard's show as "in other projects".
     todos: {
       '/Users/k/GitHub/Armasu': { sync: { state: 'synced', canSync: true }, todo: [
@@ -245,7 +267,7 @@ function baseHub(now: number): HubState {
       // Asking the closing question with the done-check short of two items: Needs you shows the red stamp.
       { sessionId: 'd-close', cwd: '/Users/k/GitHub/Armasu', state: 'needs-you', startedAt: now - 30 * 60e3, at: now - 30e3,
         roles: [{ id: 'q1', role: 'qa', state: 'done', startedAt: now - 12 * 60e3, at: now - 2 * 60e3 }],
-        tasks: [{ id: '1', subject: 'Add the size filter', status: 'completed', role: 'engineer' }, { id: '2', subject: 'Review the filter change', status: 'completed', role: 'qa' }],
+        tasks: [{ id: '1', subject: 'Add the size filter', status: 'completed', role: 'engineer' }, { id: '2', subject: 'Review the filter change', status: 'completed', role: 'qa' }, { id: '3', subject: 'Run the tests after the last edit', status: 'pending', role: 'engineer' }],
         question: 'Approve this chat as finished?',
         ask: { id: 'toolu_demo_close', kind: 'question', tool: 'AskUserQuestion', options: [],
           questions: [{ header: 'Finish', question: 'Approve this chat as finished?', options: ['Approve', 'Send back'] }] } },
@@ -494,6 +516,12 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const row = { sessionId: chat.sessionId, ai: chat.ai ?? 'claude', name: chat.name ?? origin, origin, version, cwd: chat.cwd, project: projectName(chat), startedAt: p?.startedAt, archivedAt: Date.now(), approvedAt: Date.now(), ...(p?.commit ? { commit: p.commit } : {}) }
       return { ...h, archive: [row, ...(h.archive ?? [])] }
     }
+    // Answering the closing question with Approve is an Approve; other picks have no demo effect.
+    case 'hub-answer': {
+      const ask = h.progress.find(x => x.sessionId === c.sessionId)?.ask
+      const pick = c.choice[0]
+      return typeof pick === 'number' && ask?.questions?.[0]?.options[pick] === 'Approve' ? demoApply(h, { type: 'hub-approve', sessionId: c.sessionId }) : h
+    }
     // A full chat always continues fresh, so only the branch switch applies.
     case 'hub-keep': return c.freshBranch === undefined ? h : { ...h, keep: { ...h.keep, freshBranch: c.freshBranch } }
     case 'hub-setting': {
@@ -731,6 +759,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const n = (list.seq ?? 0) + 1
       return withPlans({ ...started, todos: { ...h.todos, [c.path]: { ...list, seq: n, streak: list.streak ?? n, todo: list.todo.map(t => (run.has(t.id) ? { ...t, chat, at: now, run: n } : t)) } } })
     }
+    case 'hub-live-dismiss': return c.kind === 'mirofish' ? { ...h, mirofish: undefined } : { ...h, crowdAb: undefined }
     case 'hub-awake': return { ...h, awake: c.on }
     // The demo has no processes: Stop and Dismiss both take the item off.
     case 'hub-stuck-stop':

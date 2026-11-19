@@ -149,7 +149,7 @@ describe('contract', () => {
   it('keeps the extension and webview copies of the hub types identical', async () => {
     const fs = await import('node:fs')
     const path = await import('node:path')
-    const body = (p: string) => fs.readFileSync(path.join(__dirname, p), 'utf8').split('\n').slice(8).join('\n')
+    const body = (p: string) => fs.readFileSync(path.join(__dirname, p), 'utf8')
     assert.equal(body('../src/hub/types.ts'), body('../../web/lib/hub-types.ts'))
   })
 })
@@ -411,6 +411,13 @@ describe('close after handoff', () => {
     assert.deepEqual(h.take('old').map(i => i.kind), ['close'])
     assert.deepEqual(closing, ['old'])
     h.ingest({ token: h.token, kind: 'live', sessionId: 'newer', cwd: '/u/Armasu', limits: [] }, 5)
+    assert.deepEqual(h.take('old'), [])
+  })
+
+  it('stops waiting for the fresh chat after 30 minutes and leaves the old one to close by hand', () => {
+    const h = new HubService()
+    h.closeAfterFresh('old', '/u/Armasu', 1000)
+    h.ingest({ token: h.token, kind: 'live', sessionId: 'new', cwd: '/u/Armasu', limits: [] }, 1000 + 31 * 60_000)
     assert.deepEqual(h.take('old'), [])
   })
 
@@ -774,6 +781,39 @@ describe('usage limit retry', () => {
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-')), 'retries.json')
     fs.writeFileSync(file, JSON.stringify({ s1: Date.now() }))
     assert.ok(!kept(file).retrying())
+  })
+
+  it('a reload finds a retry\'s folder in the session transcript, and drops one it cannot', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-'))
+    const file = path.join(dir, 'retries.json')
+    fs.mkdirSync(path.join(dir, 'projects', '-r'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'projects', '-r', 's1.jsonl'), `${JSON.stringify({ type: 'summary' })}\n${JSON.stringify({ cwd: '/r', sessionId: 's1' })}\n`)
+    const due = Date.now() - 1000
+    fs.writeFileSync(file, JSON.stringify({ s1: { due }, s2: { due } }))
+    const h = new HubService()
+    h.keepRetries(file, path.join(dir, 'projects'))
+    assert.deepEqual(h.retryIds(), ['s1'])
+    assert.deepEqual(h.goneDue(() => false, Date.now() + 60_000).map(r => r.cwd), ['/r'])
+  })
+
+  it('a save keeps a retry another window wrote to the same file, and still drops its own cleared ones', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-')), 'retries.json')
+    const h = kept(file)
+    h.hook(hit, 0)
+    const other = { due: Date.now(), cwd: '/o' }
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), other }))
+    h.hook({ session_id: 's1', cwd: '/r', hook_event_name: 'SessionEnd', reason: 'clear' }, 1)
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { other })
+  })
+
+  it('a retry another window resumed and removed from the file is not written back', () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-retry-')), 'retries.json')
+    const h = kept(file)
+    h.hook(hit, 0)
+    fs.writeFileSync(file, '{}')
+    h.hook({ ...hit, session_id: 's2' }, 1)
+    assert.ok(!JSON.parse(fs.readFileSync(file, 'utf8')).s1)
+    assert.ok(!h.retryIds().includes('s1'))
   })
 
   it('a chat cleared or logged out drops its retry: the process goes on under a new id', () => {

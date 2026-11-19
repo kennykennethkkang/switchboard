@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { approvalBlock, APPROVE_OPTIONS, APPROVE_QUESTION, closingPick, approvedFields, closeApproved, LIVE_SUB_MS, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
+import { approvalBlock, APPROVE_OPTIONS, APPROVE_QUESTION, closingPick, approvedFields, closeApproved, closeApprovedRetry, staysOpenOnApprove, LIVE_SUB_MS, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
 import { isTempDir } from '../src/hub/temp'
 import { HubService } from '../src/hub/hub-service'
 import type { ChatProgress } from '../src/hub/types'
@@ -204,6 +204,26 @@ describe('closeApproved', () => {
     const mine = term('zsh', 9)
     assert.equal(await closeApproved([109], [mine], fast), 0)
     assert.equal(mine.disposed, false)
+  })
+  it('leaves a chat running on Approve while it works or has a prompt waiting', () => {
+    const p = (o: object) => ({ sessionId: 's', state: 'idle', ...o }) as never
+    assert.equal(staysOpenOnApprove(p({ state: 'working' })), true)
+    assert.equal(staysOpenOnApprove(p({ state: 'working', waiting: true })), false)
+    assert.equal(staysOpenOnApprove(p({ state: 'needs-you', ask: { id: 'a' } })), true)
+    assert.equal(staysOpenOnApprove(p({ state: 'needs-you', asks: [{ id: 'a' }] })), true)
+    assert.equal(staysOpenOnApprove(p({ state: 'needs-you' })), false)
+    assert.equal(staysOpenOnApprove(p({ state: 'done' })), false)
+    assert.equal(staysOpenOnApprove(undefined), false)
+  })
+  it('retries a close that did not land and says when it never does', async () => {
+    const ours = term('Claude: fix login', 7)
+    let polls = 0
+    const o = { parent: async (p: number) => p - 100, alive: () => ++polls <= 2, waitMs: 1, stepMs: 1 }
+    assert.equal(await closeApprovedRetry([107], [ours], o), true)
+    assert.equal(ours.disposed, true)
+    const stuck = term('Claude: other', 8)
+    assert.equal(await closeApprovedRetry([108], [stuck], { ...o, alive: () => true }, undefined, 2), false)
+    assert.equal(stuck.disposed, false)
   })
   it('names Switchboard chat terminals', () => {
     assert.equal(ourTerminal({ name: 'Claude: x' }), true)
