@@ -10,6 +10,11 @@
    "run": 69,
    "auto": true,
    "stopped": true
+  },
+  {
+   "id": "f7317fb6",
+   "text": "Learn proposal for kit/rules.md, not applied (not better: 92% -> 83%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-19T18-27-18-831Z/candidate.diff",
+   "at": 1795112924870
   }
  ],
  "removed": {
@@ -448,34 +453,16 @@
  },
  "seq": 72,
  "streak": 69,
- "suggested": [
-  {
-   "id": "c49d3ecf",
-   "text": "Allow select all for design library in tools",
-   "at": 1794952038706,
-   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
-   "name": "Enable select all design library",
-   "why": "missed"
-  },
-  {
-   "id": "f07fd516",
-   "text": "Tailscale viewing is broken on phone please take a look and fix",
-   "at": 1795087366302,
-   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
-   "name": "Fix Tailscale phone viewing",
-   "why": "missed"
-  }
- ],
  "ticked": [
   {
    "id": "9f7afcbc",
    "text": "3D memory view (?mem=3d): note labels crowd at first load, the phone sheet covers about 55% of the screen and shrinks the graph, tap-to-select after zoom not confirmed (final-approval run 2026-11-19, items 7 to 9)",
+   "at": 1795094892067,
+   "by": "bf58898c-01e7-474e-9c36-9de6816bb222",
    "from": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
    "name": "Switchboard Video Method Review",
    "run": 72,
-   "auto": true,
-   "at": 1795094892067,
-   "by": "bf58898c-01e7-474e-9c36-9de6816bb222"
+   "auto": true
   },
   {
    "id": "f3d61aa6",
@@ -561,6 +548,24 @@
    "why": "later",
    "run": 62,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "c49d3ecf",
+   "text": "Allow select all for design library in tools",
+   "at": 1794952038706,
+   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
+   "name": "Enable select all design library",
+   "why": "missed"
+  },
+  {
+   "id": "f07fd516",
+   "text": "Tailscale viewing is broken on phone please take a look and fix",
+   "at": 1795087366302,
+   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
+   "name": "Fix Tailscale phone viewing",
+   "why": "missed"
   }
  ]
 }
