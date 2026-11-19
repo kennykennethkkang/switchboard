@@ -2,16 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "a680b391",
-   "text": "Proposed fix (needs Kenneth's OK): in Switchboard extension/src/hub/sweep.ts fixBrief, replace \"ask them to press Approve in Switchboard, Settings, Installed, if they agree\" with \"then open the Approve modal for them with the switchboard ask server (POST /hub/command {type:'hub-sweep-approve', name}) so they only click Yes\". Reason: review chats sat idle looking broken on 2026-11-18.",
-   "at": 1795054569496,
-   "from": "1374c031-9409-4e1e-97b5-067381a550fd",
-   "name": "Fix Zellizard chat approvals",
-   "run": 69,
-   "auto": true,
-   "stopped": true
-  },
-  {
    "id": "08f52f1f",
    "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
    "at": 1795113233170
@@ -450,11 +440,41 @@
   "cfc0e61f": 1795088059526,
   "f3d61aa6": 1795094197921,
   "9f7afcbc": 1795094892067,
-  "f7317fb6": 1795112957985
+  "f7317fb6": 1795112957985,
+  "a680b391": 1795113248728
  },
  "seq": 73,
  "streak": 69,
+ "suggested": [
+  {
+   "id": "c49d3ecf",
+   "text": "Allow select all for design library in tools",
+   "at": 1794952038706,
+   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
+   "name": "Enable select all design library",
+   "why": "missed"
+  },
+  {
+   "id": "f07fd516",
+   "text": "Tailscale viewing is broken on phone please take a look and fix",
+   "at": 1795087366302,
+   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
+   "name": "Fix Tailscale phone viewing",
+   "why": "missed"
+  }
+ ],
  "ticked": [
+  {
+   "id": "a680b391",
+   "text": "Proposed fix (needs Kenneth's OK): in Switchboard extension/src/hub/sweep.ts fixBrief, replace \"ask them to press Approve in Switchboard, Settings, Installed, if they agree\" with \"then open the Approve modal for them with the switchboard ask server (POST /hub/command {type:'hub-sweep-approve', name}) so they only click Yes\". Reason: review chats sat idle looking broken on 2026-11-18.",
+   "from": "1374c031-9409-4e1e-97b5-067381a550fd",
+   "name": "Fix Zellizard chat approvals",
+   "run": 69,
+   "auto": true,
+   "stopped": true,
+   "at": 1795113248728,
+   "by": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6"
+  },
   {
    "id": "f7317fb6",
    "text": "Learn proposal for kit/rules.md, not applied (not better: 92% -> 83%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-19T18-27-18-831Z/candidate.diff",
@@ -537,33 +557,6 @@
    "from": "edfb7eff-b9d2-4959-ae7c-fa49433dc187",
    "run": 64,
    "auto": true
-  },
-  {
-   "id": "258bdd03",
-   "text": "Proposed fix from Learn AAR of 7b134777 (approve before applying): chats keep asking \"Approve this chat as finished?\" with no standup and no aar (d0c9b084, 1b4609a7, 7b134777); rules.md lines 66-67 and memory standup-before-approve did not stop it. Add a PreToolUse deny for AskUserQuestion when the question is the closing one (isClosing in extension/src/hub/approve.ts): read transcript_path since the last real user prompt and deny unless (a) an assistant text holds \"For you\" and \"Left\" headings and (b) a Read of aar/SKILL.md or a Skill call for aar happened, or the wiki/aar-<project>.md file changed this turn. Deny text: \"Run the aar skill and print the standup (done, for you, left, risks) before the Approve question.\" Skip the check when the chat changed no files (close-means-approved). Test in extension/test with a fixture transcript for each case.",
-   "at": 1794513749422,
-   "by": "288271e7-7af9-4562-92dc-ca57a7c71540",
-   "from": "fd54c6ec-6d5c-4c17-8d53-9f4240783485",
-   "run": 63,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "c49d3ecf",
-   "text": "Allow select all for design library in tools",
-   "at": 1794952038706,
-   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
-   "name": "Enable select all design library",
-   "why": "missed"
-  },
-  {
-   "id": "f07fd516",
-   "text": "Tailscale viewing is broken on phone please take a look and fix",
-   "at": 1795087366302,
-   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
-   "name": "Fix Tailscale phone viewing",
-   "why": "missed"
   }
  ]
 }
