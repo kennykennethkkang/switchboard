@@ -560,6 +560,13 @@
    "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
    "name": "Fix Tailscale phone viewing",
    "why": "missed"
+  },
+  {
+   "id": "4d7d52a4",
+   "text": "Fix worktrees and merge if not merged so I can commit",
+   "at": 1795127961555,
+   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
+   "why": "missed"
   }
  ]
 }
