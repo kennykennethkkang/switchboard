@@ -15,10 +15,10 @@
    "id": "cfc0e61f",
    "text": "Release the Tailscale phone 403 fix (extension/src/hub/lan.ts afterRead, keeps the tailnet name when a tailscale status read fails) once branch worktree-fix-tailscale-phone-viewing-35ab is merged back: bump past 0.21.95, package, install, so the phone app on 3131 restarts with it",
    "at": 1795085757889,
-   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
-   "name": "Fix Tailscale phone viewing",
    "chat": "96a33c11-5cf6-4e9d-8152-c0651c33f863",
    "host": "62903adf5e340f87",
+   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
+   "name": "Fix Tailscale phone viewing",
    "run": 70,
    "auto": true
   }
@@ -560,6 +560,14 @@
    "at": 1794952038706,
    "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
    "name": "Enable select all design library",
+   "why": "missed"
+  },
+  {
+   "id": "f07fd516",
+   "text": "Tailscale viewing is broken on phone please take a look and fix",
+   "at": 1795087366302,
+   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
+   "name": "Fix Tailscale phone viewing",
    "why": "missed"
   }
  ]
