@@ -14,9 +14,13 @@
   {
    "id": "9f7afcbc",
    "text": "3D memory view (?mem=3d): note labels crowd at first load, the phone sheet covers about 55% of the screen and shrinks the graph, tap-to-select after zoom not confirmed (final-approval run 2026-11-19, items 7 to 9)",
-   "at": 1795094143138,
+   "at": 1795094208781,
    "from": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
-   "name": "Switchboard Video Method Review"
+   "name": "Switchboard Video Method Review",
+   "chat": "bf58898c-01e7-474e-9c36-9de6816bb222",
+   "host": "62903adf5e340f87",
+   "run": 72,
+   "auto": true
   }
  ],
  "removed": {
@@ -452,36 +456,18 @@
   "cfc0e61f": 1795088059526,
   "f3d61aa6": 1795094197921
  },
- "seq": 71,
+ "seq": 72,
  "streak": 69,
- "suggested": [
-  {
-   "id": "c49d3ecf",
-   "text": "Allow select all for design library in tools",
-   "at": 1794952038706,
-   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
-   "name": "Enable select all design library",
-   "why": "missed"
-  },
-  {
-   "id": "f07fd516",
-   "text": "Tailscale viewing is broken on phone please take a look and fix",
-   "at": 1795087366302,
-   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
-   "name": "Fix Tailscale phone viewing",
-   "why": "missed"
-  }
- ],
  "ticked": [
   {
    "id": "f3d61aa6",
    "text": "Proposed fix (needs Kenneth's OK): in claude-mods/kit/agents/qa.md and designer.md add one line under how they work: \"Browser and crowd-test work: batch agent-browser steps into few calls, and wait on long runs (crowd-ab, MiroFish, test suites) with one foreground perl wait loop, not repeated short checks.\" Why: on 2026-11-19 six of ten such agents hit their 40-turn cap mid-run.",
+   "at": 1795094197921,
+   "by": "8fa6dfdd-7f63-4a68-974f-c563c232faf8",
    "from": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
    "name": "Switchboard Video Method Review",
    "run": 71,
-   "auto": true,
-   "at": 1795094197921,
-   "by": "8fa6dfdd-7f63-4a68-974f-c563c232faf8"
+   "auto": true
   },
   {
    "id": "cfc0e61f",
@@ -565,6 +551,24 @@
    "by": "a9ae14d8-411c-4c42-a7b1-3a923b4debc2",
    "from": "f925d27a-d0a1-48f8-a857-82ef9838b377",
    "why": "later"
+  }
+ ],
+ "suggested": [
+  {
+   "id": "c49d3ecf",
+   "text": "Allow select all for design library in tools",
+   "at": 1794952038706,
+   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
+   "name": "Enable select all design library",
+   "why": "missed"
+  },
+  {
+   "id": "f07fd516",
+   "text": "Tailscale viewing is broken on phone please take a look and fix",
+   "at": 1795087366302,
+   "from": "83b13312-57bc-4602-8ea9-0831b67a4cc9",
+   "name": "Fix Tailscale phone viewing",
+   "why": "missed"
   }
  ]
 }
