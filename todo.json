@@ -16,6 +16,14 @@
    "from": "9df0ea3d-a580-4b88-8f35-c15c661ca66e",
    "name": "Switchboard App Improvement Research",
    "short": "Auto pick runtime escalation (kem_glitch Task Router idea):"
+  },
+  {
+   "id": "a4a28743",
+   "text": "Mutation testing as an optional qa step for repos with real suites (kem_glitch \"do you mutate tests\"): add a line to claude-mods/kit/agents/qa.md naming Stryker for JS/TS, only when the diff adds tests",
+   "at": 1795213299640,
+   "from": "9df0ea3d-a580-4b88-8f35-c15c661ca66e",
+   "name": "Switchboard App Improvement Research",
+   "short": "Mutation testing as an optional qa step for repos with..."
   }
  ],
  "removed": {
