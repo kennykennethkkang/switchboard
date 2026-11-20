@@ -12,10 +12,14 @@
   {
    "id": "c6e671ff",
    "text": "Auto pick runtime escalation (kem_glitch Task Router idea): when qa or a gate sends a build back, rerun the next round one effort or model step up instead of the static pick (extension/src/hub/pick-run.ts, sentBack is only learned today)",
-   "at": 1795213298766,
+   "at": 1795213310747,
    "from": "9df0ea3d-a580-4b88-8f35-c15c661ca66e",
    "name": "Switchboard App Improvement Research",
-   "short": "Auto pick runtime escalation (kem_glitch Task Router idea):"
+   "short": "Auto pick runtime escalation (kem_glitch Task Router idea):",
+   "chat": "f7c5de74-cd0c-47ad-848a-53d48b104734",
+   "host": "62903adf5e340f87",
+   "run": 75,
+   "auto": true
   },
   {
    "id": "a4a28743",
@@ -462,7 +466,7 @@
   "f7317fb6": 1795112957985,
   "a680b391": 1795113248728
  },
- "seq": 74,
+ "seq": 75,
  "streak": 69,
  "ticked": [
   {
