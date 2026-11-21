@@ -22,6 +22,14 @@
    "run": 80,
    "auto": true,
    "stopped": true
+  },
+  {
+   "id": "c597d914",
+   "text": "Fix the top nav scrolling sideways at 380px: two button.sb-btn.sb-toggle push scrollWidth to 473 (found by qa on the Memory page, 2026-11-21)",
+   "at": 1795293404998,
+   "from": "5fbba2e2-4d09-4f22-9de3-5ce3426a3f79",
+   "name": "Finish memory map UI",
+   "short": "Fix the top nav scrolling sideways at 380px:"
   }
  ],
  "removed": {
