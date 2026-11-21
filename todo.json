@@ -449,11 +449,11 @@
   {
    "id": "4d7d52a4-ok",
    "text": "Fix worktrees and merge if not merged so I can commit",
+   "at": 1795254667572,
+   "by": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
    "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
    "why": "missed",
-   "run": 78,
-   "at": 1795254667572,
-   "by": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9"
+   "run": 78
   },
   {
    "id": "08f52f1f",
@@ -541,6 +541,17 @@
    "from": "232cf8ef-f843-4349-bf6c-d14d30528c97",
    "run": 68,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "b65599b1",
+   "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
+   "at": 1795254991667,
+   "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
+   "name": "To-do 78: Fix worktrees and merge",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
   }
  ]
 }
