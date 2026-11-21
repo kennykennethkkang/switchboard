@@ -5,9 +5,16 @@
    "id": "08f52f1f",
    "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
    "at": 1795254489265,
-   "run": 77,
    "chat": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0",
-   "host": "62903adf5e340f87"
+   "host": "62903adf5e340f87",
+   "run": 77
+  },
+  {
+   "id": "4d7d52a4-ok",
+   "text": "Fix worktrees and merge if not merged so I can commit",
+   "at": 1795254529522,
+   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
+   "why": "missed"
   }
  ],
  "removed": {
@@ -447,7 +454,8 @@
   "a680b391": 1795113248728,
   "c6e671ff": 1795213860584,
   "a4a28743": 1795213945502,
-  "f07fd516": 1795254423824
+  "f07fd516": 1795254423824,
+  "4d7d52a4": 1795254529522
  },
  "seq": 77,
  "streak": 69,
@@ -558,13 +566,6 @@
    "at": 1794952038706,
    "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
    "name": "Enable select all design library",
-   "why": "missed"
-  },
-  {
-   "id": "4d7d52a4",
-   "text": "Fix worktrees and merge if not merged so I can commit",
-   "at": 1795127961555,
-   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
    "why": "missed"
   }
  ]
