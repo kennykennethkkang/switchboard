@@ -5,25 +5,24 @@
    "id": "4e2d2dfd",
    "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
    "at": 1795290989485,
+   "chat": "8f2464fe-4217-4054-a112-2e53024f3b2a",
+   "host": "62903adf5e340f87",
    "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
    "name": "Terminal Chat Panel Overlay",
    "short": "Release the Research window (worktree...",
    "run": 81,
-   "chat": "8f2464fe-4217-4054-a112-2e53024f3b2a",
-   "host": "62903adf5e340f87",
    "auto": true
   },
   {
    "id": "4ce7729b",
    "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
-   "at": 1795265078087,
-   "chat": "59c198b7-5e36-4555-92f7-e4ccea1e9092",
-   "host": "62903adf5e340f87",
+   "at": 1795291009657,
    "from": "20ef3da4-2f86-49ed-ac19-0534389e541b",
    "name": "Revamp chat and live view",
    "short": "Release the agent drawer, Outputs and Live page redesign...",
    "run": 80,
-   "auto": true
+   "auto": true,
+   "stopped": true
   }
  ],
  "removed": {
