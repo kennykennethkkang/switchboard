@@ -22,18 +22,6 @@
    "run": 80,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "c597d914",
-   "text": "Fix the top nav scrolling sideways at 380px: two button.sb-btn.sb-toggle push scrollWidth to 473 (found by qa on the Memory page, 2026-11-21)",
-   "at": 1795293415022,
-   "from": "5fbba2e2-4d09-4f22-9de3-5ce3426a3f79",
-   "name": "Finish memory map UI",
-   "short": "Fix the top nav scrolling sideways at 380px:",
-   "chat": "1687b8f4-b33e-416f-8964-64bf4dadee4f",
-   "host": "62903adf5e340f87",
-   "run": 82,
-   "auto": true
   }
  ],
  "removed": {
@@ -477,11 +465,43 @@
   "4d7d52a4": 1795254529522,
   "c49d3ecf": 1795254541349,
   "08f52f1f": 1795254645935,
-  "4d7d52a4-ok": 1795254667572
+  "4d7d52a4-ok": 1795254667572,
+  "c597d914": 1795295817319
  },
  "seq": 82,
  "streak": 79,
+ "suggested": [
+  {
+   "id": "b65599b1",
+   "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
+   "at": 1795254991667,
+   "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
+   "name": "To-do 78: Fix worktrees and merge",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
+  },
+  {
+   "id": "75d0a20a",
+   "text": "Add this to switchboard https://www.instagram.com/reel/DdbumwFqc-c/?lqvp=NTc4MTIwNjQ2YQ== .",
+   "at": 1795293184335,
+   "from": "ff6bb0e2-d8d9-4bf1-a9c1-36d7cc557cc3",
+   "name": "Add Instagram reel link",
+   "why": "missed",
+   "short": "Add this to switchboard..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "c597d914",
+   "text": "Fix the top nav scrolling sideways at 380px: two button.sb-btn.sb-toggle push scrollWidth to 473 (found by qa on the Memory page, 2026-11-21)",
+   "from": "5fbba2e2-4d09-4f22-9de3-5ce3426a3f79",
+   "name": "Finish memory map UI",
+   "short": "Fix the top nav scrolling sideways at 380px:",
+   "run": 82,
+   "auto": true,
+   "at": 1795295817319,
+   "by": "1687b8f4-b33e-416f-8964-64bf4dadee4f"
+  },
   {
    "id": "4d7d52a4-ok",
    "text": "Fix worktrees and merge if not merged so I can commit",
@@ -568,35 +588,6 @@
    "name": "Fix Tailscale phone viewing",
    "run": 70,
    "auto": true
-  },
-  {
-   "id": "ebcfb494",
-   "text": "Kit fix proposal (aar, Armasu session 77071046): in claude-mods/kit/rules.md, Finishing bullet (line 64, \"Finish only after the checks ran...\"), after \"Kenneth approves finished chats:\" add the sentence \"If the standup still offers a choice (\"unless you want\", \"if you want\", \"optional\"), ask it as its own question and do the work before the Approve question.\" Why: Approve was asked 4 times on 2026-11-17 and Kenneth sent it back 3 times through its free text because Yo's GCP billing close was left as an optional line.",
-   "at": 1794942688168,
-   "by": "b754e76d-27b1-4f15-9730-f2e7b2bbb735",
-   "from": "232cf8ef-f843-4349-bf6c-d14d30528c97",
-   "run": 68,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "b65599b1",
-   "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
-   "at": 1795254991667,
-   "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
-   "name": "To-do 78: Fix worktrees and merge",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:"
-  },
-  {
-   "id": "75d0a20a",
-   "text": "Add this to switchboard https://www.instagram.com/reel/DdbumwFqc-c/?lqvp=NTc4MTIwNjQ2YQ== .",
-   "at": 1795293184335,
-   "from": "ff6bb0e2-d8d9-4bf1-a9c1-36d7cc557cc3",
-   "name": "Add Instagram reel link",
-   "why": "missed",
-   "short": "Add this to switchboard..."
   }
  ]
 }
