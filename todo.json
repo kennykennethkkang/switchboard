@@ -2,21 +2,13 @@
  "version": 1,
  "todo": [
   {
-   "id": "08f52f1f",
-   "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1795254489265,
-   "chat": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0",
-   "host": "62903adf5e340f87",
-   "run": 77
-  },
-  {
    "id": "4d7d52a4-ok",
    "text": "Fix worktrees and merge if not merged so I can commit",
    "at": 1795254609099,
-   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
-   "why": "missed",
    "chat": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
    "host": "62903adf5e340f87",
+   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
+   "why": "missed",
    "run": 78
   }
  ],
@@ -459,11 +451,19 @@
   "a4a28743": 1795213945502,
   "f07fd516": 1795254423824,
   "4d7d52a4": 1795254529522,
-  "c49d3ecf": 1795254541349
+  "c49d3ecf": 1795254541349,
+  "08f52f1f": 1795254645935
  },
  "seq": 78,
  "streak": 69,
  "ticked": [
+  {
+   "id": "08f52f1f",
+   "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "run": 77,
+   "at": 1795254645935,
+   "by": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0"
+  },
   {
    "id": "a4a28743",
    "text": "Mutation testing as an optional qa step for repos with real suites (kem_glitch \"do you mutate tests\"): add a line to claude-mods/kit/agents/qa.md naming Stryker for JS/TS, only when the diff adds tests",
@@ -552,14 +552,6 @@
    "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
    "name": "Instagram Reel Switchboard Planning",
    "run": 67,
-   "auto": true
-  },
-  {
-   "id": "bb6dac7e",
-   "text": "Memory consolidation: 7 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-16-5e06aab1.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1794810847568,
-   "by": "2a97fd6a-f622-4543-84d9-552485b075eb",
-   "run": 66,
    "auto": true
   }
  ]
