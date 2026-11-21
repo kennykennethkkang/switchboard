@@ -1,17 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "4d7d52a4-ok",
-   "text": "Fix worktrees and merge if not merged so I can commit",
-   "at": 1795254609099,
-   "chat": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
-   "host": "62903adf5e340f87",
-   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
-   "why": "missed",
-   "run": 78
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -452,17 +441,26 @@
   "f07fd516": 1795254423824,
   "4d7d52a4": 1795254529522,
   "c49d3ecf": 1795254541349,
-  "08f52f1f": 1795254645935
+  "08f52f1f": 1795254645935,
+  "4d7d52a4-ok": 1795254667572
  },
  "seq": 78,
- "streak": 69,
  "ticked": [
+  {
+   "id": "4d7d52a4-ok",
+   "text": "Fix worktrees and merge if not merged so I can commit",
+   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
+   "why": "missed",
+   "run": 78,
+   "at": 1795254667572,
+   "by": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9"
+  },
   {
    "id": "08f52f1f",
    "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "run": 77,
    "at": 1795254645935,
-   "by": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0"
+   "by": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0",
+   "run": 77
   },
   {
    "id": "a4a28743",
@@ -542,16 +540,6 @@
    "by": "b754e76d-27b1-4f15-9730-f2e7b2bbb735",
    "from": "232cf8ef-f843-4349-bf6c-d14d30528c97",
    "run": 68,
-   "auto": true
-  },
-  {
-   "id": "ec2c21a3",
-   "text": "Proposed kit rule (aar 2026-11-16): add to claude-mods/kit/agents/engineer.md and qa.md: \"Never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use git show HEAD:<path> or git worktree add <scratch>/base HEAD.\" (a stash in the iceberg chat lost two edits of a parallel engineer)",
-   "at": 1794857368705,
-   "by": "476535e0-ab88-4ee0-9414-5182c1813347",
-   "from": "99b1b96f-52bb-4d06-91a5-3ca8a0fbebc0",
-   "name": "Instagram Reel Switchboard Planning",
-   "run": 67,
    "auto": true
   }
  ]
