@@ -455,7 +455,8 @@
   "c6e671ff": 1795213860584,
   "a4a28743": 1795213945502,
   "f07fd516": 1795254423824,
-  "4d7d52a4": 1795254529522
+  "4d7d52a4": 1795254529522,
+  "c49d3ecf": 1795254541349
  },
  "seq": 77,
  "streak": 69,
@@ -557,16 +558,6 @@
    "by": "2a97fd6a-f622-4543-84d9-552485b075eb",
    "run": 66,
    "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "c49d3ecf",
-   "text": "Allow select all for design library in tools",
-   "at": 1794952038706,
-   "from": "899698b8-b07d-4cf7-a1ae-028298fdcc11",
-   "name": "Enable select all design library",
-   "why": "missed"
   }
  ]
 }
