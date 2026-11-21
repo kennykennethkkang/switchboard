@@ -1,6 +1,15 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "4e2d2dfd",
+   "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
+   "at": 1795263689690,
+   "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
+   "name": "Terminal Chat Panel Overlay",
+   "short": "Release the Research window (worktree..."
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
