@@ -14,10 +14,14 @@
   {
    "id": "4ce7729b",
    "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
-   "at": 1795265012054,
+   "at": 1795265078087,
    "from": "20ef3da4-2f86-49ed-ac19-0534389e541b",
    "name": "Revamp chat and live view",
-   "short": "Release the agent drawer, Outputs and Live page redesign..."
+   "short": "Release the agent drawer, Outputs and Live page redesign...",
+   "chat": "59c198b7-5e36-4555-92f7-e4ccea1e9092",
+   "host": "62903adf5e340f87",
+   "run": 80,
+   "auto": true
   }
  ],
  "removed": {
@@ -463,7 +467,7 @@
   "08f52f1f": 1795254645935,
   "4d7d52a4-ok": 1795254667572
  },
- "seq": 79,
+ "seq": 80,
  "streak": 79,
  "ticked": [
   {
