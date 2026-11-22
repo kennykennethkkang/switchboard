@@ -5,11 +5,11 @@
    "id": "a8cd1ef4",
    "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
    "at": 1795340468109,
+   "chat": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
+   "host": "62903adf5e340f87",
    "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
    "name": "Switchboard Research Tracker Fix",
    "short": "Release the Research tracker change after worktree...",
-   "chat": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
-   "host": "62903adf5e340f87",
    "run": 90,
    "auto": true
   },
@@ -20,6 +20,19 @@
    "from": "6891b582-4731-4af2-a672-91e4ab56d268",
    "name": "Auto merge all worktrees",
    "short": "Release Merge all worktrees:"
+  },
+  {
+   "id": "f64b0363",
+   "text": "Merge back worktree switchboard-research-tracker-fix-3756 into main (git apply its uncommitted diff)",
+   "at": 1795340543238,
+   "before": "a8cd1ef4",
+   "chat": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
+   "host": "62903adf5e340f87",
+   "run": 90,
+   "auto": true,
+   "from": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
+   "name": "To-do 90: Release Research tracker change",
+   "short": "Merge back worktree switchboard-research-tracker-fix-3756..."
   }
  ],
  "removed": {
