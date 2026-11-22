@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "a8cd1ef4",
-   "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
-   "at": 1795340468109,
-   "chat": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
-   "host": "62903adf5e340f87",
-   "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
-   "name": "Switchboard Research Tracker Fix",
-   "short": "Release the Research tracker change after worktree...",
-   "run": 90,
-   "auto": true
-  },
-  {
    "id": "bb97b9f9",
    "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
    "at": 1795339819493,
@@ -476,7 +464,8 @@
   "4e97ce73": 1795340456750,
   "069c9329": 1795340466785,
   "a9213073": 1795340466785,
-  "f64b0363": 1795340585184
+  "f64b0363": 1795340585184,
+  "a8cd1ef4": 1795340613624
  },
  "seq": 90,
  "streak": 88,
@@ -493,16 +482,27 @@
  ],
  "ticked": [
   {
+   "id": "a8cd1ef4",
+   "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
+   "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
+   "name": "Switchboard Research Tracker Fix",
+   "short": "Release the Research tracker change after worktree...",
+   "run": 90,
+   "auto": true,
+   "at": 1795340613624,
+   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a"
+  },
+  {
    "id": "f64b0363",
    "text": "Merge back worktree switchboard-research-tracker-fix-3756 into main (git apply its uncommitted diff)",
+   "at": 1795340585184,
+   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
    "from": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
    "before": "a8cd1ef4",
    "name": "To-do 90: Release Research tracker change",
    "short": "Merge back worktree switchboard-research-tracker-fix-3756...",
    "run": 90,
-   "auto": true,
-   "at": 1795340585184,
-   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a"
+   "auto": true
   },
   {
    "id": "4e97ce73",
@@ -591,15 +591,6 @@
    "short": "Fix the top nav scrolling sideways at 380px:",
    "run": 82,
    "auto": true
-  },
-  {
-   "id": "4d7d52a4-ok",
-   "text": "Fix worktrees and merge if not merged so I can commit",
-   "at": 1795254667572,
-   "by": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
-   "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
-   "why": "missed",
-   "run": 78
   }
  ]
 }
