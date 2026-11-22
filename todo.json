@@ -1,6 +1,15 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "e854a12e",
+   "text": "Release the memory note panel fix (worktree fix-maps-memory-item-styling-b3c8: Markdown in notes, scroll reset, sticky close) after Merge back: bump, package, install",
+   "at": 1795338615175,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "short": "Release the memory note panel fix (worktree..."
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
