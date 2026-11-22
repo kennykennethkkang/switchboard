@@ -35,6 +35,14 @@
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
    "short": "Release the self-improve 30 approved results floor after..."
+  },
+  {
+   "id": "8f8dfb3a",
+   "text": "Release the Screen tab update (VS Code panel Screen tab, Terminal/Text toggle, screen reader text) after Merge back of terminal-view-switchboard-integration-8184: bump past main, package, install, open a chat's Screen tab in the VS Code panel to confirm it shows",
+   "at": 1795386686409,
+   "from": "a2641d21-038e-47f3-85b6-12b5258aba93",
+   "name": "Terminal View Switchboard Integration",
+   "short": "Release the Screen tab update (VS Code panel Screen tab,..."
   }
  ],
  "removed": {
