@@ -3,15 +3,15 @@
  "todo": [
   {
    "id": "ac02306d",
-   "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\".",
-   "at": 1795384937979,
+   "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\". After the reload 10 chats had to be resumed by hand (4 by this chat, 6 by Instagram Reel Rotation Task), and the abyss worktree had been deleted (recreated at bd2ec53): the reload cleanup should not remove a worktree whose chat was still busy.",
+   "at": 1795385956725,
    "chat": "c61ff256-a63a-4c77-8df8-0286f20f6184",
    "host": "62903adf5e340f87",
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
-   "short": "Fix: installing a Switchboard release reloads every...",
    "run": 94,
-   "auto": true
+   "auto": true,
+   "short": "Fix: installing a Switchboard release reloads every..."
   },
   {
    "id": "6f818296",
