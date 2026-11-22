@@ -2,17 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "4e2d2dfd",
-   "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
-   "at": 1795334919102,
-   "chat": "5810b0ed-ea50-476b-b617-d0a04c8dd3f2",
-   "host": "62903adf5e340f87",
-   "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
-   "name": "Terminal Chat Panel Overlay",
-   "short": "Release the Research window (worktree...",
-   "run": 84
-  },
-  {
    "id": "4ce7729b",
    "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
    "at": 1795334939758,
@@ -478,22 +467,33 @@
   "c597d914": 1795295817319,
   "75d0a20a": 1795334900821,
   "b65599b1": 1795334906268,
-  "75d0a20a-ok": 1795335062952
+  "75d0a20a-ok": 1795335062952,
+  "4e2d2dfd": 1795335089706
  },
  "seq": 85,
  "streak": 79,
  "ticked": [
   {
+   "id": "4e2d2dfd",
+   "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
+   "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
+   "name": "Terminal Chat Panel Overlay",
+   "short": "Release the Research window (worktree...",
+   "run": 84,
+   "at": 1795335089706,
+   "by": "5810b0ed-ea50-476b-b617-d0a04c8dd3f2"
+  },
+  {
    "id": "75d0a20a-ok",
    "text": "Add this to switchboard https://www.instagram.com/reel/DdbumwFqc-c/?lqvp=NTc4MTIwNjQ2YQ== .",
+   "at": 1795335062952,
+   "by": "e80e0cb6-e6fe-4d16-9637-74c4966ff66e",
    "from": "ff6bb0e2-d8d9-4bf1-a9c1-36d7cc557cc3",
    "name": "Add Instagram reel link",
    "why": "missed",
    "short": "Add this to switchboard...",
    "run": 83,
-   "auto": true,
-   "at": 1795335062952,
-   "by": "e80e0cb6-e6fe-4d16-9637-74c4966ff66e"
+   "auto": true
   },
   {
    "id": "c597d914",
@@ -571,16 +571,6 @@
    "from": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
    "name": "Switchboard Video Method Review",
    "run": 72,
-   "auto": true
-  },
-  {
-   "id": "f3d61aa6",
-   "text": "Proposed fix (needs Kenneth's OK): in claude-mods/kit/agents/qa.md and designer.md add one line under how they work: \"Browser and crowd-test work: batch agent-browser steps into few calls, and wait on long runs (crowd-ab, MiroFish, test suites) with one foreground perl wait loop, not repeated short checks.\" Why: on 2026-11-19 six of ten such agents hit their 40-turn cap mid-run.",
-   "at": 1795094197921,
-   "by": "8fa6dfdd-7f63-4a68-974f-c563c232faf8",
-   "from": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
-   "name": "Switchboard Video Method Review",
-   "run": 71,
    "auto": true
   }
  ]
