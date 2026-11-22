@@ -1,20 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "b65599b1-ok",
-   "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
-   "at": 1795336120726,
-   "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
-   "name": "To-do 78: Fix worktrees and merge",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:",
-   "chat": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
-   "host": "62903adf5e340f87",
-   "run": 86,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -462,11 +448,23 @@
   "b65599b1": 1795334906268,
   "75d0a20a-ok": 1795335062952,
   "4e2d2dfd": 1795335089706,
-  "4ce7729b": 1795336112826
+  "4ce7729b": 1795336112826,
+  "b65599b1-ok": 1795336247300
  },
  "seq": 86,
- "streak": 79,
  "ticked": [
+  {
+   "id": "b65599b1-ok",
+   "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
+   "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
+   "name": "To-do 78: Fix worktrees and merge",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:",
+   "run": 86,
+   "auto": true,
+   "at": 1795336247300,
+   "by": "6d4b6681-ef54-402e-8cbf-9ff416105b5b"
+  },
   {
    "id": "4ce7729b",
    "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
@@ -558,14 +556,6 @@
    "run": 69,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "f7317fb6",
-   "text": "Learn proposal for kit/rules.md, not applied (not better: 92% -> 83%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-19T18-27-18-831Z/candidate.diff",
-   "at": 1795112957985,
-   "by": "b55b7d65-5c36-419b-8e35-02d8207cdc15",
-   "run": 73,
-   "auto": true
   }
  ]
 }
