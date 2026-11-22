@@ -453,28 +453,17 @@
   "5b0183ae": 1795338294658
  },
  "seq": 87,
- "suggested": [
-  {
-   "id": "069c9329",
-   "text": "Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that",
-   "at": 1795337682975,
-   "from": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
-   "name": "To-do 86: Fix worktrees and merge",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:"
-  }
- ],
  "ticked": [
   {
    "id": "5b0183ae",
    "text": "Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the chat instead of a floating always-on-top window\", package, install",
+   "at": 1795338294658,
+   "by": "ff50e275-6af8-47f5-993e-68c0911c9108",
    "from": "2aadb982-f067-4b28-b7f8-63780eacd8e1",
    "name": "Research Panel VS Code Tab",
    "short": "Release the Research-as-a-tab change after worktree...",
    "run": 87,
-   "auto": true,
-   "at": 1795338294658,
-   "by": "ff50e275-6af8-47f5-993e-68c0911c9108"
+   "auto": true
   },
   {
    "id": "b65599b1-ok",
@@ -568,6 +557,26 @@
    "short": "Auto pick runtime escalation (kem_glitch Task Router idea):",
    "run": 75,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "069c9329",
+   "text": "Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that",
+   "at": 1795337682975,
+   "from": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
+   "name": "To-do 86: Fix worktrees and merge",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
+  },
+  {
+   "id": "a9213073",
+   "text": "Switchboard to-do, in this order: 1. Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the",
+   "at": 1795338403435,
+   "from": "ff50e275-6af8-47f5-993e-68c0911c9108",
+   "name": "To-do 87: Release Research-as-a-tab change",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
   }
  ]
 }
