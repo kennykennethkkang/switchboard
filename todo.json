@@ -4,10 +4,14 @@
   {
    "id": "f5f5c66d",
    "text": "Release the to-do auto-tick fix (worktree fix-completed-todo-items-3228: missed asks tick with their chat's Release item, run prompts never become missed asks, shipped check reads extension/CHANGELOG.md and remembers seen commits across reloads) after Merge back: bump past main, CHANGELOG line, package, install",
-   "at": 1795377237887,
+   "at": 1795377239430,
    "from": "67006108-625e-4578-9713-1e8ecc1b66ac",
    "name": "Fix completed todo items",
-   "short": "Release the to-do auto-tick fix (worktree..."
+   "short": "Release the to-do auto-tick fix (worktree...",
+   "chat": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "host": "62903adf5e340f87",
+   "run": 93,
+   "auto": true
   }
  ],
  "removed": {
@@ -470,7 +474,7 @@
   "20c5030c": 1795354222399,
   "7ba2f3ce": 1795377231763
  },
- "seq": 92,
+ "seq": 93,
  "ticked": [
   {
    "id": "7ba2f3ce",
@@ -582,5 +586,6 @@
    "short": "Release the agent drawer, Outputs and Live page redesign...",
    "run": 85
   }
- ]
+ ],
+ "streak": 93
 }
