@@ -5,13 +5,21 @@
    "id": "e854a12e",
    "text": "Release the memory note panel fix (worktree fix-maps-memory-item-styling-b3c8: Markdown in notes, scroll reset, sticky close) after Merge back: bump, package, install",
    "at": 1795338626907,
+   "chat": "0960f460-c03e-4c36-bf66-054e89f7f968",
+   "host": "62903adf5e340f87",
    "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
    "name": "Fix maps memory item styling",
    "short": "Release the memory note panel fix (worktree...",
-   "chat": "0960f460-c03e-4c36-bf66-054e89f7f968",
-   "host": "62903adf5e340f87",
    "run": 88,
    "auto": true
+  },
+  {
+   "id": "4e97ce73",
+   "text": "Release the Split asks fix (worktree fix-smart-separating-chat-component-2cf1: numbered-piece split, 20 s deadline, wider pre-check) once it is merged back into main; add its CHANGELOG line from .switchboard/changes/2026-11-22-fix-smart-split-asks.md",
+   "at": 1795338667402,
+   "from": "9cbcc6e0-a86a-43ff-b4f7-1a87cb8f55d1",
+   "name": "Fix Smart Separating Chat Component",
+   "short": "Release the Split asks fix (worktree..."
   }
  ],
  "removed": {
@@ -466,6 +474,7 @@
   "5b0183ae": 1795338294658
  },
  "seq": 88,
+ "streak": 88,
  "ticked": [
   {
    "id": "5b0183ae",
@@ -591,6 +600,5 @@
    "why": "missed",
    "short": "Switchboard to-do, in this order:"
   }
- ],
- "streak": 88
+ ]
 }
