@@ -20,6 +20,13 @@
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
    "short": "Local first-draft routing:"
+  },
+  {
+   "id": "352ab00b",
+   "text": "Proposed kit rule edit (aar 2026-11-22, Switchboard clean up chat 77451c72): subagent briefs keep missing a tool-call budget, so agents hit maxTurns with no report (5 chats since 2026-11-07, see memory subagent-turn-caps-and-budget). In claude-mods/kit/rules.md, after the line starting \"- Role subagents stop at their maxTurns\", add: \"- End every brief with a budget and 'send the Report before it runs out': about 35 tool calls for engineer, 25 for qa and designer, 15 for researcher. A repo-wide unused or dead code audit starts from one `npx tsc --noEmit --noUnusedLocals --noUnusedParameters -p .` run, not a researcher reading files.\" Then setup --rules-only and check the diff of CLAUDE.md.",
+   "at": 1795385503862,
+   "from": "cc143ce5-75a5-4e99-9210-5c3b167dc523",
+   "short": "Proposed kit rule edit (aar 2026-11-22, Switchboard..."
   }
  ],
  "removed": {
@@ -489,14 +496,14 @@
   {
    "id": "f5f5c66d",
    "text": "Release the to-do auto-tick fix (worktree fix-completed-todo-items-3228: missed asks tick with their chat's Release item, run prompts never become missed asks, shipped check reads extension/CHANGELOG.md and remembers seen commits across reloads) after Merge back: bump past main, CHANGELOG line, package, install",
+   "at": 1795384971163,
+   "by": "4a34b74a-98df-4788-9b7a-638069d9f78f",
    "from": "67006108-625e-4578-9713-1e8ecc1b66ac",
    "name": "Fix completed todo items",
    "short": "Release the to-do auto-tick fix (worktree...",
    "run": 93,
    "auto": true,
-   "stopped": true,
-   "at": 1795384971163,
-   "by": "4a34b74a-98df-4788-9b7a-638069d9f78f"
+   "stopped": true
   },
   {
    "id": "7ba2f3ce",
