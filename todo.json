@@ -1,6 +1,15 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "f5f5c66d",
+   "text": "Release the to-do auto-tick fix (worktree fix-completed-todo-items-3228: missed asks tick with their chat's Release item, run prompts never become missed asks, shipped check reads extension/CHANGELOG.md and remembers seen commits across reloads) after Merge back: bump past main, CHANGELOG line, package, install",
+   "at": 1795377237887,
+   "from": "67006108-625e-4578-9713-1e8ecc1b66ac",
+   "name": "Fix completed todo items",
+   "short": "Release the to-do auto-tick fix (worktree..."
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -466,12 +475,12 @@
   {
    "id": "7ba2f3ce",
    "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795377231763,
+   "by": "67006108-625e-4578-9713-1e8ecc1b66ac",
    "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
    "name": "Fix maps memory item styling",
    "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird...",
-   "at": 1795377231763,
-   "by": "67006108-625e-4578-9713-1e8ecc1b66ac"
+   "short": "Inside of maps memory component still looks a bit weird..."
   },
   {
    "id": "20c5030c",
