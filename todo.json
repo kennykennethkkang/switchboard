@@ -629,5 +629,15 @@
    "run": 86,
    "auto": true
   }
+ ],
+ "suggested": [
+  {
+   "id": "58fbd139",
+   "text": "At 12:56 another chat installed Switchboard 0.21.124 and every VS Code window reloaded, which ended you mid-work. Check git status in your folder, then pick up exactly where you stopped and finish",
+   "at": 1795389651412,
+   "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
+   "why": "missed",
+   "short": "At 12:56 another chat installed Switchboard 0.21.124 and..."
+  }
  ]
 }
