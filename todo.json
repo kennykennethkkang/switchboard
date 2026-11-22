@@ -638,6 +638,15 @@
    "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
    "why": "missed",
    "short": "At 12:56 another chat installed Switchboard 0.21.124 and..."
+  },
+  {
+   "id": "3b565ab3",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795389688962,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
