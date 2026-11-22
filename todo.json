@@ -20,6 +20,14 @@
    "from": "9cbcc6e0-a86a-43ff-b4f7-1a87cb8f55d1",
    "name": "Fix Smart Separating Chat Component",
    "short": "Release the Split asks fix (worktree..."
+  },
+  {
+   "id": "a8cd1ef4",
+   "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
+   "at": 1795338724824,
+   "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
+   "name": "Switchboard Research Tracker Fix",
+   "short": "Release the Research tracker change after worktree..."
   }
  ],
  "removed": {
