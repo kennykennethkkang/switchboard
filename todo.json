@@ -16,13 +16,21 @@
    "id": "ac02306d",
    "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\".",
    "at": 1795384937979,
+   "chat": "c61ff256-a63a-4c77-8df8-0286f20f6184",
+   "host": "62903adf5e340f87",
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
    "short": "Fix: installing a Switchboard release reloads every...",
-   "chat": "c61ff256-a63a-4c77-8df8-0286f20f6184",
-   "host": "62903adf5e340f87",
    "run": 94,
    "auto": true
+  },
+  {
+   "id": "6f818296",
+   "text": "Local first-draft routing: a local Ollama model (Gemma 12B, 128k context) writes first drafts and scaffolds before Claude; the author of reel instagram.com/reel/DfsG079gJ62 (ChiefGyk3D) says it cut his Claude usage about 40%. Reference: github.com/ChiefGyk3D/department-of-internal-arguments packs/local-llm-routing/PACK.md (Apache-2.0: \"local output is a draft: verify it against the source\", echo and compare identifiers, quote then answer, output only what was asked). Ollama is not installed yet. Credit the repo in README Credits.",
+   "at": 1795384939931,
+   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
+   "name": "Instagram reel rule implementation",
+   "short": "Local first-draft routing:"
   }
  ],
  "removed": {
