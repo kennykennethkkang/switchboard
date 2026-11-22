@@ -1,6 +1,15 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "20c5030c",
+   "text": "Proposed kit edit (aar, map art kits 2026-11-22): in claude-mods/kit/agents/qa.md and designer.md, under the Report section add: \"If a hook makes you reply again after your Report, repeat the full Report in that reply; the lead only sees your last message.\" Reason: two qa reports arrived as \"my report stands\" stubs and needed a resend.",
+   "at": 1795354103851,
+   "from": "f79b2d95-3119-4cad-842a-013fbf1bbcee",
+   "name": "Redesign map agents page",
+   "short": "Proposed kit edit (aar, map art kits 2026-11-22):"
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -460,28 +469,17 @@
   "bb97b9f9": 1795349595962
  },
  "seq": 91,
- "suggested": [
-  {
-   "id": "7ba2f3ce",
-   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
-   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
-   "name": "Fix maps memory item styling",
-   "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
-  }
- ],
  "ticked": [
   {
    "id": "bb97b9f9",
    "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
+   "at": 1795349595962,
+   "by": "fee82622-5d10-4d12-885d-25fa1a533d8f",
    "from": "6891b582-4731-4af2-a672-91e4ab56d268",
    "name": "Auto merge all worktrees",
    "short": "Release Merge all worktrees:",
    "run": 91,
-   "auto": true,
-   "at": 1795349595962,
-   "by": "fee82622-5d10-4d12-885d-25fa1a533d8f"
+   "auto": true
   },
   {
    "id": "a8cd1ef4",
@@ -582,6 +580,17 @@
    "short": "Add this to switchboard...",
    "run": 83,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
   }
  ]
 }
