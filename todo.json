@@ -607,6 +607,15 @@
    "name": "To-do 87: Release Research-as-a-tab change",
    "why": "missed",
    "short": "Switchboard to-do, in this order:"
+  },
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
   }
  ]
 }
