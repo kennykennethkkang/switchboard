@@ -1,17 +1,49 @@
 // Usage feed for Switchboard: posts this chat's context, limits, token diet and Jev runs
 // to every open Switchboard window, and carries back what was typed in any of them (a
 // message, Remote Control, a compaction). Draws nothing in the terminal.
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 import { budgetDenial, pausedDenial, readCompany, startsToday } from './company'
 import { askHome, count, ownerOf, poll, postLive, readNote, settle, start } from './feed'
 import { ASK, ASK_RULE, EDITS, ERRORS_KEPT, FRESH, KEEP, KEPT_TOOLS, OWN, RECALL, RESULTS_KEPT, afterTool, checkFresh, errorEntry, freshStart, handedOff, handoff, heldBack, notePlan, noteTasks, restoreFeed, saveFeed, stagesRule, wrapUp } from './handoff'
 import { POLL_MS, cwdOf, norm, post } from './hub'
 import { carryGoal, indefiniteAsk, indefiniteDenial, indefiniteStop } from './indefinite'
-import { heldNow, holdTick, noteActive } from './limits'
-import { agentModel, endRun, pickModel, readLearn } from './model'
+import { fiveHour, heldNow, holdTick, noteActive } from './limits'
+import { LADDER, agentModel, alias, endRun, level, pickRun, pickable, readLearn, spawnModel } from './model'
 import { redact } from './redact'
+import { ROLE_OPTIONS, appendRows, classify, finalRow, pickRow, readSmart, smartPick } from './smart'
+import { offerResearch } from './research'
 import { noteShell, shellsDone } from './shells'
 import { company, feed, held, live, runs, st } from './state'
+
+type SmartModel = { task: string; pick: string; why: string; model?: string }
+
+/** Smart select for a spawn: the model pick with its reason, moved by smart-learned.json under the same rule as the picker. An explicit model stays. */
+async function smartModel($: EngineInterface, e: { prompt: string; model?: string }, role: string, base: string | undefined, chosen: string | undefined, smart: boolean): Promise<SmartModel | undefined> {
+  const task = classify(e.prompt)
+  if (e.model) return { task, pick: alias(e.model), why: 'set by the Agent call' }
+  const now = chosen ?? base
+  if (!now) return undefined
+  if (!smart || !base || level(base) < 0 || !pickable(role)) return { task, pick: alias(now), why: 'model from the agent file' }
+  const why = pickRun({ text: e.prompt, role, ai: 'claude', base }).reason
+  const p = smartPick('model', task, alias(now), why, LADDER, await readSmart($))
+  return { task, pick: p.pick, why: p.why, model: p.pick !== alias(now) ? p.pick : undefined }
+}
+
+/** Role and model rows for a started spawn; a model the platform swapped in is the model's final. Returns the model row's key. */
+async function logSpawn($: EngineInterface, brief: string, role: string, sm: SmartModel | undefined, got: string | undefined) {
+  if (!sm) return undefined
+  const at = await $.clock.now()
+  const session = await $.session.id()
+  const cwd = await cwdOf($)
+  const rows = [
+    pickRow({ at, session, cwd, kind: 'role', task: sm.task, pick: role, why: `${role} for a ${sm.task} task`, options: ROLE_OPTIONS }),
+    pickRow({ at, session, cwd, kind: 'model', task: sm.task, pick: sm.pick, why: sm.why, options: LADDER }),
+  ]
+  const key = String(rows[1].key)
+  if (got && level(got) >= 0 && alias(got) !== sm.pick) rows.push(finalRow({ at, session, kind: 'model', key, final: alias(got) }))
+  await appendRows($, rows)
+  return key
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -25,8 +57,8 @@ export const register: Register = on => {
     })
     await $.tool.register({
       name: RECALL,
-      description: 'Search Switchboard memory, the knowledge graph of memory notes and the vault, before researching a topic. Answers the best matching notes and how they relate (supersedes, depends-on, part-of, contradicts, related). Free and local.',
-      inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+      description: 'Search Switchboard memory, the knowledge graph of memory notes and the vault, before researching a topic. Answers the best matching notes and how they relate (supersedes, depends-on, part-of, contradicts, related). Free and local. Scope research searches the research notes only.',
+      inputSchema: { type: 'object', properties: { query: { type: 'string' }, scope: { type: 'string', enum: ['all', 'research'] } }, required: ['query'] },
     })
     $.clock.every(POLL_MS, () => { void poll($); void holdTick($).catch(() => undefined) })
     return started
@@ -53,7 +85,8 @@ export const register: Register = on => {
   on('tool.call', { tool: `mcp__usage-meter__${RECALL}` }, async ($, e) => {
     const q = (e as { query?: unknown }).query
     if (typeof q !== 'string' || !q.trim()) return { deny: 'Give a query.' }
-    const answer = await askHome($, 'recall', q.slice(0, 500)).catch(() => undefined)
+    const scope = (e as { scope?: unknown }).scope
+    const answer = await askHome($, 'recall', q.slice(0, 500), scope === 'all' || scope === 'research' ? scope : undefined).catch(() => undefined)
     return { result: answer ?? 'No Switchboard window holds this folder, so memory cannot be searched.' }
   })
 
@@ -71,6 +104,7 @@ export const register: Register = on => {
     const fresh = FRESH.exec(e.text)?.[1]
     if (fresh) { feed.freshNote = fresh; await carryGoal($, fresh).catch(() => undefined) }
     await saveFeed($).catch(() => undefined)
+    if (feed.requests.length === 1) void offerResearch($, e.text).catch(() => undefined)
     const note = await handedOff($).catch(() => undefined)
     const told = note ? wrapUp(note) : fresh ? freshStart(fresh) : undefined
     return next(told ? { ...e, context: [...(e.context ?? []), told] } : e)
@@ -93,15 +127,19 @@ export const register: Register = on => {
     const held = await heldBack($)
     if (held) return { deny: held }
     const role = e.subagentType
-    const { budgets, smart } = await readCompany($)
+    const { budgets, smart, windows } = await readCompany($)
     const { day, used } = await startsToday($)
     const denial = budgetDenial(role, used, budgets)
     if (denial) return { deny: denial }
     const base = await agentModel($, role).catch(() => undefined)
-    const model = smart ? pickModel(base, role, e.prompt, await readLearn($), await cwdOf($)) : base
+    // A model the Agent call set is an explicit pick: kept, never gated.
+    const chosen = e.model ? undefined : smart ? spawnModel(base, role, e.prompt, await readLearn($), await cwdOf($), fiveHour(windows, await $.clock.now()), runs) : base
+    const sm = await smartModel($, e, role, base, chosen, smart).catch(() => undefined)
+    const model = sm?.model ?? chosen
     const started = await next(model ? { ...e, model } : e)
     if (started.deny !== undefined) return started
-    if (started.agentId) live.set(started.agentId, { role, brief: e.prompt, model: started.model, files: new Set() })
+    const smartKey = await logSpawn($, e.prompt, role, sm, started.model).catch(() => undefined)
+    if (started.agentId) live.set(started.agentId, { role, brief: e.prompt, model: started.model, files: new Set(), smartKey })
     // Read-modify-write, so parallel spawns can undercount. Switch to an atomic increment if the store gets one.
     const counted = { ...used, [role]: (used[role] ?? 0) + 1 }
     await $.store.set('starts', { day, used: counted })

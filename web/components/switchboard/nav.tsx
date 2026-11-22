@@ -18,10 +18,11 @@ const ICON = {
 
 type Counts = { needs: number; chats: number; plan: number; live?: number; ship: number }
 
-/** Left rail of labelled pages; a fixed bottom tab bar at 760px or less. Map holds its three modes. */
-export function Nav({ page, go, counts, onFind, findKey }: { page: Page; go: (p: Page) => void; counts: Counts; onFind: () => void; findKey: string }) {
-  const items: [Page, string, keyof typeof ICON, number?, boolean?][] = [
-    ['now', 'Now', 'now', counts.needs, true],
+/** Left rail of labelled pages; a fixed bottom tab bar at 760px or less. Map holds its three modes.
+ *  simple: the Simple view's four pages, Now named Home; onCoder: the Coder view switch at the foot of the rail. */
+export function Nav({ page, go, counts, onFind, findKey, simple, onCoder }: { page: Page; go: (p: Page) => void; counts: Counts; onFind: () => void; findKey: string; simple?: boolean; onCoder?: (on: boolean) => void }) {
+  const all: [Page, string, keyof typeof ICON, number?, boolean?][] = [
+    ['now', simple ? 'Home' : 'Now', 'now', counts.needs, true],
     ['chats', 'Chats', 'chats', counts.chats],
     ['plan', 'Plan', 'plan', counts.plan],
     ['live', 'Live', 'live', counts.live],
@@ -29,6 +30,7 @@ export function Nav({ page, go, counts, onFind, findKey }: { page: Page; go: (p:
     ['map-board', 'Map', 'map'],
     ['settings', 'Settings', 'settings'],
   ]
+  const items = simple ? all.filter(([p]) => p === 'now' || p === 'chats' || p === 'plan' || p === 'settings') : all
   return (
     <nav className="nav" aria-label="Pages">
       <strong className="hub-brand nav-brand"><i aria-hidden />Switchboard</strong>
@@ -46,6 +48,9 @@ export function Nav({ page, go, counts, onFind, findKey }: { page: Page; go: (p:
           </li>
         })}
       </ul>
+      {onCoder && <button type="button" role="switch" aria-checked={!simple} className="nav-coder" onClick={() => onCoder(!!simple)} title="Every page and setting: Live, Ship, Map, models and more">
+        <span>Coder view</span><i aria-hidden />
+      </button>}
     </nav>
   )
 }

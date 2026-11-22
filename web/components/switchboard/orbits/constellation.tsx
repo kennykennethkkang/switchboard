@@ -147,7 +147,7 @@ function draw(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, no
   }
 
   // The lead: a soft breathing halo while it works or waits on you, its context as a thin arc.
-  const lc = twc('lead', needs ? C.red : finished ? (almost ? C.teal : C.green) : live ? C.blue : c.state === 'idle' ? C.yellow : C.ash)
+  const lc = twc('lead', needs || c.stuck ? C.red : finished ? (almost ? C.teal : C.green) : live ? C.blue : c.state === 'idle' ? C.yellow : C.ash)
   const halo = tw('halo', live || needs ? 1 : 0, TW.color * 3)
   if (halo > 0.01) {
     const b = still ? 0.7 : 0.6 + 0.4 * Math.sin(t * 2.2)

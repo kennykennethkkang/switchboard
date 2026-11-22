@@ -1,0 +1,27 @@
+/* Live > Smart select. Phone first: one column, rows wrap. */
+.ss { display: grid; gap: 16px; min-width: 0; }
+.ss h3 { margin: 0; font: 600 13px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.ss ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.ss-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; align-items: start; }
+.ss-kind { min-width: 0; }
+.ss-kind li { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--hub-hair); font-size: 13px; }
+.ss-kind li:first-child { border-top: 0; }
+.ss-task { color: var(--hub-ash); text-transform: capitalize; }
+.ss-kind strong { color: var(--hub-ink); font-weight: 500; overflow-wrap: anywhere; }
+.ss-rate { color: var(--hub-mute); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ss-none { margin: 0; color: var(--hub-ash); font-size: 13px; }
+.ss-recent { min-width: 0; }
+.ss-recent li { display: grid; gap: 3px; padding: 10px 0; border-top: 1px solid var(--hub-hair); min-width: 0; }
+.ss-recent li:first-child { border-top: 0; }
+.ss-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.ss-title { color: var(--hub-ink); font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-badge { flex: none; padding: 2px 8px; border-radius: 99px; font: 500 12px/1.3 var(--hub-sans); background: var(--hub-hair); color: var(--hub-mute); }
+.ss-badge[data-v='useful'] { background: var(--hub-green-soft); color: var(--hub-green); }
+.ss-badge[data-v='not'] { background: var(--hub-red-soft); color: var(--hub-red); }
+.ss-pick { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; color: var(--hub-body); }
+.ss-pick strong { color: var(--hub-ink); font-weight: 500; }
+.ss-kind-tag { color: var(--hub-ash); }
+.ss-final { color: var(--hub-yellow); }
+.ss-when { margin-left: auto; color: var(--hub-ash); font-size: 12px; }
+.ss-why { margin: 0; color: var(--hub-mute); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.ss-mark { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px; background: var(--hub-blue-soft); color: var(--hub-blue); font: 500 11px/1.4 var(--hub-sans); vertical-align: 1px; }

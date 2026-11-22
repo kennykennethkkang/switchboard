@@ -103,7 +103,7 @@ test('the demo browser per project: set, system browser, forget', () => {
 test('a demo role model pick changes only that role', () => {
   const h = demoApply(demoHub(0), { type: 'hub-role-model', role: 'ops', model: 'haiku' })
   assert.equal(h.installed.find(i => i.name === 'ops')?.model, 'haiku')
-  assert.equal(h.installed.find(i => i.name === 'qa')?.model, 'opus')
+  assert.equal(h.installed.find(i => i.name === 'qa')?.model, 'sonnet')
 })
 
 test('a demo Codex pick sets model and effort, default clears them', () => {

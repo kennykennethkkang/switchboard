@@ -16,6 +16,7 @@ import { digest, needsApproval, readSweep } from '../../kit/sweep.mjs'
 import { newerVersion } from './self-update'
 import { macNames, phoneCode, type MacNames } from './lan'
 import { editor } from '../editor'
+import { RESEARCH_ROOT, ensureResearchRoot } from './research'
 
 const HOME = os.homedir()
 const CLAUDE = path.join(HOME, '.claude')
@@ -686,8 +687,8 @@ export function decodeProjectDir(dir: string): string {
   return parts[parts.length - 1] ?? dir
 }
 
-/** Folders to open: git repos under the roots, and every folder Claude Code has run in that still exists. */
-export async function projectFolders(repoRoots: string[]): Promise<{ repos: string[]; claude: string[] }> {
+/** Folders to open: git repos under the roots, every folder Claude Code has run in that still exists, and the research folder always. */
+export async function projectFolders(repoRoots: string[], research = RESEARCH_ROOT): Promise<{ repos: string[]; claude: string[] }> {
   const repos: string[] = []
   for (const root of repoRoots) {
     const names = await fs.promises.readdir(root).catch(() => [] as string[])
@@ -697,7 +698,10 @@ export async function projectFolders(repoRoots: string[]): Promise<{ repos: stri
   // Scratch and temp folders are where chats ran, not projects to come back to.
   const claude = Object.keys((global?.projects ?? {}) as object)
     .filter(p => p !== HOME && !isTempDir(p) && fs.existsSync(p))
-  return { repos, claude }
+  // A home that cannot hold the folder must not take the whole project list with it.
+  let root: string | undefined
+  try { root = ensureResearchRoot(research) } catch { /* no research row */ }
+  return { repos, claude: !root || claude.includes(root) ? claude : [...claude, root] }
 }
 
 export async function connections(repoRoots: string[]): Promise<Connection[]> {

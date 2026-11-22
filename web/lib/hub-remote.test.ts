@@ -60,6 +60,19 @@ describe('hub-remote', () => {
     assert.equal((await fetchHubWhy(f(502))).noHub, undefined)
   })
 
+  it('does not ask a demo build for a hub, so the console stays clean', async () => {
+    const was = process.env.NEXT_PUBLIC_DEMO
+    process.env.NEXT_PUBLIC_DEMO = '1'
+    try {
+      const f = (async () => { throw new Error('asked') }) as typeof fetch
+      const r = await fetchHubWhy(f)
+      assert.equal(r.hub, null)
+      assert.equal(r.noHub, true)
+    } finally {
+      if (was === undefined) delete process.env.NEXT_PUBLIC_DEMO; else process.env.NEXT_PUBLIC_DEMO = was
+    }
+  })
+
   it('sends back the last ETag and keeps the state it had on a 304', async () => {
     const sent: Array<string | undefined> = []
     let reply = () => new Response('{"chats":[],"n":1}', { status: 200, headers: { ETag: '"a"' } })
@@ -68,6 +81,42 @@ describe('hub-remote', () => {
     reply = () => new Response(null, { status: 304, headers: { ETag: '"a"' } })
     assert.deepEqual(await fetchHubWhy(f), { hub: { chats: [], n: 1 } })
     assert.deepEqual(sent.slice(-2), [sent[sent.length - 2], '"a"'])
+  })
+
+  it('merges a delta onto the state it holds and names that state as its base', async () => {
+    const bases: Array<string | undefined> = []
+    let reply = () => new Response('{"chats":[],"big":[1,2],"n":1}', { status: 200, headers: { ETag: '"b"' } })
+    const f = (async (_u: string, init?: RequestInit) => { bases.push((init?.headers as Record<string, string>)['X-Base']); return reply() }) as typeof fetch
+    const first = (await fetchHubWhy(f)).hub as unknown as Record<string, unknown>
+    reply = () => new Response('{"set":{"n":2},"del":["chats"]}', { status: 200, headers: { ETag: '"c"', 'X-Delta': '1' } })
+    const next = (await fetchHubWhy(f)).hub as unknown as Record<string, unknown>
+    assert.deepEqual(next, { big: [1, 2], n: 2 })
+    assert.equal(next.big, first.big)
+    assert.equal(bases[bases.length - 1], '"b"')
+    reply = () => new Response(null, { status: 304, headers: { ETag: '"c"' } })
+    assert.deepEqual((await fetchHubWhy(f)).hub, { big: [1, 2], n: 2 })
+    assert.equal(bases[bases.length - 1], '"c"')
+  })
+
+  it('drops a delta whose base another reply replaced, and asks for the whole state', async () => {
+    let n = 0
+    const full = () => new Response('{"a":0,"b":0}', { status: 200, headers: { ETag: '"e0"' } })
+    await fetchHubWhy((async () => full()) as typeof fetch)
+    // Two overlapping fetches name e0; B answers first, then A's delta against e0 lands on B's state.
+    let releaseA!: () => void
+    const gate = new Promise<void>(r => { releaseA = r })
+    const fa = (async (_u: string, init?: RequestInit) => {
+      const h = init?.headers as Record<string, string>
+      if (!h['X-Base']) return new Response('{"a":1,"b":0}', { status: 200, headers: { ETag: '"e1"' } })
+      await gate
+      return new Response('{"set":{"a":1},"del":[]}', { status: 200, headers: { ETag: '"e1"', 'X-Delta': '1' } })
+    }) as typeof fetch
+    const fb = (async () => { n++; return new Response('{"set":{"a":5,"b":2},"del":[]}', { status: 200, headers: { ETag: '"e2"', 'X-Delta': '1' } }) }) as typeof fetch
+    const a = fetchHubWhy(fa)
+    assert.deepEqual((await fetchHubWhy(fb)).hub, { a: 5, b: 2 })
+    releaseA()
+    assert.deepEqual((await a).hub, { a: 1, b: 0 })
+    assert.equal(n, 1)
   })
 
   it('keeps the to-do lists, ticked and sync, from the proxy state', async () => {

@@ -2,14 +2,16 @@
  * The quick switcher (Cmd+K): named commands, every live chat and every History version, matched by name.
  * A substring wins over letters found in order; switcher.tsx draws the result.
  */
-import type { ArchivedChat, ChatProgress, ChatRow, ChatState } from './hub-types'
+import type { ArchivedChat, ChatProgress, ChatRow, ChatState, StuckItem } from './hub-types'
+import { chatShown } from './chat-state'
 import { archiveChains, projectName, splitVersion } from './archive'
 import { almostDone } from './look'
+import { CODER_PAGES, type Page } from './route'
 
 export type Command = { id: string; label: string; group: 'Go to' | 'Do'; hint?: string; keywords?: string }
 
 export type SwitchItem =
-  | { kind: 'live'; id: string; name: string; version: number; state: ChatState; almost?: boolean; chip?: string }
+  | { kind: 'live'; id: string; name: string; version: number; state: ChatState; almost?: boolean; chip?: string; /** Working, but something in it looks stuck (chatShown). */ stuck?: true }
   | { kind: 'history'; id: string; chain: string; name: string; version: number }
   | { kind: 'command'; id: string; label: string; group: Command['group']; hint?: string; keywords?: string }
 
@@ -31,29 +33,29 @@ export function matchName(name: string, q: string): number[] | null {
 }
 
 /** Empty-query order: Go to commands, live chats, Do commands, History. */
-export function switcherItems(cards: Cards, archive: ArchivedChat[], commands: Command[] = []): SwitchItem[] {
+export function switcherItems(cards: Cards, archive: ArchivedChat[], commands: Command[] = [], stuck?: StuckItem[]): SwitchItem[] {
   const live: SwitchItem[] = cards.map(({ chat, progress }) => (
-    { kind: 'live', id: chat.sessionId, name: chatName(chat), version: splitVersion(chat.name).version, state: progress?.state ?? 'idle', ...(almostDone(progress) ? { almost: true } : {}), ...(progress?.state === 'done' ? { chip: 'Ready for your OK' } : {}) }
+    { kind: 'live', id: chat.sessionId, name: chatName(chat), version: splitVersion(chat.name).version, state: progress?.state ?? 'idle', ...(almostDone(progress) ? { almost: true } : {}), ...(progress?.state === 'done' ? { chip: 'Ready for your OK' } : {}), ...(chatShown(progress, stuck) === 'stuck' ? { stuck: true as const } : {}) }
   ))
   const history: SwitchItem[] = archiveChains(archive).flatMap(c => c.versions.map(v => ({ kind: 'history' as const, id: v.sessionId, chain: `${c.latest.cwd}\n${c.origin}`, name: c.origin, version: v.version })))
   const cmd = (g: Command['group']): SwitchItem[] => commands.filter(c => c.group === g).map(c => ({ kind: 'command', ...c }))
   return [...cmd('Go to'), ...live, ...cmd('Do'), ...history]
 }
 
-/** The shell's command list; it maps each id to an action. */
-export function defaultCommands(o: { cards: Cards; repoChanges: boolean; vscode: boolean; awake?: boolean; calls?: boolean }): Command[] {
-  const go = (id: string, label: string, keywords?: string): Command => ({ id: `go:${id}`, label, group: 'Go to', ...(keywords ? { keywords } : {}) })
+/** The shell's command list; it maps each id to an action. simple: Simple view, without the pages it hides. */
+export function defaultCommands(o: { cards: Cards; repoChanges: boolean; vscode: boolean; awake?: boolean; calls?: boolean; simple?: boolean }): Command[] {
+  const go = (id: Page, label: string, keywords?: string): Command[] => o.simple && CODER_PAGES.includes(id) ? [] : [{ id: `go:${id}`, label, group: 'Go to', ...(keywords ? { keywords } : {}) }]
   const onOff = (on?: boolean) => (on ? 'On' : 'Off')
   return [
-    go('now', 'Now', 'home today needs'),
-    go('chats', 'Chats', 'sessions history'),
-    go('plan', 'Plan', 'todo to-do jev'),
-    go('live', 'Live', 'mirofish crowd ab crowd-ab simulation feed'),
-    go('ship', 'Ship', 'git dev servers terminals ci'),
-    go('map-board', 'Map: Agents', 'board'),
-    go('map-flow', 'Map: Code', 'flow'),
-    go('map-memory', 'Map: Memory', 'vault notes'),
-    go('settings', 'Settings', 'gear preferences'),
+    ...go('now', 'Now', 'home today needs'),
+    ...go('chats', 'Chats', 'sessions history'),
+    ...go('plan', 'Plan', 'todo to-do jev'),
+    ...go('live', 'Live', 'mirofish crowd ab crowd-ab simulation feed'),
+    ...go('ship', 'Ship', 'git dev servers terminals ci'),
+    ...go('map-board', 'Map: Agents', 'board'),
+    ...go('map-flow', 'Map: Code', 'flow'),
+    ...go('map-memory', 'Map: Memory', 'vault notes'),
+    ...go('settings', 'Settings', 'gear preferences'),
     { id: 'do:new', label: 'New chat', group: 'Do', keywords: 'start' },
     ...(o.repoChanges ? [{ id: 'do:commit-draft', label: 'Write commit message', group: 'Do' as const, keywords: 'git' }] : []),
     ...o.cards.filter(c => c.progress?.state === 'done').map(({ chat }): Command => ({ id: `do:approve:${chat.sessionId}`, label: `Approve ${chatName(chat)}`, group: 'Do', keywords: 'ok done' })),

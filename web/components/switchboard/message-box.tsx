@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatRow } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
-import { boxNote, sendFailure, withKeywords, type Keywords } from '@/lib/message-box'
+import { boxNote, effortCommand, EFFORTS, OPTS_KEY, readOpts, sendFailure, sendKeywords, withKeywords, writeOpts, type ChatOpts, type Effort, type Keywords } from '@/lib/message-box'
 import { MAX_MESSAGE as MAX, withAttached, type Upload } from '@/lib/attach'
+import { readStore, writeStore } from '@/lib/store'
 import { AttachButton, AttachChips, dropStyle, useAttach, type Attached } from './attach'
 import { chip } from './tool-chips'
 import { useDraft } from '@/hooks/use-draft'
@@ -15,6 +16,26 @@ const KW = {
   ultrathink: { label: 'Ultrathink', hint: 'Adds ultrathink to this message, so Claude thinks longer before answering' },
   ultracode: { label: 'Ultracode', hint: 'Adds ultracode to this message, so Claude runs it as a multi-agent workflow' },
 } as const
+
+/** The chat's own effort and sticky Ultracode, on the message row. */
+function ChatPicks({ opts, onEffort, onUltracode }: { opts: ChatOpts; onEffort: (e: Effort) => void; onUltracode: (on: boolean) => void }) {
+  return (
+    <span className="cp-picks">
+      <label className="cp-effort">
+        <span>Effort</span>
+        <select className="hub-select" aria-describedby="cp-effort-hint" value={opts.effort ?? 'default'} onChange={e => onEffort(e.target.value as Effort)} style={opts.effort ? undefined : { color: 'var(--hub-mute)' }}>
+          <option value="default">Default</option>
+          {EFFORTS.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+      </label>
+      <span id="cp-effort-hint" className="sr-only">Sends /effort to this chat now. New chats start from the effort in Settings.</span>
+      <button type="button" role="switch" className="hub-switch" aria-checked={!!opts.ultracode} aria-describedby="cp-uc-hint" onClick={() => onUltracode(!opts.ultracode)}>
+        <span aria-hidden />Ultracode
+      </button>
+      <span id="cp-uc-hint" className="sr-only">Adds ultracode to every message in this chat until turned off</span>
+    </span>
+  )
+}
 
 /** The Tools button in the message row and its popover: this send's keywords, then the chat's tools (from ChatPicture). */
 function ToolsPop({ kw, setKw, codex, children }: { kw: Keywords; setKw: (k: Keywords) => void; codex: boolean; children?: ReactNode }) {
@@ -67,8 +88,29 @@ export function MessageBox({ chat, send, upload, problem, tools }: { chat: ChatR
   // Touch keyboards have no Shift+Enter, so the key hint is for fine pointers only.
   const [touch, setTouch] = useState(false)
   useEffect(() => { setTouch(matchMedia('(pointer: coarse)').matches) }, [])
+  // Effort and sticky Ultracode, kept per chat in localStorage.
+  const [opts, setOpts] = useState<ChatOpts>({})
+  useEffect(() => { setOpts(readOpts(readStore(OPTS_KEY), chat.sessionId)) }, [chat.sessionId])
+  const keep = (next: { effort?: Effort; ultracode?: boolean }) => {
+    const raw = writeOpts(readStore(OPTS_KEY), chat.sessionId, next)
+    writeStore(OPTS_KEY, raw)
+    setOpts(readOpts(raw, chat.sessionId))
+  }
+  // was: the pick before, put back if the /effort send fails.
+  const [effortSent, setEffortSent] = useState<{ cmd: Extract<HubCommand, { type: 'hub-send' }>; at: number; was: Effort }>()
+  const effortFailed = sendFailure(effortSent?.cmd, problem)
+  useEffect(() => { if (effortFailed && effortSent) keep({ effort: effortSent.was, ultracode: opts.ultracode }) }, [effortFailed])
+  // Shown only while the /effort send is the newest, so a later good send clears it.
+  const effortNewest = !!effortSent && (!sent || effortSent.at > sent.at)
+  const effortErr = effortNewest ? effortFailed : undefined
+  const pickEffort = (e: Effort) => {
+    const cmd = { type: 'hub-send', sessionId: chat.sessionId, text: effortCommand(e) } as const
+    send(cmd)
+    setEffortSent({ cmd, at: Date.now(), was: opts.effort ?? 'default' })
+    keep({ effort: e, ultracode: opts.ultracode })
+  }
   const codex = chat.ai === 'codex'
-  const msg = codex ? withAttached(text, files.paths) : withKeywords(withAttached(text, files.paths), kw)
+  const msg = codex ? withAttached(text, files.paths) : withKeywords(withAttached(text, files.paths), sendKeywords(kw, opts.ultracode))
   const over = msg.length - MAX
   const go = () => {
     if (!msg || note || files.busy || over > 0) return
@@ -96,9 +138,12 @@ export function MessageBox({ chat, send, upload, problem, tools }: { chat: ChatR
               className="cp-say" />
             <AttachChips items={files.items} onRemove={files.remove} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 10px', alignItems: 'center' }}>
-              <span role="status" className="hub-say-hint" style={{ minWidth: 0, flex: '1 1 150px', fontSize: 13, color: failed || over > 0 ? 'var(--hub-red)' : 'var(--hub-ash)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(failed ? (kept ? `Not sent, your text is kept: ${failed}` : failed) : undefined) ?? hint ?? (restoredDraft ? 'Draft restored' : undefined) ?? (sent ? `${codex ? 'Typed into its terminal' : 'Queued, picked up within seconds'}: ${sent.text}` : touch ? '' : 'Shift+Enter for a new line')}
+              <span role="status" className="hub-say-hint" style={{ minWidth: 0, flex: '1 1 150px', fontSize: 13, color: failed || effortErr || over > 0 ? 'var(--hub-red)' : 'var(--hub-ash)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(failed ? (kept ? `Not sent, your text is kept: ${failed}` : failed) : undefined) ?? (effortErr ? `Effort not changed: ${effortErr}` : undefined) ?? hint
+                  ?? (effortNewest ? `Queued ${effortSent.cmd.text}, also the default for new chats` : undefined)
+                  ?? (restoredDraft ? 'Draft restored' : undefined) ?? (sent ? `${codex ? 'Typed into its terminal' : 'Queued, picked up within seconds'}: ${sent.text}` : touch ? '' : 'Shift+Enter for a new line')}
               </span>
+              {!codex && <ChatPicks opts={opts} onEffort={pickEffort} onUltracode={on => keep({ effort: opts.effort, ultracode: on })} />}
               {/* one group, so on a narrow box the buttons drop below the hint together */}
               <span style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
                 <ToolsPop kw={kw} setKw={setKw} codex={codex}>{tools}</ToolsPop>

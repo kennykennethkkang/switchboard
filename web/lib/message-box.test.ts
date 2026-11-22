@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { boxNote, replyBox, sendFailure, withKeywords } from './message-box'
+import { boxNote, effortCommand, MAX_OPTS, readOpts, replyBox, sendFailure, sendKeywords, withKeywords, writeOpts } from './message-box'
 import type { ChatRow } from './hub-types'
 
 const row = (extra: Partial<ChatRow>): ChatRow => ({ pid: 1, sessionId: 's1', cwd: '/w', link: '', live: true, why: [], ...extra })
@@ -44,6 +44,57 @@ describe('thinking keywords', () => {
   it('leaves an empty message empty, and a typed keyword as typed', () => {
     assert.equal(withKeywords('', { ultrathink: true, ultracode: true }), '')
     assert.equal(withKeywords('ultrathink this', { ultrathink: false, ultracode: false }), 'ultrathink this')
+  })
+
+  it('leaves a slash command alone, so a sticky keyword never becomes its argument', () => {
+    assert.equal(withKeywords('/compact', { ultrathink: true, ultracode: true }), '/compact')
+    assert.equal(withKeywords('/effort xhigh', { ultrathink: false, ultracode: true }), '/effort xhigh')
+  })
+
+  it('still adds keywords to a message that starts with a path', () => {
+    assert.equal(withKeywords('/Users/me/app/foo.ts throws, fix it', { ultrathink: false, ultracode: true }), '/Users/me/app/foo.ts throws, fix it ultracode')
+  })
+
+  it('adds the chat-wide ultracode to every send, once', () => {
+    assert.equal(withKeywords('fix it', sendKeywords({ ultrathink: false, ultracode: false }, true)), 'fix it ultracode')
+    assert.equal(withKeywords('fix it', sendKeywords({ ultrathink: false, ultracode: true }, true)), 'fix it ultracode')
+    assert.equal(withKeywords('fix it', sendKeywords({ ultrathink: true, ultracode: false }, true)), 'fix it ultrathink ultracode')
+    assert.equal(withKeywords('fix it', sendKeywords({ ultrathink: true, ultracode: false }, false)), 'fix it ultrathink')
+  })
+})
+
+describe('chat effort and ultracode', () => {
+  it('types /effort with the level, Default as auto', () => {
+    assert.equal(effortCommand('xhigh'), '/effort xhigh')
+    assert.equal(effortCommand('default'), '/effort auto')
+  })
+
+  it('keeps each chat its own picks', () => {
+    let raw = writeOpts(null, 'a', { effort: 'xhigh', ultracode: true })
+    raw = writeOpts(raw, 'b', { effort: 'low' })
+    assert.deepEqual(readOpts(raw, 'a'), { effort: 'xhigh', ultracode: true })
+    assert.deepEqual(readOpts(raw, 'b'), { effort: 'low' })
+    assert.deepEqual(readOpts(raw, 'c'), {})
+  })
+
+  it('drops a chat back to Default and off', () => {
+    const raw = writeOpts(writeOpts(null, 'a', { effort: 'max', ultracode: true }), 'a', { effort: 'default', ultracode: false })
+    assert.deepEqual(readOpts(raw, 'a'), {})
+    assert.equal(raw, '{}')
+  })
+
+  it('reads junk or a bad value as nothing set', () => {
+    assert.deepEqual(readOpts('not json', 'a'), {})
+    assert.deepEqual(readOpts('{"a":{"effort":"huge","ultracode":"yes"}}', 'a'), {})
+    assert.deepEqual(readOpts(writeOpts('[1]', 'a', { effort: 'high' }), 'a'), { effort: 'high' })
+  })
+
+  it('keeps only the newest chats past the cap', () => {
+    let raw: string | null = null
+    for (let i = 0; i <= MAX_OPTS; i++) raw = writeOpts(raw, `c${i}`, { effort: 'high' })
+    assert.deepEqual(readOpts(raw, 'c0'), {})
+    assert.deepEqual(readOpts(raw, `c${MAX_OPTS}`), { effort: 'high' })
+    assert.equal(Object.keys(JSON.parse(raw!)).length, MAX_OPTS)
   })
 })
 

@@ -7,6 +7,7 @@ import { createHash } from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 import { foldPathCase } from '../fs-utils'
+import { questionBucket, readLearned, RECOMMENDED, smartPick, stripRecommended, type Stats } from './smart-select'
 import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, DailyTrend, Helper, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall, TrendValue } from './types'
 
 type Payload = Record<string, unknown>
@@ -330,8 +331,21 @@ export function permissionAsk(payload: Payload, now: number): Ask | undefined {
   return { id: `${now.toString(36)}.${callKey(tool, payload.tool_input)}`, kind: 'permission', tool: cut(tool, 60)!, ...(preview ? { preview } : {}), options: ['Yes', ...(always ? [always] : []), 'No'] }
 }
 
+/** The option marked (Recommended), or the one the learned rates prefer over it, with its learned rate for the question's header. */
+function smartOption(header: string | undefined, question: string, options: string[], stats: Stats): AskQuestion['smart'] {
+  const rule = options.findIndex(o => RECOMMENDED.test(o))
+  if (rule < 0) return undefined
+  const task = questionBucket(header, question)
+  const bare = options.map(stripRecommended)
+  const best = bare.indexOf(smartPick('question', task, bare[rule], bare, stats).pick)
+  // Labels rarely repeat across questions: under 5 of this label, the rate is the bucket's whole record.
+  const cells = Object.values(stats.question?.[task] ?? {}), own = stats.question?.[task]?.[bare[best]]
+  const c = own && own.n >= 5 ? own : { n: cells.reduce((a, x) => a + x.n, 0), useful: cells.reduce((a, x) => a + x.useful, 0) }
+  return { option: best, ...(c.n ? { rate: c.useful / c.n, n: c.n } : {}) }
+}
+
 /** An AskUserQuestion's questions, capped; undefined when any is unreadable, since the keys go one per question. */
-export function questionAsk(id: string, input: Payload): Ask | undefined {
+export function questionAsk(id: string, input: Payload, stats: Stats = readLearned()): Ask | undefined {
   const raw = Array.isArray(input.questions) ? input.questions.slice(0, 4) : []
   const questions: AskQuestion[] = raw.flatMap(q => {
     const o = (q ?? {}) as Payload
@@ -341,7 +355,8 @@ export function questionAsk(id: string, input: Payload): Ask | undefined {
     const header = cut(o.header, 40)
     // Same order as options; only sent when some option has one.
     const details = (o.options as Payload[]).slice(0, 8).map(x => cut(x?.description, 140) ?? '')
-    return [{ ...(header ? { header } : {}), question, options, ...(details.some(Boolean) ? { details } : {}), ...(o.multiSelect === true ? { multiSelect: true } : {}) }]
+    const smart = smartOption(header, question, options, stats)
+    return [{ ...(header ? { header } : {}), question, options, ...(details.some(Boolean) ? { details } : {}), ...(o.multiSelect === true ? { multiSelect: true } : {}), ...(smart ? { smart } : {}) }]
   })
   return questions.length && questions.length === raw.length ? { id: cut(id, 80) ?? id, kind: 'question', tool: 'AskUserQuestion', options: [], questions } : undefined
 }

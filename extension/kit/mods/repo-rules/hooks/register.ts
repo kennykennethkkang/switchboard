@@ -32,8 +32,8 @@ export const addsEmDash = (before: string, after: string) => count(after) > coun
 
 export const norm = (p: string) => p.replace(/\\/g, '/')
 
-/** New text under these folders gets no em dash: the repos and Claude's memory. */
-export const rootsFor = (home: string) => [`${norm(home)}/Documents/GitHub/`, `${norm(home)}/.claude/projects/`]
+/** New text under these folders gets no em dash: the repos, Claude's memory and the research folder. */
+export const rootsFor = (home: string) => [`${norm(home)}/Documents/GitHub/`, `${norm(home)}/.claude/projects/`, `${norm(home)}/Documents/Research/`]
 export const isUnder = (path: string, roots: string[]) => roots.some(root => norm(path).startsWith(root))
 
 // The home folder, read once; HOME on macOS and Linux, USERPROFILE on Windows.
@@ -66,6 +66,83 @@ async function report($: EngineInterface, detail: string) {
   }).catch(() => undefined)
 }
 
+// File claims, from kem_glitch: two chats in one folder overwrite each other. A file a chat writes
+// is held for it until 20 idle minutes pass or it ends. Keyed by absolute path, so worktrees never clash.
+export const CLAIM_MS = 20 * 60_000
+export type Claims = Record<string, { session: string; at: number }>
+
+export const parseClaims = (text: string): Claims => {
+  try {
+    const v = JSON.parse(text)
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {}
+  } catch { return {} }
+}
+
+const live = (claims: Claims, now: number) => Object.entries(claims).filter(([, c]) => typeof c?.session === 'string' && now - c.at < CLAIM_MS)
+
+export const heldBy = (claims: Claims, path: string, session: string, now: number) =>
+  live(claims, now).find(([p, c]) => p === path && c.session !== session)?.[1]
+
+export const stamp = (claims: Claims, path: string, session: string, now: number): Claims =>
+  ({ ...Object.fromEntries(live(claims, now)), [path]: { session, at: now } })
+
+export const release = (claims: Claims, session: string): Claims =>
+  Object.fromEntries(Object.entries(claims).filter(([, c]) => c?.session !== session))
+
+const claimsDir = (home: string) => `${norm(home)}/.claude/switchboard/claims`
+export const claimFile = (home: string, root: string) => `${claimsDir(home)}/${norm(root).replace(/[^A-Za-z0-9]+/g, '-')}.json`
+
+const homeOf = async ($: EngineInterface) => (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? ''
+
+// Nearest folder with a .git (a worktree's is a file); none means the file is not claimed.
+async function repoRoot($: EngineInterface, path: string) {
+  for (let dir = norm(path).replace(/\/[^/]*$/, ''); dir.includes('/'); dir = dir.replace(/\/[^/]*$/, '')) {
+    if (await $.fs.exists(`${dir}/.git`)) return dir
+  }
+  return undefined
+}
+
+// Temp file then mv, so a reader never sees half a file.
+// ponytail: two chats saving at once can drop one stamp (last rename wins); it comes back on that chat's next write.
+async function save($: EngineInterface, file: string, claims: Claims, tag: string) {
+  const tmp = `${file}.${tag.replace(/[^A-Za-z0-9-]/g, '')}.tmp`
+  await $.fs.write(tmp, JSON.stringify(claims))
+  await $.process.run(['mv', '-f', tmp, file])
+}
+
+async function checkClaim($: EngineInterface, path: string | undefined) {
+  try {
+    const root = path && await repoRoot($, path)
+    if (!root || !path) return undefined
+    const file = claimFile(await homeOf($), root)
+    const claims = parseClaims(String(await $.fs.read(file).catch(() => '{}')))
+    const [session, now] = await Promise.all([$.session.id(), $.clock.now()])
+    const key = norm(path)
+    const other = heldBy(claims, key, session, now)
+    if (other) {
+      const name = key.split('/').pop()
+      await report($, `${name} held by chat ${other.session}`).catch(() => undefined)
+      const mins = Math.max(1, Math.round((now - other.at) / 60_000))
+      return { deny: `repo-rules: ${name} is held by chat ${other.session}, which wrote it ${mins} min ago. Find it with ListAgents and SendMessage it to make the change or say when it is done, or wait. The hold lapses after 20 idle minutes or when that chat ends.` }
+    }
+    await save($, file, stamp(claims, key, session, now), `${session}-${now}`)
+  } catch { /* fail open */ }
+  return undefined
+}
+
+async function releaseAll($: EngineInterface, session: string) {
+  const dir = claimsDir(await homeOf($))
+  for (const f of await $.fs.list(dir).catch(() => [])) {
+    if (f.kind !== 'file' || !f.name.endsWith('.json')) continue
+    const file = `${dir}/${f.name}`
+    const claims = parseClaims(String(await $.fs.read(file).catch(() => '{}')))
+    const left = release(claims, session)
+    if (Object.keys(left).length < Object.keys(claims).length) await save($, file, left, `${session}-end`)
+  }
+}
+
+const WRITES = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+
 const held = (what: string) => ({ deny: `repo-rules: the guard failed, so the ${what} was held.` })
 
 async function checkBash($: EngineInterface, command: string) {
@@ -93,4 +170,16 @@ export const register: Register = on => {
     const before = await $.fs.read(e.file_path).catch(() => '')
     return (await checkText($, e.file_path, String(before), e.content)) ?? next(e)
   }).catch(($, e, next) => (next.called ? next(e) : held('write')))
+
+  // Registered last so the em dash check answers first.
+  on('tool.call', async ($, e, next) => {
+    if (!WRITES.has(e.tool)) return next(e)
+    const f = e as { file_path?: string; notebook_path?: string }
+    return (await checkClaim($, f.file_path ?? f.notebook_path)) ?? next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('session.end', async ($, e, next) => {
+    await releaseAll($, e.sessionId).catch(() => undefined)
+    return next(e)
+  })
 }

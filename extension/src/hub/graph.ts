@@ -8,6 +8,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { redact } from './brain'
 import { decodeProjectDir } from './local'
+import { RESEARCH_ROOT } from './research'
 import type { HubState } from './types'
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference'
@@ -117,7 +118,10 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
     return add({ id: `project:${p}`, kind: 'project', label: named.get(p) ?? path.basename(p) ?? p })
   }
 
-  const bySlug = new Map(known.map(k => [slugOf(k), k]))
+  // Lowercased: macOS paths ignore case, so a chat started in ~/github/switchboard gets its memory folder in lowercase.
+  // First spelling wins: projects come before to-do folders in known, so a lowercase to-do key cannot take a project's notes.
+  const bySlug = new Map<string, string>()
+  for (const k of known) if (!bySlug.has(slugOf(k).toLowerCase())) bySlug.set(slugOf(k).toLowerCase(), k)
   // Lowercased: links resolve by name, then alias, ignoring case. claims finds names two notes use.
   const byName = new Map<string, string>()
   const byAlias = new Map<string, string>()
@@ -144,7 +148,7 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
   })
   for (const { f, m, id } of parsed) {
     add({ id, kind: 'memory', label: redact(m.name), type: m.type, ...fields(m) })
-    const home = bySlug.get(f.dir)
+    const home = bySlug.get(f.dir.toLowerCase())
     const pid = home ? projectFor(home) : add({ id: `project:dir:${f.dir}`, kind: 'project', label: decodeProjectDir(f.dir) })
     edges.push({ source: id, target: pid, kind: 'in' })
   }
@@ -239,8 +243,8 @@ function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<str
 
 /** What memory knows about query, for a chat's hub_recall: the best 3 notes by name, alias or description, then what links to
  * them within hops, superseded notes left out unless asked for by name. near: the chat's project id, first on a tied score.
- * Plain text, redacted, about 1500 characters. */
-export function recall(graph: MemoryGraph, query: string, hops = 2, near?: string): string {
+ * scope research: only the notes in the research folder's memory. Plain text, redacted, about 1500 characters. */
+export function recall(graph: MemoryGraph, query: string, hops = 2, near?: string, scope?: 'research'): string {
   const low = (x: string) => x.normalize('NFC').toLowerCase()
   const q = low(query.trim())
   const terms = q.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
@@ -249,10 +253,11 @@ export function recall(graph: MemoryGraph, query: string, hops = 2, near?: strin
   const score = (n: GraphNode) => terms.reduce((s, t) => s + (low(n.label).includes(t) ? 3 : 0)
     + (n.aliases?.some(a => low(a).includes(t)) ? 2 : 0) + (n.description && low(n.description).includes(t) ? 1 : 0), 0)
     + (low(n.label) === q ? 5 : 0)
+  const inScope = (id: string) => scope !== 'research' || id.startsWith(`memory:${slugOf(RESEARCH_ROOT)}/`)
   const home = new Set(near ? graph.edges.filter(e => e.kind === 'in' && e.target === near).map(e => e.source) : [])
   // A superseded note only when asked for by name or alias.
   const named = (n: GraphNode) => low(n.label) === q || !!n.aliases?.some(a => low(a) === q)
-  const seeds = graph.nodes.filter(n => (n.kind === 'memory' || n.kind === 'wiki' || n.kind === 'raw') && (!n.superseded || named(n)))
+  const seeds = graph.nodes.filter(n => (n.kind === 'memory' || n.kind === 'wiki' || n.kind === 'raw') && (!n.superseded || named(n)) && inScope(n.id))
     .map(n => ({ n, s: score(n) })).filter(x => x.s > 0)
     .sort((a, b) => b.s - a.s || Number(!home.has(a.n.id)) - Number(!home.has(b.n.id)) || a.n.label.length - b.n.label.length)
     .slice(0, 3).map(x => x.n)
@@ -270,7 +275,7 @@ export function recall(graph: MemoryGraph, query: string, hops = 2, near?: strin
     for (const e of graph.edges) {
       if (!KNOWS.has(e.kind) || !(front.includes(e.source) || front.includes(e.target))) continue
       const other = front.includes(e.source) ? e.target : e.source
-      if (!ok(other) || !ok(e.source) || !ok(e.target)) continue
+      if (!ok(other) || !ok(e.source) || !ok(e.target) || !inScope(other)) continue
       line(`${tag(e.source)} --[${e.kind}]--> ${tag(e.target)}`, d + 1)
       if (!seen.has(other)) { seen.add(other); next.push(other) }
     }

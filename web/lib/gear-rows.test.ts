@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { benchPrompt, blockHits, pauseValue, gearRows, keywordHit, roleModels, sweepBadge, sweepTip, sweptNow } from './gear-rows'
+import { chatGroups, benchPrompt, blockHits, pauseValue, gearRows, keywordHit, roleModels, sweepBadge, sweepTip, sweptNow } from './gear-rows'
 import type { Connection, Installed, SweepRecord } from './hub-types'
 import { demoHub } from './hub-demo'
 
@@ -145,4 +145,12 @@ test('pauseValue: on brings back the last value, else 99; off is null', () => {
   assert.equal(pauseValue(true, undefined), 99)
   assert.equal(pauseValue(true, 40), 99)
   assert.equal(pauseValue(false, 90), null)
+})
+
+test('chatGroups: five headings, every label once, strays join Advanced', () => {
+  const labels = ['Continue at usage limit', 'Chat notices', 'Phone mode', 'Show agent browsers', 'Fix stuck items', 'Advanced mode in X', 'Your name']
+  const g = chatGroups(labels.map(label => ({ label })))
+  assert.deepEqual(g.map(([h]) => h), ['Chats', 'Notices', 'Windows and phone', 'Advanced'])
+  assert.deepEqual(g.flatMap(([, r]) => r.map(x => x.label)).sort(), [...labels].sort())
+  assert.ok(g.find(([h]) => h === 'Advanced')![1].some(r => r.label === 'Advanced mode in X'))
 })

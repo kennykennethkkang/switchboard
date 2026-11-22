@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { ask, askMode, isRepoAsk, repoPlan, chainBase, chainVersion, chatLabel, codexArgs, cloneTarget, codexNote, crossNote, freshPrompt, handoffFile, labelNote, mergeProjects, newChatCommand, nextChainName, projectName, repoTop, scriptBody, scriptLine, stillRunning } from '../src/hub/projects'
+import { ask, askMode, isRepoAsk, repoPlan, chainBase, chainVersion, chatLabel, codexArgs, cloneTarget, codexNote, crossNote, freshPrompt, handoffFile, labelNote, mergeProjects, newChatCommand, nextChainName, projectName, repoTop, scriptBody, scriptLine, stillRunning, ultracodeFlags } from '../src/hub/projects'
 
 describe('projectName', () => {
   it('names a folder by the git repo holding it, else its last part', () => {
@@ -84,6 +84,35 @@ describe('projects', () => {
     assert.equal(newChatCommand({ text: 'go', name: 'Go', sessionId: '0f8fad5b-d9cb-469f-a165-70867728950e', settings: '/h/p.json', system: "Ask, don't guess." }, 'posix'),
       "claude --name 'Go' --session-id 0f8fad5b-d9cb-469f-a165-70867728950e --settings '/h/p.json' --append-system-prompt 'Ask, don'\\''t guess.' 'go'")
     assert.throws(() => newChatCommand({ sessionId: 'x; rm -rf ~' }, 'posix'))
+  })
+
+  it('passes the picked model and effort, and nothing when unset', () => {
+    assert.equal(newChatCommand({ model: 'opus', effort: 'high', text: 'go' }, 'posix'), "claude --model 'opus' --effort 'high' 'go'")
+    assert.equal(newChatCommand({ model: 'opus[1m]', name: 'Go' }, 'posix'), "claude --name 'Go' --model 'opus[1m]'")
+    assert.equal(newChatCommand({ effort: 'ultracode' }, 'powershell'), "claude --effort 'ultracode'")
+    assert.equal(newChatCommand({ text: 'go' }, 'posix'), "claude 'go'")
+    for (const bad of ['x; echo hi', '', 'a b', '$(id)']) assert.throws(() => newChatCommand({ model: bad }, 'posix'), /model/)
+    for (const bad of ['huge', 'High', '']) assert.throws(() => newChatCommand({ effort: bad }, 'posix'), /effort/)
+  })
+
+  it('ultracode at xhigh is --effort ultracode; at any other effort it is a key in the settings', () => {
+    assert.deepEqual(ultracodeFlags({ effort: 'xhigh', ultracode: true, settings: '{"a":1}' }), { effort: 'ultracode', settings: '{"a":1}' })
+    assert.deepEqual(ultracodeFlags({ effort: 'high', ultracode: true, settings: '{"a":1}' }), { effort: 'high', settings: '{"a":1,"ultracode":true}' })
+    assert.deepEqual(ultracodeFlags({ effort: 'max', ultracode: true }), { effort: 'max', settings: '{"ultracode":true}' })
+    // no effort picked: Claude Code's own level stays, ultracode rides in the settings
+    assert.deepEqual(ultracodeFlags({ ultracode: true }), { effort: undefined, settings: '{"ultracode":true}' })
+    assert.deepEqual(ultracodeFlags({ effort: 'high', settings: '/h/p.json' }), { effort: 'high', settings: '/h/p.json' })
+    assert.deepEqual(ultracodeFlags({ effort: 'xhigh', ultracode: false }), { effort: 'xhigh', settings: undefined })
+  })
+
+  it('ultracode in a settings file is written into it, other keys kept', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-ultra-'))
+    try {
+      const file = path.join(dir, 'c.settings.json')
+      fs.writeFileSync(file, '{"permissions":{"defaultMode":"bypassPermissions"}}')
+      assert.deepEqual(ultracodeFlags({ effort: 'medium', ultracode: true, settings: file }), { effort: 'medium', settings: file })
+      assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { permissions: { defaultMode: 'bypassPermissions' }, ultracode: true })
+    } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   })
 
   it('reads a first message from its file, so a long one never overflows the terminal line', () => {
@@ -215,6 +244,22 @@ it('Codex chat model and effort go in as -m and -c on new and resumed chats, not
     assert.deepEqual(codexArgs([]), [hook, '-c', 'model_reasoning_effort=xhigh'])
     ask.codexEffort = undefined
     assert.deepEqual(codexArgs([]), [hook])
+  } finally { ask.codex = false; ask.codexModel = undefined; ask.codexEffort = undefined }
+})
+
+it("a chat's own Codex model and effort beat the gear's, and resume keeps to the gear", () => {
+  const hook = '--dangerously-bypass-hook-trust'
+  ask.codex = true
+  try {
+    ask.codexModel = 'gpt-5.6-terra'
+    ask.codexEffort = 'high'
+    assert.deepEqual(codexArgs(['Fix'], { model: 'gpt-6-luna', effort: 'xhigh' }), [hook, '-m', 'gpt-6-luna', '-c', 'model_reasoning_effort=xhigh', 'Fix'])
+    assert.deepEqual(codexArgs(['Fix'], { effort: 'medium' }), [hook, '-m', 'gpt-5.6-terra', '-c', 'model_reasoning_effort=medium', 'Fix'])
+    assert.deepEqual(codexArgs(['Fix'], {}), [hook, '-m', 'gpt-5.6-terra', '-c', 'model_reasoning_effort=high', 'Fix'])
+    ask.codexModel = undefined
+    ask.codexEffort = undefined
+    assert.deepEqual(codexArgs(['Fix'], { model: 'gpt-6-luna' }), [hook, '-m', 'gpt-6-luna', 'Fix'])
+    assert.deepEqual(codexArgs(['resume', 'abc'], { model: 'gpt-6-luna' }), ['resume', hook, 'abc'])
   } finally { ask.codex = false; ask.codexModel = undefined; ask.codexEffort = undefined }
 })
 

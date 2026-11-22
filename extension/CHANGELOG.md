@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.21.113
+
+- Agent drawer: opens on one plain sentence about what the agent did and how it went, then fact chips, How it went (Changed, Checked, Still open), what it was asked, files, and every tool call folded under Details
+- Outputs: opens on an In short card (Needs you first, a one-line headline, chips colored only for a problem); reports are readable cards with their real status; the transcript folds tool calls into one row
+- Live page is a scoreboard: a headline sentence, a crowd board with labelled vote bars and a verdict in plain words, a MiroFish board with a round ring and elapsed time, then reports with their takeaway. Smart select and Source check stay on the page. The old Live cards are gone
+- Next to-do hold: when the next to-do can't start (a to-do chat waiting on another chat, the usage limit, a failed start, paused autopilot), Plan says why under Auto-run and Now says it under the first Up next item, instead of "starts by itself"
+
+## 0.21.112
+
+- Research window: when a chat starts deep-research, /deep-research or a researcher makes its first web call, a compact always-on-top window shows the run live: the question, state and clock, searches, sources by site and researcher, researcher lanes and the cited answer. Opens once per chat; after you close it, it can come back for that chat after 30 min
+- Set up installs the founder plugin (emotixco/claude-skills-founder): /pricing-strategy, /pitch-deck, /go-to-market and 11 more. It starts off like marketing-skills; a chat naming pricing strategy, a pitch deck, fundraising or go-to-market turns it on
+
+## 0.21.111
+
+- Status bar: Keep awake, Call me and the Phone button no longer push the page sideways. It happened at 380px on every page (the Memory map included) and from 761 to about 1290 with the side rail. When the bar runs out of room the Ship chip shortens first (never under 64px, so "Push N" stays readable), then the usage meters swipe sideways with a fade on the cut edge; the toggles keep their size. The meters strip is a Tab stop only while some meters are hidden
+
+## 0.21.110
+
+- Memory: the cluster map is back as the only map (Kenneth's pick after crowd-ab: Constellations won every run over Comets). The comet world, beams, strikes and level labels are gone. One Switchboard cluster instead of two (a lowercase memory folder now joins its project), projects with no notes left out, rings sit round each cluster with its name on top, click a project name to open it, no note names cluttering the map at rest, the whole map fits on screen, a shorter legend, and the note panel and legend no longer show the map through them. A project's panel says "Project" instead of "Projects in Shared"
+- Terminal layout C (pane first), picked after crowd-ab: with the side pane open only the to-do row stays above the prompt and the pane gains Smart (ponytail, model, why, roles) and Cache sections; without a pane one row carries Smart button, to-do, ponytail and cache. One style: dim labels, plain values, bold only on To-do N and Smart, color only on role names and status. New role palette, one hex set for both themes (codex roles share their base role's). side-pane 0.1.2, smart-select 0.1.4, todo-band 0.2.2, cache-keeper 0.1.1 (its row now stacks with other mods' rows), role-rows 0.3.2
+
+## 0.21.109
+
+- Memory: comets. Each project is a glowing comet head over a dark world, higher the longer since it changed; recent projects strike the world, new links pulse along one string per project pair, and heads level up (lvl 1 to 4) with notes and links. Darker than before (mean brightness about 9 on desktop, under 11 on phones), draws nothing while idle between 15 s bursts, no leak when leaving and coming back, projects with chats but no notes left out, future dates clamped
+- Smart select: model, effort, ponytail level, subagent role and model, and question answers are smart picks with a reason, logged in ~/.claude/switchboard/smart-picks.jsonl (mods write per-chat files in smart-picks.d) and scored against how each chat ended; a pick that keeps doing better for a kind of task takes over, never below a role's floor. Live page section, Smart pick mark on question options, "Smart:" reason line. Backfilled from past chats (848 rows, questions grouped into 8 kinds); per-chat pick files untouched for 60 days are skipped
+- smart-select 0.1.2 (new mod): picks the ponytail level per task, never overrides a level set by hand (a typed /ponytail included, even before the first pick) until /smart, never fights another chat over the shared level; one-line Smart row that hides on short terminals
+- side-pane 0.1.0 (new mod): a pane beside the chat with what waits on you, running agents with their full task, Claude and Codex usage bars, smart picks and the mods that are on; /side opens or closes it, /side mods shows the list. Docks beside the chat from 110 columns; while it is open the rows above the prompt hide. Picked by crowd-ab (persona panel 84%) over three other layouts
+- role-rows 0.3.1, todo-band 0.2.1: fold to fit short terminals and stack with other mods' rows instead of hiding them
+- usage-meter 0.6.5: logs each subagent's role and model pick and its escalations for Smart select
+- Codex usage meters stay on the bar after their window resets (reading 0%) instead of disappearing until the next Codex chat
+- Codex parity: context7 over stdio for Codex, and code-simplifier, auth0, aws-core, bland, i-have-adhd and marketing-skills set up for Codex too
+
+## 0.21.108
+
+- account-guard 0.1.11: an aws call whose output has one of the CLI's own signed-out error lines (session expired, ExpiredToken, no credentials, SSO token errors; a log line that only shares a phrase does not count) gets a note: skip AWS-only reads (prod logs, status probes) and list them as skipped, ask the user to sign in only when the task needs AWS (a deploy or an asked-for change)
+- Memory: the upgraded 3D map is the default (Kenneth's pick over the 2D star map). Projects spread into their own glowing clusters with the name above, brighter links that hold up at any zoom, a "!" badge on notes that need a look, pick to focus and glide, slow idle orbit on desktop only. It draws only while something moves, lays out once and remembers it, and on phones uses fewer stars, at most 8 names and 1.5x sharpness. Notebook stays the second tab; the 2D star map is gone
+- Faster on phones and other devices: the proxy sends only the hub state fields that changed (about 207 KB down to about 2 KB per update), the court map runs at 30 fps and 1.5x sharpness on touch screens, and the app loads as split modules so 3D, terminal and map code load only when opened (first load 631 KB to 233 KB of script, about 5.3 s to 3.3 s to interactive on a throttled phone)
+
+## 0.21.107
+
+- Memory: a new star map is the default (projects as glowing clusters, labels that never overlap, pick a note to focus it and read it in a side panel), with a Notebook tab for reading notes and their links. Picked by crowd-ab and MiroFish over the flat map, an upgraded 3D graph and three other maps. The old 3D graph stays at ?mem=3d; ?big=1 loads 120 demo notes
+- Same state everywhere: one rule decides working, waiting, stuck, needs you and done for every page (Now, Chats, Map, Plan counts, orbits, switcher). Only the window that runs a chat decides if it is stuck, so the VS Code panel, the web hub and the phone agree; a done or idle chat never shows Stuck
+- Auto pick shows its reason in New chat and To-do Start ("Auto: sonnet · medium, small change"), from the same rules the extension uses (pick-run.ts). Rules tuned on 150 real prompts: 10 wrong picks down to 1
+- Clearer screens: New chat keeps the main controls and tucks the rest under More options with plain labels; Screen and outputs button; Simple home puts Needs you first on a phone; first run asks without a preselected choice; every Now card names all five stations; the New chat button no longer covers content; one needs-you count; Plan shows the To-do first with Today collapsed; Map gets plain subtitles; Settings grouped into Chats, Notices, Windows and phone, Advanced
+- role-rows 0.2.0: subagent rows under the prompt draw as a tree grouped by role, like the workflow progress tree, so every role stays in view; finished agents fold into one line before a running one is ever dropped
+- repo-rules 0.2.5: Codex chats write and respect the same file claims as Claude chats
+- usage-meter 0.6.1: the picker rule fixes above
+- source-check: retries and a Bing fallback when DuckDuckGo throttles; GDELT news coverage and ClaimReview fact-check signals
+
+## 0.21.106
+
+- usage-meter 0.6.3: a subagent round that qa or the gate sent back reruns one model step above its auto pick (up to opus), instead of waiting three rounds for the learned escalation. Sent back means the last round was not clean, qa since found problems, or the new brief carries the gate's failure
+
+## 0.21.104
+
+- Auto pick per task: each new chat, To-do run and subagent gets a model, effort, ultrathink and ultracode picked from the task, with a one-line reason; your own pick always wins. xhigh, max, fable and ultracode are only picked while 5h usage is under 60%, else one level lower and the reason says so
+- Model and effort picker (Auto, low to max, xhigh included, Ultracode) on New chat, To-do Start and the deep-research box; Settings > Models: "Auto pick per task" switch, old effort "Auto" renamed "Model default"
+- Chat message row: Effort select and a sticky Ultracode switch per chat; picking an effort no longer changes the default for new chats
+- Simple view by default for new users, Coder view switch in Settings and at the foot of the rail; plain names, fewer pages and settings in Simple
+- Home: setup checklist above the ask box until setup is done, then the ask box first with Needs you, Working and Done today; empty states name the next step
+- Research mode: Research switch in New chat runs the chat in ~/Documents/Research with its own memory and no aar, standup or Approve gate; a chat that looks like research offers to move; hub_recall takes scope research
+- Now: every Working card has a stations track (Research, Build, Gate, Review, Your call) with round chips and a Verified badge; Done split into merged, approved and stopped
+- To-do: one Decide inbox (Accept, Decline, Snooze), Running, Queue by project and Waiting with reasons; status chips with counts, collapsible sections, Move up and down on touch, short titles, Start again for stopped items, Needs your OK items, model and effort on Start
+- To-do logic: stale suggestions close when their source is done or committed (Sonnet check), duplicates checked against the last 7 days, start dates
+- Screen tab: a chat's live terminal in the app, colored on desktop and fit to width on phones, secrets masked; typing only when switchboard.screenTyping is on in this Mac's settings
+- Live: Source check section showing source-check runs, each source with a band, score bar and reasons
+- Mods: role-rows (one aligned colored line per subagent), repo-rules file claims (one chat writes a file at a time), done-check and repo-rules skip the Research folder, role colors in agent files
+- qa reviews blind: the brief carries the task, checks and diff, not the engineer's report
+- Site fixes: Your moves count, Chats detail column, phone gaps and 44px targets, map labels and counts, copy
+
 ## 0.21.103
 
 - Phone: the floating New chat button steps aside while you scroll down and comes back when you scroll up, so it no longer covers what you are reading

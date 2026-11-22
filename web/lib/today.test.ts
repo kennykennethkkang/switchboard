@@ -1,7 +1,7 @@
 /** The Today card: what finished today, what waits on you, what runs, and what today cost. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { needsLines, todayView, tokenText } from './today'
+import { needsLines, todayView, tokenText, type Today } from './today'
 import { demoHub } from './hub-demo'
 import { liveChats } from './archive'
 
@@ -52,4 +52,11 @@ test('token text switches to M after rounding, not before', () => {
   assert.equal(tokenText(999_400), '999K')
   assert.equal(tokenText(999_500), '1.0M')
   assert.equal(tokenText(2_450_000), '2.5M')
+})
+
+test('todayLine: one line of counts, quiet parts left out', async () => {
+  const { todayLine } = await import('./today')
+  const t = { done: ['a'], approve: [], needs: [{ name: 'x' }], working: ['p', 'q'], tokens: 12000 } as Today
+  assert.equal(todayLine(t, 2), '2 your moves · 2 working · 1 done · 12K tokens')
+  assert.equal(todayLine({ done: [], approve: [], needs: [], working: [] } as Today, 0), 'Nothing moving today')
 })

@@ -26,7 +26,7 @@ const HTML_SHELL = `<!DOCTYPE html>
 </head>
 <body class="font-sans antialiased" style="background: var(--hub-canvas, #07080a);">
   <div id="root" style="height: 100%;"></div>
-  <script src="/index.js"></script>
+  <script type="module" src="/index.js"></script>
 </body>
 </html>`
 
@@ -85,7 +85,8 @@ export function serveStatic(req: http.IncomingMessage, res: http.ServerResponse,
   try {
     const { raw, gz, etag } = load(filePath)
     // no-cache: the browser keeps the file but checks the ETag, so a new build shows up on the next load.
-    const head = { 'Content-Type': mime, ETag: etag, 'Cache-Control': 'no-cache', Vary: 'Accept-Encoding' }
+    // Chunks carry a content hash in their name, so a phone keeps them without asking again.
+    const head = { 'Content-Type': mime, ETag: etag, 'Cache-Control': /-[\w-]{8}\.js$/.test(basename) ? 'public, max-age=31536000, immutable' : 'no-cache', Vary: 'Accept-Encoding' }
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, head).end(); return }
     const gzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))
     res.writeHead(200, { ...head, ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) })

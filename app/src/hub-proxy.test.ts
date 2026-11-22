@@ -457,7 +457,7 @@ describe('proxyHub to-do', () => {
     hops.push({ method: req.method, url: req.url, body })
     tokens.push(String(req.headers['x-switchboard-token']))
     if (req.url?.startsWith('/hub/holds')) res.writeHead(404).end()
-    else if (req.url?.startsWith('/hub/state')) res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ chats: [], todos, ...(stamp ? { stamp } : {}) }))
+    else if (req.url?.startsWith('/hub/state')) res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ chats: [], todos, pad: 'x'.repeat(600), ...(stamp ? { stamp } : {}) }))
     else res.writeHead(204).end()
   })
   let port = 0
@@ -565,6 +565,39 @@ describe('proxyHub to-do', () => {
     assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/chat/other?session=s-1')).status, 404)
   })
 
+  it('passes a screen read on with only the chat and ansi, and to the window that holds the chat', async () => {
+    hops.length = 0; other.length = 0
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/chat/screen?session=s-1&ansi=1&token=evil&x=1')).status, 204)
+    assert.deepEqual(hops.filter(h => !h.url?.startsWith('/hub/holds')).map(h => h.url), ['/hub/chat/screen?session=s-1&ansi=1'])
+    assert.equal((await call('mac.tail1.ts.net', 'GET', '/hub/chat/screen?session=s2&token=evil')).status, 204)
+    assert.deepEqual(other, ['/hub/chat/screen?session=s2 tok2 '])
+    assert.equal((await call(`127.0.0.1:${port}`, 'POST', '/hub/chat/screen?session=s-1', '{}')).status, 404)
+    const bare = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, path: '/hub/chat/screen?session=s-1', headers: { Host: `127.0.0.1:${port}` } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end())
+    assert.equal(bare, 403)
+  })
+
+  it('passes typed keys on, from the phone too, to the window that holds the chat and with the query dropped', async () => {
+    const body = JSON.stringify({ session: 's2', text: 'hello' })
+    for (const host of hosts()) {
+      hops.length = 0; other.length = 0
+      assert.equal((await call(host, 'POST', '/hub/chat/keys?token=evil&session=other', body)).status, 204, host)
+      assert.deepEqual(other, [`/hub/chat/keys tok2 ${body}`], host)
+    }
+    hops.length = 0
+    const mine = JSON.stringify({ session: 's-1', key: 'enter' })
+    assert.equal((await call(`127.0.0.1:${port}`, 'POST', '/hub/chat/keys', mine)).status, 204)
+    assert.deepEqual(hops.filter(h => !h.url?.startsWith('/hub/holds')), [{ method: 'POST', url: '/hub/chat/keys', body: mine }])
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/chat/keys?session=s-1')).status, 404)
+  })
+
+  it('refuses typed keys from another site or without the header', async () => {
+    hops.length = 0
+    const body = '{"session":"s-1","key":"enter"}'
+    const evil = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hub/chat/keys', headers: { Host: `127.0.0.1:${port}`, 'X-Switchboard': '1', Origin: 'http://evil.test' } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end(body))
+    const bare = await new Promise<number>(ok => http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hub/chat/keys', headers: { Host: `127.0.0.1:${port}` } }, x => { x.resume(); ok(x.statusCode ?? 0) }).end(body))
+    assert.deepEqual([evil, bare, hops.length], [403, 403, 0])
+  })
+
   it('passes every to-do command the panel sends, unchanged, with the window token added', async () => {
     const cmds = [
       { type: 'hub-todo-add', path: '/p', text: 'x' },
@@ -658,6 +691,23 @@ describe('proxyHub to-do', () => {
     assert.notEqual(changed.headers.etag, tag)
     assert.equal(JSON.parse(changed.body.toString()).stamp, 1)
     stamp = 0
+  })
+
+  it('sends only the changed fields when the page names the state it already holds', async () => {
+    const first = await getState({})
+    const tag = String(first.headers.etag)
+    stamp = 2
+    const d = await getState({ 'If-None-Match': tag, 'X-Base': tag, 'Accept-Encoding': 'gzip' })
+    assert.equal(d.status, 200)
+    assert.equal(d.headers['x-delta'], '1')
+    assert.deepEqual(JSON.parse(zlib.gunzipSync(d.body).toString()), { set: { stamp: 2 }, del: [] })
+    stamp = 0
+    const back = await getState({ 'X-Base': String(d.headers.etag) })
+    assert.deepEqual(JSON.parse(back.body.toString()), { set: {}, del: ['stamp'] })
+    assert.equal(back.headers.etag, tag)
+    const unknown = await getState({ 'X-Base': '"nope"' })
+    assert.equal(unknown.headers['x-delta'], undefined)
+    assert.equal(JSON.parse(unknown.body.toString()).pad.length, 600)
   })
 
   it('stops', () => { app.close(); up.close(); up2.close() })
@@ -797,4 +847,33 @@ describe('proxyHub voice clip', () => {
     assert.equal(got.length, 0)
   })
   it('stops', () => { app.closeAllConnections(); up.closeAllConnections(); app.close(); up.close() })
+})
+
+describe('proxyHub stuck', () => {
+  it('serves the window it picked with the owner-decided stuck list, not that window\'s own stale one', async () => {
+    const { HubService } = await import('../../extension/src/hub/hub-service')
+    const { byOwner } = await import('../../extension/src/hub/stuck')
+    const { handleHub, tokenHeader } = await import('../../extension/src/hub/routes')
+    const T0 = Date.now()
+    const item = (id: string) => ({ id, kind: 'job' as const, sessionId: 's', what: 'x', since: T0 })
+    const mk = (mirror: boolean) => { const h = new HubService(); h.hook({ session_id: 's', cwd: '/p', hook_event_name: 'SessionStart' }, T0, mirror); return h }
+    // A owns chat s and found it stuck; B only mirrors it and thinks an old job is stuck too.
+    const A = mk(false), B = mk(true)
+    A.setStuck([item('real')], T0)
+    B.setStuck(byOwner([item('stale')], id => B.owns(id), [A.ownedStuck()]), T0)
+    const serve = (h: InstanceType<typeof HubService>) => http.createServer((req, res) => { const r = handleHub(h, req.method, req.url, '', undefined, undefined, undefined, undefined, undefined, tokenHeader(req.headers)) as { status: number; body: string; contentType?: string }; res.writeHead(r.status, r.contentType ? { 'Content-Type': r.contentType } : {}).end(r.body) })
+    const b = serve(B)
+    await new Promise<void>(ok => b.listen(0, '127.0.0.1', ok))
+    let port = 0
+    const app = http.createServer((req, res) => { void proxyHub(req, res, port, '/p', undefined, async () => [{ port: (b.address() as AddressInfo).port, hubToken: B.token, workspace: '/p', mtimeMs: 1, pid: process.pid }]) })
+    await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+    port = (app.address() as AddressInfo).port
+    try {
+      const got = await new Promise<{ stuck: Array<{ id: string }> }>((ok, fail) => {
+        const r = http.request({ host: '127.0.0.1', port, path: '/hub/state', headers: { Host: `127.0.0.1:${port}`, 'X-Switchboard': '1', Origin: `http://127.0.0.1:${port}` } }, x => { let s = ''; x.on('data', c => { s += c }); x.on('end', () => { try { ok(JSON.parse(s)) } catch (e) { fail(e) } }) })
+        r.on('error', fail); r.end()
+      })
+      assert.deepEqual(got.stuck.map(i => i.id), ['real'])
+    } finally { app.close(); b.close() }
+  })
 })

@@ -125,8 +125,30 @@ export const ask = {
 
 // Like Claude chats in bypassPermissions: no approval prompt and no sandbox; resume takes the flags after its name.
 // Codex runs a hooks.json hook only with a trust hash it computes itself, so ours (hooks-config.ts) need the trust bypass even when asking.
-const codexFlags = () => [...(ask.codex ? [] : ['--dangerously-bypass-approvals-and-sandbox']), '--dangerously-bypass-hook-trust', ...(ask.codexModel ? ['-m', ask.codexModel] : []), ...(ask.codexEffort ? ['-c', `model_reasoning_effort=${ask.codexEffort}`] : [])]
-export const codexArgs = (args: string[]) => args[0] === 'resume' ? ['resume', ...codexFlags(), ...args.slice(1)] : [...codexFlags(), ...args]
+// run: this chat's own pick (picker.ts), which beats the gear's; a resume keeps to the gear, Codex restores the session's own model.
+const codexFlags = (run: { model?: string; effort?: string } = {}) => {
+  const model = run.model ?? ask.codexModel, effort = run.effort ?? ask.codexEffort
+  return [...(ask.codex ? [] : ['--dangerously-bypass-approvals-and-sandbox']), '--dangerously-bypass-hook-trust', ...(model ? ['-m', model] : []), ...(effort ? ['-c', `model_reasoning_effort=${effort}`] : [])]
+}
+export const codexArgs = (args: string[], run?: { model?: string; effort?: string }) => args[0] === 'resume' ? ['resume', ...codexFlags(), ...args.slice(1)] : [...codexFlags(run), ...args]
+
+const MODEL = /^[\w.[\]:-]{1,80}$/
+const EFFORT_ARGS = new Set(['low', 'medium', 'high', 'xhigh', 'max', 'ultracode'])
+
+/**
+ * What Claude Code gets for ultracode. At xhigh it is `--effort ultracode` (on, and the level set to xhigh); at any other effort
+ * it is the `ultracode` key of the --settings value (inline JSON, a settings file, or none), so the level stays as picked.
+ */
+export function ultracodeFlags(o: { effort?: string; ultracode?: boolean; settings?: string }): { effort?: string; settings?: string } {
+  if (!o.ultracode) return { effort: o.effort, settings: o.settings }
+  if (o.effort === 'xhigh') return { effort: 'ultracode', settings: o.settings }
+  const s = o.settings
+  if (s && !s.trimStart().startsWith('{')) {
+    writeJsonAtomic(s, { ...JSON.parse(fs.readFileSync(s, 'utf8')), ultracode: true })
+    return { effort: o.effort, settings: s }
+  }
+  return { effort: o.effort, settings: JSON.stringify({ ...(s ? JSON.parse(s) : {}), ultracode: true }) }
+}
 
 /**
  * `claude` with the first message, Remote Control under a name (the flag takes an
@@ -134,13 +156,21 @@ export const codexArgs = (args: string[]) => args[0] === 'resume' ? ['resume', .
  * textFile, when given, carries the message instead: a line typed into a starting shell
  * is cut at 1024 bytes on macOS, which left long messages at a `quote>` prompt.
  */
-export function newChatCommand(o: { text?: string; textFile?: string; remote?: string; branch?: string; name?: string; sessionId?: string; settings?: string; system?: string }, shell: Shell): string {
+export function newChatCommand(o: { text?: string; textFile?: string; remote?: string; branch?: string; name?: string; sessionId?: string; settings?: string; system?: string; model?: string; effort?: string }, shell: Shell): string {
   const quote = (s: string) => shellQuote(s, shell)
   let claude = 'claude'
   if (o.name) claude += ` --name ${quote(o.name)}`
   if (o.sessionId !== undefined) {
     if (!/^[0-9a-f-]{36}$/i.test(o.sessionId)) throw new Error('Not a session id')
     claude += ` --session-id ${o.sessionId}`
+  }
+  if (o.model !== undefined) {
+    if (!MODEL.test(o.model)) throw new Error('Not a model')
+    claude += ` --model ${quote(o.model)}`
+  }
+  if (o.effort !== undefined) {
+    if (!EFFORT_ARGS.has(o.effort)) throw new Error('Not an effort level')
+    claude += ` --effort ${quote(o.effort)}`
   }
   if (o.settings) claude += ` --settings ${quote(o.settings)}`
   if (o.system) claude += ` --append-system-prompt ${quote(o.system)}`

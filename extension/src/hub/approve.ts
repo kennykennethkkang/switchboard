@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { closeChatTerminal } from './ais'
+import { isResearch } from './research'
 import { CHAT_PREFIX } from './terminal-tags'
 import type { ChatProgress, DoneCheck } from './types'
 
@@ -154,8 +155,10 @@ const aarRan = (b: Block) => b.type === 'tool_use' && ((b.name === 'Skill' && /(
   || /aar\/SKILL\.md|wiki\/aar-[\w.-]+\.md/.test(JSON.stringify(b.input ?? '')))
 
 /** PreToolUse deny reason for the closing question asked before the aar and standup; undefined lets it through. */
-export function closingGate(payload: { hook_event_name?: string; tool_name?: string; tool_input?: unknown; transcript_path?: string }): string | undefined {
+export function closingGate(payload: { hook_event_name?: string; tool_name?: string; tool_input?: unknown; transcript_path?: string; cwd?: string }): string | undefined {
   if (payload.hook_event_name !== 'PreToolUse' || payload.tool_name !== 'AskUserQuestion' || !payload.transcript_path) return undefined
+  // Research chats end on a finding, not a change: no aar to run first.
+  if (isResearch(payload.cwd)) return undefined
   const qs = (payload.tool_input as { questions?: unknown })?.questions
   if (!Array.isArray(qs) || !qs.some(q => isClosing((q as { question?: unknown })?.question, Array.isArray((q as { options?: unknown })?.options) ? (q as { options: { label?: unknown }[] }).options.map(o => o?.label) : []))) return undefined
   const entries = readTail(payload.transcript_path)

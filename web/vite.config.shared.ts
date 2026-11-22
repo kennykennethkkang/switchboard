@@ -8,6 +8,8 @@ interface BuildTarget {
   entry: string
   name: string
   define: Record<string, string>
+  /** The app's page loads ES modules, so the lazy views and their libraries become chunks next to index.js. The VS Code webview stays one script. */
+  chunked?: boolean
 }
 
 export function createBuildConfig(target: BuildTarget): UserConfig {
@@ -28,7 +30,7 @@ export function createBuildConfig(target: BuildTarget): UserConfig {
       emptyOutDir: true,
       lib: {
         entry: resolve(__dirname, target.entry),
-        formats: ['iife'],
+        formats: [target.chunked ? 'es' : 'iife'],
         name: target.name,
         fileName: () => 'index',
       },
@@ -39,6 +41,7 @@ export function createBuildConfig(target: BuildTarget): UserConfig {
       rollupOptions: {
         output: {
           entryFileNames: 'index.js',
+          ...(target.chunked ? { chunkFileNames: '[name]-[hash].js' } : {}),
           assetFileNames: (info: { names?: string[] }) => {
             if (info.names?.[0]?.endsWith('.css')) return 'index.css'
             return '[name].[ext]'

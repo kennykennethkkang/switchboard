@@ -138,6 +138,8 @@ export function detect(input: Input, w: Watch, now: number): StuckItem[] {
   const seen = new Set<string>()
   for (const c of input.chats.filter(c => c.live)) {
     const p = input.progress.find(x => x.sessionId === c.sessionId)
+    // A finished or stopped chat is never stuck; a job or hog it left behind is no news.
+    if (p?.state === 'done' || p?.state === 'idle') continue
     const mine = under(procs, c.pid)
     const folded = new Set<number>()
     if (p && p.state !== 'needs-you' && !p.asks?.length) {
@@ -185,6 +187,19 @@ function shellOf(j: BgJob, mine: { pid: number; ppid: number; command: string; s
   const k = key(j.command)
   const hits = k ? mine.filter(x => x.command.includes(k)) : []
   return hits.find(x => !hits.some(y => y.pid === x.ppid))
+}
+
+/** What a window publishes at GET /hub/stuck: the chats it owns and the stuck items of just those. */
+export type OwnedStuck = { owned: string[]; stuck: StuckItem[] }
+
+/** The window that owns a chat is the only one that decides its stuck items: this window's sample keeps its own chats and the
+ * ones nobody claims, and takes every other chat's items from the window that owns it. */
+export function byOwner(mine: StuckItem[], owns: (id: string) => boolean, others: OwnedStuck[]): StuckItem[] {
+  const taken = new Set(others.flatMap(o => o.owned))
+  const out = new Map<string, StuckItem>()
+  for (const i of mine) if (owns(i.sessionId) || !taken.has(i.sessionId)) out.set(i.id, i)
+  for (const o of others) for (const i of o.stuck) if (!owns(i.sessionId) && o.owned.includes(i.sessionId)) out.set(i.id, i)
+  return [...out.values()]
 }
 
 /** items without the snoozed ones; a snooze past its 30 min is dropped. snoozes: id to when it was dismissed. */

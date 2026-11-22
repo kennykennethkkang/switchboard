@@ -61,7 +61,7 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
   const library = () => {
     const map = profile.assets ?? {}
     const keys = Object.keys(map).filter(isLib)
-    if (!keys.length) return <div style={{ display: 'grid', gap: 6 }}><h4 style={caps}><span>Design library</span><span>none</span></h4><p style={{ ...caps, textTransform: 'none' }}>No looks found in ~/.claude/switchboard/design-md.</p></div>
+    if (!keys.length) return <div style={{ display: 'grid', gap: 6 }}><h4 style={caps}><span>Design library</span></h4><p style={{ ...caps, textTransform: 'none' }}>No looks found in ~/.claude/switchboard/design-md.</p></div>
     const shown = (order.current = libraryOrder(order.current, map, find)).keys
     // All and None act on the looks the search shows, so a search then All picks just those.
     const setAll = (on: boolean) => onChange({ ...profile, assets: { ...map, ...Object.fromEntries(shown.map(k => [k, on])) } })

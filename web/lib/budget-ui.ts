@@ -61,7 +61,8 @@ export function trendArrow(v: TrendValue): { vsDay?: string; vsWeek?: string } {
 export const trendNum = (v: number, usd?: boolean) => usd ? `$${v.toFixed(2)}` : String(v)
 export function trendText(v: TrendValue, usd?: boolean): string {
   const a = trendArrow(v), fmt = (s?: string) => s && usd && /\d/.test(s) ? `${s[0]}$${Number(s.slice(1)).toFixed(2)}` : s
-  return [trendNum(v.value, usd), fmt(a.vsDay) && `${fmt(a.vsDay)} vs day`, fmt(a.vsWeek) && `${fmt(a.vsWeek)} vs week`].filter(Boolean).join(' ')
+  const vs = (d: string | undefined, when: string) => d && (d === 'same' ? `same as ${when}` : `${d} vs ${when}`)
+  return [trendNum(v.value, usd), vs(fmt(a.vsDay), 'the day before'), vs(fmt(a.vsWeek), 'a week ago')].filter(Boolean).join(', ')
 }
 
 /** A new run folder name for a pipeline chat: date, pipeline, then a time suffix so two starts never collide. */

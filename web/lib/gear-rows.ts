@@ -89,3 +89,15 @@ export const benchPrompt = 'Run the model-bench skill: benchmark each role on th
 
 /** The pause-at value a switch sets: on brings back the last % (50 to 100), else 99; off is null. */
 export const pauseValue = (on: boolean, last?: number) => (on ? (last !== undefined && last >= 50 && last <= 100 ? last : 99) : null)
+
+// The Chats pane's headings and the rows under each; a row in no list (Advanced mode for one project) joins Advanced.
+const CHAT_GROUPS: Array<[string, string[]]> = [
+  ['Chats', ['Continue at usage limit', 'Pause near the limit', 'Auto-start chats', 'Claude chat permissions', 'Ask before actions (Codex)', 'Your name', 'Hide done chats', 'Fresh branch for new chats', 'Brief for new chats']],
+  ['Notices', ['Chat notices', 'Where pop-ups show', 'Push to your phone', 'Notify when a chat needs input']],
+  ['Windows and phone', ['Phone mode', 'Phone alerts', 'Keep phone access in Apple Notes', 'Show agent browsers', 'One window', 'Keep Switchboard app running']],
+  ['Advanced', ['Fix stuck items', 'Learn automatically', 'Stop a chat\'s dev servers when it ends', 'Test anti-copy hardening (experimental)']],
+]
+export function chatGroups<T extends { label: string }>(rows: T[]) {
+  const known = (l: string) => CHAT_GROUPS.some(([, ls]) => ls.includes(l))
+  return CHAT_GROUPS.map(([head, ls]) => [head, rows.filter(r => ls.includes(r.label) || (head === 'Advanced' && !known(r.label)))] as const).filter(([, r]) => r.length)
+}

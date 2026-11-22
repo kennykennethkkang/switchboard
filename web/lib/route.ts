@@ -2,6 +2,9 @@
 export const PAGES = ['now', 'chats', 'plan', 'live', 'ship', 'map-board', 'map-flow', 'map-memory', 'settings'] as const
 export type Page = typeof PAGES[number]
 
+/** Simple view leaves these out; a link to one shows Home instead. */
+export const CODER_PAGES: Page[] = ['live', 'ship', 'map-board', 'map-flow', 'map-memory']
+
 export const isMap = (p: Page) => p.startsWith('map-')
 
 export function pageOf(hash: string, search = ''): Page {

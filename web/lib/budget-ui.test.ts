@@ -25,9 +25,9 @@ test('form to message: blanks and junk clear', () => {
 })
 
 test('trend text and check-back count', () => {
-  assert.equal(trendText({ value: 5, vsDay: 2, vsWeek: -1 }), '5 ↑2 vs day ↓1 vs week')
-  assert.equal(trendText({ value: 1.5, vsDay: -0.5 }, true), '$1.50 ↓$0.50 vs day')
-  assert.equal(trendText({ value: 0, vsDay: 0 }), '0 same vs day')
+  assert.equal(trendText({ value: 5, vsDay: 2, vsWeek: -1 }), '5, ↑2 vs the day before, ↓1 vs a week ago')
+  assert.equal(trendText({ value: 1.5, vsDay: -0.5 }, true), '$1.50, ↓$0.50 vs the day before')
+  assert.equal(trendText({ value: 0, vsDay: 0 }), '0, same as the day before')
   assert.equal(checkBackCount({ everyMin: 30, count: 3 }), '3/12')
   assert.equal(checkBackCount(undefined), '')
 })

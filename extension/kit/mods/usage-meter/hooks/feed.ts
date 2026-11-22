@@ -108,11 +108,11 @@ export async function poll($: EngineInterface) {
   } finally { st.polling = false }
 }
 /** The window holding this chat's folder, asked for its brief or an answer; this project only. */
-export async function askHome($: EngineInterface, route: 'brief' | 'ask' | 'recall', q?: string) {
+export async function askHome($: EngineInterface, route: 'brief' | 'ask' | 'recall' | 'research-offer', q?: string, scope?: string) {
   const cwd = norm(await $.session.cwd())
   const home = homeOf(await discover($), cwd)
   if (!home) return undefined
-  const query = `cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(await $.session.id())}${q ? `&q=${encodeURIComponent(q)}` : ''}`
+  const query = `cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(await $.session.id())}${q ? `&q=${encodeURIComponent(q)}` : ''}${scope ? `&scope=${scope}` : ''}`
   const got = await fetchSoon($, `http://127.0.0.1:${home.port}/hub/${route}?${query}`, withToken(home))
   return got?.ok ? got.text : undefined
 }

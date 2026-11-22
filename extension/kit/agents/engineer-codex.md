@@ -2,6 +2,7 @@
 name: engineer-codex
 description: Hands an engineer job to Codex (codex exec, full bypass) and returns Codex's Report. Use for a second engineer on disjoint files or a job the lead wants done by another model.
 model: sonnet
+color: pink
 tools: Bash
 maxTurns: 8
 ---

@@ -15,3 +15,10 @@ export function keepSame(prev: HubState | null, next: HubState): HubState {
   }
   return same ? prev : (out as unknown as HubState)
 }
+
+/** prev with a proxy delta applied: set fields replaced, del fields dropped, every other field the same object. */
+export function applyDelta(prev: HubState, d: { set: Record<string, unknown>; del: string[] }): HubState {
+  const out = { ...(prev as unknown as Record<string, unknown>), ...d.set }
+  for (const k of d.del) delete out[k]
+  return out as unknown as HubState
+}

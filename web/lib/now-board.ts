@@ -1,4 +1,4 @@
-/** The Now page's layout (the line board, or the old lanes at ?layout=classic), the to-do rows and a chat's cost and time. */
+/** The Now page's layout (the pass board, or the old lanes at ?layout=classic), the to-do rows and a chat's cost and time. */
 import type { ChatRow, ChatProgress, SessionLive, TodoItem, TodoList } from './hub-types'
 import { finishUp, ordered } from './todo'
 import { formatDuration } from './duration'
@@ -13,6 +13,17 @@ export function nextRows(list: TodoList | undefined, live: (chat?: string) => bo
   const you = finishUp(list).map(t => ({ t, you: true, running: false }))
   const open = ordered(list.todo.filter(t => t.why !== 'you')).map(r => ({ t: r.t, you: false, running: live(r.t.chat) })).filter(r => !r.running)
   return [...you, ...open]
+}
+
+type Held = NonNullable<TodoList['plan']>['held'][number]['why']
+const HELD: Record<Held, string> = { blocked: 'Blocked', you: 'Your step', stopped: 'Stopped', ok: 'Needs your OK', date: 'Scheduled' }
+/** The tag over an Up next row: why it waits when the plan holds it, else its To-do number. */
+export function nextTag({ t, you }: NextRow, n?: number, held?: Held): { tag: string; kind?: 'you' | 'stopped' | 'held' } {
+  if (you) return { tag: 'Your step', kind: 'you' }
+  if (t.stopped || held === 'stopped') return { tag: 'Stopped', kind: 'stopped' }
+  if (t.why === 'blocked') return { tag: 'Blocked', kind: 'held' }
+  if (held) return { tag: HELD[held], kind: held === 'you' ? 'you' : 'held' }
+  return { tag: n ? `To-do ${n}` : 'To-do' }
 }
 
 /** A chat started from a to-do takes the item's full text as its title while its own name is only the start of it. */

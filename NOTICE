@@ -8,6 +8,7 @@ Set up installs these third-party skills from their own repos; none are bundled:
 - pixelfx (https://github.com/patch-gg/pixelfx) by Patch, MIT License.
 - humanizer (https://github.com/blader/humanizer) by Siqi Chen, MIT License.
 - last30days (https://github.com/mvanhorn/last30days-skill) by Matt Van Horn, MIT License.
+- founder (https://github.com/emotixco/claude-skills-founder) by Emotix, MIT License.
 - find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc., MIT License.
 - Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License.
 - Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong, MIT License.
@@ -48,3 +49,5 @@ The Git panel's invisible character cleanup on commit is an idea from watermarks
 
 Playwright MCP (https://github.com/microsoft/playwright-mcp) by Microsoft, Apache License 2.0, comes in through Anthropic's playwright plugin; not bundled.
 MiroFish (https://github.com/666ghj/MiroFish) by 666ghj, AGPL-3.0, runs as a separate local server that Switchboard calls over HTTP and fills the .env of; no code from it ships here.
+
+The Screen tab bundles xterm.js (@xterm/headless and @xterm/xterm, https://github.com/xtermjs/xterm.js), MIT License. Copyright (c) 2017-2019, The xterm.js authors; Copyright (c) 2014-2016, SourceLair Private Company; Copyright (c) 2012-2013, Christopher Jeffrey.

@@ -41,8 +41,14 @@ export function ordered(todo: TodoItem[]): Array<{ t: TodoItem; depth: number }>
   return out
 }
 
-/** The first item still waiting, in list order: not a hand step and not already running in a live chat. */
-export const upNext = (list: TodoList, live: (chat?: string) => boolean) => ordered(list.todo.filter(t => t.why !== 'you')).map(r => r.t).find(t => !live(t.chat))
+/**
+ * The one rule for Start by hand, on every page: an open item that is not a hand step and not running in a live chat.
+ * A stopped item (its chat ended) qualifies, so does one that needs OK or waits for a date: those only hold auto-start (holdOf).
+ */
+export const startable = (t: TodoItem, live: (chat?: string) => boolean) => t.why !== 'you' && !live(t.chat)
+
+/** The first item that can start, in list order. */
+export const upNext = (list: TodoList, live: (chat?: string) => boolean) => ordered(list.todo).map(r => r.t).find(t => startable(t, live))
 
 /** Items the to-do list shows: hand steps (why 'you') show under Finish up instead. */
 export const openCount = (l?: TodoList) => l?.todo.filter(t => t.why !== 'you').length ?? 0
@@ -92,12 +98,15 @@ export const busiestTodo = (todos: Record<string, TodoList>) => {
 
 /** A chip in the autopilot chain: n is the To-do number (queued ones get the number they will take); a run's chip is its last item, pre: its prerequisites. */
 export type Step = { id: string; n?: number; text: string; state: 'done' | 'running' | 'next' | 'queued' | 'held'; why?: Held; pre?: number; auto?: true; chat?: string }
-export type Held = 'blocked' | 'you' | 'stopped'
+export type Held = 'blocked' | 'you' | 'stopped' | 'ok' | 'date'
+/** Why auto-start leaves an item alone (the extension's todo.ts hold, same order); none when it would start. Items in a live chat are filtered out before this. */
+export const holdOf = (t: TodoItem, now: number): Held | undefined =>
+  t.why === 'blocked' ? 'blocked' : t.why === 'you' ? 'you' : t.needsOk ? 'ok' : t.notBefore && t.notBefore > now ? 'date' : t.chat || t.stopped ? 'stopped' : undefined
 /** num: each queued row's run number; held: rows auto-start never starts; starts: each run's first row, in order. */
-export type Pilot = { on: boolean; paused: boolean; mode: 'running' | 'idle' | 'off' | 'paused' | 'empty'; steps: Step[]; running: Step[]; queued: number; head: string; note: string; num: Map<string, number>; held: Map<string, Held>; starts: string[] }
+export type Pilot = { on: boolean; paused: boolean; mode: 'running' | 'idle' | 'off' | 'paused' | 'empty'; steps: Step[]; running: Step[]; queued: number; head: string; note: string; num: Map<string, number>; held: Map<string, Held>; starts: string[]; /** Why the next item waits (the extension plan's hold). */ hold?: NonNullable<TodoList['plan']>['hold'] }
 const STATE: Record<Step['state'], string> = { done: 'Done', running: 'Running', next: 'Next', queued: 'Queued', held: 'Held' }
 /** The word a held row or chip shows. */
-export const HELD: Record<Held, string> = { blocked: 'Blocked', you: 'Waits on you', stopped: 'Stopped' }
+export const HELD: Record<Held, string> = { blocked: 'Blocked', you: 'Waits on you', stopped: 'Stopped', ok: 'Needs your OK', date: 'Waits for its date' }
 const tag = (n?: number) => (n ? `To-do ${n}` : 'a to-do')
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 /** What a screen reader says for a chip. */
@@ -107,7 +116,7 @@ export const stepLabel = (s: Step) => `${tag(s.n)}, ${s.text}${s.pre ? `, +${plu
  * The project's autopilot: on falls back to the global Auto-start; done steps are ticked ones from the current chain (run >= streak).
  * What runs next comes from the extension's plan (todo.ts upcoming); without one (an older extension) the queue has no numbers.
  */
-export function autopilot(list: TodoList, autoStart: boolean, live: (chat?: string) => boolean): Pilot {
+export function autopilot(list: TodoList, autoStart: boolean, live: (chat?: string) => boolean, now = Date.now()): Pilot {
   const on = list.pilot?.on ?? autoStart, paused = on && !!list.pilot?.paused
   const rows = ordered(list.todo.filter(t => t.why !== 'you')).map(r => r.t)
   const s = list.streak
@@ -115,22 +124,31 @@ export function autopilot(list: TodoList, autoStart: boolean, live: (chat?: stri
     .map(t => ({ id: t.id, n: t.run, text: t.text, state: 'done', ...(t.auto ? { auto: true } : {}) }))
   const running: Step[] = rows.filter(t => live(t.chat)).map(t => ({ id: t.id, n: t.run, text: t.text, state: 'running', chat: t.chat, ...(t.auto ? { auto: true } : {}) }))
   const wait = rows.filter(t => !live(t.chat)), byId = new Map(list.todo.map(t => [t.id, t]))
-  const runs = list.plan ? list.plan.runs.filter(r => r.ids.every(id => byId.has(id) && !live(byId.get(id)!.chat))) : wait.filter(t => !t.chat && !t.stopped && t.why !== 'blocked').map(t => ({ n: undefined, ids: [t.id] }))
+  const runs = list.plan ? list.plan.runs.filter(r => r.ids.every(id => byId.has(id) && !live(byId.get(id)!.chat))) : wait.filter(t => !holdOf(t, now)).map(t => ({ n: undefined, ids: [t.id] }))
   const num = new Map(runs.flatMap(r => (r.n ? r.ids.map(id => [id, r.n] as const) : [])))
   const queue: Step[] = runs.map((r, i) => { const t = byId.get(r.ids.at(-1)!)!; return { id: t.id, ...(r.n ? { n: r.n } : {}), text: t.text, state: i ? 'queued' : 'next', ...(r.ids.length > 1 ? { pre: r.ids.length - 1 } : {}) } })
   const inRun = new Set(runs.flatMap(r => r.ids)), why = new Map(list.plan?.held.map(h => [h.id, h.why]))
   // A row in no run waits on something; a chat that died since the plan was sent reads as stopped.
-  const held = new Map(wait.filter(t => !inRun.has(t.id)).map(t => [t.id, why.get(t.id) ?? (t.why === 'blocked' ? 'blocked' : 'stopped')] as const))
+  const held = new Map(wait.filter(t => !inRun.has(t.id)).map(t => [t.id, why.get(t.id) ?? holdOf(t, now) ?? 'stopped'] as const))
   const heldSteps: Step[] = [...held].map(([id, w]) => ({ id, text: byId.get(id)!.text, state: 'held', why: w }))
   const steps = [...done, ...running, ...queue, ...heldSteps], next = queue[0], last = queue.at(-1)?.n ?? running.at(-1)?.n
   const r = running.find(x => x.auto) ?? running[0]
-  const base = { on, paused, steps, running, queued: queue.length, num, held, starts: runs.map(r => r.ids[0]) }
+  const hold = list.plan?.hold
+  const base = { on, paused, steps, running, queued: queue.length, num, held, starts: runs.map(r => r.ids[0]), hold }
   if (!on) return { ...base, mode: 'off', head: 'Auto-run is off: press Start on an item', note: 'Turn on Auto-run next and each item starts by itself when the one before it is done.' }
   if (paused) return { ...base, mode: 'paused', head: 'Paused: nothing new starts. Running chats keep going.', note: queue.length ? `${queue.length} queued. Resume to pick up where it stopped.` : 'Resume to pick up where it stopped.' }
   if (r) return { ...base, mode: 'running', head: r.auto ? `Autopilot is running ${tag(r.n)}${last && last !== r.n ? ` of ${last}` : ''}` : `${tag(r.n)} is running, started by hand`,
-    note: `Runs beside your other chats. ${next ? `Next: ${tag(next.n)} starts by itself when this one is done.` : 'Nothing queued after it.'}` }
-  if (next) return { ...base, mode: 'idle', head: `Next: ${tag(next.n)} starts by itself when no to-do chat is running`, note: 'Runs beside your other chats. Start now goes at once.' }
-  return { ...base, mode: 'empty', head: 'Auto-run is on. Nothing queued.', note: held.size ? `${plural(held.size, 'item')} held. Clear what holds one and it starts by itself.` : 'Add something and it starts by itself.' }
+    note: `Runs beside your other chats. ${next ? (hold ? `${hold.text}.` : `Next: ${tag(next.n)} starts by itself when this one is done.`) : 'Nothing queued after it.'}` }
+  if (next) return { ...base, mode: 'idle', head: hold ? hold.text : `Next: ${tag(next.n)} starts by itself when no to-do chat is running`, note: 'Runs beside your other chats. Start now goes at once.' }
+  return { ...base, mode: 'empty', head: 'Auto-run is on. Nothing queued.', note: heldNote(held) }
+}
+
+/** The line under an empty queue: a stopped item says Start again, the rest what to clear. */
+function heldNote(held: Map<string, Held>): string {
+  const n = held.size, stopped = [...held.values()].filter(w => w === 'stopped').length
+  if (!n) return 'Add something and it starts by itself.'
+  if (stopped === n) return `${plural(n, 'item')} stopped: ${n === 1 ? 'its chat ended' : 'their chats ended'} before finishing. Press Start again.`
+  return `${plural(n, 'item')} held. Clear what holds one and it starts by itself.${stopped ? ' A stopped one needs Start again.' : ''}`
 }
 
 /** One Plan page lane per project with to-do items or a chain in it. */

@@ -32,6 +32,11 @@
 .hub-chats { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; margin: -20px; }
 .hub-chats > .hub-rail { padding: 16px; background: var(--hub-canvas); min-height: 100%; box-sizing: border-box; }
 .hub-chats > .hub-chat-main { min-width: 0; display: grid; align-content: start; }
+/* The list scrolls inside its own column, so a long Archive or Snapshots list never leaves the chat pane empty. The status bar is 34px, 48px on touch. */
+@media (min-width: 761px) {
+  .hub-chats > .hub-rail { position: sticky; top: 0; min-height: 0; max-height: calc(100vh - 34px); overflow-y: auto; }
+}
+@media (min-width: 761px) and (pointer: coarse) { .hub-chats > .hub-rail { max-height: calc(100vh - 48px - env(safe-area-inset-bottom)); } }
 .hub-chats .hub-chat-git { padding: 0 20px 20px; display: grid; gap: 12px; }
 .hub-ship-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .hub-ship-head h2 { margin: 0; font: 600 13px/1 var(--hub-sans); color: var(--hub-mute); }
@@ -87,7 +92,8 @@
   .hub-page .hub-filter::-webkit-scrollbar { display: none; }
   .hub-page .hub-filter > * { flex: none; white-space: nowrap; }
   .hub-col { min-height: 0; }
-  .hub-page { padding: 16px; }
+  /* the floating New chat pill (48px, 12px off the status bar) sits over the page end, so the last row scrolls clear of it */
+  .hub-page { padding: 16px 16px 84px; }
   .hub-chats { grid-template-columns: minmax(0, 1fr); margin: -16px; }
 }
 @media (pointer: coarse) { .nav-find, .nav-item { min-height: 44px; } }
@@ -98,4 +104,13 @@
   .hub-fold, .hub-page .hub-link, .sb-toggle, .hub-filter > button { min-height: 44px; }
   .hub-fold { min-width: 44px; }
 }
-@media (prefers-reduced-motion: reduce) { .nav-find, .nav-item, .map-modes button { transition: none; } }
+/* Coder view switch at the foot of the rail; on a phone it lives in Settings only. */
+.nav-coder { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--hub-mute); font: 400 13px/1.2 var(--hub-sans); cursor: pointer; text-align: left; }
+.nav-coder > i { position: relative; flex: none; margin-left: auto; width: 26px; height: 16px; border-radius: 99px; background: var(--hub-hair); transition: background 150ms var(--hub-ease-out); }
+.nav-coder > i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--hub-mute); transition: transform 150ms var(--hub-ease-out); }
+.nav-coder[aria-checked='true'] > i { background: var(--hub-green); }
+.nav-coder[aria-checked='true'] > i::after { transform: translateX(10px); background: #fff; }
+.nav-coder:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .nav-coder:hover { background: var(--hub-elev); color: var(--hub-ink); } }
+@media (max-width: 760px) { .nav .nav-coder { display: none; } }
+@media (prefers-reduced-motion: reduce) { .nav-find, .nav-item, .map-modes button, .nav-coder > i, .nav-coder > i::after { transition: none; } }

@@ -24,7 +24,9 @@ import { sweepPanel } from './hub-panel-sweep'
 import { signInsPanel } from './hub-panel-signins'
 import { codexPanel } from './hub-panel-codex'
 import { devPanel } from './hub-panel-dev'
-import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, codexExited, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, noteCheckBack } from './actions'
+import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, codexExited, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, noteCheckBack, type RunOpts } from './actions'
+import { dropEffortGuard, keepEffortDefault } from './picks'
+import { buildSmart } from './smart-select'
 import { approvedFields, closeApprovedRetry, readDoneCheck, staysOpenOnApprove, stampedChats } from './approve'
 import { syncTerminals, tags, terminalAction, watchTerminals } from './terminals'
 import { signInTerminal } from './codex-login'
@@ -35,6 +37,7 @@ import { archiveRow, backAgain, dueForHandoff, fullCodex, goneRow, idleHandedOff
 import { newestNotes, readStarred, starredRows, toggleStar, writeStarred } from './starred'
 import { rcTargets, readChats } from './sessions'
 import { ask, chainVersion, codexNote, crossNote, handoffFile, mergeProjects, planLabel, projectName, repoPlan, type RepoAsk } from './projects'
+import { dismissOffer } from './research'
 import { addAwsProfile, AWS_SESSION_MS, awsProfiles, browserEnv, cacheTimes, chromeChoice, OPEN_CHROME, openChromeScript, browserFor, deleteAwsProfile, dueHeadsUps, moveProfile, parseAwsConfig, profileFor, readAwsConfig, readChrome, readLabels, readPrefs, readSessions, renameAwsProfile, renameLabel, trackSessions, validProfileName, writeLabels, writeOpenChrome, writePrefs, writeSessions } from './aws'
 import { execFile } from 'child_process'
 import * as fs from 'fs'
@@ -48,6 +51,7 @@ import { quickAsk, waitsOn } from './brain'
 import { MOVED, promptText, routeProject } from './route-project'
 import { readGroups, splitAsks } from './split'
 import { escalationsByProject, excludeSwitchboard, keepSwitchboardDir, readStages, resetEscalations, setStageStatus, writeCompany } from './advanced'
+import { firstRunOf } from './first-run'
 import type { ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../protocol'
 import { createLogger } from '../logger'
 import { forgetAccessNote, syncAccessNote } from './access-note'
@@ -80,10 +84,10 @@ import { listSnapshots, restoreSnapshot } from './snapshots'
 import { checkHealth, fixHealth } from './health'
 import { listPipelines, savePipeline, seedPipeline, takeSeeded } from './pipelines'
 import { sendPush } from './web-push'
-import { STUCK, fixText, loops, sampleDue } from './stuck'
+import { STUCK, byOwner, fixText, loops, sampleDue, type OwnedStuck } from './stuck'
 import { psCost, sampleStuck, stopStuck } from './stuck-sampler'
 import { readUploads, uploadEvents } from './uploads'
-import { awakePid, devHome, devRows, knownDev, needsWindow, postLocal, postWindow, readDev, readFocused, readWindows, sendHome, serve, setAwake, tailnet, writeFocused } from './dev'
+import { awakePid, devHome, devRows, knownDev, needsWindow, postLocal, postWindow, readDev, readFocused, readOwnedStuck, readWindows, sendHome, serve, setAwake, tailnet, writeFocused } from './dev'
 
 const log = createLogger('Hub')
 // Off stops updates; the note stays.
@@ -305,6 +309,13 @@ export function startHub(context: vscode.ExtensionContext): void {
     for (const r of repos) if (!guarded.has(r)) { guarded.add(r); try { excludeSwitchboard(r) } catch (err) { log.warn('Exclude failed:', r, err) } installGuard(r).catch(err => log.warn('Git guard failed:', r, err)) }
   }
   addRefresher(refreshProjects)
+  // Smart select: reads the ledger and rewrites smart-learned.json at most every HISTORY_EVERY_MS.
+  let smartAt = 0
+  addRefresher(async () => {
+    if (Date.now() - smartAt < HISTORY_EVERY_MS) return
+    smartAt = Date.now()
+    try { hub.set({ smart: buildSmart(undefined, id => hub.get().chats.find(c => c.sessionId === id)?.name) }) } catch (err) { log.warn('Smart select failed:', err) }
+  })
   // Once now as well, so New chat from the app or the phone works before the panel is ever opened.
   refreshProjects().catch(err => log.warn('Projects failed:', err))
   addRefresher(() => refreshAws())
@@ -343,6 +354,7 @@ export function startHub(context: vscode.ExtensionContext): void {
   const heads = setInterval(awsHeadsUp, 5 * 60 * 1000)
   context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); if (stuck) clearInterval(stuck) } })
   const sub = hub.onChange(() => {
+    syncFirstRun()
     if (S.pending || !posters.shown) return
     S.pending = setTimeout(() => {
       S.pending = undefined
@@ -398,14 +410,16 @@ export function startHub(context: vscode.ExtensionContext): void {
 
 let stuckBusy = false, stuckAt: number | undefined
 /** A stuck sample every 30 s while some chat works, every 5 min while all are idle; process hogs of idle chats stay listed. */
-// Every open window samples every chat, one ps each, so all panels agree. If that cost shows, let one window sample and share it.
+// Every open window samples every chat, one ps each; a chat's items then come from the window that owns it, so all panels agree.
 async function checkStuck(force = false): Promise<void> {
   const now = Date.now()
   if (stuckBusy || !(force || sampleDue(stuckAt, hub.get().progress.some(p => p.state === 'working'), now))) return
   stuckBusy = true
   stuckAt = now
   try {
-    hub.setStuck(await sampleStuck())
+    // The window that owns a chat decides its stuck items; the rest are read from it.
+    const [mine, others] = await Promise.all([sampleStuck(), Promise.all(readWindows().filter(w => w.pid !== process.pid).map(w => readOwnedStuck(w)))])
+    hub.setStuck(byOwner(mine, id => hub.owns(id), others.filter((o): o is OwnedStuck => !!o)))
     if (psCost.runs === 1 || psCost.runs % 120 === 0) log.info(`Stuck check: ps took ${psCost.lastMs.toFixed(0)} ms (mean ${(psCost.ms / psCost.runs).toFixed(0)} ms over ${psCost.runs})`)
     for (const i of hub.unseenStuck()) notifyStuck(i)
     const due = hub.dueFix()
@@ -511,6 +525,7 @@ function refreshWindows(): void {
 }
 
 function focused(): void {
+  void checkGh()
   const own = ownWorkspace()
   if (own) { writeFocused(own); refreshWindows() }
 }
@@ -705,7 +720,7 @@ async function todoCommand(m: Extract<WebviewToExtensionMessage, { type: `hub-to
         await mark(m.to)
         return true
       }
-      if (!await runInNewChat(m.path, items, true)) return refuse('those to-do items are already running in a chat')
+      if (!await runInNewChat(m.path, items, true, runOpts(m))) return refuse('those to-do items are already running in a chat')
     }
     return true
   } catch (err) {
@@ -731,6 +746,7 @@ function writeSetting(key: string, value: unknown): void {
   const patch = controlPatch(key, value, statusLineCommand())
   const read = readSettingsFile(SETTINGS_PATH)
   if (!patch || !read.ok) return
+  if (key === 'effortLevel') dropEffortGuard()
   writeJsonAtomic(SETTINGS_PATH, applyPatch(read.settings, patch))
   readSettings()
 }
@@ -766,7 +782,34 @@ const LEARN_FILE = path.join(path.dirname(COMPANY_FILE), 'model-learn.json')
 /** usage-meter reads smart model switch and Advanced mode from company.json. */
 function saveCompany(): void {
   const sb = hub.get().controls.switchboard
-  try { writeCompany(COMPANY_FILE, { smartModelSwitch: sb.smartModelSwitch !== false, advancedMode: sb.advancedMode ?? {} }) } catch (err) { log.warn('company.json not written:', err) }
+  try { writeCompany(COMPANY_FILE, { smartModelSwitch: sb.smartModelSwitch !== false, advancedMode: sb.advancedMode ?? {}, coderView: sb.coderView }) } catch (err) { log.warn('company.json not written:', err) }
+}
+
+/** Coder view for every window: globalState like the other switches, and company.json. */
+function setCoderView(on: boolean): void {
+  const controls = hub.get().controls
+  const switchboard = { ...controls.switchboard, coderView: on }
+  const { hooks: _fromSettings, ...kept } = switchboard
+  void store?.update(CONTROLS_KEY, kept)
+  hub.set({ controls: { ...controls, switchboard } })
+  saveCompany()
+}
+
+const FIRST_RUN_KEY = 'switchboard.firstRunDismissed'
+let ghSignedIn = false
+/** gh auth status, rechecked on focus until it passes. */
+async function checkGh(): Promise<void> {
+  if (ghSignedIn) return
+  const gh = await ghPath()
+  if (!gh) return
+  ghSignedIn = await new Promise<boolean>(r => execFile(gh, ['auth', 'status'], { timeout: 10_000, windowsHide: true }, err => r(!err)))
+  syncFirstRun()
+}
+/** Recomputed on every state change; set only when a step flips, so it never loops. */
+function syncFirstRun(): void {
+  const s = hub.get()
+  const next = firstRunOf(s, ghSignedIn, store?.get<boolean>(FIRST_RUN_KEY) === true)
+  if (JSON.stringify(next) !== JSON.stringify(s.firstRun)) hub.set({ firstRun: next })
 }
 
 /** Advanced mode for one project: on makes its .switchboard folder, kept out of git. */
@@ -904,13 +947,15 @@ const CARD_LINK = 'Kenneth linked these in Switchboard'
 
 // New chats from New chat that wait on others: sent once the chat runs and takes messages, which waitFor needs.
 const pendingWaits = new Map<string, { on: string[]; at: number }>()
+/** The run's own picks a hub-new-chat or hub-todo-run carries. */
+const runOpts = (m: { model?: string; effort?: RunOpts['effort']; ultracode?: boolean; auto?: boolean; research?: boolean }): RunOpts => ({ model: m.model, effort: m.effort, ultracode: m.ultracode, auto: m.auto, research: m.research })
 /** newChat for a hub-new-chat: a Claude chat's id is picked here so its waits and group can find it; a new Codex chat's id is only known once it runs, so it cannot wait yet. */
 async function startChat(folder: string, m: Extract<WebviewToExtensionMessage, { type: 'hub-new-chat' }>): Promise<string | undefined> {
   const claude = (m.ai ?? 'claude') === 'claude', waits = m.waitOn ?? []
   const id = claude && (waits.length || m.group) ? randomUUID() : undefined
   // A Codex chat has no id yet: its waits are applied once bindCodexTerminals ties it.
   const text = [m.text, takeSeeded(folder)].filter(Boolean).join('\n\n') || m.text
-  const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits, claude && m.worktree === true)
+  const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits, claude && m.worktree === true, runOpts(m))
   if (!problem && id && waits.length) pendingWaits.set(id, { on: waits, at: Date.now() })
   return problem
 }
@@ -944,6 +989,8 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
   switch (m.type) {
     case 'hub-send':
       touch()
+      // Claude Code saves a chat's /effort as the default for new chats; this one is for the chat only.
+      if (m.text.startsWith('/effort ')) keepEffortDefault(SETTINGS_PATH)
       return sendToChat(m.sessionId, m.text)
     case 'hub-answer': {
       const chat = hub.get().chats.find(c => c.sessionId === m.sessionId)
@@ -996,6 +1043,9 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-live-dismiss':
       hub.dismissLive(m.kind, m.id)
       return true
+    case 'hub-research-dismiss':
+      dismissOffer(hub, m.sessionId)
+      return true
     case 'hub-mirofish-open':
       void mirofishPage(m.simId).then(r => 'url' in r ? openPage(r.url) : refuse(r.problem), err => refuse(`Could not open MiroFish: ${(err as Error).message}`))
       return true
@@ -1018,6 +1068,12 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       const problem = setAdvanced(m.path, m.on)
       return problem ? refuse(problem) : true
     }
+    case 'hub-coder-view':
+      setCoderView(m.on)
+      return true
+    case 'hub-first-run':
+      void store?.update(FIRST_RUN_KEY, m.dismissed).then(syncFirstRun)
+      return true
     case 'hub-stage': {
       if (!hub.get().projects.some(p => p.path === m.path)) return refuse(`${m.path} is not in the project list`)
       if (hub.get().controls.switchboard.advancedMode?.[m.path] !== true) return refuse(`Advanced mode is off for ${m.path}`)

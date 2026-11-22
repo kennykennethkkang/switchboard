@@ -303,3 +303,82 @@ test('dueFix: no auto-fix for a chat held by the usage pause or a limit retry', 
   h.set({ pause: undefined }, T0)
   assert.deepEqual(h.dueFix(T0 + MIN).fix.map(i => i.id), ['job:p:j'])
 })
+
+const hit = (id: string, sessionId: string) => ({ id, kind: 'job' as const, sessionId, what: 'x', since: T0 })
+
+test('byOwner: the owner alone decides a chat; unclaimed chats keep this window sample', async () => {
+  const { byOwner } = await import('../src/hub/stuck')
+  // This window owns a; b is owned elsewhere and that window found nothing; c is nobody's.
+  const mine = [hit('a1', 'a'), hit('b-stale', 'b'), hit('c1', 'c')]
+  const other = { owned: ['b', 'd'], stuck: [hit('d1', 'd')] }
+  assert.deepEqual(byOwner(mine, id => id === 'a', [other]).map(i => i.id), ['a1', 'c1', 'd1'])
+  // Its own items for a chat the other window owns never win, and an item the owner did not list for it is ignored.
+  assert.deepEqual(byOwner([], () => false, [{ owned: ['x'], stuck: [hit('x1', 'x'), hit('y1', 'y')] }]).map(i => i.id), ['x1'])
+})
+
+test('detect: a done or idle chat is never stuck, and its leftovers do not show', () => {
+  const job = { jobs: [{ id: 'j1', label: 'run', startedAt: T0 - 90 * MIN }] }
+  assert.equal(detect(input({ progress: [prog(job)], procs: [] }), newWatch(), T0).length, 1)
+  for (const state of ['done', 'idle'] as const) assert.deepEqual(detect(input({ progress: [prog({ ...job, state })], procs: [] }), newWatch(), T0), [])
+})
+
+test('hub: stuck items of a chat that went done or idle drop from the shown list', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  h.hook({ session_id: 's', cwd: '/r', hook_event_name: 'SessionStart' }, T0)
+  h.setStuck([hit('a', 's')], T0)
+  assert.deepEqual(h.get().stuck?.map(i => i.id), ['a'])
+  h.hook({ session_id: 's', cwd: '/r', hook_event_name: 'Stop', last_assistant_message: 'ok' }, T0 + 1000)
+  h.setStuck([hit('a', 's')], T0 + 2000)
+  assert.deepEqual(h.get().stuck ?? [], [])
+})
+
+test('hub: subagent jobs the transcript ends leave progress in every window', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  h.hook({ session_id: 's', cwd: '/r', hook_event_name: 'SessionStart' }, T0, true)
+  const sub = { session_id: 's', cwd: '/r', agent_id: 'a1', agent_type: 'qa', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'j9', tool_input: { command: 'sleep 999', run_in_background: true } }
+  h.hook({ session_id: 's', cwd: '/r', agent_id: 'a1', agent_type: 'qa', hook_event_name: 'SubagentStart' }, T0, true)
+  h.hook(sub, T0 + 1, true)
+  const had = h.get().progress[0].subJobs?.map(j => j.id)
+  assert.deepEqual(had, ['j9'])
+  h.endSubJobs(new Set(['j9']), T0 + 2)
+  assert.equal(h.get().progress[0].subJobs, undefined)
+})
+
+test('two windows: B mirrors a chat A owns; B shows A\'s stuck items and A shows none of B\'s stale ones', async () => {
+  const fs = await import('fs'), os = await import('os'), path = await import('path'), http = await import('http')
+  const { HubService } = await import('../src/hub/hub-service')
+  const { handleHub, tokenHeader } = await import('../src/hub/routes')
+  const { readWindows, readOwnedStuck } = await import('../src/hub/dev')
+  const mk = (mirror: boolean) => { const h = new HubService(); h.hook({ session_id: 's', cwd: '/r', hook_event_name: 'SessionStart' }, T0, mirror); return h }
+  const A = mk(false), B = mk(true)
+  const serve = async (h: InstanceType<typeof HubService>) => {
+    const server = http.createServer((req, res) => { const r = handleHub(h, req.method, req.url, '', undefined, undefined, undefined, undefined, undefined, tokenHeader(req.headers)) as { status: number; body: string }; res.writeHead(r.status).end(r.body) })
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+    return { server, port: (server.address() as { port: number }).port }
+  }
+  const a = await serve(A), b = await serve(B)
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-'))
+  // Live pids: this process and its parent stand in for two windows.
+  fs.writeFileSync(path.join(dir, `a-${process.pid}.json`), JSON.stringify({ pid: process.pid, port: a.port, hubToken: A.token, workspace: '/r' }))
+  fs.writeFileSync(path.join(dir, `b-${process.ppid}.json`), JSON.stringify({ pid: process.ppid, port: b.port, hubToken: B.token, workspace: '/r' }))
+  try {
+    const { byOwner } = await import('../src/hub/stuck')
+    const wins = readWindows(dir), win = (pid: number) => wins.find(w => w.pid === pid)!
+    // A saw the job end; B kept it and found it stuck. A's sample is the owner's.
+    A.setStuck([hit('real', 's')], T0)
+    const others = async (self: number) => (await Promise.all(wins.filter(w => w.pid !== self).map(w => readOwnedStuck(w)))).filter((o): o is NonNullable<typeof o> => !!o)
+    B.setStuck(byOwner([hit('stale', 's')], id => B.owns(id), await others(process.ppid)), T0)
+    assert.deepEqual(B.get().stuck?.map(i => i.id), ['real'])
+    // The owner clears it; B follows on its next sample, and a window that stays silent changes nothing.
+    A.setStuck([], T0 + 1)
+    B.setStuck(byOwner([hit('stale', 's')], id => B.owns(id), await others(process.ppid)), T0 + 1)
+    assert.deepEqual(B.get().stuck ?? [], [])
+    assert.equal(await readOwnedStuck({ ...win(process.pid), port: 1 }, 200), undefined)
+  } finally {
+    a.server.closeAllConnections(); b.server.closeAllConnections()
+    await new Promise(r => a.server.close(r)); await new Promise(r => b.server.close(r))
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})

@@ -43,13 +43,12 @@ export function limitMeters(live: SessionLive[], now = Date.now(), kept?: KeptLi
   const out = kept?.out && (kept.out.resetsAt ?? Infinity) > now ? kept.out : undefined
   // The window the hit was on: one at 100%, else the 5h one.
   const outKind = out && ([...live.flatMap(c => c.limits), ...kept!.windows].find(l => !l.kind.startsWith('codex_') && l.percentUsed >= 100)?.kind ?? 'five_hour')
-  // Codex meters show while a Codex chat feeds them, or from the kept window until its reset.
-  const keptCodex = codexKept.filter(l => (resetAt(l.resetsAt) ?? 0) > now)
-  const codex = CODEX.filter(([kind]) => live.some(c => c.limits.some(l => l.kind === kind)) || keptCodex.some(l => l.kind === kind))
+  // Codex meters stay once Codex has reported a window; past its reset it reads 0, like Claude's.
+  const codex = CODEX.filter(([kind]) => live.some(c => c.limits.some(l => l.kind === kind)) || codexKept.some(l => l.kind === kind))
   return [...KINDS, ...codex].map(([kind, label]) => {
     if (kind === outKind) return { kind, label, percent: 100, level: 'out' as const, reset: `Limit reached${out!.resetsAt ? `, resets ${resetText(out!.resetsAt, now)} (in ${countdown(out!.resetsAt, now)})` : ''}` }
     const fed = live.flatMap(c => c.limits).filter(l => l.kind === kind)
-    const all = (fed.length ? fed : [...(kept?.windows ?? []), ...keptCodex].filter(l => l.kind === kind)).map(l => ({ pct: l.percentUsed, at: resetAt(l.resetsAt) }))
+    const all = (fed.length ? fed : [...(kept?.windows ?? []), ...codexKept].filter(l => l.kind === kind)).map(l => ({ pct: l.percentUsed, at: resetAt(l.resetsAt) }))
     // Chats can disagree by seconds on one reset: anything within 5 min of the latest is the same window.
     const latest = Math.max(...all.map(l => l.at ?? -Infinity))
     const same = Number.isFinite(latest) ? all.filter(l => l.at !== undefined && l.at >= latest - 5 * 60_000) : all

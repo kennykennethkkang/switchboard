@@ -99,5 +99,5 @@ export const ICONS: Record<'claude' | 'codex' | 'kenneth', Icon> = {
 
 /** Badge for a court state. waiting gets none: its speech bubble already shows the dots, and the cloud means work. */
 export const badgeOf = (st?: string): Icon | undefined =>
-  st === 'needs' || st === 'idle' || st === 'done' || st === 'working' ? OVERLAYS[st] : undefined
+  st === 'needs' || st === 'stuck' || st === 'idle' || st === 'done' || st === 'working' ? OVERLAYS[st] : undefined
 

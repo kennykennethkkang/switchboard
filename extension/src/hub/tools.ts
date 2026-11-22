@@ -28,7 +28,7 @@ export const FLAGGED: string[] = ['security-guidance@claude-code-plugins']
 export const ALWAYS = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
 // Big niche bundles, off in a new chat so the rest of the skill listing keeps its descriptions.
 // Smart turns one on from its keywords (smart-tools.ts RULES), tool_on any time. Short name -> what it is for.
-export const GATED: Record<string, string> = { 'marketing-skills': 'SEO, copy, ads, pricing, launches', 'aws-core': 'AWS services', bland: 'voice agents and phone calls' }
+export const GATED: Record<string, string> = { 'marketing-skills': 'SEO, copy, ads, pricing, launches', 'aws-core': 'AWS services', bland: 'voice agents and phone calls', founder: 'startup pricing, pitch decks, go-to-market, fundraising' }
 // Claude Code drops skill descriptions past this share of context (default 0.01).
 export const LISTING = { skillListingBudgetFraction: 0.02 }
 /** Appended to a profiled chat's system prompt, so it never asks for a tool. */

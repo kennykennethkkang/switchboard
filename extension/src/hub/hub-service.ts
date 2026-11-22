@@ -15,7 +15,7 @@ import { addAsk, dropAsk, finishedJobs, LIMITS, settle, step, TOOLS_MAX } from '
 import { chainVersion } from './projects'
 import { endedOnLimit, limitReset, pauseDue, resumeOrder } from './limit-pause'
 import { phonePause } from './phone'
-import { fixDue, snoozed, waitsOnUser } from './stuck'
+import { fixDue, snoozed, waitsOnUser, type OwnedStuck } from './stuck'
 import { FLAGGED } from './tools'
 import { createLogger } from '../logger'
 import { recordSentBack } from './chains'
@@ -23,6 +23,7 @@ import { foldPathCase, saveMerged } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
 import { MirofishPoller } from './mirofish'
 import { crowdLive, dismissCrowd } from './crowd-live'
+import { sourceChecks } from './source-check'
 import type { AiId, Ask, CacheKeep, ChatLink, ChatUnlink, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, KeptLimits, Limit, LimitPause, Server, SessionLive, StuckItem } from './types'
 import { isTabCommand } from './window-tabs'
 
@@ -422,6 +423,8 @@ export class HubService {
     this.mirofish = undefined
     if (this.crowd) clearInterval(this.crowd)
     this.crowd = undefined
+    if (this.sources) clearInterval(this.sources)
+    this.sources = undefined
   }
 
   // crowd-ab runs take a minute or two, so the card reads Jev's run files every 2s and only pushes a change.
@@ -437,6 +440,22 @@ export class HubService {
     }
     tick()
     this.crowd = setInterval(tick, 2000)
+    this.startSourceChecks()
+  }
+
+  // Source-check runs are the CLI's --json files; they change in seconds at most, so read every 5s and push only a change.
+  private sources?: ReturnType<typeof setInterval>
+  startSourceChecks(read = () => sourceChecks()): void {
+    if (this.sources) return
+    let last = ''
+    const tick = () => {
+      let next
+      try { next = read() } catch { return }
+      const key = JSON.stringify(next ?? null)
+      if (key !== last) { last = key; this.set({ sourceChecks: next }) }
+    }
+    tick()
+    this.sources = setInterval(tick, 5000)
   }
 
   /** Sessions a headless learn run reported; the Flow tabs skip them too. */
@@ -687,8 +706,21 @@ export class HubService {
   /** A sample's stuck items; the shown list leaves out the snoozed ones. */
   setStuck(items: StuckItem[], now = Date.now()): void {
     this.stuckAll = items
-    const stuck = snoozed(items, this.snoozes, now)
+    // An item of a chat that went done or idle since the sample is stale.
+    const stuck = snoozed(items, this.snoozes, now).filter(i => { const st = this.state.progress.find(p => p.sessionId === i.sessionId)?.state; return st !== 'done' && st !== 'idle' })
     if (JSON.stringify(stuck) !== JSON.stringify(this.state.stuck ?? [])) this.set({ stuck }, now)
+  }
+
+  /** What GET /hub/stuck hands the other windows: the chats this one owns and their items. */
+  ownedStuck(): OwnedStuck { return { owned: [...this.owned], stuck: this.stuckAll.filter(i => this.owned.has(i.sessionId)) } }
+
+  owns(sessionId: string): boolean { return this.owned.has(sessionId) }
+
+  /** Subagent jobs a transcript says ended leave the chat's progress, so every window drops them on the same fact whatever events it saw. */
+  endSubJobs(finished: Set<string>, now = Date.now()): void {
+    if (!finished.size || !this.state.progress.some(p => p.subJobs?.some(j => finished.has(j.id)))) return
+    const progress = this.state.progress.map(p => { const left = p.subJobs?.filter(j => !finished.has(j.id)); return left?.length === p.subJobs?.length ? p : { ...p, subJobs: left?.length ? left : undefined } })
+    this.set({ progress }, now)
   }
 
   /** Dismiss: hidden for STUCK.snoozeMs. */

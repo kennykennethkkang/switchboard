@@ -31,18 +31,21 @@ export type HubCommand =
   | { type: 'hub-mirofish-open'; simId?: string }
   | { type: 'hub-mirofish-report'; simId: string }
   | { type: 'hub-live-dismiss'; kind: 'mirofish' | 'crowd'; id: string }
+  | { type: 'hub-research-dismiss'; sessionId: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
   | { type: 'hub-switchboard'; key: SwitchboardKey; value: boolean | number | string | null }
   | { type: 'hub-advanced'; path: string; on: boolean }
+  | { type: 'hub-coder-view'; on: boolean }
+  | { type: 'hub-first-run'; dismissed: boolean }
   | { type: 'hub-stage'; path: string; run: string; n: number; status: 'done' | 'redo' }
   | { type: 'hub-escalation-reset'; project: string; role: string; files: string[] }
   | { type: 'hub-compact'; sessionId: string }
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
@@ -125,7 +128,7 @@ export type HubCommand =
   | { type: 'hub-todo-dismiss'; path: string; id: string }
   | { type: 'hub-todo-move'; path: string; ids: string[] }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
-  | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
+  | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
   | { type: 'hub-todo-replace'; path: string; remote: string }
   /** The project's autopilot: on runs the next item by itself, paused holds new starts. */

@@ -4,10 +4,10 @@ import { createLogger } from '../logger'
 import * as vscode from 'vscode'
 import * as os from 'os'
 import * as path from 'path'
-import { continueText, hub, pauseText } from './hub-service'
+import { continueText, hub, pauseText, resetMs } from './hub-service'
 import { indefiniteOn, readProfiles } from './tools'
 import { newestPlanFile } from './local'
-import { bindCodexTerminals, codexExited, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, headBranch, newChat, resumeChat, indefiniteDone, setCheckBack, noteCheckBack } from './actions'
+import { bindCodexTerminals, codexExited, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, headBranch, newChat, resumeChat, indefiniteDone, setCheckBack, noteCheckBack, type RunOpts } from './actions'
 import { readDoneCheck, stampedChats } from './approve'
 import { syncTerminals } from './terminals'
 import { codexFiles, endedCodex, lastCodexPrompt, lastCodexTurn, readAis, rolloutLines } from './ais'
@@ -21,7 +21,8 @@ import { held, line } from './sweep'
 import { cleanWorktree, endedWorktrees, worktreeDirs } from './git'
 import { learnTick, usageOk } from './learn'
 import { rememberChats } from './reap'
-import { autoStartPlan, changeTodo, claimTodo, START_GRACE_MS, clearGoneChats, loadTodos, runLabel, runMessage, projectOf, startTodo } from './todo'
+import { autoStartPlan, changeTodo, claimTodo, holdReason, holdShown, START_GRACE_MS, clearGoneChats, loadTodos, runLabel, runMessage, projectOf, startTodo } from './todo'
+import { follow, outcomeIn } from '../../ask/chats.mjs'
 import { randomUUID } from 'crypto'
 import { notifyIndefiniteDone } from './notify'
 import { CHECK_BACK_TEXT, dueCheckBacks, hasOpenWork } from './checkback'
@@ -168,6 +169,36 @@ export function codexPanel(d: {
     return [...resumed.keys()]
   }
 
+  /** The inputs autoStartPlan and holdReason share for one folder. resumed, failed and tried starts belong to this window, so only its own folder gets them. */
+  function gateFor(folder: string, on: boolean, own: boolean) {
+    const s = hub.get(), now = Date.now(), chats = s.chats
+    const windows = s.live.flatMap(l => l.limits), pauseAt = s.controls.switchboard.pauseAt
+    const cap = pauseAt === null ? 100 : pauseAt ?? 99
+    const resets = windows.filter(w => !w.kind?.startsWith('codex_') && w.percentUsed >= cap).map(w => resetMs(w.resetsAt)).filter(r => r > now)
+    const started = own ? [...resumed.values()].filter(r => r.folder === folder).map(r => r.at) : []
+    return {
+      // The project's own pilot wins over the global switch; other chats in the project no longer hold it.
+      on, pilot: s.todos?.[folder]?.pilot, folder, todo: s.todos?.[folder]?.todo ?? [], tried: own ? autoTried : new Set<string>(), now,
+      live: new Set(chats.filter(c => c.live).map(c => c.sessionId)),
+      // Same hold as Learn: a pause, a retry, or at pauseAt; a window with no chats of its own must not start one mid-pause.
+      limited: !usageOk({ windows, pauseAt, paused: !!s.pause, retrying: hub.retrying() }),
+      resumed: started.length ? Math.max(...started) : undefined,
+      failedAt: own ? claimFailed.get(folder) : undefined,
+      resetAt: resets.length ? Math.max(...resets) : undefined,
+      links: s.links, label: (id: string) => chats.find(c => c.sessionId === id)?.name ?? id.slice(0, 8),
+      // A wait on a finished chat is dropped; a handoff is followed to the chat that took over.
+      open: (id: string) => { const t = follow(s, id); return outcomeIn(s, t, now).finished ? undefined : t },
+    }
+  }
+
+  /** Every folder's hold from the shared state, so windows that see the same state show the same text; set only when it changed. */
+  function showHolds(on: boolean, own?: string): void {
+    for (const folder of Object.keys(hub.get().todos ?? {})) {
+      const hold = holdReason(gateFor(folder, on, folder === own)) ?? null
+      if (JSON.stringify(hub.get().todos?.[folder]?.plan?.hold ?? null) !== JSON.stringify(hold)) holdShown(folder, hold)
+    }
+  }
+
   /** Chats that ended on a usage limit come back once it resets; with Auto-start on, an idle project starts its next to-do item. */
   async function keepGoing(): Promise<void> {
     const s = hub.get()
@@ -182,23 +213,17 @@ export function codexPanel(d: {
     const on = d.store()?.get<{ autoStart?: boolean }>(d.controlsKey)?.autoStart !== false
     if (on !== s.controls.switchboard.autoStart) hub.set({ controls: { ...s.controls, switchboard: { ...s.controls.switchboard, autoStart: on } } })
     const ws = workspace()
-    if (autoBusy || !ws) return
-    const folder = projectOf(ws)
+    // Holds show for every folder, with or without a window of its own; only the own folder auto-starts.
+    const own = ws ? projectOf(ws) : undefined
+    showHolds(on, own)
+    if (autoBusy || !ws || !own) return
+    const folder = own
     // newChat refuses a folder the project list does not have yet; wait for it rather than burn the item.
     if (folder === os.homedir() || folder === path.parse(folder).root || !s.projects.some(p => p.path === folder)) return
     autoBusy = true
     try {
       if (!s.todos?.[folder]) await loadTodos([folder])
-      const list = hub.get().todos?.[folder]
-      const plan = autoStartPlan({
-        // The project's own pilot wins over the global switch; other chats in the project no longer hold it.
-        on, pilot: list?.pilot, folder, todo: list?.todo ?? [], tried: autoTried, now: Date.now(),
-        busy: false, live: new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId)),
-        // Same hold as Learn: a pause, a retry, or at pauseAt; a window with no chats of its own must not start one mid-pause.
-        limited: !usageOk({ windows: hub.get().live.flatMap(l => l.limits), pauseAt: hub.get().controls.switchboard.pauseAt, paused: !!hub.get().pause, retrying: hub.retrying() }),
-        resumed: Math.max(-Infinity, ...[...resumed.values()].filter(r => r.folder === folder).map(r => r.at)),
-        failedAt: claimFailed.get(folder),
-      })
+      const plan = autoStartPlan({ ...gateFor(folder, on, true), busy: false })
       if (!plan) return
       log.info(`Auto-start in ${folder}: ${plan.items.map(t => t.id).join(', ')}`)
       if (await runInNewChat(plan.folder, plan.items)) claimFailed.delete(folder)
@@ -209,8 +234,9 @@ export function codexPanel(d: {
   /**
    * Claims the items for a fresh chat id on the stored list before it starts, so two windows or taps cannot both start
    * them; false when they were taken meanwhile. manual: the Run button (claimItems). A chat that cannot start frees them.
+   * run: the Start button's own model, effort, ultracode, auto and research; an auto start has none.
    */
-  async function runInNewChat(folder: string, items: TodoItem[], manual = false): Promise<boolean> {
+  async function runInNewChat(folder: string, items: TodoItem[], manual = false, run?: RunOpts): Promise<boolean> {
     const sessionId = randomUUID()
     const live = new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId))
     if (!await claimTodo(folder, items.map(t => t.id), sessionId, live, manual, undefined, autoTried)) return false
@@ -218,7 +244,7 @@ export function codexPanel(d: {
     // The claim gave them a run number; read them back for the chat's label.
     const fresh = hub.get().todos?.[folder]?.todo ?? []
     const label = runLabel(items.map(t => fresh.find(x => x.id === t.id) ?? t), folder)
-    void newChat(folder, runMessage(items), false, undefined, 'claude', undefined, sessionId, true, label).then(problem => {
+    void newChat(folder, runMessage(items), false, undefined, 'claude', undefined, sessionId, true, label, undefined, undefined, false, run).then(problem => {
       if (!problem) return
       refuse(problem)
       void unmark().catch(() => {})

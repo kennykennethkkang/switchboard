@@ -42,3 +42,17 @@ it('serves assets gzipped with an ETag, answers 304 on a match, plain when gzip 
     assert.equal((await get(port, '/x.exe')).status, 404)
   } finally { app.close() }
 })
+
+it('loads the page as a module and keeps hashed chunks, but not index.js, without asking again', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-static-'))
+  fs.writeFileSync(path.join(dir, 'board-CVlSaM8x.js'), 'export {}')
+  fs.writeFileSync(path.join(dir, 'index.js'), 'export {}')
+  const app = http.createServer((req, res) => serveStatic(req, res, dir))
+  await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+  const port = (app.address() as AddressInfo).port
+  try {
+    assert.match((await get(port, '/')).body.toString(), /<script type="module" src="\/index\.js">/)
+    assert.match(String((await get(port, '/board-CVlSaM8x.js')).headers['cache-control']), /immutable/)
+    assert.equal((await get(port, '/index.js')).headers['cache-control'], 'no-cache')
+  } finally { app.close() }
+})

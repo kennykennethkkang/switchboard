@@ -4,6 +4,7 @@ import type { Today } from './today'
 import type { TaskTotals } from './progress'
 import { inProjects, liveChats, projectName } from './archive'
 import { busyLine } from './eta'
+import { chatShown, isBusy } from './chat-state'
 
 type Card = { chat: ChatRow; progress?: ChatProgress }
 export type Day = { done: number; total: number; working: number; approved: number; jev?: { runs: number; costUsd: number } }
@@ -15,7 +16,7 @@ const newest = (key: (p: ChatProgress) => number) => (a: Card, b: Card) => key(b
 export function nowLanes<C extends Card>(cards: C[], archive: ArchivedChat[] = [], now = Date.now()): { working: C[]; done: ArchivedChat[] } {
   const day = new Date(now).toDateString()
   return {
-    working: cards.filter(c => c.progress?.state === 'working').sort(newest(p => p.at)),
+    working: cards.filter(c => isBusy(chatShown(c.progress))).sort(newest(p => p.at)),
     done: archive.filter(a => a.approvedAt && new Date(a.approvedAt).toDateString() === day).sort((a, b) => b.approvedAt! - a.approvedAt!),
   }
 }
@@ -46,7 +47,7 @@ export function laneRow({ chat, progress: p }: Card): LaneRow {
 
 /**
  * The one count of needs you, working and done today: Now, the nav, the Agents header, the council panel and Plan all read it.
- * Needs you is a question, a finished chat waiting on Approve, a failed CI run, a stuck item or a learn proposal; done is approved today.
+ * Needs you is a question, a finished chat waiting on Approve, a failed CI run, a stuck item, a learn proposal or a research offer; done is approved today.
  */
 export function hubCounts(hub: HubState, projects: string[] = [], now = Date.now()): { needs: number; working: number; done: number } {
   const cards = liveChats(hub.chats, hub.archive ?? []).map(chat => ({ chat, progress: hub.progress.find(p => p.sessionId === chat.sessionId) })).filter(c => inProjects(c.chat, projects))
@@ -54,5 +55,5 @@ export function hubCounts(hub: HubState, projects: string[] = [], now = Date.now
   const fails = ci?.conclusion === 'failure' && hub.repo ? picked([{ sessionId: hub.repo.sessionId }], cards, projects).length : 0
   const { working, done } = nowLanes(cards, (hub.archive ?? []).filter(a => inProjects(a, projects)), now)
   const needs = cards.filter(c => c.progress?.state === 'needs-you' || c.progress?.state === 'done').length
-  return { needs: needs + fails + picked(hub.stuck ?? [], cards, projects).length + (hub.learnReady?.length ?? 0), working: working.length, done: done.length }
+  return { needs: needs + fails + picked(hub.stuck ?? [], cards, projects).length + (hub.learnReady?.length ?? 0) + (hub.researchOffers?.length ?? 0), working: working.length, done: done.length }
 }

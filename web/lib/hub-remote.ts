@@ -3,6 +3,7 @@
  * (app/src/hub-proxy.ts), which adds the window's token. Used by use-hub.ts.
  */
 import type { HubState } from './hub-types'
+import { applyDelta } from './hub-share'
 import type { HubCommand } from './vscode-bridge'
 
 const HEADERS = { 'X-Switchboard': '1', 'Content-Type': 'application/json' }
@@ -17,11 +18,19 @@ export const downReason = (status: number | undefined) =>
 let last: { etag: string; hub: HubState } | undefined
 
 export async function fetchHubWhy(f: typeof fetch = fetch): Promise<{ hub: HubState | null; why?: string; /** 404: nothing serves /hub here (the demo build), so asking again is pointless. */ noHub?: true }> {
+  // NEXT_PUBLIC_DEMO=1 is the sample-data build: nothing serves /hub, and a probe only logs a 404.
+  if (process.env.NEXT_PUBLIC_DEMO === '1') return { hub: null, why: downReason(404), noHub: true }
   try {
-    const r = await f('/hub/state', { headers: { ...HEADERS, ...(last ? { 'If-None-Match': last.etag } : {}) }, cache: 'no-store' })
-    if (r.status === 304 && last) return { hub: last.hub }
+    // The base this request names; a poll and a post-command fetch can overlap and answer out of order.
+    const base = last
+    const r = await f('/hub/state', { headers: { ...HEADERS, ...(base ? { 'If-None-Match': base.etag, 'X-Base': base.etag } : {}) }, cache: 'no-store' })
+    if (r.status === 304 && base) return { hub: base.hub }
     if (!r.ok) return { hub: null, why: downReason(r.status), ...(r.status === 404 ? { noHub: true as const } : {}) }
-    const hub = (await r.json()) as HubState
+    const body = (await r.json()) as unknown
+    // X-Delta: only the fields that changed since the state this page named; the rest keep their objects.
+    // A delta only fits its own base: if another reply moved `last` meanwhile, drop it and ask for the whole state.
+    if (r.headers.get('X-Delta') && (!base || last !== base)) { last = undefined; return fetchHubWhy(f) }
+    const hub = r.headers.get('X-Delta') && base ? applyDelta(base.hub, body as { set: Record<string, unknown>; del: string[] }) : (body as HubState)
     const etag = r.headers.get('ETag')
     last = etag ? { etag, hub } : undefined
     return { hub }

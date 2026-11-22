@@ -11,7 +11,8 @@ import ForceGraph3D, { type ForceGraph3DInstance } from '3d-force-graph'
 import { AdditiveBlending, CanvasTexture, Fog, Group as Obj, LinearFilter, NormalBlending, Sprite, SpriteMaterial, type Object3D, type PerspectiveCamera, type WebGLRenderer } from 'three'
 import { GROUPS, demoGraph, dolly, findNodes, framePose, graphCounts, groupOf, healthParts, listNodes, loadGraph, neighbors, projectOf, relations, type GraphEdge, type GraphNode, type Group, type MemoryGraph } from '@/lib/memory-graph'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import { MemoryAtlas, TONE, type Zoomer } from './memory-atlas'
+import { MemoryC1 } from './memory-c1'
+import { TONE, type ViewProps } from './memory-kit'
 
 type Pt = GraphNode & { x?: number; y?: number; z?: number }
 const SIZE: Record<GraphNode['kind'], number> = { project: 22, memory: 11, wiki: 11, raw: 8, rule: 13, chat: 8, todo: 7 }
@@ -63,12 +64,16 @@ const edgeColor = (kind: GraphEdge['kind'], on: boolean, picked: boolean, base =
 }
 // A superseded note stays on the map, faded.
 const FADED = 0.35
-// The flat map by default; ?mem=3d keeps the calm 3D graph.
-const OPT: 'a' | 'b' = typeof location !== 'undefined' && new URLSearchParams(location.search).get('mem') === '3d' ? 'b' : 'a'
+// The 3D space map with its Notebook tab by default; ?mem=3d keeps the calm 3D graph.
+const MEM = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('mem') : null
 const lightHex = (h: string) => { const v = parseInt(h.replace('#', ''), 16); return ((v >> 16) & 255) * 0.299 + ((v >> 8) & 255) * 0.587 + (v & 255) * 0.114 > 150 }
 const reduced = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () => void }) {
+export function MemoryView(p: ViewProps) {
+  return MEM === '3d' ? <MemoryMap {...p} /> : <MemoryC1 {...p} />
+}
+
+function MemoryMap({ isDemo, onClose }: ViewProps) {
   const [graph, setGraph] = useState<MemoryGraph>()
   const [problem, setProblem] = useState<string>()
   const [off, setOff] = useState<Set<Group>>(new Set())
@@ -94,22 +99,19 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
   const touched = useRef(false)
   const pickRef = useRef(picked)
   pickRef.current = picked
-  const opt = OPT
-  const zoomer = useRef<Zoomer>(undefined)
   const baseRef = useRef('255,255,255')
   // The calm 3D redraws with the system theme.
   const [scheme, setScheme] = useState(0)
   useEffect(() => {
-    if (opt !== 'b') return
     const m = matchMedia('(prefers-color-scheme: light)'), on = () => setScheme(s => s + 1)
     m.addEventListener('change', on)
     return () => m.removeEventListener('change', on)
-  }, [opt])
+  }, [])
   const tone = (n: GraphNode) => TONE[groupOf(n)]
 
   useEffect(() => {
     let stop = false
-    if (isDemo) { setGraph(demoGraph()); return }
+    if (isDemo) { setGraph(demoGraph(new URLSearchParams(location.search).has('big'))); return }
     loadGraph().then(g => { if (stop) return; if (typeof g === 'string') setProblem(g); else setGraph(g) }, (e: unknown) => { if (!stop) setProblem(String((e as Error)?.message ?? e)) })
     return () => { stop = true }
   }, [isDemo])
@@ -120,7 +122,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
   // One instance per graph; filters and picks only restyle it.
   useEffect(() => {
     const el = box.current
-    if (!graph || !el || opt === 'a') return
+    if (!graph || !el) return
     const still = reduced()
     // Theme tokens; WebGL cannot read var().
     const css = getComputedStyle(dlg.current ?? el), tok = (k: string) => css.getPropertyValue(`--hub-${k}`).trim()
@@ -321,7 +323,6 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
   // Fly from where the camera already is, so the turn stays small.
   const fly = (id: string) => {
     setPicked(id)
-    if (opt === 'a') return
     const g = fg.current, n = (g?.graphData().nodes as Pt[] | undefined)?.find(p => p.id === id)
     if (!g || !n || n.x === undefined || view === 'list') return
     touched.current = true
@@ -339,8 +340,8 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
     touched.current = true
     g.cameraPosition(dolly(g.camera().position, c.target, k), c.target, reduced() ? 0 : 200)
   }
-  const zoomBy = (k: number) => (opt === 'a' ? zoomer.current?.zoom(k) : zoom3d(k))
-  const fitAll = () => { setPicked(undefined); setOnly(undefined); if (opt === 'a') zoomer.current?.fit(); else fitRef.current?.() }
+  const zoomBy = zoom3d
+  const fitAll = () => { setPicked(undefined); setOnly(undefined); fitRef.current?.() }
 
   // / to search; in the graph + / = zoom in, - out, 0 refit. Not while typing. On document: after a canvas click focus sits on body.
   useEffect(() => {
@@ -349,7 +350,6 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
       if (e.metaKey || e.ctrlKey || e.altKey || (e.target as Element).closest?.('input, textarea')) return
       if (e.key === '/') { findRef.current?.focus(); e.preventDefault(); return }
       const k = ({ '+': 0.8, '=': 0.8, '-': 1.25, _: 1.25 } as Record<string, number>)[e.key]
-      if (opt === 'a' && view === 'graph' && zoomer.current && (k || e.key === '0')) { if (k) zoomer.current.zoom(k); else fitAll(); e.preventDefault(); return }
       if (!g || view !== 'graph') return
       if (e.key === '0') fitAll()
       else if (k) zoom3d(k)
@@ -381,7 +381,7 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
   const sets = SETS.map(set => ({ set, groups: GROUPS.filter(gr => gr.set === set && counts.get(gr.id)) })).filter(x => x.groups.length)
 
   return (
-    <dialog ref={dlg} tabIndex={-1} className="hub mem" data-opt={opt} data-view={view} data-picked={node ? '' : undefined} aria-label="Memory"
+    <dialog ref={dlg} tabIndex={-1} className="hub mem" data-opt="b" data-view={view} data-picked={node ? '' : undefined} aria-label="Memory"
       onCancel={e => { e.preventDefault(); if (picked) { setPicked(undefined); setOnly(undefined) } else onClose() }}>
       <div className="mem-rail">
         <header className="mem-head">
@@ -429,13 +429,12 @@ export function MemoryView({ isDemo, onClose }: { isDemo: boolean; onClose: () =
         </section>}
       </div>
       <div className="mem-stage">
-        {opt === 'a' && graph && graph.nodes.length > 0 && view === 'graph' && <MemoryAtlas label={sum ? `Map of ${sum.notes} notes and ${sum.links} links, one cluster per project. Use search or the list to open one. Plus and minus zoom, 0 fits.` : 'Memory map'} graph={graph} off={off} picked={picked} only={only?.ids} onPick={setPicked} zoomer={zoomer} />}
         {view === 'graph' && graph && graph.nodes.length > 0 && <div className="mem-zoom" role="group" aria-label="Zoom">
           <button type="button" className="hub-btn icon" aria-label="Zoom in" onClick={() => zoomBy(0.8)}><svg aria-hidden width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M7 2v10M2 7h10" /></svg></button>
           <button type="button" className="hub-btn icon" aria-label="Zoom out" onClick={() => zoomBy(1.25)}><svg aria-hidden width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 7h10" /></svg></button>
           <button type="button" className="hub-btn icon" aria-label="Fit to view" onClick={fitAll}><svg aria-hidden width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 5V1.5H5M9 1.5h3.5V5M12.5 9v3.5H9M5 12.5H1.5V9" /></svg></button>
         </div>}
-        <div ref={box} className="mem-canvas" hidden={view === 'list' || opt === 'a'} role="img" aria-label={sum ? `Graph of ${sum.notes} notes and ${sum.links} links, grouped round their projects. Use search or the list to open one. Plus and minus zoom, 0 fits.` : 'Loading the memory graph'} />
+        <div ref={box} className="mem-canvas" hidden={view === 'list'} role="img" aria-label={sum ? `Graph of ${sum.notes} notes and ${sum.links} links, grouped round their projects. Use search or the list to open one. Plus and minus zoom, 0 fits.` : 'Loading the memory graph'} />
         {view === 'list' && graph && graph.nodes.length > 0 && (
           <div className="mem-list">
             {GROUPS.map(gr => ({ gr, items: rows.filter(n => groupOf(n) === gr.id) })).filter(x => x.items.length).map(({ gr, items }) => (

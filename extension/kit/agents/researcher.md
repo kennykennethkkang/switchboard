@@ -2,6 +2,7 @@
 name: researcher
 description: Finds things: files, symbols, docs and web pages. Fast and cheap; answers with paths, lines and short quotes.
 model: haiku
+color: blue
 disallowedTools: Edit, Write, NotebookEdit
 maxTurns: 25
 ---

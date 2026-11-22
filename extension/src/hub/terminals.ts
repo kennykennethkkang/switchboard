@@ -5,6 +5,7 @@ import { chatTerminal } from './ais'
 import { ANSI, restoredOurs, TerminalTags, type TermMemo } from './terminal-tags'
 import type { ChatRow } from './types'
 import { editor } from '../editor'
+import { watchScreens } from './screen-watch'
 
 const ICON = 'radio-tower'
 export const tags = new TerminalTags<vscode.Terminal>()
@@ -60,6 +61,7 @@ export function watchTerminals(state?: vscode.Memento): vscode.Disposable {
     vscode.window.onDidOpenTerminal(t => { void see(t).then(post) }),
     vscode.window.onDidCloseTerminal(t => { tags.gone(t); post() }),
     vscode.window.onDidChangeActiveTerminal(t => { void renameActive(t).then(post) }),
+    watchScreens(id => tags.of(id)),
   )
 }
 

@@ -98,13 +98,13 @@ test('limitMeters: codex windows are their own meters, only when fed', () => {
   assert.deepEqual(m.map(x => [x.label, x.percent]), [['5h', 10], ['Week', undefined], ['Codex 5h', 90]])
 })
 
-test('limitMeters: kept codex windows show with no live chat until their reset', () => {
+test('limitMeters: kept codex windows show with no live chat, and read 0 past their reset', () => {
   const r = new Date(2026, 10, 7, 15, 40).getTime()
   const codexKept = [{ kind: 'codex_five_hour', percentUsed: 40, resetsAt: String(r / 1000) }]
   const m = limitMeters([], now, undefined, codexKept)
   assert.deepEqual(m.map(x => [x.label, x.percent]), [['5h', undefined], ['Week', undefined], ['Codex 5h', 40]])
   const past = limitMeters([], r + 1, undefined, codexKept)
-  assert.equal(past.length, 2)
+  assert.deepEqual(past.map(x => [x.label, x.percent]), [['5h', undefined], ['Week', undefined], ['Codex 5h', 0]])
 })
 
 test('limitMeters: a full codex window does not become the Claude limit hit', () => {

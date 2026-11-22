@@ -93,6 +93,16 @@ describe('buildGraph', () => {
     assert.ok(g.nodes.some(n => n.kind === 'project' && n.label === 'CSEN122'))
   })
 
+  it('ties a memory folder that differs from its project only in case to that project', () => {
+    const g = buildGraph(state(), [{ dir: slugOf('/w/armasu'), file: 'x.md', text: 'x' }], [])
+    assert.deepEqual(g.nodes.filter(n => n.kind === 'project').map(n => n.id), ['project:/w/Armasu'])
+  })
+
+  it('keeps a project its notes when a to-do folder differs from it only in case', () => {
+    const g = buildGraph(state({ todos: { '/w/armasu': { todo: [] } } }), [{ dir: slugOf('/w/Armasu'), file: 'x.md', text: 'x' }], [])
+    assert.ok(g.edges.some(e => e.kind === 'in' && e.target === 'project:/w/Armasu'))
+  })
+
   it('puts chats under their project and to-do items under their project and chat', () => {
     const g = buildGraph(state({
       chats: [{ pid: 1, sessionId: 's1', name: 'Armasu v2', cwd: '/w/Armasu/app', link: '', live: true, why: [] }],

@@ -10,7 +10,7 @@ import type { OrbitChat } from './orbit'
 /** pick: a role node (or the lead) was pressed, open its drawer; picked: the role the drawer shows. */
 export type ViewProps = { chat: OrbitChat; showTools: boolean; instant?: boolean; pick?: (role: string) => void; picked?: string }
 
-export const LEAD_WORD: Record<string, string> = { working: 'working', active: 'working', needs: 'needs you', done: 'ready to approve', almost: 'ready to approve', idle: 'idle' }
+export const LEAD_WORD: Record<string, string> = { working: 'working', active: 'working', stuck: 'stuck', needs: 'needs you', done: 'ready to approve', almost: 'ready to approve', idle: 'idle' }
 
 /** A role node's accessible name: "engineer, 3 runs, working"; the lead's: "lead, working". */
 export function nodeName(c: OrbitChat, role: string, state: string): string {
@@ -103,15 +103,16 @@ export function Reveal({ on, children, className }: { on: boolean; children: Rea
 
 /** The colors behind a state, as CSS vars, for the DOM pictures. */
 export const TONE: Record<string, string> = {
-  active: 'var(--hub-blue)', working: 'var(--hub-blue)', done: 'var(--hub-green)', almost: 'var(--hub-teal)',
+  active: 'var(--hub-blue)', working: 'var(--hub-blue)', stuck: 'var(--hub-red)', done: 'var(--hub-green)', almost: 'var(--hub-teal)',
   needs: 'var(--hub-red)', idle: 'var(--hub-yellow)', waiting: 'var(--hub-mute)', unused: 'var(--hub-ash)',
 }
 
 /** The lead's look by chat state: working, needs, done (or almost), idle. */
-export const leadState = (c: OrbitChat, almost: boolean) => c.state === 'working' ? 'working' : c.state === 'needs-you' ? 'needs' : c.state === 'done' ? (almost ? 'almost' : 'done') : 'idle'
+export const leadState = (c: OrbitChat, almost: boolean) => c.state === 'working' ? (c.stuck ? 'stuck' : 'working') : c.state === 'needs-you' ? 'needs' : c.state === 'done' ? (almost ? 'almost' : 'done') : 'idle'
 
 /** The line under the lead, same words as the Orbit's. */
 export function leadLine(c: OrbitChat, almost: boolean, active: string[]): string {
+  if (c.stuck) return 'stuck, see Needs you'
   if (c.state === 'working') return active.length ? `${active.length > 1 ? `${active.length} roles` : active[0]} working` : busyLine(c.progress) ?? 'planning'
   if (c.state === 'needs-you') return 'waiting on you'
   if (c.state === 'done') return 'ready to approve'

@@ -1,7 +1,7 @@
 /** The Memory view's helpers: groups, search, neighbors and the sample graph. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { demoGraph, dolly, findNodes, framePose, graphCounts, groupOf, healthLine, healthParts, listNodes, neighbors, projectOf, relations, GROUPS } from './memory-graph'
+import { ago, bareProjects, demoGraph, dolly, findNodes, framePose, graphCounts, groupOf, healthLine, healthParts, listNodes, neighbors, projectOf, relations, GROUPS } from './memory-graph'
 
 test('groups a memory by its type and everything else by its kind', () => {
   assert.equal(groupOf({ id: 'a', kind: 'memory', label: 'a', type: 'feedback' }), 'feedback')
@@ -146,4 +146,26 @@ test('splits the health line into parts holding the node ids to show', () => {
   assert.deepEqual(parts.map(p => p.text), ['1 note with broken links', '1 unlinked note', '1 shared name', '1 contradiction', '1 superseded note'])
   assert.deepEqual(parts.find(p => p.text === '1 contradiction')!.ids, ['m:nograph', 'm:recall'])
   assert.deepEqual(parts.find(p => p.text === '1 shared name')!.ids, ['m:recall'])
+})
+
+test('says how long ago in the largest whole unit', () => {
+  const now = Date.parse('2026-11-21T12:00:00Z'), m = 6e4
+  assert.deepEqual([20e3, 5 * m, 130 * m, 3 * 1440 * m, 45 * 1440 * m].map(d => ago(now - d, now)), ['just now', '5m ago', '2h ago', '3d ago', '6w ago'])
+  assert.equal(ago(now + m, now), 'just now')
+})
+
+test('the big demo dates its notes over about 60 days, a few today', () => {
+  const now = Date.now(), days = demoGraph(true).nodes.filter(n => n.modified).map(n => (now - Date.parse(n.modified!)) / 864e5)
+  assert.ok(days.filter(d => d < 1).length >= 4)
+  assert.ok(Math.max(...days) > 50 && Math.max(...days) <= 61)
+})
+
+test('bare projects: a project with chats but no notes is left out, one with notes stays', () => {
+  const nodes = [
+    { id: 'p1', kind: 'project', label: 'Armasu' },
+    { id: 'p2', kind: 'project', label: 'Empty' },
+    { id: 'n1', kind: 'memory', label: 'a note' },
+  ]
+  const place = new Map([['p1', 'Armasu'], ['p2', 'Empty'], ['n1', 'Armasu']])
+  assert.deepEqual([...bareProjects(nodes, place)], ['p2'])
 })

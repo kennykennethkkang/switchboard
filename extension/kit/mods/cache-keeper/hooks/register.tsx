@@ -22,16 +22,17 @@ const keep = atom({ plugin: 'cache-keeper', key: 'keep' } as const, null)
 const mins = (ms: number) => Math.max(0, Math.round(ms / MIN))
 const size = (n: number) => n >= 1e6 ? `${Math.round(n / 1e5) / 10}M` : `${Math.round(n / 1e3)}k`
 
-export function bandLine(k: Keep, now: number, m = margin): string | undefined {
-  if (k.state === 'cold') return `cache-keeper · cache went cold · the next prompt re-reads ${size(k.tokens)} tokens`
-  if (k.state !== 'warm') return undefined
-  const left = mins(k.warmUntil - now), next = mins(k.warmUntil - m - now)
-  const pings = k.pings ? `${k.pings} ping${k.pings === 1 ? '' : 's'} sent · next in ${next}m` : `keep-alive ping in ${next}m`
-  return `cache-keeper · ${size(k.tokens)} tokens cached · warm ${left}m · ${pings}`
+// "warm 42m", or "cold": the word the status line, the row above the prompt and the side pane share.
+export function cacheWord(k: Keep, now: number): string | undefined {
+  return k.state === 'warm' ? `warm ${mins(k.warmUntil - now)}m` : k.state === 'cold' ? 'cold' : undefined
 }
 
+// The ping lands at pingAt; older stored values lack it, so fall back to the default margin.
+export const pingIn = (k: Keep, now: number) => mins((k.pingAt ?? k.warmUntil - margin) - now)
+
 export function statusLine(k: Keep, now: number): string | undefined {
-  return k.state === 'warm' ? `cache warm ${mins(k.warmUntil - now)}m` : k.state === 'cold' ? 'cache cold' : undefined
+  const w = cacheWord(k, now)
+  return w && `cache ${w}`
 }
 
 // Switchboard discovery and post, trimmed from usage-meter.
@@ -117,7 +118,7 @@ async function ping($: EngineInterface, mine: number) {
     $.ui.log(`cache-keeper: the cache had already expired (read ${size(r.usage.cache_read_input_tokens)} of ${size(k.tokens)}); not pinging until the next turn`)
     return set($, { ...k, state: 'cold', now: at })
   }
-  const next = { ...k, warmUntil: at + ttl, pings: k.pings + 1, now: at }
+  const next = { ...k, warmUntil: at + ttl, pingAt: at + ttl - margin, pings: k.pings + 1, now: at }
   await set($, next)
   schedule($, next.warmUntil - margin, at)
 }
@@ -159,7 +160,7 @@ export const register: Register = (on, options) => {
     const now = await $.clock.now()
     const tokens = (await $.session.usage()).context.tokens ?? 0
     const finished = e.answer.includes('Commit message:')
-    const k: Keep = { state: finished ? 'off' : 'warm', warmUntil: now + ttl, tokens, pings: 0, idleSince: now, now }
+    const k: Keep = { state: finished ? 'off' : 'warm', warmUntil: now + ttl, tokens, pings: 0, idleSince: now, now, pingAt: now + ttl - margin }
     await set($, k)
     if (!finished) schedule($, k.warmUntil - margin, now)
     return done
@@ -176,11 +177,19 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Other mods share this slot: stack under ours so none hides another. next(e) rejects when nothing answers beneath.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const below = await next(e).catch(() => undefined)
     const k = await read($, keep)
-    const line = k && !e.props.isWorking && !e.props.hasSurvey ? bandLine(k, k.now) : undefined
-    if (!line) return next(e)
-    const { Text } = $.ui.resolve(e)
-    return <Text dimColor>{line}</Text>
+    const word = k && !e.props.isWorking && !e.props.hasSurvey ? cacheWord(k, k.now) : undefined
+    if (!word) return below ?? next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    const row = (
+      <Text wrap="truncate-end">
+        <Text dimColor>cache </Text>
+        <Text color={word === 'cold' ? 'warning' : undefined}>{word}</Text>
+      </Text>
+    )
+    return below ? <Box flexDirection="column">{row}{below}</Box> : row
   })
 }

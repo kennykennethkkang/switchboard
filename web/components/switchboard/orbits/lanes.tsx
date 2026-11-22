@@ -14,7 +14,7 @@ const pct = (u: number) => `${(Math.min(1, Math.max(0, u)) * 100).toFixed(3)}%`
 /** A bar from a to b (0..1) of the track. Its label sticks to the pinned column while the bar runs under it. */
 const place = (a: number, b: number): CSSProperties => ({ left: pct(a), width: pct(b - a) })
 const clock = (at: number) => new Date(at).toTimeString().slice(0, 5)
-const WORD = { active: 'working', done: 'done', waiting: 'waiting', unused: 'not used' } as const
+const WORD = { active: 'working', done: 'done', waiting: 'queued', unused: 'not used' } as const
 
 /** A commit message: its summary, then any body lines as bullets, wrapped as written. */
 export function Commit({ text }: { text: string }) {
@@ -87,8 +87,8 @@ export function Lanes(v: ViewProps) {
   const f = (t: number) => (t - tl.t0) / (tl.t1 - tl.t0)
   const axis = axisTicks(tl.t0, tl.t1, px, Math.max(110, (box.vw - box.lw) / 5))
   const over = px > box.vw - box.lw + 1
-  const lead = chat.state === 'working' ? 'active' : chat.state === 'needs-you' ? 'needs' : chat.state === 'done' ? (almost ? 'almost' : 'done') : 'idle'
-  const leadWord = { active: 'working', needs: 'needs you', done: 'ready to approve', almost: 'ready to approve', idle: chat.wait ?? 'stopped' }[lead]
+  const lead = chat.stuck ? 'stuck' : chat.state === 'working' ? 'active' : chat.state === 'needs-you' ? 'needs' : chat.state === 'done' ? (almost ? 'almost' : 'done') : 'idle'
+  const leadWord = { active: 'working', stuck: 'stuck', needs: 'needs you', done: 'ready to approve', almost: 'ready to approve', idle: chat.wait ?? 'stopped' }[lead]
   const end = chat.state === 'working' || chat.state === 'needs-you' ? 'now' : `${chat.state === 'done' ? 'done' : 'stopped'} ${clock(tl.t1)}`
 
   const grid = <span className="ovl-grid" aria-hidden>{axis.slice(1).map(t => <i key={t.label} style={{ left: pct(f(t.at)) }} />)}</span>
@@ -144,7 +144,7 @@ export function Lanes(v: ViewProps) {
                 <div className="ovl-track">
                   {grid}
                   {bars.map((b, i) => bar(b, i === bars.length - 1 && m.task ? m.task : bars.length > 1 ? `Run ${i + 1}` : say(b.to - b.from).replace(/^about /, ''), i === bars.length - 1))}
-                  {!bars.length && <span className="ovl-queued">{m.task ? `next: ${m.task}` : 'waiting'}</span>}
+                  {!bars.length && <span className="ovl-queued">{m.task ? `next: ${m.task}` : 'queued'}</span>}
                   {loops.filter(l => l.role === m.role).map(l => <span key={l.at} className="ovl-loop" style={{ left: pct(f(Math.max(tl.t0, l.at))) }} title="Sent back after a later role started">↺</span>)}
                   {ticks(row.tools)}
                 </div>

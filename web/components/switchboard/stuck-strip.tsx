@@ -17,11 +17,12 @@ export const oneClick = (a?: Ask): string[] => !a ? [] : a.kind === 'permission'
 
 /**
  * Needs you: chats asking, stuck work and red checks in one strip. Every row answers in place or jumps to its chat. bare: no heading, the Now lane has its own.
+ * simple: Simple view, stuck rows in plain words without pids, commands or Stop process.
  * tint: the chat's project color, a left rule on its row. diff: the changes under a Your OK row, rendered once its Changes fold opens; onDiff says which one is open.
  */
-export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [], learning = [], approve, name, send, onJump, onCopy, onAnswer, bare, tint, diff, onDiff }: {
+export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [], learning = [], approve, name, send, onJump, onCopy, onAnswer, bare, simple, tint, diff, onDiff }: {
   stuck?: StuckItem[]; needs?: NeedRow[]; fails?: FailRow[]; /** Done chats waiting for approval, and their Approve bar. */ approvals?: string[]; approve?: (sessionId: string) => ReactNode; /** Self-improve wins waiting on Approve. */ learning?: LearnReady[]; name: (sessionId: string) => string; send: (c: HubCommand) => void
-  onJump: (sessionId: string) => void; onCopy: (text: string) => Promise<boolean>; onAnswer: (sessionId: string, askId: string, choice: Choice) => void; bare?: boolean
+  onJump: (sessionId: string) => void; onCopy: (text: string) => Promise<boolean>; onAnswer: (sessionId: string, askId: string, choice: Choice) => void; bare?: boolean; simple?: boolean
   tint?: (sessionId: string) => string | undefined; diff?: (sessionId: string) => ReactNode; onDiff?: (sessionId?: string) => void
 }) {
   const [confirm, setConfirm] = useState<string>()
@@ -49,7 +50,7 @@ export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [],
               <span className="hub-stuck-who">{r.ask?.sub ? 'A subagent in ' : ''}<b>{name(r.sessionId)}</b> {r.ask?.kind === 'permission' ? 'asks to run' : 'asks'}</span>
               <span className="hub-stuck-q">{r.question || r.ask?.questions?.[0]?.question || r.ask?.tool || 'Waiting for you'}{(r.ask?.questions?.length ?? 0) > 1 && <span className="hub-stuck-meta"> · and {r.ask!.questions!.length - 1} more</span>}</span>
               <CheckStamp check={r.check} wrap />
-              {r.block && oneClick(r.ask).includes('Approve') && <span className="hub-stuck-meta" role="status" style={{ color: 'var(--hub-red)' }}>Approve is held: {r.block}.</span>}
+              {r.block && oneClick(r.ask).includes('Approve') && <span className={simple ? 'hub-stuck-who' : 'hub-stuck-meta'} role="status" style={{ color: 'var(--hub-red)' }}>{simple ? 'Approve waits for' : 'Approve is held'}: {r.block}.</span>}
               {r.ask?.preview && <span className="hub-stuck-meta"><code>{r.ask.preview}</code></span>}
             </span>
             <span className="hub-stuck-acts">
@@ -104,8 +105,9 @@ export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [],
             <li key={i.id} data-tone={tone} style={rule(i.sessionId)}>
               <i aria-hidden />
               <span className="hub-stuck-text">
-                <span><b>{name(i.sessionId)}</b> · {i.what}</span>
-                <span className="hub-stuck-meta">{meta}{i.command && <> · <code>{i.command}</code></>}</span>
+                <span><b>{name(i.sessionId)}</b> · {simple ? 'Looks stuck' : i.what}</span>
+                {simple ? <span className="hub-stuck-who">No progress for {forHow(i, now)}</span>
+                  : <span className="hub-stuck-meta">{meta}{i.command && <> · <code>{i.command}</code></>}</span>}
               </span>
               <span className="hub-stuck-acts">
                 {confirm === i.id ? <>
@@ -114,8 +116,8 @@ export function StuckStrip({ stuck = [], needs = [], fails = [], approvals = [],
                   <button type="button" className="hub-btn sm" onClick={() => setConfirm(undefined)}>Cancel</button>
                 </> : <>
                   <button type="button" className="hub-btn sm" title={i.kind === 'agent' ? 'Tell the chat to check on this subagent' : i.pid ? 'Stop it and tell the chat to rerun it if needed' : 'Tell the chat to stop and rerun it'} onClick={() => send({ type: 'hub-stuck-fix', sessionId: i.sessionId, id: i.id })}>Fix</button>
-                  {i.pid && <button type="button" className="hub-btn sm" onClick={() => setConfirm(i.id)}>Stop process</button>}
-                  <button type="button" className="hub-btn sm" aria-live="polite" onClick={() => void copy()}>{copied === i.id ? 'Copied' : 'Copy diagnosis'}</button>
+                  {!simple && i.pid && <button type="button" className="hub-btn sm" onClick={() => setConfirm(i.id)}>Stop process</button>}
+                  {!simple && <button type="button" className="hub-btn sm" aria-live="polite" onClick={() => void copy()}>{copied === i.id ? 'Copied' : 'Copy diagnosis'}</button>}
                   {jump(i.sessionId)}
                   <button type="button" className="hub-link" style={{ padding: '6px 4px', fontSize: 12 }} title="Hide it for 30 min" onClick={() => send({ type: 'hub-stuck-dismiss', sessionId: i.sessionId, id: i.id })}>Dismiss</button>
                 </>}

@@ -46,6 +46,9 @@ test('pickTools: design keywords and the designer role fire the design set with 
 
 test('pickTools: other rules by keyword, nothing for a plain task, never a flagged plugin', () => {
   assert.deepEqual(names(pickTools('Deploy the lambda with the AWS CDK', undefined, inv)), ['aws-core@claude-plugins-official'])
+  const founder: Installed[] = [{ kind: 'plugin', name: 'founder@emotix', enabled: true }]
+  assert.deepEqual(names(pickTools('Work out a pricing strategy for the app', undefined, founder)), ['founder@emotix'])
+  assert.deepEqual(names(pickTools('Draft the pitch deck before we fundraise', undefined, founder)), ['founder@emotix'])
   assert.deepEqual(pickTools('Fix the off by one in the parser', undefined, inv), [])
   assert.ok(!names(pickTools('security review of the UI', 'designer', inv)).includes('security-guidance@claude-code-plugins'))
 })

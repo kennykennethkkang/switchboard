@@ -1,19 +1,25 @@
 'use client'
-// The Now page: the line board, or the old lanes at ?layout=classic. It reads NowPage's own props, so counts and actions match it.
+// The Now page: the pass board, or the old lanes at ?layout=classic. It reads NowPage's own props, so counts and actions match it.
 import { useEffect, useId, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react'
-import type { HubState, Stage, TodoList } from '@/lib/hub-types'
+import type { ArchivedChat, ChatProgress, HubState, TodoList } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { chatRun, stageView } from '@/lib/stages-ui'
+import { chatShown } from '@/lib/chat-state'
 import { laneRow } from '@/lib/now'
-import { chatMeta, cookTitle, layoutOf, needChip, nextCardIndex, nextRows, type NextRow, type NowLayout } from '@/lib/now-board'
+import { busyLine } from '@/lib/eta'
+import { chatMeta, cookTitle, layoutOf, needChip, nextCardIndex, nextRows, nextTag, type NextRow, type NowLayout } from '@/lib/now-board'
+import { doneGroups, gateTitle, track, verify, type DoneKind, type StepState } from '@/lib/stations'
+import { inProjects } from '@/lib/archive'
 import { ago } from '@/lib/look'
+import { CardStages } from './stages'
 import type { NowPage } from './now-page'
 import type { Card } from './chat-cards'
 import './layout.css'
 import './now-board.css'
 
 type PageProps = ComponentProps<typeof NowPage>
-type Extra = { hub: HubState; send: (c: HubCommand) => void; todo?: { folder: string; list?: TodoList }; onPlan: () => void }
+/** projects: the picked project filter, so Done's stopped chats follow it like the rest. */
+type Extra = { hub: HubState; send: (c: HubCommand) => void; todo?: { folder: string; list?: TodoList }; onPlan: () => void; projects?: string[] }
 
 /** page: the NowPage element the shell already builds; the line board reads its props. */
 export function NowLayouts({ page, ...extra }: Extra & { page: ReactElement<PageProps> }) {
@@ -23,7 +29,6 @@ export function NowLayouts({ page, ...extra }: Extra & { page: ReactElement<Page
 }
 
 type Props = PageProps & Extra
-const WORD: Record<Stage['status'], string> = { todo: 'to do', doing: 'running', done: 'done', redo: 'sent back' }
 const NARROW = '(max-width: 760px)'
 
 function useNarrow() {
@@ -56,13 +61,48 @@ function NeedChip({ n }: { n: number }) {
   return <div className="nb-need-pin"><button type="button" className="nb-need" data-away={away || undefined} onClick={go}>{label}<b aria-hidden>↓</b></button></div>
 }
 
-function Chips({ hub, sessionId }: { hub: HubState; sessionId: string }) {
-  const run = chatRun(hub, sessionId)?.run
-  if (!run) return null
+const BACK = { gate: 'a red gate', review: 'review' } as const
+// A shape beside each state's colour, so the track reads without colour.
+const MARK: Partial<Record<StepState, string>> = { done: '✓', fail: '✕', back: '↩', skip: '–' }
+
+/** One progress model per card: the stage run's stages when it has one, else Research, Build, Gate, Review, Your call from its roles and last test run.
+ *  A stage sent back or waiting on review opens the stage list in place, with Looks good and Redo. */
+function Track({ hub, sessionId, progress, send }: { hub: HubState; sessionId: string; progress?: ChatProgress; send: (c: HubCommand) => void }) {
+  const found = chatRun(hub, sessionId)
+  const v = found && stageView(found.run.stages)
+  if (v && (v.gate >= 0 || found.run.stages[v.at]?.status === 'redo')) return <CardStages hub={hub} sessionId={sessionId} send={send} inline />
+  const t = track(progress, found?.run)
+  const g = t.gate
   return (
-    <ol className="nb-chips" aria-label={stageView(run.stages).line}>
-      {run.stages.map(s => <li key={s.n} data-st={s.status} title={`${s.name}: ${WORD[s.status]}`}>{s.status === 'done' && <span aria-hidden>✓ </span>}{s.role}</li>)}
-    </ol>
+    <div className="nb-track">
+      <ol className="nb-steps" data-stages={t.stages || undefined} aria-label={found ? v!.line : 'Stations'}>
+        {t.steps.map(s => <li key={s.id} data-st={s.state} title={s.title}><i aria-hidden /><span>{MARK[s.state] && <b aria-hidden>{MARK[s.state]}</b>}<span className="nb-lbl">{s.label}</span><span className="nb-sr">, {s.title.split(': ').pop()}</span></span></li>)}
+      </ol>
+      {(t.round > 1 || g) && <p className="nb-track-meta">
+        {t.round > 1 && <span className="nb-rounds" title={`Round ${t.round}: sent back by ${BACK[t.back!]}`}>{Array.from({ length: t.round }, (_, i) => <b key={i} data-cur={i === t.round - 1 || undefined}>R{i + 1}</b>)}<span className="nb-sr"> sent back by {BACK[t.back!]}</span></span>}
+        {g && <span className="nb-gate" data-st={!t.fresh ? 'stale' : g.ok ? 'ok' : 'fail'} title={gateTitle(g)}>
+          <b>Gate</b> <span>{!t.fresh ? `last run ${g.ok ? 'passed' : 'failed'}, rerun due` : g.total !== undefined ? g.ok ? `${g.total - (g.failed ?? 0)} of ${g.total} passed` : `${g.failed ?? '?'} of ${g.total} failed` : g.ok ? 'passed' : 'failed'}</span> <code>{g.command}</code>
+        </span>}
+      </p>}
+    </div>
+  )
+}
+
+/** Verified once a review finished after the last edit and the gate passed after it; the evidence opens on tap. */
+function Verified({ progress, now }: { progress?: ChatProgress; now: number }) {
+  const v = verify(progress)
+  if (!v) return null
+  const when = (at: number) => { const w = ago(at, now); return w === 'now' ? 'just now' : `${w} ago` }
+  return (
+    <details className="nb-verify" data-ok={v.ok || undefined}>
+      <summary title={v.ok ? 'Review and gate both after the last edit' : v.reasons.join(', ')}><span><i aria-hidden>{v.ok ? '✓' : '!'}</i>{v.ok ? 'Verified' : 'Unverified'}</span></summary>
+      <ul>
+        {v.reasons.map(r => <li key={r} data-bad>{r[0].toUpperCase() + r.slice(1)}</li>)}
+        {v.gate && <li>Gate <code>{v.gate.command}</code> {v.gate.ok ? 'passed' : 'failed'}{v.gate.total !== undefined ? ` (${v.gate.total - (v.gate.failed ?? 0)} of ${v.gate.total})` : ''}, {when(v.gate.at)}</li>}
+        {v.review && <li>{v.review.role} finished {when(v.review.at ?? v.review.startedAt)}</li>}
+        <li>Last edit {when(v.edit)}</li>
+      </ul>
+    </details>
   )
 }
 
@@ -86,19 +126,23 @@ function Lane({ id, title, count, tone, empty, fold, cap, children }: { id: stri
   )
 }
 
-function CookTicket({ card, hub, send, tint, list, onOpen }: { card: Card; hub: HubState; send: (c: HubCommand) => void; tint?: string; list?: TodoList; onOpen: (id: string) => void }) {
+function CookTicket({ card, hub, send, tint, list, onOpen, now }: { card: Card; hub: HubState; send: (c: HubCommand) => void; tint?: string; list?: TodoList; onOpen: (id: string) => void; now: number }) {
   const r = laneRow(card)
   const m = chatMeta(card.chat, card.progress, hub.live)
-  const stuck = (hub.stuck ?? []).filter(i => i.sessionId === r.id)
+  const stuck = chatShown(card.progress, hub.stuck) === 'stuck' ? (hub.stuck ?? []).filter(i => i.sessionId === r.id) : []
+  const t = track(card.progress, chatRun(hub, r.id)?.run)
+  // a stage run names its own current step on the track; the task list can disagree with it, so only what still runs shows
+  const step = t.stages ? busyLine(card.progress) : r.step
   return (
     <li className="nb-ticket" data-stuck={stuck.length > 0 || undefined} style={tint ? { borderLeftColor: tint } : undefined}>
+      {t.back && t.at === 'build' && <span className="nb-back"><b aria-hidden>↩</b> Sent back by {BACK[t.back]}</span>}
       <button type="button" className="nb-open" onClick={() => onOpen(r.id)} title={`Open ${r.name} in Chats`}>
         <strong className="nb-cook">{cookTitle(r.name, r.id, list)}</strong>
-        <span className="nb-sub">{[r.project, r.role, r.total ? `${r.done} of ${r.total}` : ''].filter(Boolean).join(' · ')}</span>
+        <span className="nb-sub">{r.project}</span>
       </button>
-      <Chips hub={hub} sessionId={r.id} />
-      {r.step && <code className="now-step">{r.step}</code>}
-      <span className="nb-foot"><span className="nb-cost">{m.cost ?? 'No cost yet'}</span>{m.time && <span className="nb-cost">{m.time}</span>}</span>
+      <Track hub={hub} sessionId={r.id} progress={card.progress} send={send} />
+      {step && <code className="now-step">{step}</code>}
+      <span className="nb-foot"><span className="nb-cost">{m.cost ?? 'No cost yet'}</span>{m.time && <span className="nb-cost">{m.time}</span>}<Verified progress={card.progress} now={now} /></span>
       {stuck.map(i => (
         <span key={i.id} className="nb-stuck" role="group" aria-label={`Stuck in ${r.name}`}>
           <span className="nb-stuck-text"><b>Stuck</b> {i.what}</span>
@@ -109,28 +153,63 @@ function CookTicket({ card, hub, send, tint, list, onOpen }: { card: Card; hub: 
   )
 }
 
-function NextTicket({ row, n, start, onPlan }: { row: NextRow; n?: number; start?: () => void; onPlan: () => void }) {
+type HeldWhy = NonNullable<TodoList['plan']>['held'][number]['why']
+function NextTicket({ row, n, held, hold, start, onPlan }: { row: NextRow; n?: number; held?: HeldWhy; hold?: NonNullable<TodoList['plan']>['hold']; start?: () => void; onPlan: () => void }) {
   const { t, you } = row
-  const tag = you ? 'Your step' : t.why === 'blocked' ? 'Blocked' : n ? `To-do ${n}` : 'To-do'
+  const { tag, kind } = nextTag(row, n, held)
+  const again = kind === 'stopped' ? 'Start again' : 'Start'
   return (
-    <li className="nb-ticket nb-next" data-you={you || undefined}>
-      <span className="nb-tag" data-kind={you ? 'you' : undefined}>{tag}</span>
-      <p className="nb-text">{t.text}</p>
+    <li className="nb-ticket nb-next" data-you={you || undefined} data-kind={kind}>
+      <span className="nb-tag" data-kind={kind}>{tag}</span>
+      <p className="nb-text">{t.short ?? t.text}</p>
+      {hold && <span className="nb-hold">{hold.text}</span>}
       <span className="nb-acts">
         {you ? <button type="button" className="hub-btn sm" onClick={onPlan}>Open Plan</button>
-          : start && <button type="button" className="hub-btn sm" onClick={start} aria-label={`Start: ${t.text}`}>Start</button>}
+          : start && <button type="button" className="hub-btn sm" onClick={start} aria-label={`${again}: ${t.text}`}>{again}</button>}
       </span>
     </li>
   )
 }
 
-// A kitchen pass: Your call first, then what is cooking, what is queued and what went out today.
-export function NowLine(p: Props) {
-  const narrow = useNarrow()
+const DONE: Record<DoneKind, { title: string; word: string }> = { merged: { title: 'Merged', word: 'merged' }, approved: { title: 'Approved', word: 'approved' }, stopped: { title: 'Stopped', word: 'stopped' } }
+
+/** Today's finished chats in three groups: merged (its commit is in the branch or its PR merged), approved, and stopped on their own. */
+function useDone(p: Props) {
+  const archive = (p.hub.archive ?? []).filter(a => inProjects(a, p.projects ?? []))
+  const groups = doneGroups(p.done, archive, p.hub.repo ?? undefined, p.now ?? Date.now())
+  return { groups, count: groups.merged.length + groups.approved.length + groups.stopped.length }
+}
+
+function DoneList({ p, groups }: { p: Props; groups: Record<DoneKind, ArchivedChat[]> }) {
+  const now = p.now ?? Date.now()
+  return <>{(Object.keys(DONE) as DoneKind[]).filter(k => groups[k].length).map(k => (
+    <div key={k} className="nb-done" data-kind={k}>
+      <h3 className="nb-done-head">{DONE[k].title} <span>{groups[k].length}</span></h3>
+      <ul className="nb-list">{groups[k].map(a => { const w = ago(k === 'stopped' ? a.archivedAt : a.approvedAt!, now); return (
+        <li key={a.sessionId} className="nb-ticket" style={p.tint?.(a.cwd) ? { borderLeftColor: p.tint(a.cwd) } : undefined}>
+          <button type="button" className="nb-open" onClick={() => p.onDone(a)} title={`Show ${a.name} in History`}>
+            <strong>{a.name}</strong><span className="nb-sub">{a.project} · {DONE[k].word} {w === 'now' ? 'just now' : `${w} ago`}{a.costUsd ? ` · $${a.costUsd.toFixed(2)}` : ''}</span>
+          </button>
+        </li>) })}</ul>
+    </div>
+  ))}</>
+}
+
+/** Up next rows with their To-do number, why the plan holds them, and Start. */
+function useNext(p: Props) {
   const live = (chat?: string) => !!chat && p.hub.chats.some(c => c.sessionId === chat && c.live)
   const rows = nextRows(p.todo?.list, live)
   const num = new Map(p.todo?.list?.plan?.runs.flatMap(r => r.ids.map(id => [id, r.n] as const)))
+  const held = new Map(p.todo?.list?.plan?.held.map(h => [h.id, h.why] as const))
   const start = (id: string) => p.todo ? () => p.send({ type: 'hub-todo-run', path: p.todo!.folder, ids: [id] }) : undefined
+  return { rows, list: rows.length > 0 && <ul className="nb-list">{rows.map((r, i) => <NextTicket key={r.t.id} row={r} n={num.get(r.t.id)} held={held.get(r.t.id)} hold={i === rows.findIndex(x => !x.you) ? p.todo?.list?.plan?.hold : undefined} start={start(r.t.id)} onPlan={p.onPlan} />)}</ul> }
+}
+
+// A kitchen pass: Your call first, then what is cooking, what is queued and what went out today.
+export function NowLine(p: Props) {
+  const narrow = useNarrow()
+  const next = useNext(p)
+  const done = useDone(p)
   const now = p.now ?? Date.now()
   return (
     <div className="now nb">
@@ -140,18 +219,11 @@ export function NowLine(p: Props) {
         {narrow && <NeedChip n={p.needsCount ?? 0} />}
         <Lane id="call" title="Your call" tone="red" count={p.needsCount ?? 0} cap={narrow} empty="Nothing waits on you.">{p.needs}</Lane>
         <Lane id="cook" title="Cooking" tone="blue" count={p.working.length} empty="No chat is working.">
-          {p.working.length > 0 && <ul className="nb-list">{p.working.map(c => <CookTicket key={c.chat.sessionId} card={c} hub={p.hub} send={p.send} tint={p.tint?.(c.chat.cwd)} list={p.todo?.list} onOpen={p.onOpen} />)}</ul>}
+          {p.working.length > 0 && <ul className="nb-list">{p.working.map(c => <CookTicket key={c.chat.sessionId} card={c} hub={p.hub} send={p.send} tint={p.tint?.(c.chat.cwd)} list={p.todo?.list} onOpen={p.onOpen} now={now} />)}</ul>}
         </Lane>
-        <Lane id="next" title="Up next" tone="mute" count={rows.length} fold={narrow} empty="Nothing queued. Add a to-do on Plan.">
-          {rows.length > 0 && <ul className="nb-list">{rows.map(r => <NextTicket key={r.t.id} row={r} n={num.get(r.t.id)} start={start(r.t.id)} onPlan={p.onPlan} />)}</ul>}
-        </Lane>
-        <Lane id="done" title="Done today" tone="green" count={p.done.length} fold={narrow} empty="Nothing approved yet today.">
-          {p.done.length > 0 && <ul className="nb-list">{p.done.map(a => { const w = ago(a.approvedAt!, now); return (
-            <li key={a.sessionId} className="nb-ticket" style={p.tint?.(a.cwd) ? { borderLeftColor: p.tint(a.cwd) } : undefined}>
-              <button type="button" className="nb-open" onClick={() => p.onDone(a)} title={`Show ${a.name} in History`}>
-                <strong>{a.name}</strong><span className="nb-sub">{a.project} · {w === 'now' ? 'approved just now' : `approved ${w} ago`}{a.costUsd ? ` · $${a.costUsd.toFixed(2)}` : ''}</span>
-              </button>
-            </li>) })}</ul>}
+        <Lane id="next" title="Up next" tone="mute" count={next.rows.length} fold={narrow} empty="Nothing queued. Add a to-do on Plan.">{next.list}</Lane>
+        <Lane id="done" title="Done today" tone="green" count={done.count} fold={narrow} empty="Nothing finished yet today.">
+          {done.count > 0 && <DoneList p={p} groups={done.groups} />}
         </Lane>
       </div>
     </div>

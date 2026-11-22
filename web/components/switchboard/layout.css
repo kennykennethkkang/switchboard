@@ -67,21 +67,32 @@
   height: calc(34px + env(safe-area-inset-bottom)); padding: 0 16px env(safe-area-inset-bottom);
   background: var(--hub-surface); border-top: 1px solid var(--hub-hair); font-size: 12px; color: var(--hub-mute);
 }
-.sb-meters { display: inline-flex; align-items: center; gap: 14px; flex: none; }
+/* when the bar runs out of room the meters swipe sideways; .sb-end gives way first and never below the toggles */
+.sb-meters { display: inline-flex; align-items: center; gap: 14px; flex: 0 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
+.sb-meters::-webkit-scrollbar { display: none; }
+/* fade an edge only while meters sit past it, so a clipped "Week 5" or "5h 0%" doesn't read as a value */
+@property --sb-fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --sb-fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes sb-fade { from { --sb-fade-l: 0px; --sb-fade-r: 24px; } to { --sb-fade-l: 32px; --sb-fade-r: 0px; } }
+@supports (animation-timeline: scroll()) {
+  .sb-meters { mask-image: linear-gradient(to right, transparent calc(var(--sb-fade-l) / 2), #000 var(--sb-fade-l), #000 calc(100% - var(--sb-fade-r)), transparent); animation: sb-fade linear both; animation-timeline: scroll(self inline); }
+}
 .sb .hub-limit > i { display: inline-block; width: 36px; height: 3px; border-radius: 2px; background: var(--hub-hair); overflow: hidden; }
 .sb .hub-limit > i > b { display: block; height: 100%; background: var(--hub-blue); transform-origin: left; }
 .sb .hub-limit[data-level='high'] > i > b { background: var(--hub-yellow); }
 .sb .hub-limit[data-level='out'] > i > b { background: var(--hub-red); }
-.sb-end { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
-.sb-slot { display: inline-flex; align-items: center; min-width: 0; }
-/* Ship chip gives way first: block so the text can ellipsize, toggles keep their size. */
-.sb-slot:has(> .hub-ship-chip) { flex: 0 1 auto; overflow: hidden; }
+/* shrink weight this big keeps the meters whole to the pixel until the chip is at its floor, so the fade stays off */
+.sb-end { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 1000000; }
+.sb-slot { display: inline-flex; align-items: center; flex: none; }
+/* Ship chip gives way first: block so the text can ellipsize, toggles keep their size.
+   The minmax(0) grid track keeps the chip out of .sb-end's min-content; 64px keeps "Push N" readable. */
+.sb-slot:has(> .hub-ship-chip) { flex: 0 1 auto; min-width: 64px; overflow: hidden; display: grid; grid-template-columns: minmax(0, max-content); }
 .sb .hub-ship-chip { display: block; flex-shrink: 1; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; line-height: 26px; }
 .sb .hub-ship-chip > i { display: inline-block; margin-right: 6px; vertical-align: 1px; }
 /* needs.css hides the name up to 1440 for the header; the status bar has room above 1180. */
 @media (min-width: 1181px) { .sb .hub-ship-name { display: inline; } }
-/* Keep "Push N" readable at 761-940: drop the meter bars, not the chip text. */
-@media (max-width: 940px) { .sb-slot:has(> .hub-ship-chip) { min-width: 64px; } .sb .hub-limit > i { display: none; } }
+/* 761-940: drop the meter bars, not the chip text. */
+@media (max-width: 940px) { .sb .hub-limit > i { display: none; } }
 .sb-btn {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px;
   background: none; color: var(--hub-body); font: 500 12px/1 var(--hub-sans); white-space: nowrap; cursor: pointer;
@@ -111,7 +122,8 @@
 @media (pointer: coarse) { .sb-btn { height: auto; min-height: 44px; } .sb { height: calc(48px + env(safe-area-inset-bottom)); } .sb .hub-ship-chip { line-height: 42px; } }
 /* Bottom tab bar under 760: the bar sits on top of it, so the nav takes the safe area. */
 @media (max-width: 760px) {
-  .sb { bottom: calc(var(--nav-h, 0px) + env(safe-area-inset-bottom)); height: 34px; padding-bottom: 0; }
+  /* the tab bar is 51px tall against --nav-h 52, so the strip tucks 2px under it (z-index 5 vs 6) instead of leaving a gap */
+  .sb { bottom: calc(var(--nav-h, 0px) + env(safe-area-inset-bottom) - 2px); height: 34px; padding-bottom: 0; }
 }
 @media (max-width: 760px) and (pointer: coarse) { .sb { height: 48px; } }
 @media (prefers-reduced-motion: reduce) { .now-row, .sb-btn, .now-bar > b { transition: none; } .now-row:active, .sb-btn:active { transform: none; } }
@@ -121,4 +133,16 @@
 .hub-stuck-diff > summary { cursor: pointer; width: fit-content; font-size: 12px; color: var(--hub-mute); border-radius: 4px; }
 .hub-stuck-diff > summary:hover { color: var(--hub-ink); }
 .hub-stuck-diff > summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+@media (pointer: coarse) { .hub-stuck-diff > summary { display: flex; align-items: center; min-height: 44px; } .hub-todo-sync .hub-check { min-height: 44px; } }
+@media (pointer: coarse) { .nc-own { min-height: 44px; } }
 .hub-stuck-diff[open] > summary { margin-bottom: 8px; }
+.hub-inert-note { position: fixed; left: 50%; bottom: calc(48px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30; padding: 8px 12px; border-radius: 8px; background: var(--hub-elev); box-shadow: var(--hub-shadow-pop), inset 0 0 0 1px var(--hub-hair); color: var(--hub-yellow); font-size: 13px; white-space: nowrap; }
+@media (max-width: 760px) { .hub-inert-note { bottom: calc(var(--nav-h, 52px) + 48px + env(safe-area-inset-bottom)); } }
+@media (pointer: coarse) { .hub-jarvis-bar button.hub-btn { min-height: 44px; } }
+
+.nc-more > summary { cursor: pointer; color: var(--hub-mute); font-size: 13px; width: fit-content; padding: 4px 0; }
+.nc-more[open] > summary { color: var(--hub-ink); }
+.nc-more-in { display: grid; gap: 10px; padding-top: 6px; }
+.nc-more-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.nc-more > summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; border-radius: 4px; }
+@media (pointer: coarse) { .nc-more > summary { display: flex; align-items: center; min-height: 44px; } }

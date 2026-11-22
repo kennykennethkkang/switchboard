@@ -79,7 +79,9 @@ export async function sampleStuck(now = Date.now()): Promise<StuckItem[]> {
   psCost.lastMs = performance.now() - t
   psCost.runs++
   psCost.ms += psCost.lastMs
-  return detect({ progress: s.progress, chats: s.chats, procs, ...jobFacts(s.progress, now) }, watch, now)
+  const facts = jobFacts(s.progress, now)
+  hub.endSubJobs(facts.finished)
+  return detect({ progress: hub.get().progress, chats: s.chats, procs, ...facts }, watch, now)
 }
 
 // VS Code and its helpers, never stopped whatever the tree says.

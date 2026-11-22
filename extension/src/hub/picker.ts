@@ -1,6 +1,7 @@
 /**
  * Auto for New chat: Jev labels the task with a role, a rule table picks the AI.
  * The table comes from the Codex model bench (no Claude vs Codex head-to-head yet): code roles go to Codex, the rest to Claude.
+ * pickRun then picks the model and effort for that AI from the task (see the rule above it).
  */
 import { execFile } from 'child_process'
 import * as fs from 'fs'
@@ -8,6 +9,9 @@ import * as os from 'os'
 import * as path from 'path'
 import { keyEnv, keyStore } from './keys'
 import type { AiStatus, AutoPick } from './types'
+
+/** Whether a run gets the auto pick: its own auto (New chat, the Start popover) wins, else the gear's Auto pick per task, on unless false. */
+export const autoOn = (auto: boolean | undefined, gear: boolean | undefined) => auto ?? gear !== false
 
 const JEV = path.join(os.homedir(), '.claude', 'skills', 'claude-x-jev', 'scripts', 'jev.py')
 const SURE = 0.7
@@ -44,15 +48,20 @@ export function pickAi(o: { text: string; codexReady: boolean; label?: string })
   return { ai: 'codex', reason: `${WHY[role]}, and Codex benched best on those` }
 }
 
-/** Codex is on PATH and not signed out. ponytail: no Codex usage-limit signal exists in the hub yet; add it here when one does. */
+/** Codex is on PATH and not signed out. Its 5h usage never blocks it: pickCodexRun only holds xhigh back. */
 export const codexUsable = (ais: AiStatus[]) => { const c = ais.find(a => a.id === 'codex'); return !!c?.installed && c.signedIn !== false }
 
 type Run = (preset: string, input: string) => Promise<string | undefined>
 const viaJev: Run = (preset, input) => new Promise(done => execFile('python3', [JEV, 'ask', '--preset', preset, '--input', input],
   { timeout: 5000, maxBuffer: 1 << 20, env: { ...process.env, ...keyEnv(keyStore(), process.env) } }, (err, out) => done(err ? undefined : String(out))))
 
-/** Jev's role for the task from the project's route preset, or undefined when unsure, missing or slower than ms. */
-export async function jevRole(task: string, preset: string, run: Run = viaJev, ms = 2000): Promise<string | undefined> {
+import type { Difficulty } from './pick-run'
+export * from './pick-run'
+const DIFFICULTIES: readonly string[] = ['trivial', 'routine', 'hard', 'frontier']
+export type JevLabels = { role?: string; difficulty?: Difficulty }
+
+/** Jev's role and difficulty for the task from the project's route preset; each only when sure, nothing when missing or slower than ms. One call answers both. */
+export async function jevLabels(task: string, preset: string, run: Run = viaJev, ms = 2000): Promise<JevLabels> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pick-'))
   try {
     const input = path.join(dir, 'items.json')
@@ -60,18 +69,35 @@ export async function jevRole(task: string, preset: string, run: Run = viaJev, m
     const out = await Promise.race([run(preset, input), new Promise<undefined>(r => setTimeout(() => r(undefined), ms))])
     for (const line of out?.split('\n') ?? []) {
       try {
-        const r = JSON.parse(line) as { role?: unknown; role_conf?: unknown }
-        if (typeof r.role === 'string' && typeof r.role_conf === 'number' && r.role_conf >= SURE) return r.role
+        const r = JSON.parse(line) as { role?: unknown; role_conf?: unknown; difficulty?: unknown; difficulty_conf?: unknown }
+        const labels: JevLabels = {}
+        if (typeof r.role === 'string' && typeof r.role_conf === 'number' && r.role_conf >= SURE) labels.role = r.role
+        if (typeof r.difficulty === 'string' && DIFFICULTIES.includes(r.difficulty) && typeof r.difficulty_conf === 'number' && r.difficulty_conf >= SURE) labels.difficulty = r.difficulty as Difficulty
+        if (labels.role || labels.difficulty) return labels
       } catch { /* summary line or noise */ }
     }
-    return undefined
+    return {}
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
 }
 
-/** The full pick: Jev when the project has a route preset and the skill is installed, else the keywords. */
-export async function autoPick(text: string, ais: AiStatus[], preset?: string): Promise<AutoPick> {
-  const label = preset && fs.existsSync(JEV) && text.trim() ? await jevRole(text, preset) : undefined
+/** Jev's role for the task, or undefined when unsure, missing or slower than ms. */
+export const jevRole = async (task: string, preset: string, run: Run = viaJev, ms = 2000) => (await jevLabels(task, preset, run, ms)).role
+
+/** Jev's labels when the project has a route preset and the skill is installed, else none. */
+export const labelTask = (text: string, preset?: string): Promise<JevLabels> => (preset && fs.existsSync(JEV) && text.trim() ? jevLabels(text, preset) : Promise.resolve({}))
+
+/** The full pick: Jev when the project has a route preset and the skill is installed, else the keywords. labels: already fetched, so the call is not made twice. */
+export async function autoPick(text: string, ais: AiStatus[], preset?: string, labels?: JevLabels): Promise<AutoPick> {
+  const label = (labels ?? await labelTask(text, preset)).role
   return pickAi({ text, codexReady: codexUsable(ais), label })
+}
+
+/** The first message with Claude Code's ultrathink keyword once at the end; a slash command keeps its line as typed. */
+export const withUltrathink = (text: string): string => (!text || /\bultrathink\b/i.test(text) || /^\/[a-z][\w:-]*(\s|$)/i.test(text) ? text : `${text} ultrathink`)
+
+/** The highest unreset window of this kind (five_hour, or codex_five_hour) in percent; 0 with none. reset reads a window's resetsAt as epoch ms. */
+export function fiveHour(windows: Array<{ kind?: string; percentUsed: number; resetsAt?: string }>, kind: string, reset: (v?: string) => number, now = Date.now()): number {
+  return Math.max(0, ...windows.filter(w => w.kind === kind && !(reset(w.resetsAt) <= now)).map(w => w.percentUsed))
 }

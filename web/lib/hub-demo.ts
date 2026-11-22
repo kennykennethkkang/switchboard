@@ -3,12 +3,15 @@
  * The sample mirrors a real week on Kenneth's Mac so the demo reads true.
  */
 import type { HubCommand } from './vscode-bridge'
-import { runIds } from './todo'
+import { holdOf, runIds, type Held } from './todo'
 import { projectName, splitVersion } from './archive'
 import { looksMulti } from './split-plan'
-import type { ChangedFile, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, TodoList, ToolCall } from './hub-types'
+import type { ChangedFile, ChatLink, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, TodoList, ToolCall } from './hub-types'
 import type { RunCall, RunDetail } from './runs'
 import type { ChatAnswer, ChatAsk, ChatMessage, ChatOutputs } from './chat-view'
+import { demoSourceChecks } from './source-check-demo'
+import { demoStations } from './stations-demo'
+import type { SmartPickRow, SmartState, SmartVerdict } from './smart'
 
 export const emptyHub = (): HubState => ({
   live: [], history: [], sessions: [], plan: null,
@@ -50,24 +53,59 @@ export function demoFx(search: string, now: number): { pause?: HubState['pause']
   }
 }
 let unlinkAt: number | undefined
+/** ?view=coder turns Coder view on; ?view=first leaves it unset, so the Simple or everything choice shows. */
+const demoView = (search: string) => { const v = new URLSearchParams(search).get('view'); return v === 'first' ? {} : { coderView: v === 'coder' } }
 
 // The demo's stand-in for the extension's plan (todo.ts upcoming), which the web cannot import.
-function demoPlan(l: TodoList, live: Set<string>): NonNullable<TodoList['plan']> {
+// The extension's hold order: a chain says the first of these any of its items has.
+const HOLDS: Held[] = ['blocked', 'you', 'ok', 'date', 'stopped']
+// ctx: the window's autopilot switch, its wait links, how a chat is named, and which wait targets are still open.
+function demoPlan(l: TodoList, live: Set<string>, ctx: { autoStart: boolean; links: ChatLink[]; name: (id: string) => string; open: (id: string) => string | undefined; now: number }): NonNullable<TodoList['plan']> {
   const todo = l.todo.filter(t => !(t.chat && live.has(t.chat))), taken = new Set<string>(), runs: Array<{ n: number; ids: string[] }> = []
-  const ok = (t: TodoItem) => !t.chat && !t.stopped && t.why !== 'you' && t.why !== 'blocked' && !taken.has(t.id)
+  const ok = (t: TodoItem) => !holdOf(t, ctx.now) && !taken.has(t.id)
   const chain = (t: TodoItem) => { const s = runIds(todo, [t.id]); return todo.filter(x => s.has(x.id) && x !== t).concat(t) }
   for (let t; (t = todo.find(x => ok(x) && chain(x).every(ok)));) { const ids = chain(t).map(x => x.id); ids.forEach(id => taken.add(id)); runs.push({ n: (l.seq ?? 0) + runs.length + 1, ids }) }
-  const why = (t: TodoItem) => { const c = chain(t); return c.some(x => x.why === 'blocked') ? 'blocked' as const : c.some(x => x.why === 'you') ? 'you' as const : 'stopped' as const }
-  return { runs, held: todo.filter(t => !taken.has(t.id)).map(t => ({ id: t.id, why: why(t) })) }
+  const why = (t: TodoItem) => { const h = chain(t).map(x => holdOf(x, ctx.now)); return HOLDS.find(k => h.includes(k)) ?? 'stopped' }
+  // The hold only where the extension holds (todo.ts holdReason): autopilot on, something queued. A live to-do chat holds the start.
+  const holder = l.todo.find(t => t.chat && live.has(t.chat)), out = holder ? (ctx.links.find(x => x.from === holder.chat)?.to ?? []) : []
+  const open = out.flatMap(id => { const t = ctx.open(id); return t ? [ctx.name(t)] : [] })
+  const hold = !(l.pilot?.on ?? ctx.autoStart) || !runs.length ? undefined : l.pilot?.paused ? { kind: 'paused' as const, text: 'Next to-do waits: autopilot is paused' } : holder && (open.length ? { kind: 'waiting' as const, text: `Next to-do waits: ${holder.text} is waiting on ${open.join(', ')} to finish` } : { kind: 'running' as const, text: `Next to-do starts when ${holder.text} finishes` })
+  return { runs, held: todo.filter(t => !taken.has(t.id)).map(t => ({ id: t.id, why: why(t) })), ...(hold ? { hold } : {}) }
 }
-const withPlans = (h: HubState): HubState => {
+const withPlans = (h: HubState, now: number): HubState => {
   const live = new Set(h.chats.filter(c => c.live).map(c => c.sessionId))
-  return { ...h, todos: Object.fromEntries(Object.entries(h.todos ?? {}).map(([f, l]) => [f, { ...l, plan: demoPlan(l, live) }])) }
+  const name = (id: string) => h.chats.find(c => c.sessionId === id)?.name ?? id
+  // A target that is done or waiting on Kenneth is no longer waited on (the extension's outcomeIn, from progress only here).
+  const open = (id: string) => { const st = h.progress.find(p => p.sessionId === id)?.state; return st === 'done' || st === 'needs-you' ? undefined : id }
+  const ctx = { autoStart: h.controls.switchboard.autoStart, links: h.links ?? [], name, open, now }
+  return { ...h, todos: Object.fromEntries(Object.entries(h.todos ?? {}).map(([f, l]) => [f, { ...l, plan: demoPlan(l, live, ctx) }])) }
 }
 
 // ?demo=stalled shows the MiroFish sim as Stalled and the crowd-ab run as Stopped.
+const demoSmart = (now: number): SmartState => {
+  const m = 60e3
+  const pick = (ago: number, session: string, title: string, kind: string, task: string, p: string, why: string, verdict: SmartVerdict, final?: string): SmartPickRow => ({ at: now - ago * m, session, title, kind, task, pick: p, why, verdict, ...(final ? { final } : {}) })
+  return {
+    rates: [
+      { kind: 'ponytail', task: 'fix', pick: 'full', n: 14, useful: 12 }, { kind: 'ponytail', task: 'ui', pick: 'lite', n: 6, useful: 5 }, { kind: 'ponytail', task: 'tiny', pick: 'ultra', n: 9, useful: 8 },
+      { kind: 'model', task: 'fix', pick: 'sonnet', n: 12, useful: 10 }, { kind: 'model', task: 'fix', pick: 'haiku', n: 5, useful: 2 }, { kind: 'model', task: 'feature', pick: 'opus', n: 7, useful: 6 }, { kind: 'model', task: 'tiny', pick: 'haiku', n: 11, useful: 10 },
+      { kind: 'effort', task: 'fix', pick: 'medium', n: 12, useful: 9 }, { kind: 'effort', task: 'feature', pick: 'high', n: 8, useful: 6 },
+      { kind: 'role', task: 'review', pick: 'qa on haiku', n: 6, useful: 5 }, { kind: 'role', task: 'ui', pick: 'designer on sonnet', n: 4, useful: 3 },
+      { kind: 'question', task: 'name', pick: 'Keep Closet', n: 12, useful: 10 }, { kind: 'question', task: 'finish', pick: 'Approve', n: 20, useful: 18 },
+    ],
+    picks: [
+      pick(6, 'd-ask', 'Outfit picker copy', 'question', 'name', 'Keep Closet', 'learned: Keep Closet kept 83% of 12', 'pending'),
+      pick(22, 'd-work', 'Fix login redirect v4', 'model', 'fix', 'sonnet', 'a bug fix in a few files', 'pending'),
+      pick(22, 'd-work', 'Fix login redirect v4', 'ponytail', 'fix', 'full', 'a fix wants the smallest diff that passes', 'pending'),
+      pick(95, 'd-done', 'Hub AIs and Starred', 'role', 'review', 'qa on haiku', 'small diff, low risk', 'useful'),
+      pick(180, 'd-tree', 'Fix login (worktree)', 'model', 'fix', 'haiku', 'a typo-sized change', 'not', 'sonnet'),
+      pick(300, 'd-close', 'Size filter', 'effort', 'feature', 'high', 'new feature across several files', 'useful'),
+      pick(1500, 'd-old', 'Receipts export', 'ponytail', 'ui', 'lite', 'screens need room for design choices', 'useful'),
+    ],
+  }
+}
 export const demoHub = (now = Date.now()): HubState => {
-  const h = withPlans(baseHub(now))
+  const h = { ...demoStations(withPlans(baseHub(now), now), now), smart: demoSmart(now) } as HubState
   if (typeof location === 'undefined' || !new URLSearchParams(location.search).get('demo')?.split(',').includes('stalled')) return h
   return { ...h, mirofish: h.mirofish && { ...h.mirofish, stalled: true }, crowdAb: h.crowdAb && { ...h.crowdAb, lastAt: now - 8 * 60e3, stopped: true } }
 }
@@ -82,7 +120,7 @@ function baseHub(now: number): HubState {
     ...emptyHub(),
     controls: {
       claude: { model: 'opus', tui: 'fullscreen', statusLine: false, push: true, needInput: true },
-      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '', advancedMode: { '/Users/k/Documents/GitHub/Armasu': true } },
+      switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '', advancedMode: { '/Users/k/Documents/GitHub/Armasu': true }, ...demoView(typeof location === 'undefined' ? '' : location.search) },
       statusLineReady: true,
     },
     uploads: {
@@ -110,7 +148,7 @@ function baseHub(now: number): HubState {
       { run: 'filters', sessionId: 'd-close', at: now - 30 * 60e3, stages: [{ n: 1, name: 'Research', role: 'researcher', status: 'done' }, { n: 2, name: 'Build the size filter', role: 'engineer', status: 'done' }, { n: 3, name: 'Review', role: 'qa', status: 'todo' }] },
     ] },
     escalations: { '/Users/k/Documents/GitHub/Armasu': [
-      { project: '/Users/k/Documents/GitHub/Armasu', role: 'qa', from: 'sonnet', to: 'opus', files: ['web/components/switchboard/board.tsx'], reason: 'after 3 redesign rounds', at: now - DAY },
+      { project: '/Users/k/Documents/GitHub/Armasu', role: 'qa', from: 'sonnet', to: 'opus', files: ['auth/middleware.ts'], reason: 'after 3 redesign rounds', at: now - DAY },
       { project: '/Users/k/Documents/GitHub/Armasu', role: 'designer', from: 'opus', to: 'fable', files: ['app/closet/picker.css', 'app/closet/picker.tsx'], reason: 'after 3 redesign rounds', at: now - 2 * DAY },
     ] },
     projects: [
@@ -172,6 +210,12 @@ function baseHub(now: number): HubState {
         { id: 'dt5', text: 'Move the route release preset to the shared kit', at: now - 60 * 60e3, chat: 'd-gone' },
         // Long on purpose: the panel must show it whole, not cut at a fixed length.
         { id: 'dt7', text: 'Make the receipts export match what accounting asked for: one row per line item, the tax split into its own column, refunds as negative rows on the day they happened, and the file named by month so it sorts in Finder. Keep the old CSV format behind a toggle until they confirm the new one imports cleanly into Xero.', at: now - 26 * 60 * 60e3, from: 'd-done', name: 'Receipts export' },
+        // One of each wait: an approval gating the next item, a dated one, a stopped one, a blocked one.
+        { id: 'dt11', text: 'Proposed kit edit (AAR v3): batch agent-browser steps into one call in the aar skill. Needs Kenneth OK before it runs.', short: 'Approve kit rule: batch browser steps', needsOk: true, before: 'dt12', at: now - 16 * 36e5, from: 'd-done' },
+        { id: 'dt12', text: 'Batch the browser steps in the aar skill', short: 'Batch browser steps in aar', at: now - 16 * 36e5 },
+        { id: 'dt13', text: 'Check the push alerts after two weeks live and tell me if they ring too often', short: 'Check push alerts, 2 weeks live', notBefore: now + 10 * DAY, at: now - 2 * DAY },
+        { id: 'dt14', text: 'Review memory consolidation (5 merges) before they land in the vault', short: 'Review memory consolidation', stopped: true, at: now - 16 * 36e5 },
+        { id: 'dt15', text: 'Channel3 purchase matching, waiting on their API key', short: 'Channel3 purchase matching', why: 'blocked', at: now - 3 * DAY },
       ], ticked: [{ id: 'dt6', text: 'Fix the login redirect on Safari', at: now - 20 * 60e3, by: 'd-done', from: 'd-work', run: 1, auto: true },
         // Auto-ticked: a commit already said it.
         { id: 'dt8', text: 'Show a spinner while the outfit picker loads', at: now - 3 * 60 * 60e3, from: 'd-old', shipped: { sha: '9f3c2a17be04d1', subject: 'Outfit picker: loading spinner and empty state' } },
@@ -193,13 +237,19 @@ function baseHub(now: number): HubState {
         { id: 'da2', text: 'Check the phone layout on a real device', at: now - 4 * 60e3, from: 'd-almost', why: 'you' },
         { id: 'da3', text: 'add dark mode to the settings page', at: now - 3 * 60e3, from: 'd-almost', why: 'missed' },
       ] },
+      // A list outside every project folder.
+      '/Users/k/.claude/switchboard/misc': { todo: [{ id: 'dm1', text: 'Proposed kit edit: add a Reviewer line to the toolchain skill', short: 'Add Reviewer line to toolchain', at: now - 9 * DAY }] },
     },
     ...(fx.pause ? { pause: fx.pause } : {}),
     // One link Kenneth made on the cards, one from an edit clash on the same file.
     links: [
       { from: 'd-ask', to: ['d-work'], reason: 'Kenneth linked these in Switchboard', auto: false, since: now - 6 * 60e3 },
+      { from: 'd-work', to: ['d-wrap'], reason: 'Kenneth linked these in Switchboard', auto: false, since: now - 3 * 60e3 },
       { from: 'd-wrap', to: ['d-almost'], reason: '/Users/k/GitHub/switchboard/extension/src/hub/hub-service.ts', auto: true, since: now - 2 * 60e3 },
     ],
+    firstRun: { github: true, claude: true, project: true, chat: false, approved: false },
+    researchOffers: [{ sessionId: 'd-ask', score: 0.82, reason: 'Picker copy leans on claims about what shoppers prefer; a research run can check them', at: now - 3 * 60e3 }],
+    sourceChecks: demoSourceChecks(now),
     // The hung test run that started this check: a subagent's pnpm test, two hours on one core.
     stuck: [
       { id: 'job:d-wrap:t9', kind: 'job', sessionId: 'd-wrap', what: 'Subagent background job "Run the extension tests": no new output', since: now - 124 * 60e3, cpu: 98, rss: 1.4 * 1024 ** 3, pid: 48213, started: now - 131 * 60e3, command: 'pnpm test', last: 'Bash pnpm test' },
@@ -257,13 +307,13 @@ function baseHub(now: number): HubState {
           { id: '3', subject: 'Task tracker on the cards', status: 'completed', role: 'engineer' },
         ],
         commit: 'fix(hub): done only when nothing runs' },
-      { sessionId: 'd-ask', cwd: '/Users/k/GitHub/Armasu', state: 'needs-you', startedAt: now - 5 * 60e3, at: now,
+      { sessionId: 'd-ask', cwd: '/Users/k/GitHub/Armasu', state: 'needs-you', startedAt: now - 5 * 60e3, at: now, asked: ['Write the outfit picker copy so shoppers get what each filter does'],
         roles: [{ id: 'g1', role: 'designer', state: 'active', startedAt: now - 4 * 60e3 }, { id: 'g2', role: 'engineer-codex', state: 'active', startedAt: now - 2 * 60e3 }],
         helpers: [{ ai: 'jev', label: 'score closet-names', state: 'done', since: now - 4 * 60e3, last: now - 3 * 60e3, count: 2 }],
         tasks: [{ id: '1', subject: 'Draft the picker labels', status: 'completed', role: 'designer' }, { id: '4', subject: 'Wire the picker labels', status: 'in_progress', role: 'engineer-codex' }, { id: '2', subject: 'Pick the closet name', status: 'in_progress', role: 'designer' }, { id: '3', subject: 'Ship copy for review', status: 'pending', role: 'growth' }],
         question: "Keep 'Closet' or rename it to 'Wardrobe'?",
         ask: { id: 'toolu_demo_closet', kind: 'question', tool: 'AskUserQuestion', options: [],
-          questions: [{ header: 'Name', question: "Keep 'Closet' or rename it to 'Wardrobe'?", options: ['Keep Closet', 'Rename to Wardrobe', 'Use Wardrobe in the app, Closet in docs'], details: ['No changes; matches the docs', 'Renames labels, routes and copy', 'App says Wardrobe, docs keep Closet'] }] } },
+          questions: [{ header: 'Name', question: "Keep 'Closet' or rename it to 'Wardrobe'?", options: ['Keep Closet', 'Rename to Wardrobe', 'Use Wardrobe in the app, Closet in docs'], details: ['No changes; matches the docs', 'Renames labels, routes and copy', 'App says Wardrobe, docs keep Closet'], smart: { option: 0, rate: 0.83, n: 12 } }] } },
       // Asking the closing question with the done-check short of two items: Needs you shows the red stamp.
       { sessionId: 'd-close', cwd: '/Users/k/GitHub/Armasu', state: 'needs-you', startedAt: now - 30 * 60e3, at: now - 30e3,
         roles: [{ id: 'q1', role: 'qa', state: 'done', startedAt: now - 12 * 60e3, at: now - 2 * 60e3 }],
@@ -328,7 +378,7 @@ function baseHub(now: number): HubState {
       { kind: 'mod', name: 'usage-meter@kenneth-mods', enabled: true }, { kind: 'mod', name: 'repo-rules@kenneth-mods', enabled: true }, { kind: 'mod', name: 'paid-guard@kenneth-mods', enabled: true },
       { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, skills: ['brainstorming', 'test-driven-development', 'writing-plans'], description: 'Planning, test-first coding and review habits for every chat.' }, { kind: 'plugin', name: 'aws-core@claude-plugins-official', enabled: true, description: 'AWS docs, CLI help and account checks.' }, { kind: 'plugin', name: 'stitch-design@google-labs-code-stitch-skills', enabled: false },
       { kind: 'skill', name: 'claude-x-jev', enabled: true, description: 'Sorts and scores many items cheaply with Jev.' }, { kind: 'skill', name: 'phone', enabled: true, description: 'Sends a push notification to your phone.' }, { kind: 'skill', name: 'drei', enabled: false },
-      { kind: 'role', name: 'researcher', enabled: true, model: 'haiku' }, { kind: 'role', name: 'engineer', enabled: true, model: 'opus' }, { kind: 'role', name: 'qa', enabled: true, model: 'opus' },
+      { kind: 'role', name: 'researcher', enabled: true, model: 'haiku' }, { kind: 'role', name: 'engineer', enabled: true, model: 'opus' }, { kind: 'role', name: 'qa', enabled: true, model: 'sonnet' },
       { kind: 'role', name: 'designer', enabled: true, model: 'opus' }, { kind: 'role', name: 'ops', enabled: true, model: 'haiku' }, { kind: 'role', name: 'growth', enabled: true, model: 'sonnet' },
       { kind: 'role', name: 'qa-codex', enabled: true, model: 'sonnet', codex: true, codexModel: 'gpt-6-luna', codexEffort: 'high' },
       { kind: 'preset', name: 'armasu-copy-check', enabled: true }, { kind: 'preset', name: 'armasu-route-release', enabled: true },
@@ -645,6 +695,9 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const { [w]: _was, ...rest } = h.signIns.projects
       return { ...h, signIns: { ...h.signIns, projects: c.profile === null ? rest : { ...rest, [w]: c.profile } } }
     }
+    case 'hub-coder-view': return { ...h, controls: { ...h.controls, switchboard: { ...h.controls.switchboard, coderView: c.on } } }
+    case 'hub-research-dismiss': return { ...h, researchOffers: h.researchOffers?.filter(o => o.sessionId !== c.sessionId) }
+    case 'hub-first-run': return h.firstRun ? { ...h, firstRun: { ...h.firstRun, dismissed: c.dismissed || undefined } } : h
     case 'hub-advanced': return { ...h, controls: { ...h.controls, switchboard: { ...h.controls.switchboard, advancedMode: { ...h.controls.switchboard.advancedMode, [c.path]: c.on } } } }
     case 'hub-stage': return { ...h, stages: { ...h.stages, [c.path]: (h.stages?.[c.path] ?? []).map(r => r.run !== c.run ? r : { ...r, stages: r.stages.map(st => {
       if (st.n === c.n) return { ...st, status: c.status }
@@ -727,7 +780,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       // Like the extension, the first item for a project with no list starts one.
       const list = h.todos?.[c.path] ?? (c.type === 'hub-todo-add' ? { todo: [] } : undefined)
       if (!list) return h
-      const set = (l: typeof list) => withPlans({ ...h, todos: { ...h.todos, [c.path]: l } })
+      const set = (l: typeof list) => withPlans({ ...h, todos: { ...h.todos, [c.path]: l } }, now)
       const now = Date.now(), id = `dt-${now.toString(36)}-${++demoSeq}`
       if (c.type === 'hub-todo-pilot') return set({ ...list, pilot: { ...list.pilot, ...(c.on !== undefined ? { on: c.on } : {}), ...(c.paused !== undefined ? { paused: c.paused } : {}), at: now } })
       if (c.type === 'hub-todo-add') return c.text.trim() ? set({ ...list, todo: [...list.todo, { id, text: c.text.trim(), at: now }] }) : h
@@ -757,7 +810,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       const started = c.to ? h : demoApply(h, { type: 'hub-new-chat', path: c.path, text: items.map(t => t.text).join('; '), remote: false })
       const chat = c.to ?? started.chats[0].sessionId
       const n = (list.seq ?? 0) + 1
-      return withPlans({ ...started, todos: { ...h.todos, [c.path]: { ...list, seq: n, streak: list.streak ?? n, todo: list.todo.map(t => (run.has(t.id) ? { ...t, chat, at: now, run: n } : t)) } } })
+      return withPlans({ ...started, todos: { ...h.todos, [c.path]: { ...list, seq: n, streak: list.streak ?? n, todo: list.todo.map(t => (run.has(t.id) ? { ...t, chat, at: now, run: n } : t)) } } }, now)
     }
     case 'hub-live-dismiss': return c.kind === 'mirofish' ? { ...h, mirofish: undefined } : { ...h, crowdAb: undefined }
     case 'hub-awake': return { ...h, awake: c.on }
@@ -809,14 +862,14 @@ export function demoRunDetails(p: ChatProgress | undefined, role: string, now = 
     const done = r.state === 'done', end = done ? r.at ?? Math.min(now, r.startedAt + (8 + i * 3) * 60e3) : now
     const span = Math.max(1000, end - r.startedAt)
     const calls: RunCall[] = job.tools.map(([tool, target], k) => ({ tool, target, at: r.startedAt + ((k + 1) / (job.tools.length + 1)) * span }))
-    const sentBack = role === 'engineer' && i === steps.length - 1 && steps.length > 1
+    const sentBack = role === 'engineer' && i === 0 && steps.length > 1
     const cached = 180_000 + i * 90_000
     return {
       id: r.id, role, title: steps.length > 1 && i < steps.length - 1 ? `${job.title}, round ${i + 1}` : job.title, model: 'claude-opus-5-5',
       startedAt: r.startedAt, endedAt: end, finished: done, brief: job.brief,
-      ...(done || i < steps.length - 1 ? { report: { status: role === 'qa' ? 'done with concerns' : 'done', changed: job.changed, checked: job.checked, open: job.open }, reportText: `Status: done\nChanged:\n${job.changed.map(c => `- ${c}`).join('\n')}` } : {}),
+      ...(done || i < steps.length - 1 ? { report: { status: role === 'qa' ? 'done with concerns' : 'done', changed: job.changed, checked: job.checked, open: job.open }, reportText: `Status: done\nChanged:\n${job.changed.map(c => `- ${c}`).join('\n')}\nChecked:\n${job.checked.map(c => `- ${c}`).join('\n')}${job.open.length ? `\nOpen:\n${job.open.map(c => `- ${c}`).join('\n')}` : ''}` } : {}),
       files: job.files.map(([path, added, removed]) => ({ path, added, removed })), calls, callCount: calls.length,
-      loops: sentBack ? [{ at: r.startedAt + span * 0.6, by: 'qa', text: 'qa found /login?next= still loops: middleware.ts:18 checks the path before stripping the query. Fix it and add a test.' }] : [],
+      loops: sentBack ? [{ at: r.startedAt + span * 0.9, by: 'qa', text: 'qa found /login?next= still loops: middleware.ts:18 checks the path before stripping the query. Fix it and add a test.' }] : [],
       tokens: { input: 1200 + i * 300, output: 9_000 + i * 2_000, cacheRead: cached, cacheWrite: 24_000 }, costUsd: 0.4 + i * 0.35, file: '',
     }
   })
@@ -838,6 +891,7 @@ function demoLead(p: ChatProgress, now: number): RunDetail {
 }
 
 const DEMO_SHOT = '/Users/k/GitHub/switchboard/.playwright-mcp/hub-1440.png'
+const DEMO_SHOT2 = '/Users/k/GitHub/switchboard/.playwright-mcp/hub-380.png'
 // A small drawn page, so the demo shows an image without shipping one.
 const SHOT_SVG = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" fill="#0d0d0d"/><rect x="0" y="0" width="640" height="40" fill="#121212"/><circle cx="24" cy="20" r="6" fill="#59d499"/><rect x="40" y="14" width="120" height="12" rx="6" fill="#434345"/><rect x="16" y="56" width="180" height="328" rx="8" fill="#101111" stroke="#242728"/><rect x="28" y="72" width="156" height="44" rx="6" fill="#121212" stroke="#242728"/><rect x="28" y="124" width="156" height="44" rx="6" fill="#121212" stroke="#242728"/><rect x="212" y="56" width="412" height="328" rx="8" fill="#101111" stroke="#242728"/><rect x="232" y="80" width="200" height="14" rx="7" fill="#f4f4f6"/><rect x="232" y="108" width="360" height="10" rx="5" fill="#434345"/><rect x="232" y="128" width="300" height="10" rx="5" fill="#434345"/><rect x="232" y="168" width="96" height="28" rx="14" fill="#ffffff"/></svg>')}`
 const DEMO_LINES: ChatMessage[] = [
@@ -857,7 +911,7 @@ const DEMO_LINES: ChatMessage[] = [
 export function demoChat(h: HubState, session: string, what: 'outputs' | 'transcript' | 'shot', ask: ChatAsk = {}): ChatAnswer {
   const p = h.progress.find(x => x.sessionId === session)
   if (!p) return {}
-  if (what === 'shot') return ask.path === DEMO_SHOT ? { shot: SHOT_SVG } : {}
+  if (what === 'shot') return ask.path === DEMO_SHOT || ask.path === DEMO_SHOT2 ? { shot: SHOT_SVG } : {}
   if (what === 'transcript' && session !== 'd-done') {
     // A short script from the chat's own name, role and first task, so each chat reads as itself.
     const goal = (h.chats.find(c => c.sessionId === session)?.name ?? 'This chat').replace(/ v\d+$/, '')
@@ -881,16 +935,19 @@ export function demoChat(h: HubState, session: string, what: 'outputs' | 'transc
     final: `${p.report ? `Done:\n${p.report.done.map(d => `- ${d}`).join('\n')}` : 'Still working.'}${p.commit ? `\n\nCommit message:\n\`\`\`\n${p.commit}\n\`\`\`` : ''}`,
     ...(p.report ? { standup: p.report } : {}),
     ...(p.commit ? { commit: p.commit } : {}),
-    questions: [{ question: 'Should Codex chats share the Claude list or get their own?', answer: 'One list, with an AI chip' }],
+    questions: [
+      { question: 'Should Codex chats share the Claude list or get their own?', answer: 'One list, with an AI chip' },
+      { question: 'Keep the old resume command for Claude chats?' },
+    ],
     reports: [
       { id: 'r1', label: 'Find the session sources', role: 'researcher', text: 'Status: done\nFound:\n- Codex sessions live in ~/.codex/sessions/<date>/*.jsonl\n- Each line is one event; the first holds the cwd' },
       { id: 'e1', label: 'Codex chats and Starred', role: 'engineer', text: 'Status: done\nChanged:\n- extension/src/hub/ais.ts: a registry of AIs\n- extension/src/hub/starred.ts: star and resume\nChecked:\n- pnpm test, 538 passed' },
-      { id: 'q1', label: 'Review the AI registry', role: 'qa', text: 'Status: done\nFound: nothing blocking. The Resume command quotes the folder.' },
+      { id: 'q1', label: 'Review the AI registry', role: 'qa', text: 'Status: done with concerns\nFound: nothing blocking. The Resume command quotes the folder.\nOpen:\n- Starred list has no empty state yet\n- Resume on a folder with spaces needs a manual check' },
     ],
     tests: [{ command: 'pnpm test', ok: false, failed: 1, total: 538, first: 'ais.test.ts lists both AIs' }, { command: 'pnpm run lint && pnpm test', ok: true, total: 538 }],
     errors: [{ tool: 'Bash', text: 'Exit code 1\n1 failing: ais.test.ts lists both AIs' }],
-    files: ['/Users/k/GitHub/switchboard/extension/src/hub/ais.ts', '/Users/k/GitHub/switchboard/extension/src/hub/starred.ts', '/Users/k/GitHub/switchboard/extension/src/hub/types.ts'],
-    shots: [DEMO_SHOT],
+    files: ['/Users/k/GitHub/switchboard/extension/src/hub/ais.ts', '/Users/k/GitHub/switchboard/extension/src/hub/starred.ts', '/Users/k/GitHub/switchboard/extension/src/hub/types.ts', '/Users/k/GitHub/switchboard/extension/src/hub/ais.test.ts', '/Users/k/GitHub/switchboard/extension/src/hub/starred.test.ts', '/Users/k/GitHub/switchboard/web/components/switchboard/chat-row.tsx', '/Users/k/GitHub/switchboard/web/lib/hub-types.ts'],
+    shots: [DEMO_SHOT, DEMO_SHOT2],
   }
   return { outputs }
 }

@@ -9,7 +9,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, junkPath, extraTodoFolders, loadLocalTodos, tickShipped, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, junkPath, extraTodoFolders, loadLocalTodos, tickShipped, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS, holdReason } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
 import { HubService, hub } from '../src/hub/hub-service'
@@ -858,6 +858,59 @@ describe('todo tool', () => {
     assert.equal((await handleHub(hub, 'POST', `/hub/todo?token=${hub.token}`, JSON.stringify({ op: 'zap', cwd: '/p' }), undefined, fake))?.status, 400)
     const bad = await handleHub(hub, 'POST', `/hub/todo?token=${hub.token}`, body, undefined, async () => { throw new Error('no open to-do item matches "x"') })
     assert.deepEqual([bad?.status, bad?.body], [400, 'no open to-do item matches "x"'])
+  })
+})
+
+describe('holdReason', () => {
+  const now = 10 * 60_000
+  const item = (id: string, more: Partial<TodoDoc['todo'][number]> = {}) => ({ id, text: `do ${id}`, at: 0, ...more })
+  const base = { on: true, folder: '/p', todo: [item('a'), item('b')], limited: false, tried: new Set<string>(), now }
+
+  it('holds nothing while the next item starts', () => {
+    assert.equal(holdReason(base), undefined)
+  })
+
+  it('holds nothing while auto-run is off or nothing is startable', () => {
+    assert.equal(holdReason({ ...base, on: false }), undefined)
+    assert.equal(holdReason({ ...base, todo: [item('a', { chat: 'c1', at: 0 })] }), undefined)
+  })
+
+  it('names what a live to-do chat waits on', () => {
+    const hold = holdReason({ ...base, todo: [item('a', { chat: 'c1' }), item('b')], live: new Set(['c1']), links: [{ from: 'c1', to: ['c9'] }], label: () => 'Outfit picker copy' })
+    assert.deepEqual(hold, { kind: 'waiting', text: 'Next to-do waits: do a is waiting on Outfit picker copy to finish' })
+  })
+
+  it('drops a wait target that finished and names the chat that took over', () => {
+    const hold = holdReason({ ...base, todo: [item('a', { chat: 'c1' }), item('b')], live: new Set(['c1']), links: [{ from: 'c1', to: ['c2', 'c3'] }], open: id => (id === 'c2' ? undefined : 'c4'), label: id => `chat ${id}` })
+    assert.deepEqual(hold, { kind: 'waiting', text: 'Next to-do waits: do a is waiting on chat c4 to finish' })
+  })
+
+  it('falls back to the running text when every wait target finished', () => {
+    const hold = holdReason({ ...base, todo: [item('a', { chat: 'c1' }), item('b')], live: new Set(['c1']), links: [{ from: 'c1', to: ['c2'] }], open: () => undefined })
+    assert.deepEqual(hold, { kind: 'running', text: 'Next to-do starts when do a finishes' })
+  })
+
+  it('a failed start is named before the grace of a just-claimed item', () => {
+    assert.deepEqual(holdReason({ ...base, todo: [item('a', { chat: 'c1', at: now - 1000 }), item('b')], failedAt: now - 1000 }), { kind: 'sync', text: 'Next to-do waits: the last start failed, retrying' })
+  })
+
+  it('says the next item starts when a live to-do chat finishes, when it waits on nothing', () => {
+    assert.deepEqual(holdReason({ ...base, todo: [item('a', { chat: 'c1' }), item('b')], live: new Set(['c1']) }), { kind: 'running', text: 'Next to-do starts when do a finishes' })
+  })
+
+  it('gives the time the usage limit resets', () => {
+    const resetAt = new Date(2026, 10, 21, 15, 40).getTime()
+    assert.deepEqual(holdReason({ ...base, limited: true, resetAt }), { kind: 'limit', text: 'Next to-do waits for the usage limit to reset at 3:40 PM' })
+    assert.deepEqual(holdReason({ ...base, limited: true }), { kind: 'limit', text: 'Next to-do waits for the usage limit to reset' })
+  })
+
+  it('says the autopilot is paused', () => {
+    assert.deepEqual(holdReason({ ...base, pilot: { paused: true, at: 0 } }), { kind: 'paused', text: 'Next to-do waits: autopilot is paused' })
+  })
+
+  it('says the last start failed while the retry waits', () => {
+    assert.deepEqual(holdReason({ ...base, failedAt: now - 1000 }), { kind: 'sync', text: 'Next to-do waits: the last start failed, retrying' })
+    assert.equal(holdReason({ ...base, failedAt: 0 }), undefined)
   })
 })
 

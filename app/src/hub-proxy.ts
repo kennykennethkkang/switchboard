@@ -1,5 +1,5 @@
 /**
- * The standalone app's way to the hub: /hub/state, /hub/voice (GET, and a phone's clip POSTed), /hub/graph, /hub/runs, /hub/command, /hub/split and /hub/upload are passed to
+ * The standalone app's way to the hub: /hub/state, /hub/voice (GET, and a phone's clip POSTed), /hub/graph, /hub/runs, /hub/chat/* (the screen read and typed keys too), /hub/command, /hub/split and /hub/upload are passed to
  * a VS Code window's hook server, found through ~/.claude/switchboard/*.json, with
  * the window's token added here so it never reaches the browser. Only the app's
  * own page may call it: a custom header (no form can send one), the same Origin
@@ -307,14 +307,44 @@ export async function tellWindows(body: object): Promise<void> {
   }
 }
 
-const CHAT_READS = new Set(['/hub/chat/outputs', '/hub/chat/transcript', '/hub/chat/shot'])
+const CHAT_READS = new Set(['/hub/chat/outputs', '/hub/chat/transcript', '/hub/chat/shot', '/hub/chat/screen'])
+
+const chatId = (v: unknown) => typeof v === 'string' && /^[\w-]{1,64}$/.test(v) ? v : undefined
+/** The chat a screen read or typed keys name: only the window holding its terminal has the screen and can type. */
+export function screenSession(route: string, u: URL, body: string): string | undefined {
+  if (route === 'chat/screen') return chatId(u.searchParams.get('session'))
+  if (route !== 'chat/keys') return undefined
+  try { return chatId((JSON.parse(body) as { session?: unknown })?.session) } catch { return undefined }
+}
+
+// The last few states sent, per top-level field as JSON text. Archive and changes are most of a state and rarely move,
+// so a page that holds one of these gets only the fields that differ (see fetchHubWhy).
+const sentStates = new Map<string, Record<string, string>>()
+const KEEP_STATES = 4
+
+/** Remembers this state under its etag. When base is a remembered state and the difference is smaller than the whole, returns it. */
+export function stateDelta(etag: string, raw: Buffer, base: string): { set: Record<string, unknown>; del: string[] } | undefined {
+  let obj: Record<string, unknown>
+  try { obj = JSON.parse(raw.toString('utf8')) as Record<string, unknown> } catch { return undefined }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return undefined
+  const now = Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, JSON.stringify(v)]))
+  const old = sentStates.get(base)
+  sentStates.delete(etag)
+  sentStates.set(etag, now)
+  if (sentStates.size > KEEP_STATES) sentStates.delete(sentStates.keys().next().value as string)
+  if (!old) return undefined
+  const set = Object.fromEntries(Object.keys(now).filter(k => old[k] !== now[k]).map(k => [k, obj[k]]))
+  const del = Object.keys(old).filter(k => !(k in now))
+  const size = Object.keys(set).reduce((n, k) => n + k.length + now[k].length + 4, 0)
+  return size < raw.length * 0.8 ? { set, del } : undefined
+}
 
 /** list: the window files, swapped in tests so none reaches a real window. */
 export async function proxyHub(req: http.IncomingMessage, res: http.ServerResponse, port: number, workspace: string, lan?: Lan, list = windows): Promise<void> {
   let u: URL
   try { u = new URL(req.url ?? '/', 'http://x') } catch { res.writeHead(400).end(); return }
   const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs' : req.method === 'GET' && u.pathname === '/hub/flowmap' ? 'flowmap'
-    : req.method === 'GET' && CHAT_READS.has(u.pathname) ? u.pathname.slice('/hub/'.length) : req.method === 'POST' && u.pathname === '/hub/command' ? 'command'
+    : req.method === 'GET' && CHAT_READS.has(u.pathname) ? u.pathname.slice('/hub/'.length) : req.method === 'POST' && u.pathname === '/hub/command' ? 'command' : req.method === 'POST' && u.pathname === '/hub/chat/keys' ? 'chat/keys'
     : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : req.method === 'POST' && u.pathname === '/hub/voice' ? 'clip' : req.method === 'POST' && u.pathname === '/hub/split' ? 'split' : undefined
   if (!route || !allowed(req.headers, port, lan)) { res.writeHead(route ? 403 : 404).end(); return }
   if (route === 'upload') return proxyUpload(req, res, u, workspace, list)
@@ -329,7 +359,7 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
   const folder = route === 'command' ? commandFolder(body) : undefined
   let win = pickWindow(files, workspace, undefined, folder)
   if (!win) { res.writeHead(502).end(); return }
-  const session = route === 'command' && !folder ? commandSession(body) : undefined
+  const session = route === 'command' && !folder ? commandSession(body) : screenSession(route, u, body)
   if (session) {
     const live = files.filter((f): f is Win => usable(f, pidAlive))
     // First window to say yes wins, so a hung one only costs its timeout when nobody holds the chat.
@@ -341,9 +371,9 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
     if (holder) win = holder
   }
   // Reads pass their own fields only, so a token the page put in the query never reaches the window.
-  const fields = route === 'runs' ? ['session', 'role'] : route === 'flowmap' ? ['cwd'] : route === 'chat/outputs' ? ['session'] : route === 'chat/transcript' ? ['session', 'before'] : route === 'chat/shot' ? ['session', 'path'] : []
+  const fields = route === 'runs' ? ['session', 'role'] : route === 'flowmap' ? ['cwd'] : route === 'chat/outputs' ? ['session'] : route === 'chat/transcript' ? ['session', 'before'] : route === 'chat/shot' ? ['session', 'path'] : route === 'chat/screen' ? ['session', 'ansi'] : []
   const query = new URLSearchParams(fields.flatMap(k => { const v = u.searchParams.get(k); return v === null ? [] : [[k, v]] })).toString()
-  const up = http.request({ host: '127.0.0.1', port: win.port, method: req.method, path: `/hub/${route}${query ? `?${query}` : ''}`, headers: { 'Content-Type': 'application/json', 'X-Switchboard-Token': win.hubToken }, timeout: route === 'state' || route === 'voice' ? 5000 : COMMAND_MS }, r => {
+  const up = http.request({ host: '127.0.0.1', port: win.port, method: req.method, path: `/hub/${route}${query ? `?${query}` : ''}`, headers: { 'Content-Type': 'application/json', 'X-Switchboard-Token': win.hubToken }, timeout: route === 'state' || route === 'voice' || route === 'chat/screen' ? 5000 : COMMAND_MS }, r => {
     const head = { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' }
     if (route !== 'state' || r.statusCode !== 200) { res.writeHead(r.statusCode ?? 502, head); pipeline(r, res, err => { if (err) res.destroy() }); return }
     // The page polls state every 2s: a 304 when nothing changed, else gzip, since a full state runs to a few hundred KB.
@@ -355,8 +385,10 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
       const etag = `"${crypto.createHash('sha1').update(raw).digest('hex')}"`
       if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-store' }).end(); return }
       const gzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))
-      res.writeHead(200, { ...head, ETag: etag, Vary: 'Accept-Encoding', ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) })
-      res.end(gzip ? zlib.gzipSync(raw) : raw)
+      const sent = stateDelta(etag, raw, String(req.headers['x-base'] ?? ''))
+      const body = sent ? Buffer.from(JSON.stringify(sent)) : raw
+      res.writeHead(200, { ...head, ETag: etag, Vary: 'Accept-Encoding, X-Base', ...(sent ? { 'X-Delta': '1' } : {}), ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) })
+      res.end(gzip ? zlib.gzipSync(body) : body)
     })
   })
   up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })

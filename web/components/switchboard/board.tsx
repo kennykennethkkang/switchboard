@@ -12,16 +12,20 @@ import { demoGraph, healthLine, loadGraph, relations, type MemoryGraph } from '@
 import { keepGraph, memoryTally, todoRef, withDemoLearn, type GraphHold, type Item } from '@/lib/court-places'
 import { replyBox } from '@/lib/message-box'
 import { hubCounts } from '@/lib/now'
-import { PLACES, PLATE, buildCourt, markSpot, courtSummary, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
+import { PLACES, PLATE, buildCourt, markSpot, courtSummary, plainWord, YARD_TAG_CAP, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
 import { askChoice } from '@/lib/ask'
+import { optionSmart, smartMarkText } from '@/lib/smart'
 import { END_S, THAW_S, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
 import { BASKET, CARP, pixCanvas } from '@/lib/sprites/carp'
 import { MODE_KEY, SKIN_KEY, journeyWest, lookOf, readPick, type CourtColors as C, type Mode } from '@/lib/skins'
 import { BoardTools, beltCounts } from './board-tools'
 import { SummaryFold } from './chat-cards'
+import { ModelEffort } from './model-effort'
+import { fiveHourUse, runFields, startPicks, type RunPicks } from '@/lib/model-effort'
 import { vscodeBridge } from '@/lib/vscode-bridge'
-import { MAX_DPR, frameLoop } from '@/lib/frame-loop'
+import { COARSE_DPR, MAX_DPR, frameLoop } from '@/lib/frame-loop'
 import './board.css'
+import './smart-select.css'
 
 type View = { x: number; y: number; z: number }
 type Box = { x: number; y: number; w: number; h: number; id: string }
@@ -35,10 +39,10 @@ const DUR: Record<Fx['kind'], number> = { hop: 0.45, cheer: 1.6, meet: 2, move: 
 const CONFETTI = ['gold_lt', 'jade_lt', 'red_lt', 'peach', 'sky'] as const
 const PIX = (s: number) => `400 ${s}px Silkscreen, ui-monospace, monospace`
 const SANS = (s: number, w = 600) => `${w} ${s}px 'Hanken Grotesk', system-ui, sans-serif`
-const WORD: Record<CourtState, string> = { working: 'RUN', waiting: 'WAIT', done: 'DONE', needs: 'ASK', idle: 'IDLE' }
-const SAY: Record<CourtState, string> = { working: 'working', waiting: 'waiting', done: 'done', needs: 'needs you', idle: 'idle' }
-const LEGEND: Array<[CourtState, string]> = [['working', 'Working'], ['needs', 'Needs you'], ['waiting', 'Waiting'], ['done', 'Done'], ['idle', 'Idle']]
-const RANK: Record<CourtState, number> = { needs: 4, working: 3, waiting: 2, done: 1, idle: 0 }
+const WORD: Record<CourtState, string> = { working: 'RUN', waiting: 'WAIT', stuck: 'STUCK', done: 'DONE', needs: 'ASK', idle: 'IDLE' }
+const SAY: Record<CourtState, string> = { working: 'working', waiting: 'waiting', stuck: 'stuck', done: 'done', needs: 'needs you', idle: 'idle' }
+const LEGEND: Array<[CourtState, string]> = [['working', 'Working'], ['stuck', 'Stuck'], ['needs', 'Needs you'], ['waiting', 'Waiting'], ['done', 'Done'], ['idle', 'Idle']]
+const RANK: Record<CourtState, number> = { needs: 5, stuck: 4, working: 3, waiting: 2, done: 1, idle: 0 }
 const AI_KEY: Record<string, keyof C> = { claude: 'red_lt', codex: 'blue_lt', gemini: 'sky', jev: 'jade_lt', hermes: 'gold_lt', perplexity: 'sky', research: 'plum' }
 const ROLE_KEY: Record<string, [keyof C, keyof C]> = { lead: ['gold', 'gold_dk'], researcher: ['blue_lt', 'blue'], engineer: ['red', 'red_dk'], qa: ['jade', 'jade_dk'], designer: ['peach', 'peach_dk'], ops: ['brown', 'brown_dk'], growth: ['plum', 'ink2'], pilgrim: ['brown', 'brown_dk'] }
 const KINDS: Record<CourtNode['kind'], string> = { council: 'Council Hall', pavilion: 'Pavilion', window: 'Window', courtyard: 'Courtyard', realm: 'Realm', desk: 'Desk', garden: 'Tea garden', armory: 'Armory', library: 'Memory library', notice: 'Notice board', tower: 'Signal tower', study: 'Study hall', treasury: 'Treasury', maps: 'Map room', uploads: 'Uploads' }
@@ -276,7 +280,7 @@ const pixArt = (rows: string[], pal: Record<string, string>, ink: string) => {
 }
 
 export const stateColor = (s: CourtState | undefined, c: C) =>
-  s === 'working' ? c.gold : s === 'needs' ? c.red_lt : s === 'done' ? c.jade_lt : s === 'waiting' ? c.cloud_sh : '#8a8496'
+  s === 'working' ? c.gold : s === 'stuck' ? c.red : s === 'needs' ? c.red_lt : s === 'done' ? c.jade_lt : s === 'waiting' ? c.cloud_sh : '#8a8496'
 const roleKey = (r?: string) => cast(r)
 const roleColor = (r: string | undefined, c: C) => c[ROLE_KEY[roleKey(r)][0]]
 const fmt = (ms: number) => {
@@ -285,7 +289,7 @@ const fmt = (ms: number) => {
 }
 const timer = (n: CourtNode, now: number) => {
   const st = n.state ?? 'idle'
-  return (st === 'working' || st === 'needs') && n.since ? `${WORD[st]} ${fmt(now - n.since)}` : WORD[st]
+  return (st === 'working' || st === 'stuck' || st === 'needs') && n.since ? `${WORD[st]} ${fmt(now - n.since)}` : WORD[st]
 }
 const roleTag = (n: CourtNode) => `${n.role ?? 'lead'}${n.model ? ` · ${n.model}` : ''}`.toUpperCase()
 const tally = (n: CourtNode) => `${n.runs ?? 0} ${n.runs === 1 ? 'run' : 'runs'} · ${n.shipped ?? 0} done`
@@ -362,7 +366,7 @@ function desk(g: G, x: number, y: number, lit: boolean, c: C) {
 function bubble(g: G, x: number, y: number, st: CourtState | undefined, step: number, c: C) {
   if (!st || st === 'idle') return
   rect(g, x - 4, y - 7, 9, 7, c.ink); rect(g, x - 3, y - 8, 7, 7, c.cloud); rect(g, x, y - 1, 1, 2, c.ink)
-  if (st === 'working') { rect(g, x - 1, y - 7, 1, 4, c.gold_dk); rect(g, x, y - 6, 2, 1, c.gold); rect(g, x + 1, y - 7, 1, 1, step ? c.gold_lt : c.gold) }
+  if (st === 'working' || st === 'stuck') { const hot = st === 'stuck'; rect(g, x - 1, y - 7, 1, 4, hot ? c.red : c.gold_dk); rect(g, x, y - 6, 2, 1, hot ? c.red_lt : c.gold); rect(g, x + 1, y - 7, 1, 1, step && !hot ? c.gold_lt : hot ? c.red : c.gold) }
   else if (st === 'waiting') [-2, 0, 2].forEach((d, i) => rect(g, x + d, y - 4, 1, 1, (step + i) % 3 ? c.cloud_sh : c.ink2))
   else if (st === 'done') [[-2, -4], [-1, -3], [0, -4], [1, -5], [2, -6]].forEach(([dx, dy]) => rect(g, x + dx, y + dy, 1, 1, c.jade))
   else { rect(g, x - 3, y - 8, 7, 7, c.red); rect(g, x, y - 7, 1, 3, c.cloud); rect(g, x, y - 3, 1, 1, c.cloud) }
@@ -809,13 +813,14 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       if (!at) continue
       const [x, y] = at
       g.fillStyle = c.red_dk; g.beginPath(); g.roundRect(x, y, w, h, 3); g.fill(); g.strokeStyle = c.red_lt; g.lineWidth = 1.5; g.stroke()
-      if (h > 22) text(g, `PETITION · ${yard?.label ?? 'chat'} lead`.toUpperCase(), x + 8, y + 11, PIX(8), c.peach_lt, w - 16)
+      if (h > 22) text(g, `PETITION (ASKS YOU) · ${yard?.label ?? 'chat'}`.toUpperCase(), x + 8, y + 11, PIX(8), c.peach_lt, w - 16)
       text(g, d?.ask ?? 'Needs your answer', x + 8, y + h - 10, SANS(12), TEXT, w - 16)
       hits.push({ x, y, w, h, id: pet.deskId })
       break
     }
   }
   const order = court.nodes.filter(n => n.kind === 'courtyard').sort((a, b) => +(kids.get(b.id) ?? []).some(d => d.state === 'needs') - +(kids.get(a.id) ?? []).some(d => d.state === 'needs'))
+  let tags = 0
   for (const yard of order) {
     if (!seen(yard, 260)) continue
     const own = kids.get(yard.id) ?? [], desks = [...own, ...own.filter(r => r.kind === 'realm').flatMap(r => kids.get(r.id) ?? [])].filter(d => d.kind === 'desk')
@@ -886,7 +891,9 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       while (words.length > 1 && g.measureText(a ? `${a} ${words[0]}` : words[0]).width <= max) a = a ? `${a} ${words.shift()}` : words.shift()!
       return a ? [a, fit(g, words.join(' '), max)] : [fit(g, name, max)]
     }
-    for (const [max, force, wrap] of [[180, false, true], [180, false, false], [120, false, false], [90, false, false], [90, true, false]] as const) {
+    // Past the cap only the ones asking for you keep a tag; the rest stay a dot.
+    const capped = tags >= YARD_TAG_CAP && !hot && s.picked !== yard.id
+    for (const [max, force, wrap] of capped ? [] : [[180, false, true], [180, false, false], [120, false, false], [90, false, false], [90, true, false]] as const) {
       const lines = [...(realmTitle ? [fit(g, realmTitle, max), fit(g, name, max)] : wrap ? two(max) : [fit(g, name, max)]), ...(note ? [fit(g, note, max)] : [])]
       const w = Math.max(...lines.map(l => g.measureText(l).width)) + 26, h = 18 + (lines.length - 1) * 12, up = above - (h - 18)
       const at = force ? [Math.min(Math.max(cx - w / 2, stageBox[0]), stageBox[0] + stageBox[2] - w), up] as const : place([[cx - w / 2, up], [cx - w / 2, below], [cx - w, up], [cx, up], [cx - w, below], [cx, below], ...([[X(yard.x + yard.w) + 4, my], [X(yard.x) - w - 4, my]] as Array<[number, number]>).filter(([x]) => x >= 4 && x + w <= cw - 4)], w, h, yard.id, true)
@@ -895,6 +902,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       card(g, x, y, w, h, hot || !YR ? c.red_lt : YR.hi, hot); lines.forEach((l, i) => text(g, l, x + 17, y + 9.5 + i * 12, PIX(8), note && i === lines.length - 1 ? noteCol : YR && !i ? YR.hi : TEXT, max + 10))
       hits.push({ x, y, w, h, id: yard.id })
       dot = [x + 9, y + 9]
+      tags++
       break
     }
     g.fillStyle = c.ink; g.beginPath(); g.arc(dot[0], dot[1], 5, 0, 7); g.fill()
@@ -1006,7 +1014,7 @@ function AskBlock({ ask, sent, onAnswer }: { ask: Ask; sent?: string; onAnswer: 
     <section className="bp-ask">
       <p className="bp-eye">Question for you</p>
       {qs.map((q, n) => <div key={n} role="group" aria-label={q.header ?? q.question}><p>{q.question}</p>
-        {q.options.map((o, i) => <button key={i} type="button" className="bp-opt" aria-pressed={one ? undefined : [picks[n] ?? []].flat().includes(i)} onClick={() => pick(n, i)}>{o}</button>)}</div>)}
+        {q.options.map((o, i) => <button key={i} type="button" className="bp-opt" aria-pressed={one ? undefined : [picks[n] ?? []].flat().includes(i)} onClick={() => pick(n, i)}>{o}{optionSmart(q, i) && <span className="ss-mark">{smartMarkText(optionSmart(q, i)!)}</span>}</button>)}</div>)}
       {!one && <button type="button" className="bp-opt bp-send" disabled={!choice} onClick={() => choice && onAnswer(choice, 'Answers sent')}>Submit answers</button>}
     </section>
   )
@@ -1063,6 +1071,7 @@ function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, on
 }) {
   const [tab, setTab] = useState<'t' | 'd'>('t')
   const [ask0, setAsk0] = useState(''), [asked, setAsked] = useState('')
+  const [picks, setPicks] = useState<RunPicks>(() => startPicks(hub))
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
   // A pavilion's chats are its AI's, wherever they hang.
@@ -1102,14 +1111,15 @@ function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, on
   return (
     <aside className="bp" aria-label={`${title} details`}>
       <button type="button" className="bp-close" aria-label="Close details" onClick={onClose}>×</button>
-      <header><p className="bp-eye" style={{ color: eyeColor }}>{eye}</p><h3>{title}</h3>{sub && <p className="bp-sub">{sub}</p>}{ties.map(t => <p key={t} className="bp-sub bp-tie" data-wait={t.startsWith('Split') ? undefined : ''}>{t}</p>)}</header>
+      <header><p className="bp-eye" style={{ color: eyeColor }}>{eye}</p><h3>{title}</h3>{plainWord(node.kind) && <p className="bp-sub">{plainWord(node.kind)}</p>}{sub && <p className="bp-sub">{sub}</p>}{ties.map(t => <p key={t} className="bp-sub bp-tie" data-wait={t.startsWith('Split') ? undefined : ''}>{t}</p>)}</header>
       {stats.length > 0 && <dl className="bp-stats">{stats.map(([v, l, hot]) => <div key={l}><dt>{l}</dt><dd className={hot ? 'hot' : undefined}>{v}</dd></div>)}</dl>}
       {node.kind === 'pavilion' && node.ai === 'research' && (() => {
         const proj = hub.projects.find(p => p.isOpen)?.path ?? hub.projects[0]?.path
-        const go = () => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false }); setAsked(ask0.trim()); setAsk0('') } }
+        const go = () => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false, research: true, ...runFields(picks, 'claude') }); setAsked(ask0.trim()); setAsk0('') } }
         return <div className="bp-pad bp-form">
           <textarea className="bp-text" rows={3} aria-label="Research question" placeholder="What should the research chat look into?" value={ask0}
             onChange={e => setAsk0(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go() }} />
+          <ModelEffort ai="claude" value={picks} onChange={setPicks} usage={fiveHourUse(hub, 'claude')} compact />
           <button type="button" className="hub-btn primary sm" disabled={!ask0.trim() || !proj} onClick={go}>Research</button>
           <p className="bp-said" role="status">{asked && <>Started a research chat: {asked}</>}</p>
         </div>
@@ -1138,7 +1148,7 @@ function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, on
         <i aria-hidden style={node.kind === 'garden' ? { borderColor: roleColor(i.name, c) } : undefined} /><span><b>{i.name}</b>{i.note && <small>{i.note}</small>}</span>{rowAct(node.kind, i, hub, send)}</li>)}</ul>
         : <p className="bp-sub">{EMPTY[node.kind] ?? 'Nothing here yet.'}</p>)}
       {roster.length > 0 && <>
-        <p className="bp-eye bp-pad">{node.kind === 'council' ? 'Petitions' : node.kind === 'pavilion' || node.kind === 'window' ? 'Courtyards' : isPlace(node.kind) ? 'Nearby places' : 'Desks'}</p>
+        <p className="bp-eye bp-pad" title={node.kind === 'council' ? plainWord('petition') : undefined}>{node.kind === 'council' ? 'Petitions: chats asking for you' : node.kind === 'pavilion' || node.kind === 'window' ? 'Courtyards' : isPlace(node.kind) ? 'Nearby places' : 'Desks'}</p>
         <ul className="bp-roster">{roster.map(r => <li key={r.id}><button type="button" onClick={() => onPick(r.id)}>
           <b style={{ color: r.kind === 'desk' ? roleColor(r.role, c) : undefined }}>{r.kind === 'desk' ? (node.kind === 'council' ? court.nodes.find(y => y.id === r.parent)?.label : `${r.role ?? 'lead'}${r.model ? ` · ${r.model}` : ''}`) : r.label}</b>
           <span>{r.kind === 'desk' ? (node.kind === 'council' ? r.ask : r.task) ?? SAY[r.state ?? 'idle'] : r.task ?? ''}</span>
@@ -1282,13 +1292,13 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     const live = () => fading() || awake() || s.fx.size > 0 || s.court.nodes.some(n => n.state === 'working' || n.state === 'needs')
     // Runs while something moves and can be seen; reduced motion still ticks once a second for the timers, and runs a fade through.
     const run = () => (!motion.matches || fading()) && onScreen && !document.hidden && vscodeBridge?.shown !== false && live()
-    const { wake, stop, running } = frameLoop(now => frame(now), run)
+    const { wake, stop, running } = frameLoop(now => frame(now), run, matchMedia('(pointer: coarse)').matches ? 30 : 0)
     s.wake = wake
     // Once a second also lifts the Zzz of idle sprites, so a quiet board needs no rAF.
     tick = window.setInterval(() => { if (!running() && onScreen && !document.hidden && (live() || !!s.pause || s.court.nodes.some(n => n.kind === 'desk' && n.state === 'idle'))) frame(performance.now()) }, 1000)
     const size = () => {
       const r = el.getBoundingClientRect()
-      dpr = Math.min(MAX_DPR, devicePixelRatio || 1)
+      dpr = Math.min(matchMedia('(pointer: coarse)').matches ? COARSE_DPR : MAX_DPR, devicePixelRatio || 1)
       W = Math.round(r.width * dpr); H = Math.round(r.height * dpr)
       if (el.width !== W || el.height !== H) { el.width = W; el.height = H }
       setStage(cur => { const nx = Math.round(r.width / 40) * 40, ny = Math.round(r.height / 40) * 40; return cur[0] === nx && cur[1] === ny ? cur : [nx, ny] })
@@ -1413,7 +1423,8 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
         if ((e.target as HTMLElement).closest?.('input, select')) return; if (e.key === '+' || e.key === '=') st.current.zoom(1); else if (e.key === '-') st.current.zoom(-1); else if (e.key === '0') st.current.refit() }}>
       <header className="board-head">
         <h2>Agents</h2>
-        <span className="board-sub">{skin.copy.title}</span>
+        <span className="board-sub" title={plainWord('court')}>{skin.copy.title}</span>
+        <span className="board-plain">{plainWord('court')}</span>
         <span className="board-meta"><b>{shared.working}</b> working <b>{shared.done}</b> done today <b>{yards.length}</b> chats{shared.needs > 0 && !needs && <> <b>{shared.needs}</b> need you</>}</span>
         {needs && shared.needs > 0 && <button type="button" className="hub-btn board-need" aria-label={`${shared.needs} needs you`} onClick={() => open(needs, true)}><i aria-hidden />{shared.needs}<span className="board-need-word"> needs you</span></button>}
         <span className="board-zoom" role="group" aria-label="Zoom">
@@ -1421,7 +1432,6 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
           <button type="button" className="hub-btn board-z" aria-label="Zoom in" aria-keyshortcuts="+" title="Zoom in (+)" onClick={() => st.current.zoom(1)}>+</button>
           <button type="button" className="hub-btn board-z" aria-label="Zoom out" aria-keyshortcuts="-" title="Zoom out (-)" onClick={() => st.current.zoom(-1)}>-</button>
           <button type="button" className="hub-btn board-fit" aria-label="Fit board" aria-keyshortcuts="0" title="Fit board (0)" onClick={() => st.current.refit()}>Fit</button>
-          <span className="board-keys" aria-hidden><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></span>
         </span>
       </header>
       <div className="board-stage">

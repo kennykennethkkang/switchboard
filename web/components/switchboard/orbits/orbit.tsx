@@ -17,15 +17,16 @@ import { vscodeBridge } from '@/lib/vscode-bridge'
 import { NodeButtons, placeNodes, type Hit, type ViewProps } from './parts'
 
 /** models: each role's model, drawn under its bubble. */
-export type OrbitChat = { id: string; name: string; state: ChatState; ago: string; /** "waiting on X" while it holds for another chat; never read as idle. */ wait?: string; progress?: ChatProgress; live?: SessionLive; models?: Record<string, string> }
+export type OrbitChat = { id: string; name: string; state: ChatState; /** Working, but something in it looks stuck (chatShown). */ stuck?: boolean; ago: string; /** "waiting on X" while it holds for another chat; never read as idle. */ wait?: string; progress?: ChatProgress; live?: SessionLive; models?: Record<string, string> }
 /** running: the ids of this role's subagents still at work. */
 type RoleOn = { role: string; state: 'active' | 'done' | 'waiting' | 'unused'; running: string[] }
 
-/** The ring: the roles this chat used in plan order, plus researcher, engineer and qa dimmed when unused, so it never has fewer than 3. */
+/** The ring: the roles this chat used or has queued tasks for, in plan order, plus researcher, engineer and qa dimmed when unused, so it never has fewer than 3. */
 function ringRoles(p?: ChatProgress): RoleOn[] {
   const used = new Map(groupRoles(p?.roles ?? []).map(g => [g.role, g]))
   const rank = (r: string) => (ORDER.indexOf(r) + 100) % 100
-  return [...new Set([...used.keys(), 'researcher', 'engineer', 'qa'])].sort((a, b) => rank(a) - rank(b)).map(role => ({
+  const queued = (p?.tasks ?? []).filter(t => t.role && t.status !== 'completed').map(t => t.role as string)
+  return [...new Set([...used.keys(), ...queued, 'researcher', 'engineer', 'qa'])].sort((a, b) => rank(a) - rank(b)).map(role => ({
     role, state: used.get(role)?.state ?? (p?.tasks.some(t => t.role === role && t.status !== 'completed') ? 'waiting' : 'unused'), running: used.get(role)?.running ?? [],
   }))
 }
@@ -33,7 +34,7 @@ function ringRoles(p?: ChatProgress): RoleOn[] {
 export function describe(c: OrbitChat): string {
   const roles = ringRoles(c.progress).filter(r => r.state !== 'unused')
     .map(r => `${r.role}${c.models?.[r.role] ? ` (${c.models[r.role]})` : ''} ${r.state}${r.running.length > 1 ? `, ${r.running.length} running` : ''}`)
-  return `${c.name}: ${c.wait && c.state !== 'done' && c.state !== 'needs-you' ? c.wait.replace(/^./, x => x.toUpperCase()) : (almostDone(c.progress) ? ALMOST : STATE[c.state]).label}. You, the lead${roles.length ? `, and ${roles.join('; ')}` : ', no roles yet'}.`
+  return `${c.name}: ${c.wait && c.state !== 'done' && c.state !== 'needs-you' ? c.wait.replace(/^./, x => x.toUpperCase()) : (c.stuck ? { label: 'Stuck' } : almostDone(c.progress) ? ALMOST : STATE[c.state]).label}. You, the lead${roles.length ? `, and ${roles.join('; ')}` : ', no roles yet'}.`
 }
 
 /**
@@ -435,7 +436,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, no
     })
   }
 
-  const lc = twc('lead', C[(almostDone(c.progress) ? ALMOST : STATE[c.state]).key])
+  const lc = twc('lead', C[(c.stuck ? { key: 'red' as const } : almostDone(c.progress) ? ALMOST : STATE[c.state]).key])
   pulse(cx, cy, lr, C.blue, 0.3, wWork)
   pulse(cx, cy, lr, C.red, 0.6, wNeed)
   S.hits.set('lead', { x: cx, y: cy, r: lr })

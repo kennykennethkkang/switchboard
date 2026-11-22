@@ -109,3 +109,26 @@ describe('setRoleCodex and the command', () => {
     assert.match(commandProblem({ type: 'hub-role-codex', model: 'default', effort: 'high' }) ?? '', /role/)
   })
 })
+
+describe('kit role colors', () => {
+  const COLORS: Record<string, string> = { researcher: 'blue', engineer: 'red', qa: 'green', designer: 'orange', ops: 'yellow', growth: 'purple', Explore: 'cyan', 'engineer-codex': 'pink', 'qa-codex': 'pink' }
+  const dir = path.join(__dirname, '..', 'kit', 'agents')
+  it('every kit role file has the color matching the board', () => {
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.md')).map(f => f.slice(0, -3)).sort()
+    assert.deepEqual(files, Object.keys(COLORS).sort())
+    for (const role of files) {
+      const m = /^color: *(\S+) *\r?$/m.exec(fs.readFileSync(path.join(dir, `${role}.md`), 'utf8').split(/\r?\n---/)[0])
+      assert.equal(m?.[1], COLORS[role], role)
+    }
+  })
+})
+
+describe('blind qa', () => {
+  const kit = path.join(__dirname, '..', 'kit')
+  it('qa judges the diff, not the engineer', () => {
+    assert.match(fs.readFileSync(path.join(kit, 'agents', 'qa.md'), 'utf8'), /not the engineer's claims/)
+  })
+  it('the lead keeps the engineer report out of the qa brief', () => {
+    assert.match(fs.readFileSync(path.join(kit, 'rules.md'), 'utf8'), /qa brief carries only the task, the acceptance checks and the diff or paths/)
+  })
+})

@@ -11,8 +11,9 @@ export const ADVANCED_HINT = 'Switchboard splits big tasks into stages that each
 
 const WORD = { todo: 'To do', doing: 'Running', done: 'Done', redo: 'Sent back' } as const
 
-export function CardStages({ hub, sessionId, send }: { hub: Pick<HubState, 'stages' | 'controls'>; sessionId: string; send: (c: HubCommand) => void }) {
-  const [open, setOpen] = useState(false)
+/** inline: on a Now card, opened at once (a stage sent back or waiting on review), without Save as pipeline. */
+export function CardStages({ hub, sessionId, send, inline }: { hub: Pick<HubState, 'stages' | 'controls'>; sessionId: string; send: (c: HubCommand) => void; inline?: boolean }) {
+  const [open, setOpen] = useState(!!inline)
   const [name, setName] = useState('')
   const [saved, setSaved] = useState('')
   const id = useId()
@@ -41,7 +42,7 @@ export function CardStages({ hub, sessionId, send }: { hub: Pick<HubState, 'stag
           </li>
         ))}
       </ol>}
-      {open && <form className="hub-stages-save" onSubmit={e => { e.preventDefault(); const n = name.trim(); if (!n) return; send({ type: 'hub-pipeline-save', path, run: run.run, name: n }); setSaved(n); setName('') }}>
+      {open && !inline && <form className="hub-stages-save" onSubmit={e => { e.preventDefault(); const n = name.trim(); if (!n) return; send({ type: 'hub-pipeline-save', path, run: run.run, name: n }); setSaved(n); setName('') }}>
         <input aria-label="Pipeline name" placeholder="Pipeline name" maxLength={80} value={name} onChange={e => { setName(e.target.value); setSaved('') }} />
         <button type="submit" className="hub-btn sm" disabled={!name.trim()} title="Keeps these stages and their CONTEXT.md files, without outputs, to start new chats from">Save as pipeline</button>
         {saved && <span role="status">Saved {saved}</span>}

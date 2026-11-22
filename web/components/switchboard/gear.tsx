@@ -9,7 +9,7 @@ import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { useFlash } from '@/hooks/use-flash'
 import type { HubState, SettingKey, SwitchboardKey } from '@/lib/hub-types'
 import { editorName } from '@/lib/editor'
-import { benchPrompt, blockHits, gearRows, pauseValue, sweepBadge, sweptNow } from '@/lib/gear-rows'
+import { chatGroups, benchPrompt, blockHits, gearRows, pauseValue, sweepBadge, sweptNow } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
 import { Credits } from './credits'
@@ -47,26 +47,17 @@ const CODEX_MODELS: Array<[string, string]> = [['default', 'Default (config.toml
 const CLAUDE_MODES: Array<[string, string]> = [['bypass', 'Bypass'], ['ask', 'Ask'], ['auto', 'Auto']]
 const NOTICE_SPOTS: Array<[string, string]> = [['top-right', 'Top right'], ['bottom-left', 'Bottom left'], ['bottom-right', 'Bottom right']]
 const CODEX_EFFORTS: Array<[string, string]> = [['default', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
-const EFFORTS: Array<[string, string]> = [['default', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
+const EFFORTS: Array<[string, string]> = [['default', 'Model default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
 const IDLE: Array<[string, string]> = [['5', 'After 5 min'], ['15', 'After 15 min'], ['30', 'After 30 min'], ['60', 'After 1 h'], ['never', 'Never']]
 
 const SECTIONS = ['Chats', 'Models', 'Accounts', 'Integrations', 'Installed'] as const
 export type Section = typeof SECTIONS[number]
+// Simple view: these sections and rows only; Coder view shows them all.
+const SIMPLE_SECTIONS: readonly Section[] = ['Chats', 'Accounts']
+const SIMPLE_ROWS = ['Your name', 'Continue at usage limit', 'Pause near the limit', 'Phone mode']
 // group: rows the panel sets apart under their own heading.
-// sub: the Chats heading the row sits under. group: advanced rows sit under their own heading; roles and tail split the Models pane.
+// group: advanced rows sit under their own heading; roles and tail split the Models pane.
 type Row = { label: string; control: ReactNode; hint?: string; section: Section; group?: 'advanced' | 'roles' | 'tail' }
-const SUBS: Array<[string, string[]]> = [
-  ['Usage limits', ['Continue at usage limit', 'Pause near the limit', 'Auto-start chats']],
-  ['Notices', ['Chat notices', 'Where pop-ups show', 'Push to your phone', 'Notify when a chat needs input']],
-  ['Phone', ['Phone mode', 'Phone alerts', 'Keep phone access in Apple Notes']],
-  ['Permissions', ['Claude chat permissions', 'Ask before actions (Codex)']],
-  ['Upkeep', ['Fix stuck items', 'Learn automatically', 'Stop a chat\'s dev servers when it ends', 'Fresh branch for new chats', 'Brief for new chats', 'Test anti-copy hardening (experimental)']],
-  ['Look', ['Your name', 'Hide done chats']],
-  ['Windows', ['Show agent browsers', 'One window', 'Keep Switchboard app running']],
-]
-/** The Chats rows grouped under their headings; a row in no list (Advanced mode for one project) joins Upkeep. */
-const subbed = (rows: Row[]) => SUBS.map(([head, labels]) => [head, rows.filter(r => labels.includes(r.label) || (head === 'Upkeep' && !SUBS.some(([, l]) => l.includes(r.label))))] as const).filter(([, r]) => r.length)
-
 /** pane: the settings page a search hit lives on, shown as a small label. */
 function Line({ row, pane }: { row: Row; pane?: string }) {
   // A switch or a pick saves at once, so the row says so for a moment.
@@ -86,7 +77,7 @@ function Line({ row, pane }: { row: Row; pane?: string }) {
   )
 }
 
-const sub = { ...label, lineHeight: 1, margin: '16px 0 4px' } as const
+const sub = { font: '600 14px/1.2 var(--hub-sans)', color: 'var(--hub-ink)', margin: '28px 0 4px', paddingTop: 16, borderTop: '1px solid var(--hub-hair)' } as const
 
 /** start: the section to open on. layout: this device's own pick, kept in its browser storage. */
 // Same check as kit/sweep.mjs repoOf, so a typo shows here; the extension checks again.
@@ -112,7 +103,7 @@ function Sweep({ hub, send }: { hub: HubState; send: (c: HubCommand) => void }) 
             <button type="button" className="hub-btn" disabled={!ok || busy} onClick={add}>Add</button>
           </span>
         ) }} />
-      <Line row={{ section: 'Installed', label: 'Sweep', hint: [busy ? (s?.progress ? `Sweeping ${s.progress.done} of ${s.progress.total}.` : 'Sweeping now.') : s?.note, `${count('Clean')} clean, ${count('Review')} to review, ${count('Reviewed')} reviewed, ${count('Approved')} approved. NVIDIA SkillSpector, no LLM.`].filter(Boolean).join(' '),
+      <Line row={{ section: 'Installed', label: 'Sweep', hint: [busy ? (s?.progress ? `Sweeping ${s.progress.done} of ${s.progress.total}.` : 'Sweeping now.') : s?.note, now.length ? `${count('Clean')} clean, ${count('Review')} to review, ${count('Reviewed')} reviewed, ${count('Approved')} approved. NVIDIA SkillSpector, no LLM.` : 'Nothing swept yet. Sweep all checks every plugin and skill with NVIDIA SkillSpector, no LLM.'].filter(Boolean).join(' '),
         control: <button type="button" className="hub-btn" disabled={busy} onClick={() => send({ type: 'hub-sweep' })}>{busy ? 'Sweeping' : 'Sweep all'}</button> }} />
       {flagged.length > 0 && <>
         <h4 style={sub}>Needs review</h4>
@@ -157,6 +148,11 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
   const alerts = phoneAlertsShown()
   const smart = sb.smartModelSwitch !== false
   const raises = smart ? raisesFor(hub, folder) : {}
+  const coder = sb.coderView === true
+  const sections: readonly Section[] = coder ? SECTIONS : SIMPLE_SECTIONS
+  const pane = sections.includes(at) ? at : 'Chats'
+  const coderRow: Row = { section: 'Chats', label: 'Coder view', hint: 'On adds Live, Ship, Map, terminals, models, integrations and every setting. Off keeps Home, Chats, Plan and the basic settings in plain words.',
+    control: <Switch label="Coder view" on={coder} onChange={on => send({ type: 'hub-coder-view', on })} /> }
   const adv = advancedRows(hub, folder)
   const advSwitch = (r: typeof adv[number]) => <Switch label={`Advanced mode in ${r.name}`} on={r.on} onChange={on => send({ type: 'hub-advanced', path: r.path, on })} />
   // One project: a single row. Several: a heading and a switch each.
@@ -224,6 +220,8 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
     ...advanced,
     { section: 'Chats', label: 'Notify when a chat needs input', hint: 'Claude Code sends a push to your phone when a chat stops to ask you something.', control: <Switch label="Notify when a chat needs input" on={c.needInput} onChange={next => set('inputNeededNotifEnabled', next)} /> },
 
+    { section: 'Models', label: 'Auto pick per task', hint: 'New chats and To-do Start runs pick their model and effort from the task, and hold xhigh, max and ultracode once the 5h window passes 60%. Off starts the picker on the settings below; you can still pick per chat.',
+      control: <Switch label="Auto pick per task" on={sb.autoPick !== false} onChange={next => own('autoPick', next)} /> },
     { section: 'Models', label: 'Lead model', hint: 'The main chat, and every role set to Inherit.',
       control: <Pick label="Lead model" options={MODELS} value={lead} onChange={v => set('model', v === 'default' ? null : v)} /> },
     { section: 'Models', label: 'Lead effort', hint: 'The main chat, and every role set to Inherit.',
@@ -264,7 +262,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Hooks" on={sb.hooks} onChange={next => own('hooks', next)} /> },
     { section: 'Integrations', label: 'Status bar button', hint: `The Switchboard button in ${ed}'s status bar.`,
       control: <Switch label="Status bar button" on={sb.statusBar} onChange={next => own('statusBar', next)} /> },
-    { section: 'Integrations', label: 'Status line', hint: hub.controls.statusLineReady ? undefined : 'Needs claude-mods/kit/statusline.mjs.',
+    { section: 'Integrations', label: 'Status line', hint: hub.controls.statusLineReady ? 'One row under each chat in the terminal: model, context used, the 5 hour and weekly limits, cost and branch.' : 'Needs claude-mods/kit/statusline.mjs.',
       control: hub.controls.statusLineReady ? <Switch label="Status line" on={c.statusLine} onChange={next => set('statusLine', next)} /> : <span style={{ color: 'var(--hub-ash)', fontSize: 12 }}>Not set up</span> },
     { section: 'Integrations', label: 'Sync rules and roles', hint: `${hub.controls.rulesNote ?? 'Not synced yet'}. Writes ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md and ~/.claude/agents; files you edited are kept.`,
       control: (
@@ -274,12 +272,13 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         </span>
       ) },
     { section: 'Integrations', label: 'Remote Control at startup', hint: 'Lets the Claude app reach new chats.', control: <Switch label="Remote Control at startup" on={hub.rc.atStartup} onChange={on => send({ type: 'hub-rc', on })} /> },
-    ...hub.rcServers.map((r): Row => ({ section: 'Integrations', label: `Remote Control for all repos in ${r.name}`, hint: `Chats you start from the Claude app begin in ${r.folder.replace(/^\/Users\/[^/]+/, '~')} and can work in any repo under it.`,
-      control: <Switch label={`Remote Control for all repos in ${r.name}`} on={r.on} onChange={on => send({ type: 'hub-rc-server', folder: r.folder, on })} /> })),
+    ...hub.rcServers.map((r): Row => ({ section: 'Integrations', label: `Remote Control server: ${r.name}`, hint: `Chats you start from the Claude app begin in ${r.folder.replace(/^\/Users\/[^/]+/, '~')} and can work in any repo under it.`,
+      control: <Switch label={`Remote Control server: ${r.name}`} on={r.on} onChange={on => send({ type: 'hub-rc-server', folder: r.folder, on })} /> })),
   ]
 
   const lists = gearRows(hub, query)
-  const hits = query ? rows.filter(row => `${row.label} ${row.hint ?? ''} ${row.section}`.toLowerCase().includes(query)) : []
+  const shown = [coderRow, ...(coder ? rows : rows.filter(r => SIMPLE_ROWS.includes(r.label)))]
+  const hits = query ? shown.filter(row => `${row.label} ${row.hint ?? ''} ${row.section}`.toLowerCase().includes(query)) : []
   const blocks = blockHits(query)
   const listHits = query ? lists.filter(l => l.match) : []
 
@@ -314,10 +313,11 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         {installed()}
       </>
     )
-    const all = rows.filter(r => r.section === s), mine = all.filter(r => !r.group), grouped = all.filter(r => r.group === 'advanced'), roles = all.filter(r => r.group === 'roles')
+    const all = shown.filter(r => r !== coderRow && r.section === s), mine = all.filter(r => !r.group), grouped = all.filter(r => r.group === 'advanced'), roles = all.filter(r => r.group === 'roles')
     if (s === 'Chats') return (
       <>
-        {subbed(mine).map(([head, rs]) => <Fragment key={head}><h4 style={sub}>{head}</h4>{rs.map(r => <Line key={r.label} row={r} />)}</Fragment>)}
+        <Line row={coderRow} />
+        {chatGroups(mine).map(([head, rs]) => <Fragment key={head}><h4 style={sub}>{head}</h4>{rs.map(r => <Line key={r.label} row={r} />)}</Fragment>)}
         {grouped.length > 0 && <>
           <h4 style={sub}>Advanced mode</h4>
           <p style={{ margin: '0 0 4px', fontSize: 12, lineHeight: 1.45, color: 'var(--hub-ash)' }}>{ADVANCED_HINT} Per project.</p>
@@ -350,12 +350,12 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       <nav aria-label="Settings sections" className="hub-set-nav">
         <input type="search" className="hub-search" aria-label="Find a setting" placeholder="Find a setting" value={q} onChange={e => setQ(e.target.value)} />
         <div>
-          {SECTIONS.map(s => (
-            <button key={s} type="button" aria-current={!query && at === s ? 'page' : undefined} onClick={() => { setAt(s); setQ('') }}>{s}</button>
+          {sections.map(s => (
+            <button key={s} type="button" aria-current={!query && pane === s ? 'page' : undefined} onClick={() => { setAt(s); setQ('') }}>{s}</button>
           ))}
         </div>
       </nav>
-      <div role="region" aria-label={query ? 'Search results' : at} className="hub-set-panel" style={{ minWidth: 0 }}>
+      <div role="region" aria-label={query ? 'Search results' : pane} className="hub-set-panel" style={{ minWidth: 0 }}>
         {query
           ? <>
               {hits.map(r => <Line key={r.label} row={r} pane={r.section} />)}
@@ -364,9 +364,9 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
               {listHits.length > 0 && <><h4 style={sub}>Installed</h4>{installed(listHits)}</>}
               {!hits.length && !blocks.length && !listHits.length && <p style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>Nothing matches.</p>}
             </>
-          : body(at)}
-        {!query && at === 'Integrations' && <SpendLimits hub={hub} send={send} />}
-        {!query && at === 'Chats' && <Health hub={hub} send={send} />}
+          : body(pane)}
+        {!query && pane === 'Integrations' && <SpendLimits hub={hub} send={send} />}
+        {!query && coder && pane === 'Chats' && <Health hub={hub} send={send} />}
         <details className="hub-fold-list" style={{ marginTop: 16 }}
           onToggle={e => { const d = e.currentTarget; if (d.open) requestAnimationFrame(() => d.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })) }}>
           <summary>

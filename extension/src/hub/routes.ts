@@ -8,12 +8,15 @@
  * GET  /hub/ask     ?cwd=&q=: one paid Haiku answer from that project's board (token in the x-switchboard-token header or the query)
  * GET  /hub/holds   204 when this window holds the chat's terminal, so the app routes its commands here
  * GET  /hub/graph   the Memory view's graph (graph.ts), redacted (token in the x-switchboard-token header or the query)
- * GET  /hub/recall  ?q=&cwd=: what memory knows about q, from that graph (graph.ts recall), free (token in the x-switchboard-token header or the query)
+ * GET  /hub/recall  ?q=&cwd=&scope=: what memory knows about q, from that graph (graph.ts recall), free; scope=research keeps to the research folder's notes, scope=all is the default (token in the x-switchboard-token header or the query)
+ * GET  /hub/research-offer  ?q={sessionId,score,reason}: a usage mod offers Research mode for a chat; kept in HubState.researchOffers (research.ts), the mods only have GET (token in the x-switchboard-token header or the query)
  * GET  /hub/flowmap ?cwd=: that project's Flow map (flowmap.ts), built on demand and cached (token in the x-switchboard-token header or the query)
  * GET  /hub/runs    ?session=&role=: that role's runs in that chat for the node drawer (runs.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/outputs     ?session=: what that chat produced (chat-view.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/transcript  ?session=&before=: 50 messages ending before byte before (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/shot        ?session=&path=: an image listed in that chat's outputs, under 10 MB (token in the x-switchboard-token header or the query)
+ * GET  /hub/chat/screen      ?session=&ansi=: the chat terminal's screen as masked text (and ANSI with ansi=1), from the window holding it (screen.ts; token in the x-switchboard-token header or the query)
+ * POST /hub/chat/keys        {session, text | key}: types into that terminal, only when the Mac's Screen Typing setting is on and claude or codex has the terminal (token in the x-switchboard-token header or the query)
  * GET  /hub/voice   {voice, level, heard}: the mic while it runs, polled by the app (token in the x-switchboard-token header or the query)
  * POST /hub/voice   a phone's audio clip, under 5 MB (handleVoice): answers {text}, or the problem as plain text (token in the x-switchboard-token header or the query)
  * GET  /hub/state   the whole HubState, for the standalone web app's proxy (token in the x-switchboard-token header or the query); no thisWindow, it is no window
@@ -43,10 +46,12 @@ import { phoneAsk } from './phone'
 import { todoTool, type TodoCall } from './todo'
 import { toolOn } from './tools'
 import { projectId, readGraph, recall, recentGraph, type MemoryGraph } from './graph'
+import { offerResearch } from './research'
 import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './flowmap'
 import { readGroups, splitAsks } from './split'
 import { readRuns, type RunDetail } from './runs'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs, type ChatOutputs, type ChatTranscript } from './chat-view'
+import { readScreen, typeKeys, type ScreenSnap, type Typed } from './screen'
 import { chatLabel, saveUpload, UploadRefused } from './uploads'
 import { isClipType } from './voice'
 import { SPEND_KEYS, SPEND_MODES } from './spend'
@@ -54,8 +59,8 @@ import { isTabCommand, TAB_OPS } from './window-tabs'
 
 /** bytes: a binary body, sent in place of body. */
 export type HubReply = { status: number; body: string; contentType?: string; bytes?: Buffer }
-export type ChatReads = { outputs: (session: string) => Promise<ChatOutputs | null>; transcript: (session: string, before?: number) => Promise<ChatTranscript | null> }
-const CHAT: ChatReads = { outputs: s => chatOutputs(s), transcript: (s, b) => chatTranscript(s, b) }
+export type ChatReads = { outputs: (session: string) => Promise<ChatOutputs | null>; transcript: (session: string, before?: number) => Promise<ChatTranscript | null>; screen?: (session: string, ansi: boolean) => Promise<(ScreenSnap & { typing: boolean }) | undefined>; keys?: (session: string, input: unknown) => Promise<Typed> }
+const CHAT: ChatReads = { outputs: s => chatOutputs(s), transcript: (s, b) => chatTranscript(s, b), screen: (s, a) => readScreen(s, a), keys: (s, i) => typeKeys(s, i) }
 const json = (v: unknown): HubReply => ({ status: 200, body: JSON.stringify(v), contentType: 'application/json' })
 
 const text = (body: string): HubReply => ({ status: 200, body, contentType: 'text/plain; charset=utf-8' })
@@ -66,6 +71,8 @@ const str: Check = v => typeof v === 'string'
 // Run and sim ids end up in file names.
 const slug: Check = v => typeof v === 'string' && /^[\w-]{1,80}$/.test(v)
 const bool: Check = v => typeof v === 'boolean'
+// A model alias or id: ends up in a shell line, which newChatCommand quotes and checks again.
+const model: Check = v => typeof v === 'string' && /^[\w.[\]:-]{1,80}$/.test(v)
 const num: Check = v => typeof v === 'number' && Number.isFinite(v)
 const opt = (f: Check): Check => v => v === undefined || f(v)
 const oneOf = (...xs: unknown[]): Check => v => xs.includes(v)
@@ -87,7 +94,7 @@ const SPLIT_MAX = 8000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort', 'autoPick']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -98,6 +105,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-mirofish-open': { simId: opt(str) },
   'hub-mirofish-report': { simId: str },
   'hub-live-dismiss': { kind: oneOf('mirofish', 'crowd'), id: slug },
+  'hub-research-dismiss': { sessionId: slug },
   'hub-web': { phone: bool },
   'hub-toggle': { kind: oneOf('mod', 'plugin', 'skill'), name: str, enabled: bool },
   'hub-setting': { key: oneOf(...SETTING_KEYS), value: any(bool, num, str, oneOf(null)) },
@@ -106,10 +114,12 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-pause': { action: oneOf('resume', 'cancel') },
   'hub-hand-to': { sessionId: str },
   'hub-ai-login': { ai: isAi },
-  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool) },
+  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool) },
   'hub-split': { reqId: str, path: str, text: v => typeof v === 'string' && v.length <= SPLIT_MAX },
   'hub-pick-tools': { text: str, path: opt(str) },
   'hub-advanced': { path: str, on: bool },
+  'hub-coder-view': { on: bool },
+  'hub-first-run': { dismissed: bool },
   'hub-stage': { path: str, run: str, n: num, status: oneOf('done', 'redo') },
   'hub-escalation-reset': { project: str, role: str, files: paths },
   'hub-chat-tools': { sessionId: str, tools: profile },
@@ -194,7 +204,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-todo-accept': { path: str, id: str },
   'hub-todo-dismiss': { path: str, id: str },
   'hub-todo-move': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 500 && v.every(x => typeof x === 'string') },
-  'hub-todo-run': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(x => typeof x === 'string'), to: opt(str) },
+  'hub-todo-run': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(x => typeof x === 'string'), to: opt(str), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool) },
   'hub-todo-sync': { path: str, on: bool },
   'hub-todo-pilot': { path: str, on: opt(bool), paused: opt(bool) },
   'hub-todo-replace': { path: str, remote: v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v) },
@@ -290,7 +300,9 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     const q = u.searchParams.get('q')?.trim().slice(0, 500)
     if (!q) return { status: 400, body: '' }
     const cwd = u.searchParams.get('cwd')
-    return recentGraph(hub.get(), graph).then(g => text(recall(g, q, 2, cwd ? projectId(hub.get(), cwd) : undefined)), err => ({ status: 500, body: (err as Error).message }))
+    const scope = u.searchParams.get('scope')
+    if (scope !== null && scope !== 'research' && scope !== 'all') return { status: 400, body: 'scope is all or research' }
+    return recentGraph(hub.get(), graph).then(g => text(recall(g, q, 2, cwd ? projectId(hub.get(), cwd) : undefined, scope === 'research' ? scope : undefined)), err => ({ status: 500, body: (err as Error).message }))
   }
 
   if (method === 'GET' && u.pathname === '/hub/flowmap') {
@@ -328,7 +340,21 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
       return chat.outputs(session).then(o => o ? chatShot(o.shots, file) : undefined)
         .then(s => s ? { status: 200, body: '', bytes: s.bytes, contentType: s.type } : { status: 404, body: '' }, () => ({ status: 404, body: '' }))
     }
+    if (u.pathname === '/hub/chat/screen') {
+      return (chat.screen?.(session, u.searchParams.get('ansi') === '1') ?? Promise.resolve(undefined)).then(s => s ? json(s) : { status: 404, body: '' }, fail)
+    }
     return { status: 404, body: '' }
+  }
+
+  // Typing into a chat's terminal. screen.ts checks the input, the Mac's setting and what runs in the terminal.
+  if (method === 'POST' && u.pathname === '/hub/chat/keys') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    let b: unknown
+    try { b = JSON.parse(body) } catch { return { status: 400, body: '' } }
+    if (!obj(b) || typeof b.session !== 'string' || !/^[\w-]{1,64}$/.test(b.session) || Object.keys(b).some(k => k !== 'session' && k !== 'text' && k !== 'key')) return { status: 400, body: 'session and one of text or key only' }
+    const { session: _session, ...input } = b
+    if (!chat.keys) return { status: 404, body: '' }
+    return chat.keys(b.session, input).then(r => r.status === 204 ? { status: 204, body: '' } : { status: r.status, body: r.problem }, err => ({ status: 500, body: (err as Error).message }))
   }
 
   // The app polls this while the mic is on, instead of the whole state.
@@ -336,6 +362,12 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     if (!hub.isToken(sent)) return { status: 403, body: '' }
     const s = hub.get()
     return { status: 200, body: JSON.stringify({ voice: s.voice ?? null, level: hub.voiceLevel, heard: s.heard ?? null }), contentType: 'application/json' }
+  }
+
+  // Other windows read the stuck items of the chats this one owns.
+  if (method === 'GET' && u.pathname === '/hub/stuck') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    return { status: 200, body: JSON.stringify(hub.ownedStuck()), contentType: 'application/json' }
   }
 
   if (method === 'GET' && u.pathname === '/hub/state') {
@@ -421,6 +453,16 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     if (!obj(b) || (b.op !== 'add' && b.op !== 'done') || typeof b.cwd !== 'string' || !b.cwd || !['text', 'id', 'before', 'session'].every(k => field(b[k]))) return { status: 400, body: 'op, cwd and string fields only' }
     const c = Object.fromEntries(['op', 'cwd', 'text', 'id', 'before', 'session'].filter(k => b[k] !== undefined).map(k => [k, b[k]])) as TodoCall & { cwd: string }
     return todo(c).then(text, err => ({ status: 400, body: (err as Error).message }))
+  }
+
+  // usage-meter's askHome only sends GETs, so the offer rides in q.
+  if (method === 'GET' && u.pathname === '/hub/research-offer') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    let o: unknown
+    try { o = JSON.parse(u.searchParams.get('q') ?? '') } catch { return { status: 400, body: '' } }
+    if (!obj(o) || typeof o.sessionId !== 'string' || !/^[\w-]{1,80}$/.test(o.sessionId) || !num(o.score) || typeof o.reason !== 'string' || o.reason.length > 200) return { status: 400, body: 'sessionId, score and reason only' }
+    offerResearch(hub, { sessionId: o.sessionId, score: o.score as number, reason: o.reason })
+    return text('ok')
   }
 
   // The discussion runs here so the ask server and the Discuss button share it.

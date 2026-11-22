@@ -1,12 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chatMeta, cookTitle, layoutOf, needChip, nextCardIndex, nextRows } from './now-board'
+import { chatMeta, cookTitle, layoutOf, needChip, nextCardIndex, nextRows, nextTag } from './now-board'
 import { finishUp, openCount } from './todo'
 import type { ChatRow, TodoList } from './hub-types'
 
 test('layoutOf: the line board unless ?layout=classic', () => {
   assert.equal(layoutOf(''), 'line')
   assert.equal(layoutOf('?layout=classic'), 'classic')
+  assert.equal(layoutOf('?layout=stations'), 'line')
   assert.equal(layoutOf('?x=1&layout=classic'), 'classic')
   assert.equal(layoutOf('?layout=focus'), 'line')
 })
@@ -54,4 +55,15 @@ test('nextCardIndex: the first card below the edge, wrapping to the first', () =
   assert.equal(nextCardIndex([-300, -10, 42], 40), 2)
   assert.equal(nextCardIndex([-300, -10, 41], 40), 0)
   assert.equal(nextCardIndex([], 40), -1)
+})
+
+test('nextTag: a stopped item says so, held items say why, else the To-do number', () => {
+  const row = (t: Partial<TodoList['todo'][number]>, you = false) => ({ t: { id: 'a', text: 'x', at: 1, ...t }, you, running: false })
+  assert.deepEqual(nextTag(row({ stopped: true })), { tag: 'Stopped', kind: 'stopped' })
+  assert.deepEqual(nextTag(row({}), undefined, 'stopped'), { tag: 'Stopped', kind: 'stopped' })
+  assert.deepEqual(nextTag(row({}), undefined, 'ok'), { tag: 'Needs your OK', kind: 'held' })
+  assert.deepEqual(nextTag(row({ why: 'blocked' })), { tag: 'Blocked', kind: 'held' })
+  assert.deepEqual(nextTag(row({}, true)), { tag: 'Your step', kind: 'you' })
+  assert.deepEqual(nextTag(row({}), 3), { tag: 'To-do 3' })
+  assert.deepEqual(nextTag(row({})), { tag: 'To-do' })
 })

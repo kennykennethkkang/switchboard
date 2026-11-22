@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { laneRow, type Day } from '@/lib/now'
 import type { ArchivedChat, StuckItem } from '@/lib/hub-types'
 import { stuckTone } from '@/lib/stuck'
+import { chatShown } from '@/lib/chat-state'
 import { plural, type Card } from './chat-cards'
 import { ago } from '@/lib/look'
 import './layout.css'
@@ -24,7 +25,7 @@ function Lane({ tone, title, count, empty, children }: { tone: Tone; title: stri
 
 function Row({ card, tint, stuck, onOpen }: { card: Card; tint?: (c: Card) => string | undefined; stuck?: StuckItem[]; onOpen: (id: string) => void }) {
   const r = laneRow(card)
-  const tone = stuckTone(stuck, r.id)
+  const tone = chatShown(card.progress, stuck) === 'stuck' ? stuckTone(stuck, r.id) : undefined
   return (
     <li>
       <button type="button" className="now-row" onClick={() => onOpen(r.id)} title={`Open ${r.name} in Chats`}>

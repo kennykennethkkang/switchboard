@@ -1,5 +1,5 @@
 @media (pointer: coarse) { .git-summary { min-height: 44px; } }
 /* nav.css sets 32px on .hub-page .hub-link; these win on touch. */
 @media (pointer: coarse) { .hub-page button.git-gh, .hub-page button.git-undo { min-height: 44px; } }
-.git-undo { border: 1px solid var(--hub-hair); background: var(--hub-elev); color: var(--hub-ink); padding: 6px 10px; }
+.git-undo { border: 1px solid var(--hub-hair); background: var(--hub-elev); color: var(--hub-ink); padding: 6px 10px; margin-left: 8px; } /* the row pulls text links 8px left; a bordered button cancels it */
 @media (hover: hover) and (pointer: fine) { .hub-link.git-undo:hover { border-color: var(--hub-hair-strong); } }

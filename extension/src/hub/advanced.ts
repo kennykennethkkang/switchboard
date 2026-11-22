@@ -7,10 +7,11 @@ import type { Escalation, Stage, StageRun } from './types'
 
 const obj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-/** usage-meter reads both from company.json; other keys there are left as they are. */
-export function writeCompany(file: string, s: { smartModelSwitch: boolean; advancedMode: Record<string, boolean> }): void {
+/** usage-meter reads both from company.json; other keys there are left as they are. coderView unset drops the key. */
+export function writeCompany(file: string, s: { smartModelSwitch: boolean; advancedMode: Record<string, boolean>; coderView?: boolean }): void {
   const was = readJsonOr(file)
-  writeJsonAtomic(file, { ...(obj(was) ? was : {}), smartModelSwitch: s.smartModelSwitch, advancedMode: s.advancedMode })
+  const { coderView: _old, ...rest } = obj(was) ? was : {}
+  writeJsonAtomic(file, { ...rest, smartModelSwitch: s.smartModelSwitch, advancedMode: s.advancedMode, ...(s.coderView === undefined ? {} : { coderView: s.coderView }) })
 }
 
 /** Makes <project>/.switchboard and keeps it out of git through .git/info/exclude. */

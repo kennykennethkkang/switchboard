@@ -10,6 +10,7 @@ import * as path from 'path'
 import { run } from './local'
 import { tailscaleBin } from './lan'
 import { projectName } from './projects'
+import type { OwnedStuck } from './stuck'
 import type { DevProject, Server } from './types'
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
@@ -129,6 +130,23 @@ export function postLocal(port: number, path: string, body: unknown, ms: number,
 /** Posts to another window's hub; false when it did not take it. */
 export async function postWindow(w: Win, body: Record<string, unknown>): Promise<boolean> {
   try { return (await postLocal(w.port, '/hub', { token: w.hubToken, ...body }, 2000)).ok } catch { return false }
+}
+
+/** The stuck items of the chats another window owns, or undefined when it does not answer. */
+export function readOwnedStuck(w: Win, ms = 2000): Promise<OwnedStuck | undefined> {
+  return new Promise(resolve => {
+    const done = (v?: OwnedStuck) => { clearTimeout(timer); resolve(v) }
+    const req = http.request({ host: '127.0.0.1', port: w.port, path: '/hub/stuck', method: 'GET', agent: false, headers: { 'x-switchboard-token': w.hubToken } }, res => {
+      let text = ''
+      res.setEncoding('utf8')
+      res.on('data', c => { text += c })
+      res.on('end', () => { try { const v = JSON.parse(text); done(res.statusCode === 200 && Array.isArray(v?.owned) && Array.isArray(v?.stuck) ? v : undefined) } catch { done() } })
+      res.on('error', () => done())
+    })
+    const timer = setTimeout(() => { req.destroy(); done() }, ms)
+    req.on('error', () => done())
+    req.end()
+  })
 }
 
 /** Runs a hub-* command in another window, as its panel would; false when it did not take it.

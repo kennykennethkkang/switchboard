@@ -9,9 +9,12 @@ import * as os from 'os'
 import * as path from 'path'
 import * as crypto from 'crypto'
 import { execFile, spawn } from 'child_process'
-import { hub, type Handoff } from './hub-service'
+import { hub, resetMs, type Handoff } from './hub-service'
 import type { AiId, ChatProfile, ChatRow, NewChatAi } from './types'
-import { autoPick } from './picker'
+import { autoOn, autoPick, fiveHour, keywordRole, labelTask, pickRun, scoreTask, withUltrathink, type Effort } from './picker'
+import { logPick, readPick, type PickRow } from './picks'
+import { logDrafts, readLearned, smartRun, type SmartDraft } from './smart-select'
+import { ensureResearchRoot } from './research'
 import { presetFor } from './jev-project'
 import { AIS, chatTerminal, cliPath, codexFirst, codexPaste, codexReady, saveCodexOwn, shareKitWithHermes } from './ais'
 import { quickAsk, withBrief } from './brain'
@@ -19,7 +22,7 @@ import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
 import { CLI_APPS, cliBinary, cliBusy, deviceUrl, endCli, startCli } from './cli-logins'
 import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
-import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, repoTop, stillRunning } from './projects'
+import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, repoTop, stillRunning, ultracodeFlags } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { addWorktree } from './git'
 import { saveGroup } from './split'
@@ -52,7 +55,7 @@ const trustHere = (dir: string) => trustFolder(dir, { ask: ask.claude, trusted: 
 // bindCodexTerminals ties it to exactly one new rollout. Lost on reload: such a chat is then never closed by Switchboard.
 const codexTerminals = new Map<string, vscode.Terminal>()
 const codexBorn = new WeakMap<vscode.Terminal, number>()
-let codexStarts: (CodexStart & { terminal: vscode.Terminal; group?: string; title?: string; waitOn?: string[] })[] = []
+let codexStarts: (CodexStart & { terminal: vscode.Terminal; group?: string; title?: string; waitOn?: string[]; pick?: PickRow })[] = []
 const START_TTL_MS = 60 * 60 * 1000
 const TEMP = /^switchboard-[0-9a-f-]{36}\.(txt|sh|ps1)$/
 /** Launch files left over a day: a first message is read by its chat's shell at start, a script never ran. */
@@ -83,9 +86,11 @@ const typed = (command: string) => {
   fs.writeFileSync(file, scriptBody(file, command, SHELL))
   return scriptLine(file, SHELL)
 }
+/** A research chat's system note (research mode skips the finishing steps). */
+const RESEARCH_NOTE = 'Research chat: look things up and answer with sources; save findings to memory; no aar, standup, Commit message or Approve question.'
 const rowName = (first: string) => first.replace(/\s+/g, ' ').trim().slice(0, 60)
-const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | undefined, group?: string, title?: string, waitOn?: string[]) => {
-  if (name) codexStarts.push({ key: Math.random().toString(36).slice(2), cwd, name, at: Date.now(), terminal, group, title, waitOn })
+const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | undefined, group?: string, title?: string, waitOn?: string[], pick?: PickRow) => {
+  if (name) codexStarts.push({ key: Math.random().toString(36).slice(2), cwd, name, at: Date.now(), terminal, group, title, waitOn, pick })
 }
 
 // A resumed or handed-off to-do chat keeps its todo-band; a handoff opens before moveTodoChat, so the old id holds it.
@@ -100,7 +105,9 @@ export function bindCodexTerminals(chats: ChatRow[], now = Date.now(), onTied?: 
   codexStarts = codexStarts.filter(s => now - s.at < START_TTL_MS && s.terminal.exitStatus === undefined)
   const tied = matchCodexStarts(codexStarts, chats, new Set(codexTerminals.keys()), c => codexFirst.get(c.sessionId) ?? c.name)
   for (const [key, sessionId] of tied) {
-    const { terminal: t, group, title, waitOn } = codexStarts.find(s => s.key === key)!
+    const { terminal: t, group, title, waitOn, pick } = codexStarts.find(s => s.key === key)!
+    // A Codex chat has no id until it is tied, so its pick row waits for it.
+    if (pick) logPick({ ...pick, session: sessionId })
     if (group) saveGroup(sessionId, group)
     if (title) saveCodexOwn(sessionId, title)
     if (waitOn?.length) onTied?.(sessionId, waitOn)
@@ -114,10 +121,10 @@ export function bindCodexTerminals(chats: ChatRow[], now = Date.now(), onTied?: 
  * A Codex chat runs as its terminal's own process, with no shell around it: when Codex quits the terminal ends,
  * so a message typed into it can never land at a shell prompt. Answers why it could not start.
  */
-async function codexTerminal(name: string, cwd: string, args: string[], sessionId?: string, env?: Record<string, string>): Promise<vscode.Terminal | string> {
+async function codexTerminal(name: string, cwd: string, args: string[], sessionId?: string, env?: Record<string, string>, run?: { model?: string; effort?: string }): Promise<vscode.Terminal | string> {
   const bin = await cliPath('codex')
   if (!bin) return 'codex is not on PATH'
-  const t = openChatTerminal({ name, cwd, env: { ...chatEnv(cwd), ...env }, shellPath: bin, shellArgs: codexArgs(args) }, AIS.codex.name, sessionId)
+  const t = openChatTerminal({ name, cwd, env: { ...chatEnv(cwd), ...env }, shellPath: bin, shellArgs: codexArgs(args, run) }, AIS.codex.name, sessionId)
   codexBorn.set(t, Date.now())
   return t
 }
@@ -134,11 +141,44 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
 /** A worktree folder name from a chat title, made unique with a short suffix. */
 const worktreeName = (title: string) => `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '') || 'chat'}-${crypto.randomUUID().slice(0, 4)}`
 
-/** Auto becomes claude or codex with the reason; a named AI stays as it is. */
-export async function resolveAi(ai: NewChatAi, text: string | undefined, folder: string): Promise<{ ai: AiId; reason?: string }> {
-  if (ai !== 'auto') return { ai }
-  const p = await autoPick(text ?? '', hub.get().ais, presetFor(folder, 'route'))
-  return { ai: p.ai, reason: `Auto: ${p.ai === 'codex' ? 'Codex' : 'Claude'}, because ${p.reason}` }
+/** The run's own picks from the command (hub-new-chat, hub-todo-run); unset fields are filled by the auto pick unless auto is false; no auto follows the gear's Auto pick per task. */
+export type RunOpts = { model?: string; effort?: Effort; ultracode?: boolean; auto?: boolean; research?: boolean }
+export type Run = { ai: AiId; model?: string; effort?: string; ultracode: boolean; ultrathink: boolean; reason?: string; row?: Omit<PickRow, 'at' | 'session' | 'project'>; /** Smart select's model and effort picks, logged once the chat has an id. */ smart?: SmartDraft[] }
+
+/**
+ * Auto becomes claude or codex; then the model, effort, ultracode and ultrathink come from the task (picker.ts pickRun),
+ * with the reason for the notice. Kenneth's own picks win: the command's, else the gear's (a set model or effort in Controls,
+ * Codex's from its rows). auto false (or unset with the gear's switch off), or no task yet, picks nothing. unattended: a To-do run.
+ */
+export async function resolveRun(want: NewChatAi, text: string | undefined, folder: string, o: RunOpts = {}, unattended = false): Promise<Run> {
+  const goal = text?.trim() ?? '', s = hub.get(), preset = presetFor(folder, 'route')
+  const picking = autoOn(o.auto, s.controls.switchboard.autoPick) && !!goal
+  // One Jev call gives the role and the difficulty.
+  const labels = want === 'auto' || picking ? await labelTask(goal, preset) : {}
+  const named = want === 'auto' ? await autoPick(goal, s.ais, preset, labels) : undefined
+  const ai: AiId = named?.ai ?? (want === 'auto' ? 'claude' : want)
+  const mine = { model: o.model, effort: o.effort, ultracode: o.ultracode }
+  const claude = ai === 'claude', codex = ai === 'codex'
+  if (!picking || !(claude || codex)) {
+    return { ai, ...mine, ultrathink: false, ultracode: !!o.ultracode, reason: named && `Auto: ${codex ? 'Codex' : 'Claude'}, because ${named.reason}` }
+  }
+  const gear = s.controls.claude
+  const explicit = claude ? { ...mine, model: o.model ?? gear.model, effort: o.effort ?? gear.effortLevel }
+    : { model: o.model ?? ask.codexModel, effort: o.effort ?? (ask.codexEffort as Effort | undefined) }
+  const windows = [...s.live.flatMap(l => l.limits), ...(claude ? s.limitsKept?.windows ?? [] : s.codexKept ?? [])]
+  const input = { text: goal, role: claude ? 'lead' : labels.role ?? keywordRole(goal), ai, unattended, usage5h: fiveHour(windows, claude ? 'five_hour' : 'codex_five_hour', resetMs), jevDifficulty: labels.difficulty, explicit }
+  const { run: p, drafts } = claude ? smartRun(input, pickRun(input), goal, readLearned()) : { run: pickRun(input), drafts: undefined }
+  // The notice only when the pick filled something in.
+  const filled = !explicit.model || !explicit.effort || p.ultrathink || (o.ultracode === undefined && p.ultracode)
+  const shown = [p.model, p.effort, p.ultracode ? 'ultracode' : '', p.ultrathink ? 'ultrathink' : ''].filter(Boolean).join(' · ')
+  const why = [named?.reason, p.reason].filter(Boolean).join('; ')
+  const pinned = Object.fromEntries(Object.entries(explicit).filter(([, v]) => v !== undefined))
+  return {
+    ai, model: p.model, effort: p.effort, ultracode: p.ultracode, ultrathink: p.ultrathink,
+    reason: named || filled ? `Auto: ${named ? `${codex ? 'Codex' : 'Claude'} ` : ''}${shown}, because ${why}` : undefined,
+    row: { ai: claude ? 'claude' : 'codex', role: input.role, model: p.model, effort: p.effort, ultracode: p.ultracode, ultrathink: p.ultrathink, reason: p.reason, auto: true, features: scoreTask(input), ...(Object.keys(pinned).length ? { explicit: pinned } : {}) },
+    smart: drafts,
+  }
 }
 
 /**
@@ -150,14 +190,21 @@ export async function resolveAi(ai: NewChatAi, text: string | undefined, folder:
  * todo: a To-do run's label (runLabel): the chat is named `To-do N: <title>` and gets it as SWITCHBOARD_TODO.
  * group: a split's group id (split.ts), saved once the session id is known.
  * worktree: Claude only, starts in repo/.claude/worktrees/<slug> on branch worktree-<slug>.
+ * run: the run's own model, effort and ultracode, auto false, research (resolveRun). A To-do run counts as unattended.
+ * research: starts in the research folder instead, with a note that skips the finishing steps.
  */
-export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[], worktree = false): Promise<string | undefined> {
+export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[], worktree = false, run?: RunOpts): Promise<string | undefined> {
   const project = hub.get().projects.find(p => p.path === folder)
   if (!project) return `${folder} is not in the project list yet; open Switchboard once and try again`
-  const { ai, reason } = await resolveAi(want, text, folder)
+  const picked = await resolveRun(want, text, folder, run, !!todo)
+  const { ai, reason } = picked
   if (reason) void vscode.window.showInformationMessage(`${reason}`)
+  let where = folder
+  if (run?.research) {
+    try { where = ensureResearchRoot() } catch (err) { return `could not make the research folder (${(err as Error).message})` }
+  }
   const goal = text?.trim()
-  const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(folder) : []
+  const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(where) : []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
   const named = goal ? await titleFor(goal, quickAsk) : project.name
   // Prefix, not suffix: a handoff's version number has to stay at the end (projects.ts CHAIN).
@@ -167,45 +214,50 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   const profile = start && !tools ? withGoal(start, text ?? '', inv) : start
   // Codex has no hook to read the brief from, so it rides in front of the first message.
   // Codex has no --append-system-prompt: Claude's system notes ride in the brief's block, which the row name skips (ais.ts withoutBrief).
-  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? '', uiSdkNote(folder) ?? ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
-  const lead = [withBrief(hub.get(), folder, undefined), notes && `Switchboard notes: ${notes}`].filter(Boolean).join('\n')
+  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
+  const lead = [withBrief(hub.get(), where, undefined), notes && `Switchboard notes: ${notes}`].filter(Boolean).join('\n')
   const first = withPointer(ai === 'claude' ? '' : [lead, text].filter(Boolean).join('\n\n'), rulesState.ready[ai], rulesState.kit)
   if (ai === 'codex') {
-    const t = await codexTerminal(`${AIS.codex.name}: ${title}`, folder, first.trim() ? [first] : [], undefined, todoEnv(todo))
+    const t = await codexTerminal(`${AIS.codex.name}: ${title}`, where, first.trim() ? [first] : [], undefined, todoEnv(todo), { model: picked.model, effort: picked.effort })
     if (typeof t === 'string') return t
     t.show(true)
     // The row is tied by the message, never the brief in front of it (ais.ts); the title is what it then shows.
-    waitForCodex(t, folder, rowName(text ?? '') || undefined, group, title, waitOn)
+    waitForCodex(t, where, rowName(text ?? '') || undefined, group, title, waitOn, picked.row && { ...picked.row, at: Date.now(), project: project.name })
     return undefined
   }
   if (ai === 'hermes') {
-    const t = openChatTerminal({ name: `${AIS.hermes.name}: ${title}`, cwd: folder }, AIS.hermes.name)
+    const t = openChatTerminal({ name: `${AIS.hermes.name}: ${title}`, cwd: where }, AIS.hermes.name)
     t.show(true)
     t.sendText(typed(AIS.hermes.startCommand({ text: first }, SHELL)))
     return undefined
   }
   let command: string
   // Own worktree: made here, then a plain claude starts in it (claude --worktree makes Claude Code's guard refuse compound Bash).
-  let cwd = folder
-  const top = worktree ? repoTop(folder) : undefined
+  let cwd = where
+  const top = worktree ? repoTop(where) : undefined
   if (top) {
     const made = await addWorktree(top, worktreeName(title))
     if (!made.ok) return made.error
     cwd = made.dir
   }
-  const sessionId = id ?? (profile ? crypto.randomUUID() : undefined)
+  // A picked chat always has an id, so the log row and a later handoff can find it.
+  const sessionId = id ?? (profile || picked.row ? crypto.randomUUID() : undefined)
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
-    command = newChatCommand({ textFile: messageFile(withPointer(text ?? '', rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), folder, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, folder)) ?? '', uiSdkNote(folder) ?? ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    const fx = ultracodeFlags({ effort: picked.effort, ultracode: picked.ultracode, settings })
+    const message = picked.ultrathink ? withUltrathink(text ?? '') : text ?? ''
+    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings: fx.settings, model: picked.model, effort: fx.effort, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
-  trustHere(folder)
+  trustHere(where)
   if (group && sessionId) saveGroup(sessionId, group)
-  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd, env: { ...chatEnv(folder), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
+  const t = openChatTerminal({ name: `${AIS[ai].name}: ${title}`, cwd, env: { ...chatEnv(where), ...todoEnv(todo) } }, AIS[ai].name, sessionId)
   t.show(true)
   t.sendText(typed(command))
+  if (picked.row) logPick({ ...picked.row, at: Date.now(), session: sessionId, project: project.name })
+  logDrafts(picked.smart, sessionId, where)
   return undefined
 }
 
@@ -497,8 +549,13 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
     try { setChatProfile(freshId, carried); indefiniteDone(h.sessionId) } catch { /* the flag stays with the old chat */ }
   }
   const system = [settings && carried ? toolsNote(carried) : '', myName(), uiSdkNote(h.cwd) ?? ''].filter(Boolean).join(' ') || undefined
-  const tools = { ...(settings ? { settings } : {}), system }
-  const claude = (branch?: string) => newChatCommand({ textFile: messageFile(text), name: fresh, remote: hub.get().rc.atStartup && !off ? fresh : undefined, branch, sessionId: freshId, ...tools }, SHELL)
+  // The fresh chat runs on the old one's pick; it is not picked again.
+  const was = readPick(h.sessionId)
+  const kept = was?.ai === ai ? was : undefined
+  let fx: { effort?: string; settings?: string } = { settings }
+  try { if (!codex) fx = ultracodeFlags({ effort: kept?.effort, ultracode: kept?.ultracode, settings }) } catch { /* starts without ultracode */ }
+  const tools = { ...(fx.settings ? { settings: fx.settings } : {}), system }
+  const claude = (branch?: string) => newChatCommand({ textFile: messageFile(text), name: fresh, remote: hub.get().rc.atStartup && !off ? fresh : undefined, branch, sessionId: freshId, model: kept?.model, effort: fx.effort, ...tools }, SHELL)
   let command = ''
   try {
     // Codex has no --name and no hook to read the brief from: the brief rides in front, the name lives in the note.
@@ -516,14 +573,14 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
   }
   if (!codex) trustHere(h.cwd)
   const t = codex
-    ? await codexTerminal(`Codex: ${fresh}`, h.cwd, [withBrief(hub.get(), h.cwd, text)])
+    ? await codexTerminal(`Codex: ${fresh}`, h.cwd, [withBrief(hub.get(), h.cwd, text)], undefined, undefined, kept && { model: kept.model, effort: kept.effort })
     : openChatTerminal({ name: `Claude: ${fresh}`, cwd: h.cwd, env: { ...chatEnv(h.cwd), ...heldEnv(h.cwd, [h.sessionId]) } }, 'Claude', freshId)
   if (typeof t === 'string') {
     void vscode.window.showWarningMessage(`${t}.`)
     return false
   }
   t.show(true)
-  if (codex) waitForCodex(t, h.cwd, fresh)
+  if (codex) waitForCodex(t, h.cwd, fresh, undefined, undefined, undefined, kept && { ...kept, at: Date.now(), kept: true })
   else t.sendText(typed(command))
   // Only now that the fresh chat runs: the old chat moves to History and is closed once the fresh one posts.
   try {
@@ -532,6 +589,7 @@ export async function continueInFreshChat(h: Handoff, workspace: string | undefi
       note: h.note, startedAt: hub.get().progress.find(p => p.sessionId === h.sessionId)?.startedAt, archivedAt: Date.now(),
     })
   } catch (err) { void vscode.window.showWarningMessage(`Could not move the old chat to History (${(err as Error).message}).`) }
+  if (kept && freshId) logPick({ ...kept, at: Date.now(), session: freshId, kept: true })
   if (!codex) hub.closeAfterFresh(h.sessionId, h.cwd)
   if (freshId) void moveTodoChat(h.cwd, h.sessionId, freshId).catch(() => {})
   return true

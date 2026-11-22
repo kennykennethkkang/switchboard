@@ -53,6 +53,9 @@ interface HookPayload {
   [key: string]: unknown
 }
 
+// The Research panel closes a parallel fetch by its URL.
+const fetchUrl = (p: HookPayload) => (p.tool_name === 'WebFetch' && typeof p.tool_input?.url === 'string' ? { url: p.tool_input.url } : {})
+
 const PATCH_FILE = /^\*\*\* (?:(?:Update|Add|Delete) File|Move to):\s*(.+?)\s*$/gm
 
 /** The files an edit tool call writes, when it has a cwd to resolve against. Codex's apply_patch names them in the patch text. */
@@ -348,6 +351,7 @@ export class HookServer implements vscode.Disposable {
         tool: toolName,
         result: result.slice(0, RESULT_MAX),
         tokenCost,
+        ...fetchUrl(payload),
         ...(discovery ? { discovery } : {}),
       },
     }, payload.session_id)
@@ -365,6 +369,7 @@ export class HookServer implements vscode.Disposable {
         tool: toolName,
         result: `[FAILED] ${(payload.tool_response ? summarizeResult(payload.tool_response) : '').slice(0, FAILED_RESULT_MAX)}`,
         tokenCost: 0,
+        ...fetchUrl(payload),
       },
     }, payload.session_id)
   }

@@ -47,7 +47,7 @@ test('picked: keeps items whose chat is in a picked project, and ones no chat ma
 test('hubCounts: one rule for needs you, working and done today', () => {
   const arch: ArchivedChat = { sessionId: 'a1', ai: 'claude', name: 'a1', origin: 'a1', version: 1, cwd: '/x/switchboard', project: 'switchboard', archivedAt: now - H, approvedAt: now - H }
   const cs = [card('w', 'working'), card('n', 'needs-you'), card('d', 'done'), card('i', 'idle')]
-  const hub = { chats: cs.map(c => c.chat), progress: cs.flatMap(c => c.progress ? [c.progress] : []), archive: [arch], stuck: [{}], learnReady: [{}, {}] } as unknown as HubState
-  assert.deepEqual(hubCounts(hub, [], now), { needs: 5, working: 1, done: 1 })
-  assert.deepEqual(hubCounts(hub, ['other'], now), { needs: 3, working: 0, done: 0 })
+  const hub = { chats: cs.map(c => c.chat), progress: cs.flatMap(c => c.progress ? [c.progress] : []), archive: [arch], stuck: [{}], learnReady: [{}, {}], researchOffers: [{}] } as unknown as HubState
+  assert.deepEqual(hubCounts(hub, [], now), { needs: 6, working: 1, done: 1 })
+  assert.deepEqual(hubCounts(hub, ['other'], now), { needs: 4, working: 0, done: 0 })
 })

@@ -2,8 +2,9 @@
 import type { LinkChip } from '@/lib/wait-links'
 import { readStore, writeStore } from '@/lib/store'
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
-import type { Ask, ChatProfile, Choice, DoneCheck, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, TaskRow } from '@/lib/hub-types'
+import type { Ask, ChatProfile, Choice, DoneCheck, ChatProgress, ChatRow, Connection, Installed, Limit, SessionLive, SmartRecord, StuckItem, TaskRow } from '@/lib/hub-types'
 import { askChoice } from '@/lib/ask'
+import { optionSmart, smartMarkText } from '@/lib/smart'
 import { hookNotes, limitLine, testsPrompt } from '@/lib/checks'
 import { eta, say, sayLeft, timeLeft, type Eta } from '@/lib/eta'
 import { projectName } from '@/lib/archive'
@@ -19,7 +20,9 @@ import { TestsCard } from './check-cards'
 import { onMac } from './dev-rows'
 import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import { CheckStamp, Warn } from './approve'
+import { chatShown } from '@/lib/chat-state'
 import './centre.css'
+import './smart-select.css'
 
 const TOOLS_KEY = 'switchboard.toolCalls'
 const clock = (at: number) => new Date(at).toTimeString().slice(0, 8)
@@ -130,7 +133,7 @@ function AskButtons({ ask, onAnswer, block }: { ask: Ask; onAnswer: (askId: stri
         {qs.length > 1 && <p className="cp-subq">{q.header && <span className="cp-role">{q.header} · </span>}{q.question}</p>}
         {q.multiSelect && <span className="cp-hint">Pick any that apply</span>}
         <div style={row}>
-          {q.options.map((o, i) => <button key={i} type="button" className="hub-btn hub-opt" aria-pressed={together ? picked(n).includes(i) : undefined} disabled={held(o)} onClick={() => pick(n, i)}>{o}{q.details?.[i] ? <span className="hub-opt-d">{q.details[i]}</span> : null}</button>)}
+          {q.options.map((o, i) => <button key={i} type="button" className="hub-btn hub-opt" aria-pressed={together ? picked(n).includes(i) : undefined} disabled={held(o)} onClick={() => pick(n, i)}>{o}{optionSmart(q, i) && <span className="ss-mark">{smartMarkText(optionSmart(q, i)!)}</span>}{q.details?.[i] ? <span className="hub-opt-d">{q.details[i]}</span> : null}</button>)}
           <button type="button" className="hub-btn hub-opt cp-other" aria-pressed={n in others} onClick={() => toggleOther(n)}>Other</button>
         </div>
         {n in others && <input type="text" autoFocus maxLength={200} style={field} aria-label={`Other answer for ${q.header ?? q.question}`} placeholder="Type your answer"
@@ -170,8 +173,8 @@ const NO_MODELS: Record<string, string> = {}
 /** profile: the chat's own plugins and skills, when Switchboard started it with a set; onProfile saves a change. */
 /** limits and autoContinue: for the usage-limit note; onSend: queues a message to this chat. note: an extra mute line under the head (a pause). */
 /** place: the VS Code window holding the chat. menu: Outputs and the more menu. message: the message box; given a function, it gets the Tools popover body. */
-export function ChatPicture({ chat, progress, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onIndefinite, onCommand, onFocus, onAnswer, onCopy, onSend, approve, block, check, links = [] }: {
-  chat: ChatRow; progress?: ChatProgress; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
+export function ChatPicture({ chat, progress, stuckItems, all = [], live, instant, demo, models = NO_MODELS, profile, flagged = [], smart, globalOff, limits = [], autoContinue = false, place, menu, message, note, installed, connections, toolsOpen, onInstalled, onProfile, onIndefinite, onCommand, onFocus, onAnswer, onCopy, onSend, approve, block, check, links = [] }: {
+  chat: ChatRow; progress?: ChatProgress; /** hub.stuck, for the stuck look. */ stuckItems?: StuckItem[]; /** Every chat's progress, the history behind the estimate. */ all?: ChatProgress[]; live?: SessionLive; instant?: boolean; models?: Record<string, string>; /** The browser demo: the node drawer shows sample runs. */ demo?: boolean
   profile?: ChatProfile; flagged?: string[]; smart?: SmartRecord; globalOff?: string[]; limits?: Limit[]; autoContinue?: boolean; onProfile?: (p: ChatProfile) => void; onIndefinite?: (on: boolean) => void; onCommand?: (c: HubCommand) => void; onFocus: () => void; onAnswer?: (askId: string, choice: Choice) => void; onCopy: (text: string) => Promise<boolean>; onSend?: (text: string) => void; /** The Approve bar, while it waits for approval. */ approve?: ReactNode; /** Why an Approve answer is held (approveBlock). */ block?: string; /** The done-check stamp under the closing question. */ check?: DoneCheck
   place?: { name: string; color: string }; menu?: ReactNode; message?: ReactNode | ((tools: ReactNode) => ReactNode); note?: ReactNode; installed?: Installed[]; connections?: Connection[]; toolsOpen?: boolean; onInstalled?: () => void; /** Its wait links, for the Orbit arcs and the waiting word. */ links?: LinkChip[]
 }) {
@@ -185,12 +188,12 @@ export function ChatPicture({ chat, progress, all = [], live, instant, demo, mod
   useEffect(() => setRemote(!vscodeBridge?.isVSCode && !onMac()), [])
   const toggle = (on: boolean) => { setShowTools(on); writeStore(TOOLS_KEY, on ? 'on' : 'off') }
 
-  const state = progress?.state ?? 'idle', s = chipOf(progress), name = chat.name ?? projectName(chat)
+  const state = progress?.state ?? 'idle', stuck = chatShown(progress, stuckItems) === 'stuck', s = chipOf(progress), name = chat.name ?? projectName(chat)
   const since = ago(progress?.at ?? chat.updatedAt ?? Date.now())
   // A held chat reads as waiting, never idle.
   const wait = state === 'done' || state === 'needs-you' ? undefined : waitWord(links)
   // The views redraw when this changes, so it changes only with what they show.
-  const orbit = useMemo(() => ({ id: chat.sessionId, name, state, ago: since, wait, progress, live, models }), [chat.sessionId, name, state, since, wait, progress, live, models])
+  const orbit = useMemo(() => ({ id: chat.sessionId, name, state, ...(stuck ? { stuck: true } : {}), ago: since, wait, progress, live, models }), [chat.sessionId, name, state, stuck, since, wait, progress, live, models])
   const tasks = progress?.tasks ?? [], now = Date.now(), e = progress && tasks.length ? eta(progress, now) : undefined
   const running = stillRunning(progress), timeleft = progress && timeLeft(progress, all, now)
   const feed = [...(progress?.tools ?? [])].reverse().slice(0, 6)

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { aiPath, autopilot, busiestTodo, upNext, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, withHome } from './todo'
+import { aiPath, autopilot, busiestTodo, upNext, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, startable, holdOf, HELD, withHome } from './todo'
 import { demoHub } from './hub-demo'
 import type { ChatRow, TodoItem, TodoList } from './hub-types'
 
@@ -102,6 +102,12 @@ describe('autopilot', () => {
     // As todo.ts upcoming sends it: r's chat is live, so q1 waits on nothing.
     plan: { runs: [{ n: 3, ids: ['q1'] }], held: [{ id: 'q2', why: 'stopped' }, { id: 'y', why: 'you' }] }, ...more,
   })
+  it('shows the hold in the head when the next item waits, not "starts by itself"', () => {
+    const hold = { kind: 'waiting' as const, text: 'Next to-do waits: Fix login is waiting on Outfit picker copy to finish' }
+    assert.equal(autopilot(list({ plan: { runs: [{ n: 3, ids: ['q1'] }], held: [], hold } }), true, () => false).head, hold.text)
+    assert.match(autopilot(list({ plan: { runs: [{ n: 3, ids: ['q1'] }], held: [], hold } }), false, live).note, /Next to-do waits: Fix login is waiting on Outfit picker copy to finish\./)
+    assert.equal(autopilot(list({ plan: { runs: [{ n: 3, ids: ['q1'] }], held: [] } }), true, () => false).head, 'Next: To-do 3 starts by itself when no to-do chat is running')
+  })
   it('chains done (run >= streak), running, then the plan with its numbers; a stopped chat is held; hand steps stay out', () => {
     const p = autopilot(list(), false, live)
     assert.deepEqual(p.steps.map(s => [s.id, s.n, s.state, s.why]), [['d1', 1, 'done', undefined], ['r', 2, 'running', undefined], ['q1', 3, 'next', undefined], ['q2', undefined, 'held', 'stopped']])
@@ -150,7 +156,10 @@ describe('autopilot', () => {
   })
   it('the demo lists carry a plan', () => {
     const l = demoHub(1e12).todos!['/Users/k/GitHub/Armasu']
-    assert.deepEqual(l.plan, { runs: [{ n: 3, ids: ['dt1'] }, { n: 4, ids: ['dt4'] }, { n: 5, ids: ['dt7'] }], held: [{ id: 'dt5', why: 'stopped' }] })
+    assert.deepEqual(l.plan, { runs: [{ n: 3, ids: ['dt1'] }, { n: 4, ids: ['dt4'] }, { n: 5, ids: ['dt7'] }], held: [{ id: 'dt5', why: 'stopped' },
+      // An approval holds the item after it too; a dated, a stopped and a blocked one each say why.
+      { id: 'dt11', why: 'ok' }, { id: 'dt12', why: 'ok' }, { id: 'dt13', why: 'date' }, { id: 'dt14', why: 'stopped' }, { id: 'dt15', why: 'blocked' }], hold: { kind: 'waiting', text: 'Next to-do waits: Put a Stripe test key in .env.local is waiting on Accurate Done state to finish' } })
+    assert.deepEqual(demoHub(1e12).todos!['/Users/k/GitHub/switchboard'].plan?.hold, { kind: 'paused', text: 'Next to-do waits: autopilot is paused' })
   })
   it('no plan (an older extension): queued in list order, no numbers', () => {
     const p = autopilot(list({ plan: undefined }), true, live)
@@ -166,6 +175,54 @@ describe('autopilot', () => {
   })
   it('lanes skip projects with nothing in them', () => {
     assert.deepEqual(pilotLanes({ '/a': list(), '/b': { todo: [] }, '/c': { todo: [{ id: 'y', text: 'k', at: 1, why: 'you' }] } }, true, live).map(l => l.folder), ['/a'])
+  })
+})
+
+describe('one startable rule', () => {
+  const no = () => false
+  it('Start works on any open item that is not a hand step or running: stopped ones included', () => {
+    assert.equal(startable({ id: 'a', text: 'A', at: 1 }, no), true)
+    assert.equal(startable({ id: 'a', text: 'A', at: 1, stopped: true }, no), true)
+    assert.equal(startable({ id: 'a', text: 'A', at: 1, chat: 'gone' }, no), true)
+    assert.equal(startable({ id: 'a', text: 'A', at: 1, chat: 'live' }, c => c === 'live'), false)
+    assert.equal(startable({ id: 'a', text: 'A', at: 1, why: 'you' }, no), false)
+    // A gate holds auto-start, not Start.
+    assert.equal(startable({ id: 'a', text: 'A', at: 1, needsOk: true, notBefore: 9e12 }, no), true)
+  })
+  it('the Now card offers a stopped item, the same one the Plan page can start', () => {
+    const list: TodoList = { todo: [{ id: 'y', text: 'Key', at: 1, why: 'you' }, { id: 's', text: 'Memory', at: 1, stopped: true }] }
+    assert.equal(upNext(list, no)?.id, 's')
+    assert.equal(startable(list.todo[1], no), true)
+  })
+  it('holdOf says why auto-start leaves an item, as the extension plan does', () => {
+    const now = 1000, t = (more: Partial<TodoItem>): TodoItem => ({ id: 'a', text: 'A', at: 1, ...more })
+    assert.equal(holdOf(t({}), now), undefined)
+    assert.equal(holdOf(t({ why: 'blocked', needsOk: true }), now), 'blocked')
+    assert.equal(holdOf(t({ why: 'you' }), now), 'you')
+    assert.equal(holdOf(t({ needsOk: true, notBefore: now + 1, stopped: true }), now), 'ok')
+    assert.equal(holdOf(t({ needsOk: false, notBefore: now + 1 }), now), 'date')
+    assert.equal(holdOf(t({ notBefore: now }), now), undefined)
+    assert.equal(holdOf(t({ notBefore: 0 }), now), undefined)
+    assert.equal(holdOf(t({ stopped: true }), now), 'stopped')
+    assert.equal(holdOf(t({ chat: 'c' }), now), 'stopped')
+  })
+  it('names the new holds', () => {
+    assert.deepEqual([HELD.ok, HELD.date], ['Needs your OK', 'Waits for its date'])
+  })
+  it('a stopped item gets its own note, not a promise that clearing something starts it', () => {
+    const stopped: TodoList = { todo: [{ id: 's', text: 'Memory', at: 1, stopped: true }], pilot: { on: true, at: 1 }, plan: { runs: [], held: [{ id: 's', why: 'stopped' }] } }
+    assert.equal(autopilot(stopped, false, () => false).note, '1 item stopped: its chat ended before finishing. Press Start again.')
+    const two: TodoList = { ...stopped, todo: [...stopped.todo, { id: 'k', text: 'K', at: 1, stopped: true }], plan: { runs: [], held: [{ id: 's', why: 'stopped' }, { id: 'k', why: 'stopped' }] } }
+    assert.equal(autopilot(two, false, () => false).note, '2 items stopped: their chats ended before finishing. Press Start again.')
+    const mixed: TodoList = { ...stopped, todo: [...stopped.todo, { id: 'b', text: 'B', at: 1, why: 'blocked' }], plan: { runs: [], held: [{ id: 's', why: 'stopped' }, { id: 'b', why: 'blocked' }] } }
+    assert.equal(autopilot(mixed, false, () => false).note, '2 items held. Clear what holds one and it starts by itself. A stopped one needs Start again.')
+  })
+  it('without a plan, a gated item is held, not next', () => {
+    const now = 1000
+    const l: TodoList = { todo: [{ id: 'o', text: 'O', at: 1, needsOk: true }, { id: 'd', text: 'D', at: 1, notBefore: now + 5 }, { id: 'z', text: 'Z', at: 1 }], pilot: { on: true, at: 1 } }
+    const p = autopilot(l, true, () => false, now)
+    assert.deepEqual(p.steps.map(s => [s.id, s.state, s.why]), [['z', 'next', undefined], ['o', 'held', 'ok'], ['d', 'held', 'date']])
+    assert.equal(stepLabel(p.steps[1]), 'a to-do, O: Needs your OK')
   })
 })
 

@@ -1,6 +1,6 @@
 {
   "name": "cache-keeper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keeps an idle chat's prompt cache warm with a silent ping just before it expires, and shows warm or cold above the prompt and in Switchboard",
   "author": {
     "name": "Kenneth Kang"

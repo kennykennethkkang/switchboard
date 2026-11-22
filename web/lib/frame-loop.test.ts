@@ -19,3 +19,17 @@ test('wake draws once, loops while run holds, sleeps after', () => {
   on = true; l.wake(); assert.equal(seen.length, 4)
   l.stop(); assert.ok(!l.running())
 })
+
+test('minDt skips frames that come sooner than it, but keeps the loop going', () => {
+  const q: Array<(t: number) => void> = []
+  const g = globalThis as any
+  g.requestAnimationFrame = (f: (t: number) => void) => q.push(f)
+  g.cancelAnimationFrame = () => { q.length = 0 }
+  const seen: number[] = []
+  const l = frameLoop(now => seen.push(now), () => true, 30)
+  l.wake()
+  const t = seen[0]
+  q.shift()!(t + 16); assert.equal(seen.length, 1); assert.ok(l.running())
+  q.shift()!(t + 33); assert.equal(seen.length, 2)
+  l.stop()
+})

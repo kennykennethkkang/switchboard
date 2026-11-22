@@ -5,6 +5,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { CLOSING_DENY, closingGate } from '../src/hub/approve'
+import { RESEARCH_ROOT } from '../src/hub/research'
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'closing-gate-'))
 after(() => fs.rmSync(dir, { recursive: true, force: true }))
@@ -17,10 +18,10 @@ const STANDUP = '**Done**\n- the fix\n\n**For you**\n- reload\n\n**Left**\n- non
 const edit = use('Edit', { file_path: '/p/a.ts' })
 
 let n = 0
-const gate = (entries: unknown[], question = 'Approve this chat as finished?', options = ['Approve', 'Send back']) => {
+const gate = (entries: unknown[], question = 'Approve this chat as finished?', options = ['Approve', 'Send back'], cwd?: string) => {
   const file = path.join(dir, `t${n++}.jsonl`)
   fs.writeFileSync(file, entries.map(e => JSON.stringify(e)).join('\n') + '\n')
-  return closingGate({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', transcript_path: file, tool_input: { questions: [{ question, options: options.map(label => ({ label })) }] } })
+  return closingGate({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', transcript_path: file, cwd, tool_input: { questions: [{ question, options: options.map(label => ({ label })) }] } })
 }
 
 describe('closingGate', () => {
@@ -56,6 +57,13 @@ describe('closingGate', () => {
   })
   it('lets it through when the turn started before the tail', () => {
     assert.equal(gate([edit, result(), say('Fixed.')]), undefined)
+  })
+  it('lets a chat in the research folder close with no aar', () => {
+    const work = [prompt('survey it'), edit, result(), say('Found three.')]
+    assert.equal(gate(work, undefined, undefined, `${RESEARCH_ROOT}/agents`), undefined)
+    assert.equal(gate(work, undefined, undefined, RESEARCH_ROOT), undefined)
+    assert.equal(gate(work, undefined, undefined, `${RESEARCH_ROOT}2`), CLOSING_DENY)
+    assert.equal(gate(work, undefined, undefined, '/p'), CLOSING_DENY)
   })
   it('skips a chat that changed no files', () => {
     assert.equal(gate([prompt('close it'), say('Closing.')]), undefined)

@@ -336,6 +336,7 @@ export class TranscriptParser {
       name: toolName,
       args,
       filePath,
+      ...(toolName === 'WebFetch' && typeof block.input?.url === 'string' ? { url: block.input.url } : {}),
       startTime: Date.now(),
     })
 
@@ -424,6 +425,7 @@ export class TranscriptParser {
         tool: toolName,
         result: result.slice(0, RESULT_MAX),
         tokenCost,
+        ...(pending.url ? { url: pending.url } : {}),
         ...(discovery ? { discovery } : {}),
         ...(isError ? { isError, errorMessage } : {}),
       },

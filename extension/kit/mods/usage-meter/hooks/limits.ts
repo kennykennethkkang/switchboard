@@ -17,6 +17,8 @@ export function overLimit(windows: Window[], pauseAt: number | null | undefined,
   const w = windows.filter(l => l.percentUsed >= (pauseAt ?? 99) && msOf(l.resetsAt) > Math.max(now, pauseOff)).sort((a, b) => b.percentUsed - a.percentUsed)[0]
   return w && { kind: w.kind, percent: Math.floor(w.percentUsed), resetsAt: msOf(w.resetsAt) }
 }
+/** The fullest five_hour window not yet past its reset, in percent; 0 with none, so the gate fails open. */
+export const fiveHour = (windows: Window[], now: number) => Math.max(0, ...windows.filter(w => w.kind === 'five_hour' && !(msOf(w.resetsAt) <= now)).map(w => w.percentUsed))
 /** The hub's pause from limits.json, until its resumeAt: a window that closed never lifts it, so the time does. */
 export const hubHold = (p: HubPause | undefined, now: number): Hold | undefined => {
   if (!p) return undefined

@@ -110,6 +110,8 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
     if (!m.keyHeader) out.push({ label: `${m.name} (Codex)`, needs: ['codex'], wait: 20, run: ['codex', 'mcp', 'add', m.name, '--url', m.url!] })
     else if (o.key21st) out.push({ say: `${m.name} for Codex: not added, its key goes in an x-api-key header that codex mcp add cannot set.` })
   }
+  // The context7 plugin is an http server Codex wants an OAuth login for (AuthRequired); the stdio one needs none.
+  if (!cx.mcps.includes('context7') && kit.plugins.some(id => id.startsWith('context7@'))) out.push({ label: 'context7 (Codex)', needs: ['codex', 'npx'], run: ['codex', 'mcp', 'add', 'context7', '--', 'npx', '-y', '@upstash/context7-mcp'] })
   // --codex is what turns on the chat-wait and hub tools, which Codex has no mods for.
   if (cx.askOld) out.push({ label: 'Ask tool (Codex, old entry)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'remove', 'switchboard'] })
   if (!cx.mcps.includes('switchboard') || cx.askOld) out.push({ label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK, '--codex'] })

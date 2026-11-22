@@ -15,7 +15,7 @@ export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: s
 export type MemoryGraph = { nodes: GraphNode[]; edges: GraphEdge[]; health: GraphHealth }
 
 export type Group = 'user' | 'feedback' | 'project-memory' | 'reference' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'
-/** Dark-theme colors per group; the view itself paints with hub tokens (TONE in memory-atlas.tsx). */
+/** Dark-theme colors per group; the view itself paints with hub tokens (TONE in memory-kit.tsx). */
 export const GROUPS: { id: Group; label: string; color: string; set: 'Memory' | 'Vault' | 'Workspace' }[] = [
   { id: 'user', label: 'About you', color: '#a98bff', set: 'Memory' },
   { id: 'feedback', label: 'Feedback', color: '#59d499', set: 'Memory' },
@@ -63,6 +63,12 @@ export function framePose(pts: P3[], cam: P3, fov: number, aspect: number, fill 
 
 /** cam moved along its line to at, k times as far. */
 export const dolly = (cam: P3, at: P3, k: number): P3 => ({ x: at.x + (cam.x - at.x) * k, y: at.y + (cam.y - at.y) * k, z: at.z + (cam.z - at.z) * k })
+
+/** How long ago t was, short: "just now", "5m ago", "2h ago", "3d ago", "6w ago". */
+export function ago(t: number, now = Date.now()): string {
+  const m = Math.max(0, (now - t) / 6e4)
+  return m < 1 ? 'just now' : m < 60 ? `${Math.floor(m)}m ago` : m < 1440 ? `${Math.floor(m / 60)}h ago` : m < 20160 ? `${Math.floor(m / 1440)}d ago` : `${Math.floor(m / 10080)}w ago`
+}
 
 const aka = (n: GraphNode, s: string) => !!n.aliases?.some(a => a.toLowerCase().includes(s))
 
@@ -149,7 +155,12 @@ export async function loadGraph(f: typeof fetch = fetch): Promise<MemoryGraph | 
   }
 }
 
-export function demoGraph(): MemoryGraph {
+export function demoGraph(big = false): MemoryGraph {
+  const g = baseDemo()
+  return big ? padDemo(g) : g
+}
+
+function baseDemo(): MemoryGraph {
   const nodes: GraphNode[] = [
     { id: 'project:/w/Armasu', kind: 'project', label: 'Armasu' },
     { id: 'project:/w/switchboard', kind: 'project', label: 'switchboard' },
@@ -182,4 +193,44 @@ export function demoGraph(): MemoryGraph {
     ],
     health: { dangling: ['m:vision'], orphans: ['m:who'], duplicates: [], contradictions: [['m:nograph', 'm:recall']], superseded: ['m:askall'], invalid: [], stale: [], loops: [] },
   }
+}
+
+// Demo only: about 120 extra notes over 5 projects so map layouts can be judged at a real size (?big=1).
+function padDemo(g: MemoryGraph): MemoryGraph {
+  const projects = ['Armasu', 'switchboard', 'claude-mods', 'source-check', 'vault']
+  const topics = ['tokens', 'release', 'hooks', 'tests', 'layout', 'routing', 'memory', 'phone', 'auth', 'copy', 'crowd', 'stages', 'picker', 'todo', 'gates', 'graph', 'search', 'cache', 'deploy', 'design', 'usage', 'codex', 'review', 'screens']
+  const types = ['feedback', 'project', 'reference', 'user'] as const
+  // Days since each project was last touched; its notes spread up to 20 days older, a few of the first two from today.
+  const fresh = [0, 0.2, 3, 18, 40], now = Date.now(), at = (days: number) => new Date(now - days * 864e5).toISOString()
+  const nodes = g.nodes.map((n, i) => (NOTE.has(n.kind) && !n.modified ? { ...n, modified: at(1 + i * 2.5) } : n)), edges = [...g.edges]
+  const health = { ...g.health, dangling: [...g.health.dangling], orphans: [...g.health.orphans], contradictions: [...g.health.contradictions], superseded: [...g.health.superseded], stale: [...g.health.stale] }
+  for (const p of projects) if (!nodes.some(n => n.id === `project:/w/${p}`)) nodes.push({ id: `project:/w/${p}`, kind: 'project', label: p })
+  const ids: string[] = []
+  for (let i = 0; i < 120; i++) {
+    const p = projects[i % projects.length]!, t = topics[(i * 7) % topics.length]!
+    const id = `m:x${i}`, label = `${p.toLowerCase().slice(0, 6)}-${t}-${i}`
+    const wiki = i % 9 === 0, pi = i % projects.length
+    const modified = at(i < 10 && pi < 2 ? (i * 1.7 + 0.5) / 24 : i < 5 ? fresh[pi]! : fresh[pi]! + (((i * 13) % 23) / 23) * 20)
+    nodes.push(wiki
+      ? { id: `wiki:${label}.md`, kind: 'wiki', label, modified, description: `How ${t} works in ${p}`, text: `Notes on ${t} for ${p}.` }
+      : { id, kind: 'memory', type: types[i % types.length], label, modified, description: `${t} rule for ${p}`, text: `Keep ${t} simple in ${p}. See [[${p.toLowerCase().slice(0, 6)}-${topics[(i * 7 + 7) % topics.length]}-${(i + 5) % 120}]].` })
+    const nid = wiki ? `wiki:${label}.md` : id
+    ids.push(nid)
+    edges.push({ source: nid, target: `project:/w/${p}`, kind: 'in' })
+  }
+  ids.forEach((id, i) => {
+    edges.push({ source: id, target: ids[(i + 5) % ids.length]!, kind: 'link' })
+    if (i % 4 === 0) edges.push({ source: id, target: ids[(i + 17) % ids.length]!, kind: 'related' })
+    if (i % 11 === 0) edges.push({ source: id, target: ids[(i + 1) % ids.length]!, kind: 'depends-on' })
+    if (i % 23 === 0) { edges.push({ source: id, target: ids[(i + 2) % ids.length]!, kind: 'supersedes' }); health.superseded.push(ids[(i + 2) % ids.length]!) }
+    if (i % 31 === 0) { edges.push({ source: id, target: ids[(i + 40) % ids.length]!, kind: 'contradicts' }); health.contradictions.push([id, ids[(i + 40) % ids.length]!]) }
+    if (i % 29 === 7) health.stale.push(id)
+  })
+  return { nodes, edges, health }
+}
+
+/** Projects with no notes in their place (chat folders only): the map leaves them out. */
+export function bareProjects(nodes: { id: string; kind: string; label: string }[], place: Map<string, string>) {
+  const full = new Set(nodes.filter(n => n.kind !== 'project').map(n => place.get(n.id)))
+  return new Set(nodes.filter(n => n.kind === 'project' && !full.has(n.label)).map(n => n.id))
 }

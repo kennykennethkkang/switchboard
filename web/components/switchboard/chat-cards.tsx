@@ -4,6 +4,7 @@ import { useFlash } from '@/hooks/use-flash'
 import type { AiId, ArchivedChat, CacheKeep, ChatSummary, ChatProgress, ChatRow, ChatState, TaskRow, HandoffWait, NoteSearch, StuckItem, WindowInfo } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { stuckTone } from '@/lib/stuck'
+import { chatShown, isBusy } from '@/lib/chat-state'
 import { summaryView } from '@/lib/summary'
 import { cacheChip } from '@/lib/cache'
 import { byWindow, windowOf } from '@/lib/windows'
@@ -141,7 +142,7 @@ export function ChatCards({ looping = [], cards, all = [], waits = [], held = []
       {groups.map(g => {
         const color = g.window && WINDOW_VAR[g.window.color]
         const name = g.window?.name ?? 'Other'
-        const busy = g.cards.filter(c => c.progress?.state === 'working')
+        const busy = g.cards.filter(c => isBusy(chatShown(c.progress, stuck, c.chat.sessionId)))
         const left = busy.length > 1 ? projectLeft(busy.map(c => timeLeft(c.progress!, all, now))) : undefined
         return (
           <section key={g.window?.workspace ?? ''} aria-label={g.here ? `${name}, this window` : name} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
@@ -178,7 +179,7 @@ function CardList({ looping, cards, label, stripe, grouped, waits, held, links, 
         const tasks = progress?.tasks ?? [], done = tasks.filter(t => t.status === 'completed').length
         const open = tasks.length - done
         const left = progress && timeLeft(progress, all, now), leftText = left && sayLeft(left)
-        const tone = stuckTone(stuck, chat.sessionId)
+        const tone = chatShown(progress, stuck) === 'stuck' ? stuckTone(stuck, chat.sessionId) : undefined
         const warm = finished ? undefined : cacheChip(cache, chat.sessionId, now)
         const outs = chips.filter(c => c.dir === 'out'), paused = held.includes(chat.sessionId)
         const meta = [grouped ? '' : projectName(chat), finished ? '' : active, progress ? replyAge(progress.at, now) : ''].filter(Boolean).join(' · ')

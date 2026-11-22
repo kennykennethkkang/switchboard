@@ -2,13 +2,16 @@
  * When VS Code windows are known, each window gets its own island on the ring and its chats fan out from it instead. Pure, so it is tested. */
 import type { ChatProgress, HubState, WindowColor } from './hub-types'
 import { byWindow } from './windows'
+import { chatShown, type Shown } from './chat-state'
+import { liveChats } from './archive'
 import { ORDER, almostDone, missedCount } from './look'
 import type { MemoryGraph } from './memory-graph'
 import { limitTag } from './budget-ui'
+import { chatSmart } from './smart'
 import { chatRun, raiseLine, raisesFor, stageView } from './stages-ui'
 import { armoryList, gardenList, keyList, mapList, memoryTally, studyList, todoList, towerList, uploadList, uploadSummary, type Item } from './court-places'
 
-export type CourtState = 'working' | 'waiting' | 'done' | 'needs' | 'idle'
+export type CourtState = Shown
 /** x, y: top left corner in world px; the council's center sits on 0,0.
  * Yards: group is the split id its chat was started from (siblings share it, Court.ties joins them); waitsOn names the chats it waits on, for a "Waiting on X" line. The wait rope itself comes from board-fx ropesOf. */
 export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Done with this many requests Jev found not covered (look.ts almostDone). */ missed?: number; /** Problems a place flags (memory health, missing keys). */ warn?: number; /** A desk's role raised to this model (stages-ui raiseLine says why). */ model?: string; raise?: string; group?: string; /** Run indefinitely limits and check-back, one quiet line (budget-ui limitTag). */ limits?: string; waitsOn?: string[] }
@@ -41,13 +44,6 @@ const mid = (n: CourtNode): P => [n.x + n.w / 2, n.y + n.h / 2]
 const box = (id: string, kind: CourtNode['kind'], c: P, s: { w: number; h: number }, label: string): CourtNode =>
   ({ id, kind, label, x: Math.round(c[0]) - s.w / 2, y: Math.round(c[1]) - s.h / 2, w: s.w, h: s.h })
 
-function chatState(p?: ChatProgress): CourtState {
-  if (!p) return 'idle'
-  if (p.state === 'needs-you' || p.asks?.length || p.ask) return 'needs'
-  if (p.limited || p.waiting) return 'waiting'
-  return p.state
-}
-
 // Where the road from p meets n's edge, 12px out, so the petition's callout stays off n's label.
 const rimOf = (n: CourtNode, p: P): P => {
   const [cx, cy] = mid(n), dx = p[0] - cx, dy = p[1] - cy, k = Math.min((n.w / 2 + 12) / (Math.abs(dx) || 1e-9), (n.h / 2 + 12) / (Math.abs(dy) || 1e-9), 1)
@@ -72,7 +68,8 @@ const crosses = (p: P, q: P, r: P, s: P) => side(p, q, r) * side(p, q, s) < 0 &&
 /** mem: the memory graph, fetched apart from hub state; the library stands empty without it. */
 export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: MemoryGraph): Court {
   const nodes: CourtNode[] = [], links: CourtLink[] = []
-  const live = h.chats.filter(c => c.live)
+  // A chat archived a moment ago still has a row until the next scan; Chats already leaves it out.
+  const live = liveChats(h.chats, h.archive ?? []).filter(c => c.live)
   const progress = new Map(h.progress.map(p => [p.sessionId, p]))
   const byId = (id?: string) => nodes.find(n => n.id === id)
   // Centers from n up to its home, for the petition's road.
@@ -114,6 +111,12 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const n: CourtNode = { ...box(`ai:${ai}`, 'pavilion', spot(at(i), R), ISLE, h.ais.find(a => a.id === ai)?.name ?? NAMES[ai] ?? ai), ai, parent: 'council' }
     if (ai === 'jev' && h.jev.length) n.runs = h.jev.length
     if (ai === 'jev' && h.crowdAb && !h.crowdAb.ended) n.task = `Crowd A/B ${h.crowdAb.stopped ? 'stopped at ' : ''}${h.crowdAb.done}/${h.crowdAb.items}`
+    // Research holds the source checks on its answers: how many, how many finished, and the one still checking.
+    const checks = ai === 'research' ? h.sourceChecks ?? [] : []
+    if (checks.length) {
+      const running = checks.find(r => !r.done)
+      Object.assign(n, { runs: checks.length, shipped: checks.filter(r => r.done).length, task: running ? `Source check: ${running.question}` : undefined })
+    }
     pav.set(ai, n); homes.set(`ai:${ai}`, { n, a: at(i) }); nodes.push(n); link(council, n)
   })
   const busy = new Set(live.flatMap(c => progress.get(c.sessionId)?.roles.filter(r => r.state === 'active').map(r => r.role) ?? []))
@@ -140,7 +143,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
   // Courtyards per home, so a chat the home has no straight sky for can hang off a sibling yard.
   const yardsOf = new Map<string, CourtNode[]>()
   for (const c of live) {
-    const ai = c.ai ?? 'claude', from = movedFrom(h, c), key = homeKey(c), { n: home, a: angle } = homes.get(key)!, p = progress.get(c.sessionId), state = chatState(p)
+    const ai = c.ai ?? 'claude', from = movedFrom(h, c), key = homeKey(c), { n: home, a: angle } = homes.get(key)!, p = progress.get(c.sessionId), state = chatShown(p, h.stuck)
     const runs = p?.roles ?? [], tasks = p?.tasks ?? []
     const all = [...new Set(runs.map(r => r.role))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
     // engineer-codex / qa-codex desks go in the Codex realm, not the yard; a Codex chat has no Codex realm.
@@ -212,7 +215,8 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
         x: box.x + PAD + (k % COLS) * (DESK.w + DGAP), y: box.y + TOP + PAD + Math.floor(k / COLS) * (DESK.h + ROOM), w: DESK.w, h: DESK.h, ...extra }
       nodes.push(d); link(box, d); return d
     }
-    const lead = desk(0, 'lead', { state, task: leadTask, since: p?.startedAt, ask, missed })
+    const sm = chatSmart(h.smart?.picks, c.sessionId)
+    const lead = desk(0, 'lead', { state, task: leadTask, since: p?.startedAt, ask, missed, ...(sm ? { ...(sm.model ? { model: sm.model } : {}), raise: sm.line } : {}) })
     if (state === 'needs' && !petition) petition = { deskId: lead.id, path: [mid(lead), mid(yard), ...chain(hub), rimOf(council, chain(hub).at(-1)!)] }
     for (const r of realms.values()) { nodes.push(r); link(yard, r) }
     const roleDesk = (k: number, role: string, box = yard) => {
@@ -371,3 +375,15 @@ export function courtEvents(prev: Court | undefined, next: Court) {
   }
   return { meet, cheer, move }
 }
+
+/** Plain-words line under the court's jargon, so the ids and names stay as they are. */
+const PLAIN: Record<string, string> = {
+  council: 'Your role agents, and the chats they work in',
+  realm: 'One AI doing part of a chat elsewhere',
+  petition: 'A chat asking for your answer',
+  court: 'Your chats and role agents on one map',
+}
+export const plainWord = (k: string) => PLAIN[k]
+
+/** Most chat name tags the board draws at once; the rest keep their state dot until zoomed in or picked. */
+export const YARD_TAG_CAP = 6

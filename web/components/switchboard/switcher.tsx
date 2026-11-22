@@ -4,6 +4,8 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefOb
 import { rankItems, type SwitchItem } from '@/lib/switcher'
 import { ALMOST, STATE } from '@/lib/look'
 
+const STUCK = { label: 'Stuck', color: 'var(--hub-red)', soft: 'var(--hub-red-soft)' }
+
 const Marked = ({ text, hits }: { text: string; hits: number[] }) => {
   const on = new Set(hits)
   return <>{[...text].map((ch, i) => (on.has(i) ? <mark key={i}>{ch}</mark> : ch))}</>
@@ -75,7 +77,7 @@ export function Switcher({ items, tint, onPick, onClose, jarvis, filter }: {
                     {item.version > 1 && <span className="hub-chip ver" style={{ flex: 'none', marginLeft: 6 }}>v{item.version}</span>}
                   </span>
                   {item.kind === 'live'
-                    ? (s => <span className="hub-chip" style={{ color: s.color, background: s.soft }}><i aria-hidden />{item.chip ?? s.label}</span>)(item.almost ? ALMOST : STATE[item.state])
+                    ? (s => <span className="hub-chip" style={{ color: s.color, background: s.soft }}><i aria-hidden />{item.chip ?? s.label}</span>)(item.stuck ? STUCK : item.almost ? ALMOST : STATE[item.state])
                     : <span style={{ font: '400 12px/1 var(--hub-mono)', color: 'var(--hub-ash)' }}>History</span>}
                 </>}
               </li>,

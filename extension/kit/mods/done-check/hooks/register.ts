@@ -16,6 +16,14 @@ const FINISH = 'run the aar skill, print the standup (done, for you, left, risks
 // Windows paths: forward slashes, drive letter as a lowercase first segment.
 const slashes = (p: string) => p.replace(/\\/g, '/').replace(/^([a-zA-Z]):(?=\/|$)/, (_, d) => `/${d.toLowerCase()}:`)
 
+/** Whether cwd is ~/Documents/Research or inside it: those chats end on a finding, so no check or finish steps are asked of them. */
+export function inResearch(cwd: string, home: string): boolean {
+  if (!cwd || !home) return false
+  const root = `${slashes(home).replace(/\/+$/, '')}/documents/research`.toLowerCase()
+  const c = slashes(cwd).replace(/\/+$/, '').toLowerCase()
+  return c === root || c.startsWith(`${root}/`)
+}
+
 /** Normalised absolute path, or undefined when it has a shell variable or no cwd to resolve against. */
 function resolvePath(raw: string, cwd: string): string | undefined {
   let p = slashes(raw.replace(/^["']|["']$/g, ''))
@@ -152,18 +160,18 @@ export function lastTurn(tail: string, cwd = ''): Turn {
 }
 
 /** Whether to hold the stop, and what is missing either way. */
-export function judge(t: Turn, last: string, tasks: Task[], main = true) {
+export function judge(t: Turn, last: string, tasks: Task[], main = true, research = false) {
   const missing: string[] = []
   const open = tasks.filter(x => x.status !== 'completed' && x.status !== 'deleted')
   if (open.length) missing.push(`open tasks: ${open.map(x => x.subject).join('; ')}`)
-  if (t.edited && t.lastEdit > t.lastCheck) missing.push('files were edited after the last test, lint or typecheck run')
+  if (!research && t.edited && t.lastEdit > t.lastCheck) missing.push('files were edited after the last test, lint or typecheck run')
   if (t.edited && t.lastCheck >= 0 && t.checkFailed && CLAIM.test(last)) missing.push('the message claims success but the last check failed')
   const question = /\?\s*$/.test(last.trim()) && !APPROVAL.test(last)
   // No ask tool in the session (it never loads): the closing question asked as text counts.
   // ponytail: the tool list sits outside the tail, so text alone counts; check it if chats start skipping the tool.
   const waiting = t.asked || last.includes(CLOSING) || t.bg === true || t.held === true || question || LIMIT.test(last) || HANDOFF.test(last)
   // Edited, checked, but never asked the closing question: hold once for the finish steps.
-  const unclosed = main && t.edited && !waiting && missing.length === 0
+  const unclosed = main && !research && t.edited && !waiting && missing.length === 0
   const reason = missing.length ? `${missing.join('. ')}. Finish it and run the checks, or say what is blocking.` : `${FINISH}.`
   return { block: t.edited && !waiting && (missing.length > 0 || unclosed), verified: missing.length === 0, waiting, missing, reason }
 }
@@ -237,7 +245,8 @@ async function tail($: EngineInterface, path: string) {
 type Status = { session: string; agent?: string; verified: boolean; state: string; missing: string[]; edited: boolean; blocks: number; at: number }
 async function verdict($: EngineInterface, transcript: string, owner: string, last: string, cwd = '', main = true) {
   const t = lastTurn(await tail($, transcript), cwd)
-  return { t, v: judge(t, last, [...(await taskList($, owner)).mine.values()], main) }
+  const home = (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? ''
+  return { t, v: judge(t, last, [...(await taskList($, owner)).mine.values()], main, inResearch(cwd, home)) }
 }
 
 async function writeStatus($: EngineInterface, s: Status) {

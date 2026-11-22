@@ -16,6 +16,7 @@ import { withSkipShell } from './hub/controls'
 import { orphanTab } from './orphan-tab'
 import { hub } from './hub/hub-service'
 import { SliceUploads, chatLabel } from './hub/uploads'
+import { setResearchOpener } from './hub/research-window'
 import { readGraph } from './hub/graph'
 import { readRuns } from './hub/runs'
 import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './hub/flowmap'
@@ -67,6 +68,15 @@ export async function activate(context: vscode.ExtensionContext) {
   // The hub and the Activity Bar view first: a click on the Switchboard icon resolves the view at once,
   // without waiting for the session runtimes below to start.
   startHub(context)
+  setResearchOpener(async (id, question) => {
+    const panel = await VisualizerPanel.research(context.extensionUri, id, `Research: ${hub.get().chats.find(c => c.sessionId === id)?.name ?? id.slice(0, 8)}`)
+    wirePanel(panel)
+    // The replay carries no messages, so the question comes after it; wirePanel's ready handler runs first.
+    if (question) panel.onCommand(m => {
+      if (m.type === 'ready') panel.postMessage({ type: 'agent-event', event: { time: 0, type: 'message', sessionId: id, payload: { agent: 'orchestrator', role: 'user', content: question } } })
+    })
+    return panel
+  })
   startSelfUpdate(context, kitDir())
   watchCloseForMove(context)
 

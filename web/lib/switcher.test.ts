@@ -85,3 +85,8 @@ test('switcherItems: done chats read Ready for your OK, as on Now', () => {
   const items = switcherItems([c('d', 'done'), c('w', 'working')], [])
   assert.deepEqual(items.map(i => i.kind === 'live' && i.chip), ['Ready for your OK', undefined])
 })
+
+test('defaultCommands: Simple view leaves out the pages it hides', () => {
+  const ids = defaultCommands({ cards: [], repoChanges: false, vscode: false, simple: true }).filter(c => c.group === 'Go to').map(c => c.id)
+  assert.deepEqual(ids, ['go:now', 'go:chats', 'go:plan', 'go:settings'])
+})

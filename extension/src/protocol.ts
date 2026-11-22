@@ -109,6 +109,8 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-mirofish-open'; simId?: string }
   | { type: 'hub-mirofish-report'; simId: string }
   | { type: 'hub-live-dismiss'; kind: 'mirofish' | 'crowd'; id: string }
+  /** Kenneth turned down the Research mode offer for this chat. */
+  | { type: 'hub-research-dismiss'; sessionId: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
@@ -117,12 +119,16 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   /** Advanced mode on or off for one project (an absolute path from the project list). */
   | { type: 'hub-advanced'; path: string; on: boolean }
+  /** Coder view on (every page and control) or off (the Simple view); global, kept in globalState and company.json. */
+  | { type: 'hub-coder-view'; on: boolean }
+  /** Hides or brings back the first-run checklist card. */
+  | { type: 'hub-first-run'; dismissed: boolean }
   /** Looks good or Redo on one stage of an Advanced mode run (a folder under <path>/.switchboard/stages). */
   | { type: 'hub-stage'; path: string; run: string; n: number; status: 'done' | 'redo' }
   /** Clears a smart model switch escalation: its model-learn.json rows go. */
@@ -235,7 +241,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-todo-dismiss'; path: string; id: string }
   | { type: 'hub-todo-move'; path: string; ids: string[] }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
-  | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string }
+  | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
   | { type: 'hub-todo-pilot'; path: string; on?: boolean; paused?: boolean }
   | { type: 'hub-todo-replace'; path: string; remote: string }
@@ -323,6 +329,8 @@ export interface PendingToolCall {
   name: string
   args: string
   filePath?: string
+  /** WebFetch only: the end event carries it so parallel fetches close the right source. */
+  url?: string
   startTime: number
 }
 

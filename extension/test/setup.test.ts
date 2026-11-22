@@ -59,7 +59,7 @@ describe('setup steps', () => {
     const r = runs({
       plugins: [...KIT.plugins, ...KIT.mods.map(m => `${m}@kenneth-mods`)],
       marketplaces: [...Object.keys(KIT.marketplaces), 'kenneth-mods'],
-      mcps: [...KIT.mcps.map(m => m.name), 'switchboard', 'scrapling'],
+      mcps: [...KIT.mcps.map(m => m.name), 'switchboard', 'context7', 'scrapling'],
       key21st: true,
     }).join('\n')
     assert.doesNotMatch(r, /claude plugin (install|marketplace add)|claude mcp add/)
@@ -122,6 +122,19 @@ describe('setup steps', () => {
     assert.deepEqual(steps({ codex: { ...fresh.codex, mcps: ['switchboard'] } }).filter(s => s.run?.[0] === 'codex' && s.run.includes('switchboard')), [])
   })
 
+  it('gives Codex context7 over stdio, since its http plugin entry needs a login', () => {
+    const c = steps().find(s => s.label === 'context7 (Codex)')
+    assert.deepEqual(c?.run, ['codex', 'mcp', 'add', 'context7', '--', 'npx', '-y', '@upstash/context7-mcp'])
+    assert.ok(!steps({ codex: { ...fresh.codex, mcps: ['context7'] } }).some(s => s.label === 'context7 (Codex)'))
+  })
+
+  it('ships the Claude plugins Codex can run: code-simplifier, auth0, aws-core, bland, i-have-adhd, marketing-skills', () => {
+    for (const id of ['code-simplifier@claude-plugins-official', 'auth0@claude-plugins-official', 'aws-core@claude-plugins-official', 'bland@bland', 'i-have-adhd@i-have-adhd', 'marketing-skills@marketingskills']) {
+      assert.ok(KIT.plugins.includes(id), id)
+      assert.ok(KIT.marketplaces[id.split('@')[1]], id)
+    }
+  })
+
   it('reads whether the Codex switchboard entry has --codex', () => {
     const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cx-')), 'config.toml')
     const read = (t: string) => { fs.writeFileSync(f, t); return codexState(f) }
@@ -148,7 +161,7 @@ describe('setup steps', () => {
     assert.ok(steps().some(s => s.say?.includes('codex mcp login slack')))
     assert.deepEqual(cx.find(s => s.run!.includes('switchboard')), { label: 'Ask tool (Codex)', needs: ['codex'], ifExists: ASK, run: ['codex', 'mcp', 'add', 'switchboard', '--', 'node', ASK, '--codex'] })
     for (const s of cx) assert.ok(s.needs?.includes('codex'), s.label)
-    const all = { plugins: KIT.plugins, marketplaces: Object.keys(KIT.marketplaces), mcps: [...KIT.mcps.map(m => m.name), 'switchboard', ...(KIT.tools ?? []).flatMap(t => t.mcp ? [t.mcp.name] : [])] }
+    const all = { plugins: KIT.plugins, marketplaces: Object.keys(KIT.marketplaces), mcps: [...KIT.mcps.map(m => m.name), 'switchboard', 'context7', ...(KIT.tools ?? []).flatMap(t => t.mcp ? [t.mcp.name] : [])] }
     assert.deepEqual(steps({ codex: all }).filter(s => s.run?.[0] === 'codex'), [])
   })
 

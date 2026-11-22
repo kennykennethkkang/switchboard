@@ -565,3 +565,24 @@ test('yards carry group and waitsOn; one tie per group sibling', () => {
   assert.deepEqual(c.ties.map(t => [t.from, t.to, t.group]), [['yard:a', 'yard:b', 'g-1'], ['yard:b', 'yard:c', 'g-1']])
   for (const t of c.ties) assert.deepEqual(t.points, [[yard(t.from.slice(5)).x + yard(t.from.slice(5)).w / 2, yard(t.from.slice(5)).y + yard(t.from.slice(5)).h / 2], [yard(t.to.slice(5)).x + yard(t.to.slice(5)).w / 2, yard(t.to.slice(5)).y + yard(t.to.slice(5)).h / 2]])
 })
+
+test('a chat archived a moment ago gets no yard, so the map counts what Chats counts', () => {
+  const archive = [{ sessionId: 'b', origin: 'b', version: 1, archivedAt: NOW, name: 'b', cwd: '/x' }] as unknown as HubState['archive']
+  const c = buildCourt(hub({ chats: [chat('a'), chat('b')], archive }))
+  assert.deepEqual(c.nodes.filter(n => n.kind === 'courtyard').map(n => n.chatId), ['a'])
+})
+
+test('the Research island counts source checks and names the one still running', () => {
+  const src = (id: string, done: boolean) => ({ id, question: `q ${id}`, at: NOW, done, sources: [] })
+  const c = buildCourt(hub({ sourceChecks: [src('a', true), src('b', false)] }))
+  const r = c.nodes.find(n => n.id === 'ai:research')!
+  assert.deepEqual([r.runs, r.shipped, r.task], [2, 1, 'Source check: q b'])
+})
+
+test('plainWord explains the court jargon and nothing else', async () => {
+  const { plainWord, YARD_TAG_CAP } = await import('./court-map')
+  assert.match(plainWord('council')!, /role agents/)
+  assert.ok(plainWord('realm') && plainWord('petition'))
+  assert.equal(plainWord('desk'), undefined)
+  assert.ok(YARD_TAG_CAP >= 4)
+})

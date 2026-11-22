@@ -74,3 +74,5 @@ Kit skills that ship in claude-mods/kit/skills and are copied with their LICENSE
 - image-to-code-skill is by Leonxlnx, MIT License, Copyright (c) 2026 Leonxlnx.
 - extract-design-md, extract-static-html and taste-design are from stitch-skills (https://github.com/google-labs-code/stitch-skills) by Google, Apache License 2.0; the first two are modified.
 - web-design-guidelines names Vercel as its author; claude-x-jev and jev-setup-project name Charles J Dove (Jev, TypeSafe). skill-inspector runs NVIDIA SkillSpector, which is not bundled.
+
+The Screen tab bundles xterm.js (@xterm/headless), https://github.com/xtermjs/xterm.js, MIT License. Copyright (c) 2017-2019, The xterm.js authors; Copyright (c) 2014-2016, SourceLair Private Company; Copyright (c) 2012-2013, Christopher Jeffrey.

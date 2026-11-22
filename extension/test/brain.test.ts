@@ -143,6 +143,13 @@ describe('quickAskArgs', () => {
     assert.ok(args.includes('--no-session-persistence'))
     assert.deepEqual(JSON.parse(args[args.indexOf('--settings') + 1]), { disableAllHooks: true })
     assert.equal(args.at(-1), 'hi')
+    assert.equal(args[args.indexOf('--model') + 1], 'haiku')
+  })
+
+  it('takes the model as a second argument and keeps the prompt last', () => {
+    const args = quickAskArgs('hi', 'sonnet')
+    assert.equal(args[args.indexOf('--model') + 1], 'sonnet')
+    assert.equal(args.at(-1), 'hi')
   })
 })
 

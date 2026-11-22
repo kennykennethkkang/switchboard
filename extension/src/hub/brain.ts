@@ -218,12 +218,12 @@ export function askContext(state: HubState, cwd: string, gone: Server[], now = D
 
 /** A throwaway call: no transcript saved, and no hooks, so it never shows up as a chat in Switchboard. */
 // No plugins, MCP servers, tools or default system prompt: a quick ask took 17 s with them.
-export const quickAskArgs = (prompt: string) => ['-p', '--no-session-persistence', '--settings', JSON.stringify({ disableAllHooks: true }), '--setting-sources', '', '--strict-mcp-config', '--disable-slash-commands', '--tools', '', '--system-prompt', 'Answer exactly as the prompt asks.', '--model', 'haiku', prompt]
+export const quickAskArgs = (prompt: string, model = 'haiku') => ['-p', '--no-session-persistence', '--settings', JSON.stringify({ disableAllHooks: true }), '--setting-sources', '', '--strict-mcp-config', '--disable-slash-commands', '--tools', '', '--system-prompt', 'Answer exactly as the prompt asks.', '--model', model, prompt]
 
-/** One quick answer from Claude Code's Haiku on the subscription; rejects on error. */
-export function quickAsk(prompt: string, timeoutMs = ASK_TIMEOUT_MS): Promise<string> {
+/** One quick answer from Claude Code on the subscription, Haiku unless model says otherwise; rejects on error. */
+export function quickAsk(prompt: string, timeoutMs = ASK_TIMEOUT_MS, model = 'haiku'): Promise<string> {
   // CLAUDE_CODE_CHILD_SESSION keeps this throwaway call out of the chat list and /resume.
-  return new Promise((resolve, reject) => execFile(claudeBinary(), quickAskArgs(prompt), { timeout: timeoutMs, maxBuffer: 1 << 20, env: { ...process.env, CLAUDE_CODE_CHILD_SESSION: '1' } },
+  return new Promise((resolve, reject) => execFile(claudeBinary(), quickAskArgs(prompt, model), { timeout: timeoutMs, maxBuffer: 1 << 20, env: { ...process.env, CLAUDE_CODE_CHILD_SESSION: '1' } },
     (err, stdout) => (err ? reject(err) : resolve(stdout.trim()))))
 }
 

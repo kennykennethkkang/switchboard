@@ -62,6 +62,8 @@
 .cp-say { font: inherit; padding: 4px 2px; border: 0; background: transparent; color: var(--hub-ink); resize: vertical; outline: none; min-height: 44px; }
 .cp-say::placeholder { color: var(--hub-ash); }
 .cp-tools { position: relative; display: inline-flex; flex: none; }
+.cp-picks { display: flex; gap: 12px; align-items: center; flex: none; }
+.cp-effort { display: inline-flex; gap: 6px; align-items: center; font: 500 13px/1 var(--hub-sans); color: var(--hub-body); }
 .cp-pop {
   position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; width: min(460px, calc(100vw - 32px)); max-height: min(70vh, 560px); overflow: auto; overscroll-behavior: contain;
   padding: 14px; display: grid; gap: 14px; background: var(--hub-card); border: 1px solid var(--hub-hair-strong); border-radius: 12px; box-shadow: var(--hub-shadow-pop);

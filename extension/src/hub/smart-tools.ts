@@ -28,6 +28,7 @@ const RULES: Array<[RegExp, string, string[]]> = [
   [/\b(aws|lambda|s3|ec2|cloudformation|cdk|bedrock|dynamodb|cloudwatch|aws amplify)\b/i, 'AWS words', ['aws-core']],
   [/\b(bland|voice agents?|phone calls?|bland pathways?|conversational pathways?)\b/i, 'Bland words', ['bland']],
   [/\b(seo|marketing|copywriting|ad copy|ad creative|pricing page|cold email|email sequence|launch post|conversion rate|growth (hacking|marketing|loops?)|competitor (analysis|profiling|research)|onboarding emails?)\b/i, 'marketing words', ['marketing-skills']],
+  [/\b(pricing strategy|pitch deck|fundrais(e|ing)|go-to-market|gtm plan|mvp scope|validate (the|my|an?) idea|investor update|unit economics|user personas?)\b/i, 'founder words', ['founder']],
   [/\b(playwright|e2e|end-to-end)\b/i, 'browser test words', ['e2e-testing', 'playwright']],
   [/\b(charts?|graphs?|plots?|dataviz)\b/i, 'chart words', ['dataviz']],
   [/\bjev\b/i, 'Jev words', ['claude-x-jev']],

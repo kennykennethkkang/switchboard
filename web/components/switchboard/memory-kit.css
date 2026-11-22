@@ -1,0 +1,23 @@
+/* Shared by the memory map and notebook. Follows the system theme. */
+.mem.mk { color-scheme: light dark; }
+.mem.mk[open] { display: block; }
+:where(.mk) button { font: inherit; color: inherit; cursor: pointer; }
+:where(.mk) :is(h1, h2, h3, h4, p) { margin: 0; }
+.mk-dot { display: inline-block; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
+.mk-flags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.mk-flag { padding: 2px 6px; border-radius: 4px; font: 500 11px/1.3 var(--hub-sans); letter-spacing: 0.2px; white-space: nowrap; background: var(--hub-yellow-soft); color: var(--hub-yellow); }
+.mk-flag[data-bad] { background: var(--hub-red-soft); color: var(--hub-red); }
+.mk-text { white-space: pre-wrap; overflow-wrap: anywhere; font: 400 15px/1.7 var(--hub-sans); color: var(--hub-body); }
+.mk-wl { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; margin: 0 1px; border-radius: 6px; border: 1px solid var(--hub-hair); background: var(--hub-elev); font: 500 13px/1.6 var(--hub-sans); color: var(--hub-ink); vertical-align: baseline; }
+.mk-wl[data-broken] { border-style: dashed; border-color: var(--hub-red); background: none; color: var(--hub-red); text-decoration: line-through; cursor: help; }
+.mk-find { position: relative; }
+.mk-find > svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--hub-ash); pointer-events: none; }
+.mk-find input { width: 100%; box-sizing: border-box; font: 400 14px/1.2 var(--hub-sans); padding: 9px 10px 9px 32px; border-radius: 8px; border: 1px solid var(--hub-hair); background: var(--hub-canvas); color: var(--hub-ink); }
+.mk-find input::placeholder { color: var(--hub-ash); }
+.mk button:focus-visible, .mk-find input:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 1px; }
+.mk-label { font: 500 12px/1.5 var(--hub-sans); letter-spacing: 0.2px; color: var(--hub-mute); }
+@media (pointer: coarse) {
+  .mk-find input { font-size: 16px; min-height: 44px; }
+  .mk-wl { min-height: 32px; }
+}
+@media (hover: hover) and (pointer: fine) { button.mk-wl:hover { border-color: var(--hub-hair-strong); } }

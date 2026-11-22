@@ -44,6 +44,7 @@ import { stopChatServers } from './hub/reap'
 import type { ChatProgress, ChatState } from './hub/types'
 import { wireWatcherToPanel } from './session-runtime'
 import { smartHook } from './hub/smart-tools'
+import { researchHook } from './hub/research-window'
 import type { AgentRuntime } from './session-runtime'
 
 const log = createLogger('ClaudeRuntime')
@@ -123,6 +124,7 @@ export async function startClaudeRuntime(
       const change = hub.hook(payload, Date.now(), mirror)
       if (!mirror) smartHook(hub, payload).catch(err => log.warn('Smart toggle failed:', err))
       if (!mirror) smartSwitch(payload).catch(err => log.warn('Smart switch failed:', err))
+      if (!mirror) researchHook(payload)
       // Every window, mirror or not: each fills the Source Control boxes of the repos it has open.
       fillBoxes(hub.get().progress.find(p => p.sessionId === payload.session_id))
       if (!change) return

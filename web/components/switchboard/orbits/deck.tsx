@@ -61,12 +61,12 @@ export function Deck(v: ViewProps) {
   }
 
   const leadSum = chat.state === 'needs-you' ? p?.question ?? 'Waiting on you' : chat.state === 'done' ? (p?.commit ? 'Finished. Commit message ready.' : 'Finished.') : cur ?? leadLine(chat, almost, active)
-  const leadChip = { working: 'Working', needs: 'Needs you', done: 'Ready for your OK', almost: 'Ready for your OK', idle: chat.wait ? 'Waiting' : 'Idle' }[ls]
+  const leadChip = { working: 'Working', stuck: 'Stuck', needs: 'Needs you', done: 'Ready for your OK', almost: 'Ready for your OK', idle: chat.wait ? 'Waiting' : 'Idle' }[ls]
   return (
     <div ref={root} className="ov-stage ov-deck" aria-label="The chat as role cards">
       <p className="ov-you"><Glyph k="you" size={15} /><span><b>You</b>{p?.asked?.length ? <> · {p.asked.at(-1)}</> : null}</span><span>{chat.state === 'needs-you' ? 'waiting on you' : chat.ago}</span></p>
       {card('lead', ls, 'Lead', chat.live?.model, leadSum, leadChip, chat.state !== 'idle', <>
-        {chat.state === 'needs-you' ? <p className="ov-note" data-tone="needs">{p?.question ?? 'This chat is waiting on you.'} Answer below.</p>
+        {chat.state === 'needs-you' ? <p className="ov-note" data-tone="needs">{p?.question ? 'Answer it below.' : 'This chat is waiting on you. Answer below.'}</p>
           : chat.state === 'done' ? <p className="ov-note" data-tone={almost ? 'almost' : 'done'}>{p?.commit ? <CommitText text={p.commit} max={180} /> : 'No commit message.'}</p>
           : cur && cur !== leadSum ? <p className="ov-task">{cur}</p> : null}
         {tokens && cap ? <div className="ov-ctx"><span>context</span><span className="ov-meter"><i style={{ transform: `scaleX(${Math.min(1, tokens / cap)})` }} /></span><span>{Math.round(Math.min(1, tokens / cap) * 100)}%</span></div> : null}
