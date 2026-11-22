@@ -2,17 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "4ce7729b",
-   "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
-   "at": 1795334939758,
-   "chat": "23614cc0-44ed-42c8-b4db-a5960dac2732",
-   "host": "62903adf5e340f87",
-   "from": "20ef3da4-2f86-49ed-ac19-0534389e541b",
-   "name": "Revamp chat and live view",
-   "short": "Release the agent drawer, Outputs and Live page redesign...",
-   "run": 85
-  },
-  {
    "id": "b65599b1-ok",
    "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
    "at": 1795334906268,
@@ -468,20 +457,31 @@
   "75d0a20a": 1795334900821,
   "b65599b1": 1795334906268,
   "75d0a20a-ok": 1795335062952,
-  "4e2d2dfd": 1795335089706
+  "4e2d2dfd": 1795335089706,
+  "4ce7729b": 1795336112826
  },
  "seq": 85,
  "streak": 79,
  "ticked": [
   {
+   "id": "4ce7729b",
+   "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
+   "from": "20ef3da4-2f86-49ed-ac19-0534389e541b",
+   "name": "Revamp chat and live view",
+   "short": "Release the agent drawer, Outputs and Live page redesign...",
+   "run": 85,
+   "at": 1795336112826,
+   "by": "23614cc0-44ed-42c8-b4db-a5960dac2732"
+  },
+  {
    "id": "4e2d2dfd",
    "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
+   "at": 1795335089706,
+   "by": "5810b0ed-ea50-476b-b617-d0a04c8dd3f2",
    "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
    "name": "Terminal Chat Panel Overlay",
    "short": "Release the Research window (worktree...",
-   "run": 84,
-   "at": 1795335089706,
-   "by": "5810b0ed-ea50-476b-b617-d0a04c8dd3f2"
+   "run": 84
   },
   {
    "id": "75d0a20a-ok",
@@ -561,16 +561,6 @@
    "at": 1795112957985,
    "by": "b55b7d65-5c36-419b-8e35-02d8207cdc15",
    "run": 73,
-   "auto": true
-  },
-  {
-   "id": "9f7afcbc",
-   "text": "3D memory view (?mem=3d): note labels crowd at first load, the phone sheet covers about 55% of the screen and shrinks the graph, tap-to-select after zoom not confirmed (final-approval run 2026-11-19, items 7 to 9)",
-   "at": 1795094892067,
-   "by": "bf58898c-01e7-474e-9c36-9de6816bb222",
-   "from": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
-   "name": "Switchboard Video Method Review",
-   "run": 72,
    "auto": true
   }
  ]
