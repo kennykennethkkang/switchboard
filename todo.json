@@ -5,11 +5,11 @@
    "id": "4e97ce73",
    "text": "Release the Split asks fix (worktree fix-smart-separating-chat-component-2cf1: numbered-piece split, 20 s deadline, wider pre-check) once it is merged back into main; add its CHANGELOG line from .switchboard/changes/2026-11-22-fix-smart-split-asks.md",
    "at": 1795338837099,
+   "chat": "6e3f19d7-5a20-4e20-b9b7-6b2b2e1e0491",
+   "host": "62903adf5e340f87",
    "from": "9cbcc6e0-a86a-43ff-b4f7-1a87cb8f55d1",
    "name": "Fix Smart Separating Chat Component",
    "short": "Release the Split asks fix (worktree...",
-   "chat": "6e3f19d7-5a20-4e20-b9b7-6b2b2e1e0491",
-   "host": "62903adf5e340f87",
    "run": 89,
    "auto": true
   },
@@ -20,6 +20,14 @@
    "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
    "name": "Switchboard Research Tracker Fix",
    "short": "Release the Research tracker change after worktree..."
+  },
+  {
+   "id": "bb97b9f9",
+   "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
+   "at": 1795339819493,
+   "from": "6891b582-4731-4af2-a672-91e4ab56d268",
+   "name": "Auto merge all worktrees",
+   "short": "Release Merge all worktrees:"
   }
  ],
  "removed": {
