@@ -26,11 +26,15 @@
   {
    "id": "75d0a20a-ok",
    "text": "Add this to switchboard https://www.instagram.com/reel/DdbumwFqc-c/?lqvp=NTc4MTIwNjQ2YQ== .",
-   "at": 1795334900821,
+   "at": 1795334912551,
    "from": "ff6bb0e2-d8d9-4bf1-a9c1-36d7cc557cc3",
    "name": "Add Instagram reel link",
    "why": "missed",
-   "short": "Add this to switchboard..."
+   "short": "Add this to switchboard...",
+   "chat": "e80e0cb6-e6fe-4d16-9637-74c4966ff66e",
+   "host": "62903adf5e340f87",
+   "run": 83,
+   "auto": true
   },
   {
    "id": "b65599b1-ok",
@@ -488,7 +492,7 @@
   "75d0a20a": 1795334900821,
   "b65599b1": 1795334906268
  },
- "seq": 82,
+ "seq": 83,
  "streak": 79,
  "ticked": [
   {
