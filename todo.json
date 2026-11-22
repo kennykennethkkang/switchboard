@@ -4,10 +4,14 @@
   {
    "id": "bb97b9f9",
    "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
-   "at": 1795339819493,
+   "at": 1795340626731,
    "from": "6891b582-4731-4af2-a672-91e4ab56d268",
    "name": "Auto merge all worktrees",
-   "short": "Release Merge all worktrees:"
+   "short": "Release Merge all worktrees:",
+   "chat": "fee82622-5d10-4d12-885d-25fa1a533d8f",
+   "host": "62903adf5e340f87",
+   "run": 91,
+   "auto": true
   }
  ],
  "removed": {
@@ -467,30 +471,19 @@
   "f64b0363": 1795340585184,
   "a8cd1ef4": 1795340613624
  },
- "seq": 90,
+ "seq": 91,
  "streak": 88,
- "suggested": [
-  {
-   "id": "7ba2f3ce",
-   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
-   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
-   "name": "Fix maps memory item styling",
-   "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
-  }
- ],
  "ticked": [
   {
    "id": "a8cd1ef4",
    "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
+   "at": 1795340613624,
+   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
    "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
    "name": "Switchboard Research Tracker Fix",
    "short": "Release the Research tracker change after worktree...",
    "run": 90,
-   "auto": true,
-   "at": 1795340613624,
-   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a"
+   "auto": true
   },
   {
    "id": "f64b0363",
@@ -591,6 +584,17 @@
    "short": "Fix the top nav scrolling sideways at 380px:",
    "run": 82,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
   }
  ]
 }
