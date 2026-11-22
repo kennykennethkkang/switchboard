@@ -11,6 +11,14 @@
    "run": 93,
    "auto": true,
    "stopped": true
+  },
+  {
+   "id": "ac02306d",
+   "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\".",
+   "at": 1795384928542,
+   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
+   "name": "Instagram reel rule implementation",
+   "short": "Fix: installing a Switchboard release reloads every..."
   }
  ],
  "removed": {
