@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "4e97ce73",
-   "text": "Release the Split asks fix (worktree fix-smart-separating-chat-component-2cf1: numbered-piece split, 20 s deadline, wider pre-check) once it is merged back into main; add its CHANGELOG line from .switchboard/changes/2026-11-22-fix-smart-split-asks.md",
-   "at": 1795338837099,
-   "chat": "6e3f19d7-5a20-4e20-b9b7-6b2b2e1e0491",
-   "host": "62903adf5e340f87",
-   "from": "9cbcc6e0-a86a-43ff-b4f7-1a87cb8f55d1",
-   "name": "Fix Smart Separating Chat Component",
-   "short": "Release the Split asks fix (worktree...",
-   "run": 89,
-   "auto": true
-  },
-  {
    "id": "a8cd1ef4",
    "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
    "at": 1795338724824,
@@ -480,11 +468,52 @@
   "4ce7729b": 1795336112826,
   "b65599b1-ok": 1795336247300,
   "5b0183ae": 1795338294658,
-  "e854a12e": 1795338827062
+  "e854a12e": 1795338827062,
+  "4e97ce73": 1795340456750
  },
  "seq": 89,
  "streak": 88,
+ "suggested": [
+  {
+   "id": "069c9329",
+   "text": "Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that",
+   "at": 1795337682975,
+   "from": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
+   "name": "To-do 86: Fix worktrees and merge",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
+  },
+  {
+   "id": "a9213073",
+   "text": "Switchboard to-do, in this order: 1. Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the",
+   "at": 1795338403435,
+   "from": "ff50e275-6af8-47f5-993e-68c0911c9108",
+   "name": "To-do 87: Release Research-as-a-tab change",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
+  },
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "4e97ce73",
+   "text": "Release the Split asks fix (worktree fix-smart-separating-chat-component-2cf1: numbered-piece split, 20 s deadline, wider pre-check) once it is merged back into main; add its CHANGELOG line from .switchboard/changes/2026-11-22-fix-smart-split-asks.md",
+   "from": "9cbcc6e0-a86a-43ff-b4f7-1a87cb8f55d1",
+   "name": "Fix Smart Separating Chat Component",
+   "short": "Release the Split asks fix (worktree...",
+   "run": 89,
+   "auto": true,
+   "at": 1795340456750,
+   "by": "6e3f19d7-5a20-4e20-b9b7-6b2b2e1e0491"
+  },
   {
    "id": "e854a12e",
    "text": "Release the memory note panel fix (worktree fix-maps-memory-item-styling-b3c8: Markdown in notes, scroll reset, sticky close) after Merge back: bump, package, install",
@@ -577,46 +606,6 @@
    "at": 1795254645935,
    "by": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0",
    "run": 77
-  },
-  {
-   "id": "a4a28743",
-   "text": "Mutation testing as an optional qa step for repos with real suites (kem_glitch \"do you mutate tests\"): add a line to claude-mods/kit/agents/qa.md naming Stryker for JS/TS, only when the diff adds tests",
-   "at": 1795213945502,
-   "by": "9ef4c958-fbae-4aa9-8e16-116266a277e2",
-   "from": "9df0ea3d-a580-4b88-8f35-c15c661ca66e",
-   "name": "Switchboard App Improvement Research",
-   "short": "Mutation testing as an optional qa step for repos with...",
-   "run": 76,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "069c9329",
-   "text": "Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that",
-   "at": 1795337682975,
-   "from": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
-   "name": "To-do 86: Fix worktrees and merge",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:"
-  },
-  {
-   "id": "a9213073",
-   "text": "Switchboard to-do, in this order: 1. Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the",
-   "at": 1795338403435,
-   "from": "ff50e275-6af8-47f5-993e-68c0911c9108",
-   "name": "To-do 87: Release Research-as-a-tab change",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:"
-  },
-  {
-   "id": "7ba2f3ce",
-   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
-   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
-   "name": "Fix maps memory item styling",
-   "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
   }
  ]
 }
