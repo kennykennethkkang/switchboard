@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "5b0183ae",
-   "text": "Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the chat instead of a floating always-on-top window\", package, install",
-   "at": 1795338190665,
-   "from": "2aadb982-f067-4b28-b7f8-63780eacd8e1",
-   "name": "Research Panel VS Code Tab",
-   "short": "Release the Research-as-a-tab change after worktree...",
-   "chat": "ff50e275-6af8-47f5-993e-68c0911c9108",
-   "host": "62903adf5e340f87",
-   "run": 87,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -462,10 +449,33 @@
   "75d0a20a-ok": 1795335062952,
   "4e2d2dfd": 1795335089706,
   "4ce7729b": 1795336112826,
-  "b65599b1-ok": 1795336247300
+  "b65599b1-ok": 1795336247300,
+  "5b0183ae": 1795338294658
  },
  "seq": 87,
+ "suggested": [
+  {
+   "id": "069c9329",
+   "text": "Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that",
+   "at": 1795337682975,
+   "from": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
+   "name": "To-do 86: Fix worktrees and merge",
+   "why": "missed",
+   "short": "Switchboard to-do, in this order:"
+  }
+ ],
  "ticked": [
+  {
+   "id": "5b0183ae",
+   "text": "Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the chat instead of a floating always-on-top window\", package, install",
+   "from": "2aadb982-f067-4b28-b7f8-63780eacd8e1",
+   "name": "Research Panel VS Code Tab",
+   "short": "Release the Research-as-a-tab change after worktree...",
+   "run": 87,
+   "auto": true,
+   "at": 1795338294658,
+   "by": "ff50e275-6af8-47f5-993e-68c0911c9108"
+  },
   {
    "id": "b65599b1-ok",
    "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
@@ -558,29 +568,6 @@
    "short": "Auto pick runtime escalation (kem_glitch Task Router idea):",
    "run": 75,
    "auto": true
-  },
-  {
-   "id": "a680b391",
-   "text": "Proposed fix (needs Kenneth's OK): in Switchboard extension/src/hub/sweep.ts fixBrief, replace \"ask them to press Approve in Switchboard, Settings, Installed, if they agree\" with \"then open the Approve modal for them with the switchboard ask server (POST /hub/command {type:'hub-sweep-approve', name}) so they only click Yes\". Reason: review chats sat idle looking broken on 2026-11-18.",
-   "at": 1795113248728,
-   "by": "065e9dda-c87e-4ce8-86ea-f4ab91ce9be6",
-   "from": "1374c031-9409-4e1e-97b5-067381a550fd",
-   "name": "Fix Zellizard chat approvals",
-   "run": 69,
-   "auto": true,
-   "stopped": true
   }
- ],
- "suggested": [
-  {
-   "id": "069c9329",
-   "text": "Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that",
-   "at": 1795337682975,
-   "from": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
-   "name": "To-do 86: Fix worktrees and merge",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:"
-  }
- ],
- "streak": 87
+ ]
 }
