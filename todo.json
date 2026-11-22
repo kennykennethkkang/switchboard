@@ -4,13 +4,13 @@
   {
    "id": "4e2d2dfd",
    "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
-   "at": 1795291146812,
+   "at": 1795334919102,
    "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
    "name": "Terminal Chat Panel Overlay",
    "short": "Release the Research window (worktree...",
-   "run": 81,
-   "auto": true,
-   "stopped": true
+   "run": 84,
+   "chat": "5810b0ed-ea50-476b-b617-d0a04c8dd3f2",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "4ce7729b",
@@ -27,12 +27,12 @@
    "id": "75d0a20a-ok",
    "text": "Add this to switchboard https://www.instagram.com/reel/DdbumwFqc-c/?lqvp=NTc4MTIwNjQ2YQ== .",
    "at": 1795334912551,
+   "chat": "e80e0cb6-e6fe-4d16-9637-74c4966ff66e",
+   "host": "62903adf5e340f87",
    "from": "ff6bb0e2-d8d9-4bf1-a9c1-36d7cc557cc3",
    "name": "Add Instagram reel link",
    "why": "missed",
    "short": "Add this to switchboard...",
-   "chat": "e80e0cb6-e6fe-4d16-9637-74c4966ff66e",
-   "host": "62903adf5e340f87",
    "run": 83,
    "auto": true
   },
@@ -492,7 +492,7 @@
   "75d0a20a": 1795334900821,
   "b65599b1": 1795334906268
  },
- "seq": 83,
+ "seq": 84,
  "streak": 79,
  "ticked": [
   {
