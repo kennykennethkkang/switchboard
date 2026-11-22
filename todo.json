@@ -4,11 +4,15 @@
   {
    "id": "b65599b1-ok",
    "text": "Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok) Do prerequisites first. When you find something that must be done before an item, add it",
-   "at": 1795334906268,
+   "at": 1795336120726,
    "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
    "name": "To-do 78: Fix worktrees and merge",
    "why": "missed",
-   "short": "Switchboard to-do, in this order:"
+   "short": "Switchboard to-do, in this order:",
+   "chat": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
+   "host": "62903adf5e340f87",
+   "run": 86,
+   "auto": true
   }
  ],
  "removed": {
@@ -460,18 +464,18 @@
   "4e2d2dfd": 1795335089706,
   "4ce7729b": 1795336112826
  },
- "seq": 85,
+ "seq": 86,
  "streak": 79,
  "ticked": [
   {
    "id": "4ce7729b",
    "text": "Release the agent drawer, Outputs and Live page redesign (worktree revamp-chat-and-live-view-2408) after Merge back: bump, package and install Switchboard",
+   "at": 1795336112826,
+   "by": "23614cc0-44ed-42c8-b4db-a5960dac2732",
    "from": "20ef3da4-2f86-49ed-ac19-0534389e541b",
    "name": "Revamp chat and live view",
    "short": "Release the agent drawer, Outputs and Live page redesign...",
-   "run": 85,
-   "at": 1795336112826,
-   "by": "23614cc0-44ed-42c8-b4db-a5960dac2732"
+   "run": 85
   },
   {
    "id": "4e2d2dfd",
