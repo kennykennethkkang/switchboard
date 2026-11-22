@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "bb97b9f9",
-   "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
-   "at": 1795340626731,
-   "from": "6891b582-4731-4af2-a672-91e4ab56d268",
-   "name": "Auto merge all worktrees",
-   "short": "Release Merge all worktrees:",
-   "chat": "fee82622-5d10-4d12-885d-25fa1a533d8f",
-   "host": "62903adf5e340f87",
-   "run": 91,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -469,11 +456,33 @@
   "069c9329": 1795340466785,
   "a9213073": 1795340466785,
   "f64b0363": 1795340585184,
-  "a8cd1ef4": 1795340613624
+  "a8cd1ef4": 1795340613624,
+  "bb97b9f9": 1795349595962
  },
  "seq": 91,
- "streak": 88,
+ "suggested": [
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "bb97b9f9",
+   "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
+   "from": "6891b582-4731-4af2-a672-91e4ab56d268",
+   "name": "Auto merge all worktrees",
+   "short": "Release Merge all worktrees:",
+   "run": 91,
+   "auto": true,
+   "at": 1795349595962,
+   "by": "fee82622-5d10-4d12-885d-25fa1a533d8f"
+  },
   {
    "id": "a8cd1ef4",
    "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
@@ -573,28 +582,6 @@
    "short": "Add this to switchboard...",
    "run": 83,
    "auto": true
-  },
-  {
-   "id": "c597d914",
-   "text": "Fix the top nav scrolling sideways at 380px: two button.sb-btn.sb-toggle push scrollWidth to 473 (found by qa on the Memory page, 2026-11-21)",
-   "at": 1795295817319,
-   "by": "1687b8f4-b33e-416f-8964-64bf4dadee4f",
-   "from": "5fbba2e2-4d09-4f22-9de3-5ce3426a3f79",
-   "name": "Finish memory map UI",
-   "short": "Fix the top nav scrolling sideways at 380px:",
-   "run": 82,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "7ba2f3ce",
-   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
-   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
-   "name": "Fix maps memory item styling",
-   "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
   }
  ]
 }
