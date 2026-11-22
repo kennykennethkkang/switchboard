@@ -458,31 +458,31 @@
   "f64b0363": 1795340585184,
   "a8cd1ef4": 1795340613624,
   "bb97b9f9": 1795349595962,
-  "20c5030c": 1795354222399
+  "20c5030c": 1795354222399,
+  "7ba2f3ce": 1795377231763
  },
  "seq": 92,
- "suggested": [
+ "ticked": [
   {
    "id": "7ba2f3ce",
    "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
    "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
    "name": "Fix maps memory item styling",
    "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
-  }
- ],
- "ticked": [
+   "short": "Inside of maps memory component still looks a bit weird...",
+   "at": 1795377231763,
+   "by": "67006108-625e-4578-9713-1e8ecc1b66ac"
+  },
   {
    "id": "20c5030c",
    "text": "Proposed kit edit (aar, map art kits 2026-11-22): in claude-mods/kit/agents/qa.md and designer.md, under the Report section add: \"If a hook makes you reply again after your Report, repeat the full Report in that reply; the lead only sees your last message.\" Reason: two qa reports arrived as \"my report stands\" stubs and needed a resend.",
+   "at": 1795354222399,
+   "by": "99e25226-6618-4e32-bfe7-6ca1ddba4906",
    "from": "f79b2d95-3119-4cad-842a-013fbf1bbcee",
    "name": "Redesign map agents page",
    "short": "Proposed kit edit (aar, map art kits 2026-11-22):",
    "run": 92,
-   "auto": true,
-   "at": 1795354222399,
-   "by": "99e25226-6618-4e32-bfe7-6ca1ddba4906"
+   "auto": true
   },
   {
    "id": "bb97b9f9",
@@ -572,16 +572,6 @@
    "name": "Revamp chat and live view",
    "short": "Release the agent drawer, Outputs and Live page redesign...",
    "run": 85
-  },
-  {
-   "id": "4e2d2dfd",
-   "text": "Release the Research window (worktree terminal-chat-panel-overlay-d015) after Merge back: bump past main's version, package, install, then open a deep-research chat and check the floating window opens with the live panel",
-   "at": 1795335089706,
-   "by": "5810b0ed-ea50-476b-b617-d0a04c8dd3f2",
-   "from": "69472f27-deb1-4c9e-8c3a-9b6fc6adcd98",
-   "name": "Terminal Chat Panel Overlay",
-   "short": "Release the Research window (worktree...",
-   "run": 84
   }
  ]
 }
