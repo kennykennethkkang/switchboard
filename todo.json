@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "20c5030c",
-   "text": "Proposed kit edit (aar, map art kits 2026-11-22): in claude-mods/kit/agents/qa.md and designer.md, under the Report section add: \"If a hook makes you reply again after your Report, repeat the full Report in that reply; the lead only sees your last message.\" Reason: two qa reports arrived as \"my report stands\" stubs and needed a resend.",
-   "at": 1795354115439,
-   "from": "f79b2d95-3119-4cad-842a-013fbf1bbcee",
-   "name": "Redesign map agents page",
-   "short": "Proposed kit edit (aar, map art kits 2026-11-22):",
-   "chat": "99e25226-6618-4e32-bfe7-6ca1ddba4906",
-   "host": "62903adf5e340f87",
-   "run": 92,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "60191406": 1793870136284,
@@ -470,10 +457,33 @@
   "a9213073": 1795340466785,
   "f64b0363": 1795340585184,
   "a8cd1ef4": 1795340613624,
-  "bb97b9f9": 1795349595962
+  "bb97b9f9": 1795349595962,
+  "20c5030c": 1795354222399
  },
  "seq": 92,
+ "suggested": [
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "20c5030c",
+   "text": "Proposed kit edit (aar, map art kits 2026-11-22): in claude-mods/kit/agents/qa.md and designer.md, under the Report section add: \"If a hook makes you reply again after your Report, repeat the full Report in that reply; the lead only sees your last message.\" Reason: two qa reports arrived as \"my report stands\" stubs and needed a resend.",
+   "from": "f79b2d95-3119-4cad-842a-013fbf1bbcee",
+   "name": "Redesign map agents page",
+   "short": "Proposed kit edit (aar, map art kits 2026-11-22):",
+   "run": 92,
+   "auto": true,
+   "at": 1795354222399,
+   "by": "99e25226-6618-4e32-bfe7-6ca1ddba4906"
+  },
   {
    "id": "bb97b9f9",
    "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
@@ -572,30 +582,6 @@
    "name": "Terminal Chat Panel Overlay",
    "short": "Release the Research window (worktree...",
    "run": 84
-  },
-  {
-   "id": "75d0a20a-ok",
-   "text": "Add this to switchboard https://www.instagram.com/reel/DdbumwFqc-c/?lqvp=NTc4MTIwNjQ2YQ== .",
-   "at": 1795335062952,
-   "by": "e80e0cb6-e6fe-4d16-9637-74c4966ff66e",
-   "from": "ff6bb0e2-d8d9-4bf1-a9c1-36d7cc557cc3",
-   "name": "Add Instagram reel link",
-   "why": "missed",
-   "short": "Add this to switchboard...",
-   "run": 83,
-   "auto": true
   }
- ],
- "suggested": [
-  {
-   "id": "7ba2f3ce",
-   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
-   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
-   "name": "Fix maps memory item styling",
-   "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
-  }
- ],
- "streak": 92
+ ]
 }
