@@ -20,19 +20,6 @@
    "from": "6891b582-4731-4af2-a672-91e4ab56d268",
    "name": "Auto merge all worktrees",
    "short": "Release Merge all worktrees:"
-  },
-  {
-   "id": "f64b0363",
-   "text": "Merge back worktree switchboard-research-tracker-fix-3756 into main (git apply its uncommitted diff)",
-   "at": 1795340543238,
-   "before": "a8cd1ef4",
-   "chat": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
-   "host": "62903adf5e340f87",
-   "run": 90,
-   "auto": true,
-   "from": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
-   "name": "To-do 90: Release Research tracker change",
-   "short": "Merge back worktree switchboard-research-tracker-fix-3756..."
   }
  ],
  "removed": {
@@ -488,11 +475,35 @@
   "e854a12e": 1795338827062,
   "4e97ce73": 1795340456750,
   "069c9329": 1795340466785,
-  "a9213073": 1795340466785
+  "a9213073": 1795340466785,
+  "f64b0363": 1795340585184
  },
  "seq": 90,
  "streak": 88,
+ "suggested": [
+  {
+   "id": "7ba2f3ce",
+   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
+   "at": 1795338741599,
+   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
+   "name": "Fix maps memory item styling",
+   "why": "missed",
+   "short": "Inside of maps memory component still looks a bit weird..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "f64b0363",
+   "text": "Merge back worktree switchboard-research-tracker-fix-3756 into main (git apply its uncommitted diff)",
+   "from": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
+   "before": "a8cd1ef4",
+   "name": "To-do 90: Release Research tracker change",
+   "short": "Merge back worktree switchboard-research-tracker-fix-3756...",
+   "run": 90,
+   "auto": true,
+   "at": 1795340585184,
+   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a"
+  },
   {
    "id": "4e97ce73",
    "text": "Release the Split asks fix (worktree fix-smart-separating-chat-component-2cf1: numbered-piece split, 20 s deadline, wider pre-check) once it is merged back into main; add its CHANGELOG line from .switchboard/changes/2026-11-22-fix-smart-split-asks.md",
@@ -589,24 +600,6 @@
    "from": "9c245bcc-810e-43db-b69a-5f697809c79d",
    "why": "missed",
    "run": 78
-  },
-  {
-   "id": "08f52f1f",
-   "text": "Memory consolidation: 5 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-19-7c6a255f.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1795254645935,
-   "by": "6ba3be2c-9d2a-46c5-8b14-89d7c507f6b0",
-   "run": 77
-  }
- ],
- "suggested": [
-  {
-   "id": "7ba2f3ce",
-   "text": "Inside of maps memory component still looks a bit weird when clicking individual memory item please fix that but the new style looks good.",
-   "at": 1795338741599,
-   "from": "0003e068-a5a3-4f87-b7d1-bd1fefda5ada",
-   "name": "Fix maps memory item styling",
-   "why": "missed",
-   "short": "Inside of maps memory component still looks a bit weird..."
   }
  ]
 }
