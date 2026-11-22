@@ -4,10 +4,14 @@
   {
    "id": "5b0183ae",
    "text": "Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the chat instead of a floating always-on-top window\", package, install",
-   "at": 1795338183134,
+   "at": 1795338190665,
    "from": "2aadb982-f067-4b28-b7f8-63780eacd8e1",
    "name": "Research Panel VS Code Tab",
-   "short": "Release the Research-as-a-tab change after worktree..."
+   "short": "Release the Research-as-a-tab change after worktree...",
+   "chat": "ff50e275-6af8-47f5-993e-68c0911c9108",
+   "host": "62903adf5e340f87",
+   "run": 87,
+   "auto": true
   }
  ],
  "removed": {
@@ -460,7 +464,7 @@
   "4ce7729b": 1795336112826,
   "b65599b1-ok": 1795336247300
  },
- "seq": 86,
+ "seq": 87,
  "ticked": [
   {
    "id": "b65599b1-ok",
@@ -577,5 +581,6 @@
    "why": "missed",
    "short": "Switchboard to-do, in this order:"
   }
- ]
+ ],
+ "streak": 87
 }
