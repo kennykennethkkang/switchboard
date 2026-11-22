@@ -9,9 +9,9 @@
    "host": "62903adf5e340f87",
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
+   "short": "Fix: installing a Switchboard release reloads every...",
    "run": 94,
-   "auto": true,
-   "short": "Fix: installing a Switchboard release reloads every..."
+   "auto": true
   },
   {
    "id": "6f818296",
@@ -27,6 +27,14 @@
    "at": 1795385503862,
    "from": "cc143ce5-75a5-4e99-9210-5c3b167dc523",
    "short": "Proposed kit rule edit (aar 2026-11-22, Switchboard..."
+  },
+  {
+   "id": "d1835d63",
+   "text": "Release the self-improve 30 approved results floor after Merge back of worktree instagram-reel-rule-implementation-e264 (learn.ts betterOrNot + extension/kit/skills/self-improve generic copy); claude-mods source already edited.",
+   "at": 1795386170862,
+   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
+   "name": "Instagram reel rule implementation",
+   "short": "Release the self-improve 30 approved results floor after..."
   }
  ],
  "removed": {
