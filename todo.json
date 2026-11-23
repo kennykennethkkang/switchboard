@@ -5,11 +5,11 @@
    "id": "55a17f3a",
    "text": "Trim CLAUDE.md and MEMORY.md (35k characters load in every chat and subagent, about 11k tokens). Baseline and method: vault wiki/token-efficiency.md. From Token Efficiency Analysis. Suggested, for later.",
    "at": 1795475445337,
+   "chat": "539d32a0-0660-472c-870b-eefa6ad112d8",
+   "host": "62903adf5e340f87",
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "Trim CLAUDE.md and MEMORY.md (35k characters load in...",
-   "chat": "539d32a0-0660-472c-870b-eefa6ad112d8",
-   "host": "62903adf5e340f87",
    "run": 130,
    "auto": true
   },
@@ -20,6 +20,14 @@
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "Decide whether the Artifact tool stays on in main chats..."
+  },
+  {
+   "id": "4c31f78a",
+   "text": "On or after 2026-11-30, compare a week of token use with the 2026-11-23 baseline in vault wiki/token-efficiency.md (cost split, starting context, caches expired during AskUserQuestion). From Token Efficiency Analysis. Suggested, for later.",
+   "at": 1795475445672,
+   "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
+   "name": "Token Efficiency Analysis",
+   "short": "On or after 2026-11-30, compare a week of token use with..."
   }
  ],
  "removed": {
@@ -522,6 +530,7 @@
   "a2aa4796": 1795428786896
  },
  "seq": 130,
+ "streak": 130,
  "ticked": [
   {
    "id": "a2aa4796",
@@ -639,6 +648,5 @@
    "why": "missed",
    "short": "Adjust ship area to not need to have chat running to..."
   }
- ],
- "streak": 130
+ ]
 }
