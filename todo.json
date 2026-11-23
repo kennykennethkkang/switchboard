@@ -4,9 +4,13 @@
   {
    "id": "352ab00b",
    "text": "Proposed kit rule edit (aar 2026-11-22, Switchboard clean up chat 77451c72): subagent briefs keep missing a tool-call budget, so agents hit maxTurns with no report (5 chats since 2026-11-07, see memory subagent-turn-caps-and-budget). In claude-mods/kit/rules.md, after the line starting \"- Role subagents stop at their maxTurns\", add: \"- End every brief with a budget and 'send the Report before it runs out': about 35 tool calls for engineer, 25 for qa and designer, 15 for researcher. A repo-wide unused or dead code audit starts from one `npx tsc --noEmit --noUnusedLocals --noUnusedParameters -p .` run, not a researcher reading files.\" Then setup --rules-only and check the diff of CLAUDE.md.",
-   "at": 1795385503862,
+   "at": 1795399596499,
    "from": "cc143ce5-75a5-4e99-9210-5c3b167dc523",
-   "short": "Proposed kit rule edit (aar 2026-11-22, Switchboard..."
+   "short": "Proposed kit rule edit (aar 2026-11-22, Switchboard...",
+   "chat": "fdda2901-3e9c-4bff-8bc0-8aa96c46e705",
+   "host": "62903adf5e340f87",
+   "run": 96,
+   "auto": true
   },
   {
    "id": "d1835d63",
@@ -513,30 +517,19 @@
   "ac02306d": 1795397281427,
   "6f818296": 1795399587509
  },
- "seq": 95,
+ "seq": 96,
  "streak": 93,
- "suggested": [
-  {
-   "id": "3b565ab3",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795389688962,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
-  }
- ],
  "ticked": [
   {
    "id": "6f818296",
    "text": "Local first-draft routing: a local Ollama model (Gemma 12B, 128k context) writes first drafts and scaffolds before Claude; the author of reel instagram.com/reel/DfsG079gJ62 (ChiefGyk3D) says it cut his Claude usage about 40%. Reference: github.com/ChiefGyk3D/department-of-internal-arguments packs/local-llm-routing/PACK.md (Apache-2.0: \"local output is a draft: verify it against the source\", echo and compare identifiers, quote then answer, output only what was asked). Ollama is not installed yet. Credit the repo in README Credits.",
+   "at": 1795399587509,
+   "by": "5bc0e4df-2a29-4ec3-957f-355fe7f53caf",
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
    "short": "Local first-draft routing:",
    "run": 95,
-   "auto": true,
-   "at": 1795399587509,
-   "by": "5bc0e4df-2a29-4ec3-957f-355fe7f53caf"
+   "auto": true
   },
   {
    "id": "ac02306d",
@@ -635,6 +628,17 @@
    "short": "Release the Split asks fix (worktree...",
    "run": 89,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "3b565ab3",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795389688962,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
