@@ -1,6 +1,15 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "62583c2e",
+   "text": "Merge back: treat renamed files and non-ASCII (git-quoted) file names that main already holds identically as already merged, instead of a clash. sameInMain in extension/src/hub/git.ts skips headers where a/ != b/ and quoted paths; parse git's quoted headers and rename pairs, keep the lstat+mode+readlink compare, add tests in extension/test/merge-back.test.ts (qa probe repro S3/S4). From chat \"Worktree merge fix and chat\".",
+   "at": 1795424640612,
+   "from": "bdd8fc14-2d9f-4691-aaa3-d9484caf47e9",
+   "name": "Worktree merge fix and chat",
+   "short": "Merge back: treat renamed files and non-ASCII..."
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "58032070": 1795404119789,
@@ -502,13 +511,13 @@
   {
    "id": "ea70f92c",
    "text": "Proposed fix, claude-mods/kit/skills/self-improve/scripts/self-improve.mjs: in the agent job, write o.result to path.join(ws, 'out.md') after each run; in the judge loop, on the third bad reply write the raw j.result to path.join(run, `judge-fail-${o.t.id}-${o.side}-${o.run}.txt`) before throwing. Why: run 2026-11-23T08-15-20-377Z lost all 28 outputs to one flaky judge failure with nothing to inspect. Add a test in self-improve.test.mjs if the write is factored out. Filed by chat 16adfd89 aar.",
+   "at": 1795422422896,
+   "by": "0a309375-6829-42d1-ac2f-d71e91e78e85",
    "from": "16adfd89-6ae1-4159-9c91-2a87e1814cbe",
    "name": "To-do 122: Rerun self-improve on rules md",
    "short": "Proposed fix, claude-mods/kit/skills/self-improve/scripts...",
    "run": 127,
-   "auto": true,
-   "at": 1795422422896,
-   "by": "0a309375-6829-42d1-ac2f-d71e91e78e85"
+   "auto": true
   },
   {
    "id": "007e1c30",
