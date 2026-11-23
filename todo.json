@@ -13,17 +13,6 @@
    "stopped": true
   },
   {
-   "id": "91eb2700",
-   "text": "repo-rules fails closed on transient errors (improve-system 2026-11-22): \"repo-rules: the guard failed, so the command was held\" hit 5 sessions in Switchboard worktrees on 11-22/23, on plain commands (cd ../../../web && cat lib/skins/README.md; git status --short | wc -l) and two Write/Edit calls. bashRule returns undefined on that command in 180 ms when run alone, so the throw comes from roots()/report()/engine timeout under load, not the rule. In claude-mods/repo-rules/hooks/register.ts line 146 (held) and the .catch on the Bash, Edit and Write handlers: find what threw (log the error into the deny text), fix it, and add a test that a throwing roots() on a clean command does not hold it.",
-   "at": 1795418449888,
-   "from": "8db3461e-3619-42d8-a08a-f74267017535",
-   "short": "repo-rules fails closed on transient errors...",
-   "chat": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
-   "host": "62903adf5e340f87",
-   "run": 114,
-   "auto": true
-  },
-  {
    "id": "9feadeed",
    "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
    "at": 1795417026149,
@@ -511,11 +500,22 @@
   "07da17e7": 1795413235700,
   "ae106774": 1795414776403,
   "72ae2a0f": 1795415155063,
-  "2669df6d": 1795418439396
+  "2669df6d": 1795418439396,
+  "91eb2700": 1795418828291
  },
  "seq": 114,
  "streak": 93,
  "ticked": [
+  {
+   "id": "91eb2700",
+   "text": "repo-rules fails closed on transient errors (improve-system 2026-11-22): \"repo-rules: the guard failed, so the command was held\" hit 5 sessions in Switchboard worktrees on 11-22/23, on plain commands (cd ../../../web && cat lib/skins/README.md; git status --short | wc -l) and two Write/Edit calls. bashRule returns undefined on that command in 180 ms when run alone, so the throw comes from roots()/report()/engine timeout under load, not the rule. In claude-mods/repo-rules/hooks/register.ts line 146 (held) and the .catch on the Bash, Edit and Write handlers: find what threw (log the error into the deny text), fix it, and add a test that a throwing roots() on a clean command does not hold it.",
+   "from": "8db3461e-3619-42d8-a08a-f74267017535",
+   "short": "repo-rules fails closed on transient errors...",
+   "run": 114,
+   "auto": true,
+   "at": 1795418828291,
+   "by": "42b516db-7c35-4a6e-a34b-d1d2b38989d6"
+  },
   {
    "id": "2669df6d",
    "text": "Fix: a finished chat keeps progress state 'working', which holds midTurn() true and blocks the window's idle update reload forever. Seen 2026-11-22: Zellizard-Tracker chat aefdf1b5 (turn ended 19:05, Stop + turn_duration in transcript) shows state working (at 20:55, ended map a2e071e2d91c69b92), so that window stayed on 0.21.136 past the 0.21.138 install. Likely a late subagent hook after Stop flipping state back to working (extension/src/hub/progress.ts, hub-service.ts midTurn line ~722).",
@@ -613,17 +613,6 @@
    "why": "missed",
    "short": "You were cut off by a Switchboard window reload at 12:57...",
    "run": 105,
-   "auto": true
-  },
-  {
-   "id": "99dca330",
-   "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
-   "at": 1795406146003,
-   "by": "aa5e9732-7f88-491c-8db6-402c08a70273",
-   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
-   "name": "Realistic Map Agents Theme",
-   "short": "Agents map at 390 px:",
-   "run": 104,
    "auto": true
   }
  ]
