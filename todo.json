@@ -15,10 +15,14 @@
   {
    "id": "dbcec580",
    "text": "bash-approve and paid-guard fail closed on clean calls (from chat 42b516db, repo-rules fix): claude-mods/bash-approve/hooks/register.ts:138 and paid-guard/hooks/register.ts:229 use `.catch(($, e, next) => next.called ? next(e) : { deny })`, so any $ failure (env read, worker end, timeout) holds a clean call. Do as repo-rules 0.2.6 did: run the pure check before any $ call, have the .catch re-run only the pure check (deny on a hit, next(e) otherwise), put next.error.kind and message in the deny, add a test with a beneath-hook that denies the $ call on a clean call, bump each plugin.json and update via kenneth-mods. See memory guard-catch-rejudge.",
-   "at": 1795419038003,
+   "at": 1795420250707,
    "from": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
    "name": "To-do 114: Fix repo-rules fail-open transient errors",
-   "short": "bash-approve and paid-guard fail closed on clean calls..."
+   "short": "bash-approve and paid-guard fail closed on clean calls...",
+   "chat": "26a95cd5-7fd6-47cd-871a-87b001aae007",
+   "host": "62903adf5e340f87",
+   "run": 118,
+   "auto": true
   },
   {
    "id": "76653e53",
@@ -545,19 +549,19 @@
   "69a53497": 1795419138361,
   "d8e84eab": 1795420243766
  },
- "seq": 117,
+ "seq": 118,
  "streak": 93,
  "ticked": [
   {
    "id": "d8e84eab",
    "text": "Release the Research library (chat \"Review research tab implementation\", already in main uncommitted): bump past main's version, move the CHANGELOG Unreleased lines under it, package, install. Then live test: one /deep-research project chat and one Research-switch chat. Check that each writes ~/.claude/switchboard/research/<project|general>/*.md, a single \"Research done\" notice appears, and the report opens on the Research page in VS Code and in the 3131 browser app.",
+   "at": 1795420243766,
+   "by": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f",
    "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
    "name": "Review research tab implementation",
    "short": "Release the Research library (chat \"Review research tab...",
    "run": 117,
-   "auto": true,
-   "at": 1795420243766,
-   "by": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f"
+   "auto": true
   },
   {
    "id": "69a53497",
