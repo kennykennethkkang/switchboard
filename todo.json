@@ -47,6 +47,14 @@
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:"
+  },
+  {
+   "id": "ec112d09",
+   "text": "Lantern Sea map theme: smooth drawings for the tea garden and armory places (route through placeArt hook in board.tsx bake, art/lantern.ts placeArtSmooth). From chat Realistic Map Agents Theme",
+   "at": 1795400744293,
+   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
+   "name": "Realistic Map Agents Theme",
+   "short": "Lantern Sea map theme:"
   }
  ],
  "removed": {
