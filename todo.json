@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "a261e4a4",
-   "text": "Compact Switchboard MEMORY.md from 194 lines to under 140 by merging overlapping notes (memory-fix skill, gold check before and after, one link per line). From chat ad4c10a7 (memory consolidation apply).",
-   "at": 1795420805958,
-   "chat": "4dbff639-7423-4945-b974-a552abeef793",
-   "host": "62903adf5e340f87",
-   "from": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
-   "name": "To-do 116: Consolidate memory proposals review",
-   "short": "Compact Switchboard MEMORY.md from 194 lines to under...",
-   "run": 121,
-   "auto": true
-  },
-  {
    "id": "75675ae5",
    "text": "Rerun self-improve on claude-mods/kit/rules.md with the worktree Bash line (from run 2026-11-19T18-27-18-831Z), now that tasks.json has held-out tasks worktree-read-and-grep and worktree-three-step-check. Wait until Kenneth has reviewed those two tasks. Filed by chat 1d6a74b3.",
    "at": 1795419205809,
@@ -542,11 +530,23 @@
   "d8e84eab": 1795420243766,
   "dbcec580": 1795420556301,
   "76653e53": 1795420713842,
-  "d26897e3": 1795420796487
+  "d26897e3": 1795420796487,
+  "a261e4a4": 1795421259385
  },
  "seq": 121,
  "streak": 93,
  "ticked": [
+  {
+   "id": "a261e4a4",
+   "text": "Compact Switchboard MEMORY.md from 194 lines to under 140 by merging overlapping notes (memory-fix skill, gold check before and after, one link per line). From chat ad4c10a7 (memory consolidation apply).",
+   "from": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
+   "name": "To-do 116: Consolidate memory proposals review",
+   "short": "Compact Switchboard MEMORY.md from 194 lines to under...",
+   "run": 121,
+   "auto": true,
+   "at": 1795421259385,
+   "by": "4dbff639-7423-4945-b974-a552abeef793"
+  },
   {
    "id": "d26897e3",
    "text": "Research library (chat \"Review research tab implementation\"): ~/.claude/switchboard/research/.claims/ gets one file per saved run and is never cleaned up. Prune claim files older than about 30 days in extension/src/hub/research-library.ts, keeping claims for runs still in the library or in .trash, and add a test.",
@@ -639,17 +639,6 @@
    "from": "10d41c97-aef1-407f-8d5a-fda5f69fd1f4",
    "short": "Memory: bring Switchboard MEMORY.md under 200 lines (now...",
    "run": 112,
-   "auto": true
-  },
-  {
-   "id": "ae106774",
-   "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
-   "at": 1795414776403,
-   "by": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
-   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
-   "name": "To-do 107: Fix research report memory save",
-   "short": "Save deep-research reports to project memory from the...",
-   "run": 111,
    "auto": true
   }
  ]
