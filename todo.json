@@ -16,11 +16,11 @@
    "id": "e00a421e",
    "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
    "at": 1795399944755,
+   "chat": "0a0be0be-aa65-4b39-9deb-df52de218adc",
+   "host": "62903adf5e340f87",
    "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
    "name": "Research tab seems to be",
    "short": "Release the research tab fixes (worktree...",
-   "chat": "0a0be0be-aa65-4b39-9deb-df52de218adc",
-   "host": "62903adf5e340f87",
    "run": 99,
    "auto": true
   },
@@ -39,6 +39,14 @@
    "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
    "name": "To-do 94: Fix Switchboard reload killing chats",
    "short": "Fix: a chat killed by a window reload looks ended, so..."
+  },
+  {
+   "id": "c6f0dbb5",
+   "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
+   "at": 1795400743387,
+   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
+   "name": "Realistic Map Agents Theme",
+   "short": "Lantern Sea map theme:"
   }
  ],
  "removed": {
