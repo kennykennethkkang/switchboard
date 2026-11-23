@@ -15,10 +15,14 @@
   {
    "id": "76653e53",
    "text": "Live check of 0.21.139 research save (from chat 5e0538ab): once the window runs 0.21.139, start a project chat with /deep-research while no Switchboard view is open in that window (see memory research-live-test: hub-new-chat POST via node script), then confirm a research-*.md note and its MEMORY.md line appear in that project's ~/.claude/projects/<slug>/memory. The extension now saves via saveResearch in extension/src/session-runtime.ts.",
-   "at": 1795419065997,
+   "at": 1795420565698,
    "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
    "name": "To-do 111: Extension research memory save",
-   "short": "Live check of 0.21.139 research save (from chat 5e0538ab):"
+   "short": "Live check of 0.21.139 research save (from chat 5e0538ab):",
+   "chat": "8fe28baf-8726-40bd-ab75-be3d94e1ffba",
+   "host": "62903adf5e340f87",
+   "run": 119,
+   "auto": true
   },
   {
    "id": "d26897e3",
@@ -538,19 +542,19 @@
   "d8e84eab": 1795420243766,
   "dbcec580": 1795420556301
  },
- "seq": 118,
+ "seq": 119,
  "streak": 93,
  "ticked": [
   {
    "id": "dbcec580",
    "text": "bash-approve and paid-guard fail closed on clean calls (from chat 42b516db, repo-rules fix): claude-mods/bash-approve/hooks/register.ts:138 and paid-guard/hooks/register.ts:229 use `.catch(($, e, next) => next.called ? next(e) : { deny })`, so any $ failure (env read, worker end, timeout) holds a clean call. Do as repo-rules 0.2.6 did: run the pure check before any $ call, have the .catch re-run only the pure check (deny on a hit, next(e) otherwise), put next.error.kind and message in the deny, add a test with a beneath-hook that denies the $ call on a clean call, bump each plugin.json and update via kenneth-mods. See memory guard-catch-rejudge.",
+   "at": 1795420556301,
+   "by": "26a95cd5-7fd6-47cd-871a-87b001aae007",
    "from": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
    "name": "To-do 114: Fix repo-rules fail-open transient errors",
    "short": "bash-approve and paid-guard fail closed on clean calls...",
    "run": 118,
-   "auto": true,
-   "at": 1795420556301,
-   "by": "26a95cd5-7fd6-47cd-871a-87b001aae007"
+   "auto": true
   },
   {
    "id": "d8e84eab",
