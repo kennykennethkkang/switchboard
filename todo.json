@@ -13,19 +13,6 @@
    "stopped": true
   },
   {
-   "id": "3b565ab3-ok",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795406157604,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57...",
-   "chat": "8c51ef92-fb74-4d57-ac90-98af8e04260b",
-   "host": "62903adf5e340f87",
-   "run": 105,
-   "auto": true
-  },
-  {
    "id": "9afdac3c",
    "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
    "at": 1795403764215,
@@ -529,11 +516,24 @@
   "1f7454e5": 1795403847442,
   "c6f0dbb5": 1795405524734,
   "ec112d09": 1795405818077,
-  "99dca330": 1795406146003
+  "99dca330": 1795406146003,
+  "3b565ab3-ok": 1795406228107
  },
  "seq": 105,
  "streak": 93,
  "ticked": [
+  {
+   "id": "3b565ab3-ok",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57...",
+   "run": 105,
+   "auto": true,
+   "at": 1795406228107,
+   "by": "8c51ef92-fb74-4d57-ac90-98af8e04260b"
+  },
   {
    "id": "99dca330",
    "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
@@ -630,17 +630,6 @@
    "name": "Instagram reel rule implementation",
    "short": "Local first-draft routing:",
    "run": 95,
-   "auto": true
-  },
-  {
-   "id": "ac02306d",
-   "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\". After the reload 10 chats had to be resumed by hand (4 by this chat, 6 by Instagram Reel Rotation Task), and the abyss worktree had been deleted (recreated at bd2ec53): the reload cleanup should not remove a worktree whose chat was still busy.",
-   "at": 1795397281427,
-   "by": "c61ff256-a63a-4c77-8df8-0286f20f6184",
-   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
-   "name": "Instagram reel rule implementation",
-   "short": "Fix: installing a Switchboard release reloads every...",
-   "run": 94,
    "auto": true
   }
  ]
