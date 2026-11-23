@@ -16,11 +16,11 @@
    "id": "d8e84eab",
    "text": "Release the Research library (chat \"Review research tab implementation\", already in main uncommitted): bump past main's version, move the CHANGELOG Unreleased lines under it, package, install. Then live test: one /deep-research project chat and one Research-switch chat. Check that each writes ~/.claude/switchboard/research/<project|general>/*.md, a single \"Research done\" notice appears, and the report opens on the Research page in VS Code and in the 3131 browser app.",
    "at": 1795419140211,
+   "chat": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f",
+   "host": "62903adf5e340f87",
    "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
    "name": "Review research tab implementation",
    "short": "Release the Research library (chat \"Review research tab...",
-   "chat": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f",
-   "host": "62903adf5e340f87",
    "run": 117,
    "auto": true
   },
@@ -47,6 +47,14 @@
    "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
    "name": "Review research tab implementation",
    "short": "Research library (chat \"Review research tab..."
+  },
+  {
+   "id": "a261e4a4",
+   "text": "Compact Switchboard MEMORY.md from 194 lines to under 140 by merging overlapping notes (memory-fix skill, gold check before and after, one link per line). From chat ad4c10a7 (memory consolidation apply).",
+   "at": 1795419192032,
+   "from": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
+   "name": "To-do 116: Consolidate memory proposals review",
+   "short": "Compact Switchboard MEMORY.md from 194 lines to under..."
   }
  ],
  "removed": {
