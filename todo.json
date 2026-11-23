@@ -33,6 +33,14 @@
    "text": "Learned: kit/rules.md in claude-mods updated (pass rate 85% -> 90%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/candidate.diff. Undo: cp \"/Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/previous.md\" \"/Users/kennykennethkkang/Documents/GitHub/claude-mods/kit/rules.md\"",
    "at": 1795419454974,
    "short": "Learned: kit/rules.md in claude-mods updated (pass rate..."
+  },
+  {
+   "id": "06ebaaa6",
+   "text": "Four orphan worktrees with uncommitted files and no chat (from chat \"Fix idle chats\"): .claude/worktrees/also-issue-with-approve-page-c0d8 (1 file), fix-terminal-usage-bar-7fee (2), https-www-instagram-com-reel-1be3 (3), research-panel-vs-code-tab-dc4f (2). For each: diff against main, fold what main lacks per the merge-back memory note (git apply --check first), or discard if already in main; then git worktree remove and delete the branch.",
+   "at": 1795420805348,
+   "from": "44e05433-8196-4e67-8fea-5fead283cfee",
+   "name": "Fix idle chats",
+   "short": "Four orphan worktrees with uncommitted files and no chat..."
   }
  ],
  "removed": {
@@ -530,13 +538,13 @@
   {
    "id": "d26897e3",
    "text": "Research library (chat \"Review research tab implementation\"): ~/.claude/switchboard/research/.claims/ gets one file per saved run and is never cleaned up. Prune claim files older than about 30 days in extension/src/hub/research-library.ts, keeping claims for runs still in the library or in .trash, and add a test.",
+   "at": 1795420796487,
+   "by": "8083026f-ddf5-4ff9-8a06-ce7cd93cc97c",
    "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
    "name": "Review research tab implementation",
    "short": "Research library (chat \"Review research tab...",
    "run": 120,
-   "auto": true,
-   "at": 1795420796487,
-   "by": "8083026f-ddf5-4ff9-8a06-ce7cd93cc97c"
+   "auto": true
   },
   {
    "id": "76653e53",
