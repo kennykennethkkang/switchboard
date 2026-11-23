@@ -55,6 +55,14 @@
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:"
+  },
+  {
+   "id": "99dca330",
+   "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
+   "at": 1795400745018,
+   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
+   "name": "Realistic Map Agents Theme",
+   "short": "Agents map at 390 px:"
   }
  ],
  "removed": {
