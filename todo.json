@@ -63,6 +63,12 @@
    "from": "1d6a74b3-290d-41fe-b8d6-15fb01350d64",
    "name": "To-do 115: Worktree Bash Rules Held-Out Tasks",
    "short": "Rerun self-improve on claude-mods/kit/rules.md with the..."
+  },
+  {
+   "id": "a89feef4",
+   "text": "Learned: kit/rules.md in claude-mods updated (pass rate 85% -> 90%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/candidate.diff. Undo: cp \"/Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/previous.md\" \"/Users/kennykennethkkang/Documents/GitHub/claude-mods/kit/rules.md\"",
+   "at": 1795419454974,
+   "short": "Learned: kit/rules.md in claude-mods updated (pass rate..."
   }
  ],
  "removed": {
