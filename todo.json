@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "1f7454e5",
-   "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
-   "at": 1795403802170,
-   "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
-   "name": "Redesign Site Pages Ship",
-   "short": "Kit fix (aar, Redesign Site Pages Ship):",
-   "chat": "4efe3163-4ce7-43e7-8a93-7c3ab16abddc",
-   "host": "62903adf5e340f87",
-   "run": 100,
-   "auto": true
-  },
-  {
    "id": "58032070",
    "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
    "at": 1795397447783,
@@ -540,11 +528,23 @@
   "352ab00b": 1795399653788,
   "d1835d63": 1795399811700,
   "3b565ab3": 1795403233104,
-  "e00a421e": 1795403793425
+  "e00a421e": 1795403793425,
+  "1f7454e5": 1795403847442
  },
  "seq": 100,
  "streak": 93,
  "ticked": [
+  {
+   "id": "1f7454e5",
+   "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
+   "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
+   "name": "Redesign Site Pages Ship",
+   "short": "Kit fix (aar, Redesign Site Pages Ship):",
+   "run": 100,
+   "auto": true,
+   "at": 1795403847442,
+   "by": "4efe3163-4ce7-43e7-8a93-7c3ab16abddc"
+  },
   {
    "id": "e00a421e",
    "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
@@ -639,17 +639,6 @@
    "name": "Redesign map agents page",
    "short": "Proposed kit edit (aar, map art kits 2026-11-22):",
    "run": 92,
-   "auto": true
-  },
-  {
-   "id": "bb97b9f9",
-   "text": "Release Merge all worktrees: after the auto-merge-all-worktrees-1c25 worktree is in main, bump extension/package.json, package and install (CHANGELOG has it under Unreleased)",
-   "at": 1795349595962,
-   "by": "fee82622-5d10-4d12-885d-25fa1a533d8f",
-   "from": "6891b582-4731-4af2-a672-91e4ab56d268",
-   "name": "Auto merge all worktrees",
-   "short": "Release Merge all worktrees:",
-   "run": 91,
    "auto": true
   }
  ]
