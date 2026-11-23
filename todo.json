@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "d1c39247",
-   "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
-   "at": 1795406442741,
-   "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
-   "name": "To-do 99: Release research tab fixes",
-   "short": "Fix: a project chat's deep-research report never reaches...",
-   "chat": "62718e5b-4064-4fa8-aeee-e55a95000abf",
-   "host": "62903adf5e340f87",
-   "run": 107,
-   "auto": true
-  },
-  {
    "id": "e4bcd541",
    "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
    "at": 1795404381168,
@@ -514,11 +502,23 @@
   "ec112d09": 1795405818077,
   "99dca330": 1795406146003,
   "3b565ab3-ok": 1795406228107,
-  "9afdac3c": 1795406440914
+  "9afdac3c": 1795406440914,
+  "d1c39247": 1795407280219
  },
  "seq": 107,
  "streak": 93,
  "ticked": [
+  {
+   "id": "d1c39247",
+   "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
+   "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
+   "name": "To-do 99: Release research tab fixes",
+   "short": "Fix: a project chat's deep-research report never reaches...",
+   "run": 107,
+   "auto": true,
+   "at": 1795407280219,
+   "by": "62718e5b-4064-4fa8-aeee-e55a95000abf"
+  },
   {
    "id": "9afdac3c",
    "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
@@ -617,16 +617,6 @@
    "name": "Instagram reel rule implementation",
    "short": "Release the self-improve 30 approved results floor after...",
    "run": 97,
-   "auto": true
-  },
-  {
-   "id": "352ab00b",
-   "text": "Proposed kit rule edit (aar 2026-11-22, Switchboard clean up chat 77451c72): subagent briefs keep missing a tool-call budget, so agents hit maxTurns with no report (5 chats since 2026-11-07, see memory subagent-turn-caps-and-budget). In claude-mods/kit/rules.md, after the line starting \"- Role subagents stop at their maxTurns\", add: \"- End every brief with a budget and 'send the Report before it runs out': about 35 tool calls for engineer, 25 for qa and designer, 15 for researcher. A repo-wide unused or dead code audit starts from one `npx tsc --noEmit --noUnusedLocals --noUnusedParameters -p .` run, not a researcher reading files.\" Then setup --rules-only and check the diff of CLAUDE.md.",
-   "at": 1795399653788,
-   "by": "fdda2901-3e9c-4bff-8bc0-8aa96c46e705",
-   "from": "cc143ce5-75a5-4e99-9210-5c3b167dc523",
-   "short": "Proposed kit rule edit (aar 2026-11-22, Switchboard...",
-   "run": 96,
    "auto": true
   }
  ]
