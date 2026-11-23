@@ -4,10 +4,14 @@
   {
    "id": "ea70f92c",
    "text": "Proposed fix, claude-mods/kit/skills/self-improve/scripts/self-improve.mjs: in the agent job, write o.result to path.join(ws, 'out.md') after each run; in the judge loop, on the third bad reply write the raw j.result to path.join(run, `judge-fail-${o.t.id}-${o.side}-${o.run}.txt`) before throwing. Why: run 2026-11-23T08-15-20-377Z lost all 28 outputs to one flaky judge failure with nothing to inspect. Add a test in self-improve.test.mjs if the write is factored out. Filed by chat 16adfd89 aar.",
-   "at": 1795422010383,
+   "at": 1795422360986,
    "from": "16adfd89-6ae1-4159-9c91-2a87e1814cbe",
    "name": "To-do 122: Rerun self-improve on rules md",
-   "short": "Proposed fix, claude-mods/kit/skills/self-improve/scripts..."
+   "short": "Proposed fix, claude-mods/kit/skills/self-improve/scripts...",
+   "chat": "0a309375-6829-42d1-ac2f-d71e91e78e85",
+   "host": "62903adf5e340f87",
+   "run": 127,
+   "auto": true
   }
  ],
  "removed": {
@@ -505,19 +509,19 @@
   "8f8dfb3a": 1795422167085,
   "007e1c30": 1795422359124
  },
- "seq": 126,
+ "seq": 127,
  "streak": 93,
  "ticked": [
   {
    "id": "007e1c30",
    "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
+   "at": 1795422359124,
+   "by": "a947970f-927c-4229-89de-b99ea63b25a1",
    "from": "4dbff639-7423-4945-b974-a552abeef793",
    "name": "To-do 121: Compact Switchboard MEMORY md",
    "short": "Memory recall scoring:",
    "run": 125,
-   "auto": true,
-   "at": 1795422359124,
-   "by": "a947970f-927c-4229-89de-b99ea63b25a1"
+   "auto": true
   },
   {
    "id": "8f8dfb3a",
