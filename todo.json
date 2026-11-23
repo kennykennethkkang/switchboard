@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "d8e84eab",
-   "text": "Release the Research library (chat \"Review research tab implementation\", already in main uncommitted): bump past main's version, move the CHANGELOG Unreleased lines under it, package, install. Then live test: one /deep-research project chat and one Research-switch chat. Check that each writes ~/.claude/switchboard/research/<project|general>/*.md, a single \"Research done\" notice appears, and the report opens on the Research page in VS Code and in the 3131 browser app.",
-   "at": 1795419140211,
-   "chat": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f",
-   "host": "62903adf5e340f87",
-   "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
-   "name": "Review research tab implementation",
-   "short": "Release the Research library (chat \"Review research tab...",
-   "run": 117,
-   "auto": true
-  },
-  {
    "id": "dbcec580",
    "text": "bash-approve and paid-guard fail closed on clean calls (from chat 42b516db, repo-rules fix): claude-mods/bash-approve/hooks/register.ts:138 and paid-guard/hooks/register.ts:229 use `.catch(($, e, next) => next.called ? next(e) : { deny })`, so any $ failure (env read, worker end, timeout) holds a clean call. Do as repo-rules 0.2.6 did: run the pure check before any $ call, have the .catch re-run only the pure check (deny on a hit, next(e) otherwise), put next.error.kind and message in the deny, add a test with a beneath-hook that denies the $ call on a clean call, bump each plugin.json and update via kenneth-mods. See memory guard-catch-rejudge.",
    "at": 1795419038003,
@@ -554,11 +542,23 @@
   "2669df6d": 1795418439396,
   "91eb2700": 1795418828291,
   "9feadeed": 1795418985789,
-  "69a53497": 1795419138361
+  "69a53497": 1795419138361,
+  "d8e84eab": 1795420243766
  },
  "seq": 117,
  "streak": 93,
  "ticked": [
+  {
+   "id": "d8e84eab",
+   "text": "Release the Research library (chat \"Review research tab implementation\", already in main uncommitted): bump past main's version, move the CHANGELOG Unreleased lines under it, package, install. Then live test: one /deep-research project chat and one Research-switch chat. Check that each writes ~/.claude/switchboard/research/<project|general>/*.md, a single \"Research done\" notice appears, and the report opens on the Research page in VS Code and in the 3131 browser app.",
+   "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
+   "name": "Review research tab implementation",
+   "short": "Release the Research library (chat \"Review research tab...",
+   "run": 117,
+   "auto": true,
+   "at": 1795420243766,
+   "by": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f"
+  },
   {
    "id": "69a53497",
    "text": "Memory consolidation: 10 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-23-f3dcd803.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
@@ -651,17 +651,6 @@
    "name": "To-do 101: Fix worktree sweep grace",
    "short": "Fix: extension `pnpm run lint:test` fails with 9 TS...",
    "run": 108,
-   "auto": true
-  },
-  {
-   "id": "d1c39247",
-   "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
-   "at": 1795407280219,
-   "by": "62718e5b-4064-4fa8-aeee-e55a95000abf",
-   "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
-   "name": "To-do 99: Release research tab fixes",
-   "short": "Fix: a project chat's deep-research report never reaches...",
-   "run": 107,
    "auto": true
   }
  ]
