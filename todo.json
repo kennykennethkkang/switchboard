@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "76653e53",
-   "text": "Live check of 0.21.139 research save (from chat 5e0538ab): once the window runs 0.21.139, start a project chat with /deep-research while no Switchboard view is open in that window (see memory research-live-test: hub-new-chat POST via node script), then confirm a research-*.md note and its MEMORY.md line appear in that project's ~/.claude/projects/<slug>/memory. The extension now saves via saveResearch in extension/src/session-runtime.ts.",
-   "at": 1795420565698,
-   "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
-   "name": "To-do 111: Extension research memory save",
-   "short": "Live check of 0.21.139 research save (from chat 5e0538ab):",
-   "chat": "8fe28baf-8726-40bd-ab75-be3d94e1ffba",
-   "host": "62903adf5e340f87",
-   "run": 119,
-   "auto": true
-  },
-  {
    "id": "d26897e3",
    "text": "Research library (chat \"Review research tab implementation\"): ~/.claude/switchboard/research/.claims/ gets one file per saved run and is never cleaned up. Prune claim files older than about 30 days in extension/src/hub/research-library.ts, keeping claims for runs still in the library or in .trash, and add a test.",
    "at": 1795419070318,
@@ -540,11 +528,23 @@
   "9feadeed": 1795418985789,
   "69a53497": 1795419138361,
   "d8e84eab": 1795420243766,
-  "dbcec580": 1795420556301
+  "dbcec580": 1795420556301,
+  "76653e53": 1795420713842
  },
  "seq": 119,
  "streak": 93,
  "ticked": [
+  {
+   "id": "76653e53",
+   "text": "Live check of 0.21.139 research save (from chat 5e0538ab): once the window runs 0.21.139, start a project chat with /deep-research while no Switchboard view is open in that window (see memory research-live-test: hub-new-chat POST via node script), then confirm a research-*.md note and its MEMORY.md line appear in that project's ~/.claude/projects/<slug>/memory. The extension now saves via saveResearch in extension/src/session-runtime.ts.",
+   "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
+   "name": "To-do 111: Extension research memory save",
+   "short": "Live check of 0.21.139 research save (from chat 5e0538ab):",
+   "run": 119,
+   "auto": true,
+   "at": 1795420713842,
+   "by": "8fe28baf-8726-40bd-ab75-be3d94e1ffba"
+  },
   {
    "id": "dbcec580",
    "text": "bash-approve and paid-guard fail closed on clean calls (from chat 42b516db, repo-rules fix): claude-mods/bash-approve/hooks/register.ts:138 and paid-guard/hooks/register.ts:229 use `.catch(($, e, next) => next.called ? next(e) : { deny })`, so any $ failure (env read, worker end, timeout) holds a clean call. Do as repo-rules 0.2.6 did: run the pure check before any $ call, have the .catch re-run only the pure check (deny on a hit, next(e) otherwise), put next.error.kind and message in the deny, add a test with a beneath-hook that denies the $ call on a clean call, bump each plugin.json and update via kenneth-mods. See memory guard-catch-rejudge.",
@@ -637,17 +637,6 @@
    "name": "To-do 107: Fix research report memory save",
    "short": "Live check of the 0.21.138 research save fix (from chat...",
    "run": 110,
-   "auto": true
-  },
-  {
-   "id": "84a32676",
-   "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
-   "at": 1795407656678,
-   "by": "64d45c6b-0052-44ab-be13-0778c109415c",
-   "from": "082694b8-c7f6-49bf-89ef-650811afd552",
-   "name": "To-do 102: Bake Lantern Sea islands sharp",
-   "short": "Fix: web/lib/court-map.test.ts perf budget fails on its...",
-   "run": 109,
    "auto": true
   }
  ]
