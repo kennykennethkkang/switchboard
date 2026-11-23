@@ -15,8 +15,12 @@
   {
    "id": "a89feef4",
    "text": "Learned: kit/rules.md in claude-mods updated (pass rate 85% -> 90%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/candidate.diff. Undo: cp \"/Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/previous.md\" \"/Users/kennykennethkkang/Documents/GitHub/claude-mods/kit/rules.md\"",
-   "at": 1795419454974,
-   "short": "Learned: kit/rules.md in claude-mods updated (pass rate..."
+   "at": 1795421985827,
+   "short": "Learned: kit/rules.md in claude-mods updated (pass rate...",
+   "chat": "2e763078-41cc-418e-9b2c-30a3d8aeff58",
+   "host": "62903adf5e340f87",
+   "run": 123,
+   "auto": true
   },
   {
    "id": "06ebaaa6",
@@ -526,19 +530,19 @@
   "a261e4a4": 1795421259385,
   "75675ae5": 1795421983030
  },
- "seq": 122,
+ "seq": 123,
  "streak": 93,
  "ticked": [
   {
    "id": "75675ae5",
    "text": "Rerun self-improve on claude-mods/kit/rules.md with the worktree Bash line (from run 2026-11-19T18-27-18-831Z), now that tasks.json has held-out tasks worktree-read-and-grep and worktree-three-step-check. Wait until Kenneth has reviewed those two tasks. Filed by chat 1d6a74b3.",
+   "at": 1795421983030,
+   "by": "16adfd89-6ae1-4159-9c91-2a87e1814cbe",
    "from": "1d6a74b3-290d-41fe-b8d6-15fb01350d64",
    "name": "To-do 115: Worktree Bash Rules Held-Out Tasks",
    "short": "Rerun self-improve on claude-mods/kit/rules.md with the...",
    "run": 122,
-   "auto": true,
-   "at": 1795421983030,
-   "by": "16adfd89-6ae1-4159-9c91-2a87e1814cbe"
+   "auto": true
   },
   {
    "id": "a261e4a4",
