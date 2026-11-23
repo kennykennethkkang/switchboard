@@ -63,6 +63,15 @@
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Agents map at 390 px:"
+  },
+  {
+   "id": "3b565ab3-ok",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795403233104,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ],
  "removed": {
@@ -529,7 +538,8 @@
   "ac02306d": 1795397281427,
   "6f818296": 1795399587509,
   "352ab00b": 1795399653788,
-  "d1835d63": 1795399811700
+  "d1835d63": 1795399811700,
+  "3b565ab3": 1795403233104
  },
  "seq": 99,
  "streak": 93,
@@ -640,17 +650,6 @@
    "short": "Release the Research tracker change after worktree...",
    "run": 90,
    "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "3b565ab3",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795389688962,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
