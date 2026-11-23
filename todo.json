@@ -30,6 +30,13 @@
    "at": 1795417012219,
    "from": "8db3461e-3619-42d8-a08a-f74267017535",
    "short": "repo-rules fails closed on transient errors..."
+  },
+  {
+   "id": "9feadeed",
+   "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
+   "at": 1795417026149,
+   "from": "8db3461e-3619-42d8-a08a-f74267017535",
+   "short": "Add two held-out rules tasks for worktree Bash to..."
   }
  ],
  "removed": {
