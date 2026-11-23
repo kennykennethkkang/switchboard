@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "62583c2e",
-   "text": "Merge back: treat renamed files and non-ASCII (git-quoted) file names that main already holds identically as already merged, instead of a clash. sameInMain in extension/src/hub/git.ts skips headers where a/ != b/ and quoted paths; parse git's quoted headers and rename pairs, keep the lstat+mode+readlink compare, add tests in extension/test/merge-back.test.ts (qa probe repro S3/S4). From chat \"Worktree merge fix and chat\".",
-   "at": 1795424646086,
-   "from": "bdd8fc14-2d9f-4691-aaa3-d9484caf47e9",
-   "name": "Worktree merge fix and chat",
-   "short": "Merge back: treat renamed files and non-ASCII...",
-   "chat": "41a66f79-b65a-4723-912e-37a06492bb09",
-   "host": "62903adf5e340f87",
-   "run": 128,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "58032070": 1795404119789,
@@ -508,10 +495,22 @@
   "06ebaaa6": 1795422084700,
   "8f8dfb3a": 1795422167085,
   "007e1c30": 1795422359124,
-  "ea70f92c": 1795422422896
+  "ea70f92c": 1795422422896,
+  "62583c2e": 1795424761406
  },
  "seq": 128,
  "ticked": [
+  {
+   "id": "62583c2e",
+   "text": "Merge back: treat renamed files and non-ASCII (git-quoted) file names that main already holds identically as already merged, instead of a clash. sameInMain in extension/src/hub/git.ts skips headers where a/ != b/ and quoted paths; parse git's quoted headers and rename pairs, keep the lstat+mode+readlink compare, add tests in extension/test/merge-back.test.ts (qa probe repro S3/S4). From chat \"Worktree merge fix and chat\".",
+   "from": "bdd8fc14-2d9f-4691-aaa3-d9484caf47e9",
+   "name": "Worktree merge fix and chat",
+   "short": "Merge back: treat renamed files and non-ASCII...",
+   "run": 128,
+   "auto": true,
+   "at": 1795424761406,
+   "by": "41a66f79-b65a-4723-912e-37a06492bb09"
+  },
   {
    "id": "ea70f92c",
    "text": "Proposed fix, claude-mods/kit/skills/self-improve/scripts/self-improve.mjs: in the agent job, write o.result to path.join(ws, 'out.md') after each run; in the judge loop, on the third bad reply write the raw j.result to path.join(run, `judge-fail-${o.t.id}-${o.side}-${o.run}.txt`) before throwing. Why: run 2026-11-23T08-15-20-377Z lost all 28 outputs to one flaky judge failure with nothing to inspect. Add a test in self-improve.test.mjs if the write is factored out. Filed by chat 16adfd89 aar.",
@@ -607,18 +606,6 @@
    "short": "Live check of 0.21.139 research save (from chat 5e0538ab):",
    "run": 119,
    "auto": true
-  },
-  {
-   "id": "dbcec580",
-   "text": "bash-approve and paid-guard fail closed on clean calls (from chat 42b516db, repo-rules fix): claude-mods/bash-approve/hooks/register.ts:138 and paid-guard/hooks/register.ts:229 use `.catch(($, e, next) => next.called ? next(e) : { deny })`, so any $ failure (env read, worker end, timeout) holds a clean call. Do as repo-rules 0.2.6 did: run the pure check before any $ call, have the .catch re-run only the pure check (deny on a hit, next(e) otherwise), put next.error.kind and message in the deny, add a test with a beneath-hook that denies the $ call on a clean call, bump each plugin.json and update via kenneth-mods. See memory guard-catch-rejudge.",
-   "at": 1795420556301,
-   "by": "26a95cd5-7fd6-47cd-871a-87b001aae007",
-   "from": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
-   "name": "To-do 114: Fix repo-rules fail-open transient errors",
-   "short": "bash-approve and paid-guard fail closed on clean calls...",
-   "run": 118,
-   "auto": true
   }
- ],
- "streak": 128
+ ]
 }
