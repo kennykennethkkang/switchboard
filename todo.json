@@ -15,10 +15,14 @@
   {
    "id": "d26897e3",
    "text": "Research library (chat \"Review research tab implementation\"): ~/.claude/switchboard/research/.claims/ gets one file per saved run and is never cleaned up. Prune claim files older than about 30 days in extension/src/hub/research-library.ts, keeping claims for runs still in the library or in .trash, and add a test.",
-   "at": 1795419070318,
+   "at": 1795420715787,
    "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
    "name": "Review research tab implementation",
-   "short": "Research library (chat \"Review research tab..."
+   "short": "Research library (chat \"Review research tab...",
+   "chat": "8083026f-ddf5-4ff9-8a06-ce7cd93cc97c",
+   "host": "62903adf5e340f87",
+   "run": 120,
+   "auto": true
   },
   {
    "id": "a261e4a4",
@@ -531,19 +535,19 @@
   "dbcec580": 1795420556301,
   "76653e53": 1795420713842
  },
- "seq": 119,
+ "seq": 120,
  "streak": 93,
  "ticked": [
   {
    "id": "76653e53",
    "text": "Live check of 0.21.139 research save (from chat 5e0538ab): once the window runs 0.21.139, start a project chat with /deep-research while no Switchboard view is open in that window (see memory research-live-test: hub-new-chat POST via node script), then confirm a research-*.md note and its MEMORY.md line appear in that project's ~/.claude/projects/<slug>/memory. The extension now saves via saveResearch in extension/src/session-runtime.ts.",
+   "at": 1795420713842,
+   "by": "8fe28baf-8726-40bd-ab75-be3d94e1ffba",
    "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
    "name": "To-do 111: Extension research memory save",
    "short": "Live check of 0.21.139 research save (from chat 5e0538ab):",
    "run": 119,
-   "auto": true,
-   "at": 1795420713842,
-   "by": "8fe28baf-8726-40bd-ab75-be3d94e1ffba"
+   "auto": true
   },
   {
    "id": "dbcec580",
