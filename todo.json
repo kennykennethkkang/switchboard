@@ -13,17 +13,6 @@
    "stopped": true
   },
   {
-   "id": "72ae2a0f",
-   "text": "Memory: bring Switchboard MEMORY.md under 200 lines (now 208; lines 201+ never load). The cut includes release-todo-unmerged-worktree (line 203), the note for \"release X after Merge back\" to-dos; chat f460e4eb missed it and retried node --test and pnpm run package. Run the memory-fix skill (merge related index lines, keep each under ~200 chars), then memory-gold.mjs --base to check no recall hit is lost. From Learn AAR of f460e4eb.",
-   "at": 1795414785754,
-   "from": "10d41c97-aef1-407f-8d5a-fda5f69fd1f4",
-   "short": "Memory: bring Switchboard MEMORY.md under 200 lines (now...",
-   "chat": "5046f43f-6c59-4078-8a22-4593d9b3918f",
-   "host": "62903adf5e340f87",
-   "run": 112,
-   "auto": true
-  },
-  {
    "id": "2669df6d",
    "text": "Fix: a finished chat keeps progress state 'working', which holds midTurn() true and blocks the window's idle update reload forever. Seen 2026-11-22: Zellizard-Tracker chat aefdf1b5 (turn ended 19:05, Stop + turn_duration in transcript) shows state working (at 20:55, ended map a2e071e2d91c69b92), so that window stayed on 0.21.136 past the 0.21.138 install. Likely a late subagent hook after Stop flipping state back to working (extension/src/hub/progress.ts, hub-service.ts midTurn line ~722).",
    "at": 1795413113846,
@@ -510,11 +499,22 @@
   "e4bcd541": 1795407319411,
   "84a32676": 1795407656678,
   "07da17e7": 1795413235700,
-  "ae106774": 1795414776403
+  "ae106774": 1795414776403,
+  "72ae2a0f": 1795415155063
  },
  "seq": 112,
  "streak": 93,
  "ticked": [
+  {
+   "id": "72ae2a0f",
+   "text": "Memory: bring Switchboard MEMORY.md under 200 lines (now 208; lines 201+ never load). The cut includes release-todo-unmerged-worktree (line 203), the note for \"release X after Merge back\" to-dos; chat f460e4eb missed it and retried node --test and pnpm run package. Run the memory-fix skill (merge related index lines, keep each under ~200 chars), then memory-gold.mjs --base to check no recall hit is lost. From Learn AAR of f460e4eb.",
+   "from": "10d41c97-aef1-407f-8d5a-fda5f69fd1f4",
+   "short": "Memory: bring Switchboard MEMORY.md under 200 lines (now...",
+   "run": 112,
+   "auto": true,
+   "at": 1795415155063,
+   "by": "5046f43f-6c59-4078-8a22-4593d9b3918f"
+  },
   {
    "id": "ae106774",
    "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
@@ -613,17 +613,6 @@
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:",
    "run": 103,
-   "auto": true
-  },
-  {
-   "id": "c6f0dbb5",
-   "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
-   "at": 1795405524734,
-   "by": "082694b8-c7f6-49bf-89ef-650811afd552",
-   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
-   "name": "Realistic Map Agents Theme",
-   "short": "Lantern Sea map theme:",
-   "run": 102,
    "auto": true
   }
  ]
