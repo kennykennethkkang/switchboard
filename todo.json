@@ -512,11 +512,32 @@
   "bb97b9f9": 1795349595962,
   "20c5030c": 1795354222399,
   "7ba2f3ce": 1795377231763,
-  "f5f5c66d": 1795384971163
+  "f5f5c66d": 1795384971163,
+  "58fbd139": 1795395506637
  },
  "seq": 94,
  "streak": 93,
+ "suggested": [
+  {
+   "id": "3b565ab3",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795389688962,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "58fbd139",
+   "text": "At 12:56 another chat installed Switchboard 0.21.124 and every VS Code window reloaded, which ended you mid-work. Check git status in your folder, then pick up exactly where you stopped and finish",
+   "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
+   "why": "missed",
+   "short": "At 12:56 another chat installed Switchboard 0.21.124 and...",
+   "at": 1795395506637,
+   "by": "45f4fefa-fd03-47d5-85ed-b20adfcd7425"
+  },
   {
    "id": "f5f5c66d",
    "text": "Release the to-do auto-tick fix (worktree fix-completed-todo-items-3228: missed asks tick with their chat's Release item, run prompts never become missed asks, shipped check reads extension/CHANGELOG.md and remembers seen commits across reloads) after Merge back: bump past main, CHANGELOG line, package, install",
@@ -616,37 +637,6 @@
    "short": "Release the Research-as-a-tab change after worktree...",
    "run": 87,
    "auto": true
-  },
-  {
-   "id": "b65599b1-ok",
-   "text": "Fix worktrees and merge if not merged so I can commit",
-   "at": 1795336247300,
-   "by": "6d4b6681-ef54-402e-8cbf-9ff416105b5b",
-   "from": "b7fd02f6-c0f8-4dae-ac44-3a8b0b7f1ce9",
-   "name": "To-do 78: Fix worktrees and merge",
-   "why": "missed",
-   "short": "Switchboard to-do, in this order:",
-   "run": 86,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "58fbd139",
-   "text": "At 12:56 another chat installed Switchboard 0.21.124 and every VS Code window reloaded, which ended you mid-work. Check git status in your folder, then pick up exactly where you stopped and finish",
-   "at": 1795389651412,
-   "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
-   "why": "missed",
-   "short": "At 12:56 another chat installed Switchboard 0.21.124 and..."
-  },
-  {
-   "id": "3b565ab3",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795389688962,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
