@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "06ebaaa6",
-   "text": "Four orphan worktrees with uncommitted files and no chat (from chat \"Fix idle chats\"): .claude/worktrees/also-issue-with-approve-page-c0d8 (1 file), fix-terminal-usage-bar-7fee (2), https-www-instagram-com-reel-1be3 (3), research-panel-vs-code-tab-dc4f (2). For each: diff against main, fold what main lacks per the merge-back memory note (git apply --check first), or discard if already in main; then git worktree remove and delete the branch.",
-   "at": 1795422031097,
-   "from": "44e05433-8196-4e67-8fea-5fead283cfee",
-   "name": "Fix idle chats",
-   "short": "Four orphan worktrees with uncommitted files and no chat...",
-   "chat": "7e7539c8-61da-4c2f-b5b6-fe1ffa9886ed",
-   "host": "62903adf5e340f87",
-   "run": 124,
-   "auto": true
-  },
-  {
    "id": "007e1c30",
    "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
    "at": 1795421259148,
@@ -531,11 +519,23 @@
   "d26897e3": 1795420796487,
   "a261e4a4": 1795421259385,
   "75675ae5": 1795421983030,
-  "a89feef4": 1795422029237
+  "a89feef4": 1795422029237,
+  "06ebaaa6": 1795422084700
  },
  "seq": 124,
  "streak": 93,
  "ticked": [
+  {
+   "id": "06ebaaa6",
+   "text": "Four orphan worktrees with uncommitted files and no chat (from chat \"Fix idle chats\"): .claude/worktrees/also-issue-with-approve-page-c0d8 (1 file), fix-terminal-usage-bar-7fee (2), https-www-instagram-com-reel-1be3 (3), research-panel-vs-code-tab-dc4f (2). For each: diff against main, fold what main lacks per the merge-back memory note (git apply --check first), or discard if already in main; then git worktree remove and delete the branch.",
+   "from": "44e05433-8196-4e67-8fea-5fead283cfee",
+   "name": "Fix idle chats",
+   "short": "Four orphan worktrees with uncommitted files and no chat...",
+   "run": 124,
+   "auto": true,
+   "at": 1795422084700,
+   "by": "7e7539c8-61da-4c2f-b5b6-fe1ffa9886ed"
+  },
   {
    "id": "a89feef4",
    "text": "Learned: kit/rules.md in claude-mods updated (pass rate 85% -> 90%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/candidate.diff. Undo: cp \"/Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/previous.md\" \"/Users/kennykennethkkang/Documents/GitHub/claude-mods/kit/rules.md\"",
@@ -628,16 +628,6 @@
    "from": "8db3461e-3619-42d8-a08a-f74267017535",
    "short": "Add two held-out rules tasks for worktree Bash to...",
    "run": 115,
-   "auto": true
-  },
-  {
-   "id": "91eb2700",
-   "text": "repo-rules fails closed on transient errors (improve-system 2026-11-22): \"repo-rules: the guard failed, so the command was held\" hit 5 sessions in Switchboard worktrees on 11-22/23, on plain commands (cd ../../../web && cat lib/skins/README.md; git status --short | wc -l) and two Write/Edit calls. bashRule returns undefined on that command in 180 ms when run alone, so the throw comes from roots()/report()/engine timeout under load, not the rule. In claude-mods/repo-rules/hooks/register.ts line 146 (held) and the .catch on the Bash, Edit and Write handlers: find what threw (log the error into the deny text), fix it, and add a test that a throwing roots() on a clean command does not hold it.",
-   "at": 1795418828291,
-   "by": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
-   "from": "8db3461e-3619-42d8-a08a-f74267017535",
-   "short": "repo-rules fails closed on transient errors...",
-   "run": 114,
    "auto": true
   }
  ]
