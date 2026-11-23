@@ -16,12 +16,18 @@
    "id": "9feadeed",
    "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
    "at": 1795418833016,
-   "from": "8db3461e-3619-42d8-a08a-f74267017535",
-   "short": "Add two held-out rules tasks for worktree Bash to...",
    "chat": "1d6a74b3-290d-41fe-b8d6-15fb01350d64",
    "host": "62903adf5e340f87",
+   "from": "8db3461e-3619-42d8-a08a-f74267017535",
+   "short": "Add two held-out rules tasks for worktree Bash to...",
    "run": 115,
    "auto": true
+  },
+  {
+   "id": "69a53497",
+   "text": "Memory consolidation: 10 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-23-f3dcd803.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "at": 1795418939060,
+   "short": "Memory consolidation:"
   }
  ],
  "removed": {
