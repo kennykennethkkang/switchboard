@@ -15,10 +15,14 @@
   {
    "id": "07da17e7",
    "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
-   "at": 1795412749018,
+   "at": 1795412759607,
    "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "name": "To-do 107: Fix research report memory save",
-   "short": "Live check of the 0.21.138 research save fix (from chat..."
+   "short": "Live check of the 0.21.138 research save fix (from chat...",
+   "chat": "64b45b22-552a-462b-9f4b-f58113821c30",
+   "host": "62903adf5e340f87",
+   "run": 110,
+   "auto": true
   },
   {
    "id": "ae106774",
@@ -507,7 +511,7 @@
   "e4bcd541": 1795407319411,
   "84a32676": 1795407656678
  },
- "seq": 109,
+ "seq": 110,
  "streak": 93,
  "ticked": [
   {
