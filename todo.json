@@ -13,16 +13,6 @@
    "stopped": true
   },
   {
-   "id": "69a53497",
-   "text": "Memory consolidation: 10 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-23-f3dcd803.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
-   "at": 1795418990164,
-   "chat": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
-   "host": "62903adf5e340f87",
-   "short": "Memory consolidation:",
-   "run": 116,
-   "auto": true
-  },
-  {
    "id": "d8e84eab",
    "text": "Release the Research library (chat \"Review research tab implementation\", already in main uncommitted): bump past main's version, move the CHANGELOG Unreleased lines under it, package, install. Then live test: one /deep-research project chat and one Research-switch chat. Check that each writes ~/.claude/switchboard/research/<project|general>/*.md, a single \"Research done\" notice appears, and the report opens on the Research page in VS Code and in the 3131 browser app.",
    "at": 1795418982570,
@@ -537,11 +527,21 @@
   "72ae2a0f": 1795415155063,
   "2669df6d": 1795418439396,
   "91eb2700": 1795418828291,
-  "9feadeed": 1795418985789
+  "9feadeed": 1795418985789,
+  "69a53497": 1795419138361
  },
  "seq": 116,
  "streak": 93,
  "ticked": [
+  {
+   "id": "69a53497",
+   "text": "Memory consolidation: 10 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-23-f3dcd803.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
+   "short": "Memory consolidation:",
+   "run": 116,
+   "auto": true,
+   "at": 1795419138361,
+   "by": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae"
+  },
   {
    "id": "9feadeed",
    "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
@@ -636,17 +636,6 @@
    "name": "To-do 99: Release research tab fixes",
    "short": "Fix: a project chat's deep-research report never reaches...",
    "run": 107,
-   "auto": true
-  },
-  {
-   "id": "9afdac3c",
-   "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
-   "at": 1795406440914,
-   "by": "f460e4eb-61be-4f53-9aec-51d0aecb1351",
-   "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
-   "name": "Fix VS Code terminal usage",
-   "short": "Release the side pane dock fix (worktree...",
-   "run": 106,
    "auto": true
   }
  ]
