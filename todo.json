@@ -2,18 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "ac02306d",
-   "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\". After the reload 10 chats had to be resumed by hand (4 by this chat, 6 by Instagram Reel Rotation Task), and the abyss worktree had been deleted (recreated at bd2ec53): the reload cleanup should not remove a worktree whose chat was still busy.",
-   "at": 1795385956725,
-   "chat": "c61ff256-a63a-4c77-8df8-0286f20f6184",
-   "host": "62903adf5e340f87",
-   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
-   "name": "Instagram reel rule implementation",
-   "short": "Fix: installing a Switchboard release reloads every...",
-   "run": 94,
-   "auto": true
-  },
-  {
    "id": "6f818296",
    "text": "Local first-draft routing: a local Ollama model (Gemma 12B, 128k context) writes first drafts and scaffolds before Claude; the author of reel instagram.com/reel/DfsG079gJ62 (ChiefGyk3D) says it cut his Claude usage about 40%. Reference: github.com/ChiefGyk3D/department-of-internal-arguments packs/local-llm-routing/PACK.md (Apache-2.0: \"local output is a draft: verify it against the source\", echo and compare identifiers, quote then answer, output only what was asked). Ollama is not installed yet. Credit the repo in README Credits.",
    "at": 1795384939931,
@@ -521,11 +509,34 @@
   "20c5030c": 1795354222399,
   "7ba2f3ce": 1795377231763,
   "f5f5c66d": 1795384971163,
-  "58fbd139": 1795395506637
+  "58fbd139": 1795395506637,
+  "ac02306d": 1795397281427
  },
  "seq": 94,
  "streak": 93,
+ "suggested": [
+  {
+   "id": "3b565ab3",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795389688962,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "ac02306d",
+   "text": "Fix: installing a Switchboard release reloads every window while chats are mid-turn and kills them. 2026-11-22 12:56 the 0.21.124 install (To-do 93 chat, code --install-extension --force) reloaded all 4 windows (*.reloading markers 12:56:43-49) and cut off 4 busy Switchboard chats at 12:57:45; the idle-reload guard (2 idle min, from 0.21.12) did not hold. Also: hub-resume then refused them with \"That chat's folder is gone\" because the reloaded hub had dropped them from chats/archive; resumeChat should fall back to the transcript's cwd. Found by chat \"Instagram reel rule implementation\". After the reload 10 chats had to be resumed by hand (4 by this chat, 6 by Instagram Reel Rotation Task), and the abyss worktree had been deleted (recreated at bd2ec53): the reload cleanup should not remove a worktree whose chat was still busy.",
+   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
+   "name": "Instagram reel rule implementation",
+   "short": "Fix: installing a Switchboard release reloads every...",
+   "run": 94,
+   "auto": true,
+   "at": 1795397281427,
+   "by": "c61ff256-a63a-4c77-8df8-0286f20f6184"
+  },
   {
    "id": "58fbd139",
    "text": "At 12:56 another chat installed Switchboard 0.21.124 and every VS Code window reloaded, which ended you mid-work. Check git status in your folder, then pick up exactly where you stopped and finish",
@@ -623,28 +634,6 @@
    "short": "Release the memory note panel fix (worktree...",
    "run": 88,
    "auto": true
-  },
-  {
-   "id": "5b0183ae",
-   "text": "Release the Research-as-a-tab change after worktree research-panel-vs-code-tab-dc4f merges back: bump, CHANGELOG line \"Research opens as a VS Code tab beside the chat instead of a floating always-on-top window\", package, install",
-   "at": 1795338294658,
-   "by": "ff50e275-6af8-47f5-993e-68c0911c9108",
-   "from": "2aadb982-f067-4b28-b7f8-63780eacd8e1",
-   "name": "Research Panel VS Code Tab",
-   "short": "Release the Research-as-a-tab change after worktree...",
-   "run": 87,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "3b565ab3",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795389688962,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
