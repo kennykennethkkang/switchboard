@@ -5,11 +5,11 @@
    "id": "6f818296",
    "text": "Local first-draft routing: a local Ollama model (Gemma 12B, 128k context) writes first drafts and scaffolds before Claude; the author of reel instagram.com/reel/DfsG079gJ62 (ChiefGyk3D) says it cut his Claude usage about 40%. Reference: github.com/ChiefGyk3D/department-of-internal-arguments packs/local-llm-routing/PACK.md (Apache-2.0: \"local output is a draft: verify it against the source\", echo and compare identifiers, quote then answer, output only what was asked). Ollama is not installed yet. Credit the repo in README Credits.",
    "at": 1795397295301,
+   "chat": "5bc0e4df-2a29-4ec3-957f-355fe7f53caf",
+   "host": "62903adf5e340f87",
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
    "short": "Local first-draft routing:",
-   "chat": "5bc0e4df-2a29-4ec3-957f-355fe7f53caf",
-   "host": "62903adf5e340f87",
    "run": 95,
    "auto": true
   },
@@ -51,6 +51,14 @@
    "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
    "name": "Redesign Site Pages Ship",
    "short": "Kit fix (aar, Redesign Site Pages Ship):"
+  },
+  {
+   "id": "58032070",
+   "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
+   "at": 1795397447783,
+   "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
+   "name": "To-do 94: Fix Switchboard reload killing chats",
+   "short": "Fix: a chat killed by a window reload looks ended, so..."
   }
  ],
  "removed": {
