@@ -4,10 +4,14 @@
   {
    "id": "8f8dfb3a",
    "text": "Release the Screen tab update (VS Code panel Screen tab, Terminal/Text toggle, screen reader text) after Merge back of terminal-view-switchboard-integration-8184: bump past main, package, install, open a chat's Screen tab in the VS Code panel to confirm it shows",
-   "at": 1795386686409,
+   "at": 1795399822457,
    "from": "a2641d21-038e-47f3-85b6-12b5258aba93",
    "name": "Terminal View Switchboard Integration",
-   "short": "Release the Screen tab update (VS Code panel Screen tab,..."
+   "short": "Release the Screen tab update (VS Code panel Screen tab,...",
+   "chat": "5b724cda-e06d-4e17-9f11-21bb4be7eab1",
+   "host": "62903adf5e340f87",
+   "run": 98,
+   "auto": true
   },
   {
    "id": "e00a421e",
@@ -500,30 +504,19 @@
   "352ab00b": 1795399653788,
   "d1835d63": 1795399811700
  },
- "seq": 97,
+ "seq": 98,
  "streak": 93,
- "suggested": [
-  {
-   "id": "3b565ab3",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795389688962,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
-  }
- ],
  "ticked": [
   {
    "id": "d1835d63",
    "text": "Release the self-improve 30 approved results floor after Merge back of worktree instagram-reel-rule-implementation-e264 (learn.ts betterOrNot + extension/kit/skills/self-improve generic copy); claude-mods source already edited.",
+   "at": 1795399811700,
+   "by": "607d4398-b654-458a-80bc-000828b75a05",
    "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
    "name": "Instagram reel rule implementation",
    "short": "Release the self-improve 30 approved results floor after...",
    "run": 97,
-   "auto": true,
-   "at": 1795399811700,
-   "by": "607d4398-b654-458a-80bc-000828b75a05"
+   "auto": true
   },
   {
    "id": "352ab00b",
@@ -620,6 +613,17 @@
    "short": "Release the Research tracker change after worktree...",
    "run": 90,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "3b565ab3",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795389688962,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
