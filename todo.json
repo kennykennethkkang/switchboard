@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "ea70f92c",
-   "text": "Proposed fix, claude-mods/kit/skills/self-improve/scripts/self-improve.mjs: in the agent job, write o.result to path.join(ws, 'out.md') after each run; in the judge loop, on the third bad reply write the raw j.result to path.join(run, `judge-fail-${o.t.id}-${o.side}-${o.run}.txt`) before throwing. Why: run 2026-11-23T08-15-20-377Z lost all 28 outputs to one flaky judge failure with nothing to inspect. Add a test in self-improve.test.mjs if the write is factored out. Filed by chat 16adfd89 aar.",
-   "at": 1795422360986,
-   "from": "16adfd89-6ae1-4159-9c91-2a87e1814cbe",
-   "name": "To-do 122: Rerun self-improve on rules md",
-   "short": "Proposed fix, claude-mods/kit/skills/self-improve/scripts...",
-   "chat": "0a309375-6829-42d1-ac2f-d71e91e78e85",
-   "host": "62903adf5e340f87",
-   "run": 127,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "58032070": 1795404119789,
@@ -507,11 +494,22 @@
   "a89feef4": 1795422029237,
   "06ebaaa6": 1795422084700,
   "8f8dfb3a": 1795422167085,
-  "007e1c30": 1795422359124
+  "007e1c30": 1795422359124,
+  "ea70f92c": 1795422422896
  },
  "seq": 127,
- "streak": 93,
  "ticked": [
+  {
+   "id": "ea70f92c",
+   "text": "Proposed fix, claude-mods/kit/skills/self-improve/scripts/self-improve.mjs: in the agent job, write o.result to path.join(ws, 'out.md') after each run; in the judge loop, on the third bad reply write the raw j.result to path.join(run, `judge-fail-${o.t.id}-${o.side}-${o.run}.txt`) before throwing. Why: run 2026-11-23T08-15-20-377Z lost all 28 outputs to one flaky judge failure with nothing to inspect. Add a test in self-improve.test.mjs if the write is factored out. Filed by chat 16adfd89 aar.",
+   "from": "16adfd89-6ae1-4159-9c91-2a87e1814cbe",
+   "name": "To-do 122: Rerun self-improve on rules md",
+   "short": "Proposed fix, claude-mods/kit/skills/self-improve/scripts...",
+   "run": 127,
+   "auto": true,
+   "at": 1795422422896,
+   "by": "0a309375-6829-42d1-ac2f-d71e91e78e85"
+  },
   {
    "id": "007e1c30",
    "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
@@ -606,17 +604,6 @@
    "name": "To-do 114: Fix repo-rules fail-open transient errors",
    "short": "bash-approve and paid-guard fail closed on clean calls...",
    "run": 118,
-   "auto": true
-  },
-  {
-   "id": "d8e84eab",
-   "text": "Release the Research library (chat \"Review research tab implementation\", already in main uncommitted): bump past main's version, move the CHANGELOG Unreleased lines under it, package, install. Then live test: one /deep-research project chat and one Research-switch chat. Check that each writes ~/.claude/switchboard/research/<project|general>/*.md, a single \"Research done\" notice appears, and the report opens on the Research page in VS Code and in the 3131 browser app.",
-   "at": 1795420243766,
-   "by": "d09bd3b9-8bee-42ab-8467-2b8dfdb8156f",
-   "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
-   "name": "Review research tab implementation",
-   "short": "Release the Research library (chat \"Review research tab...",
-   "run": 117,
    "auto": true
   }
  ]
