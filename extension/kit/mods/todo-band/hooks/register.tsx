@@ -61,13 +61,13 @@ function cutSegs(segs: Seg[], cols: number): Seg[] {
   return out
 }
 
-// "To-do 3 auto  item  +3 more  from aar": bold head, dim rest. Folds: source first, then the
+// "To-do 3 auto  item  +3 more  left by aar": bold head, dim rest. Folds: source first, then the
 // item text is cut. compact (a short terminal) also drops the source and says "+3".
 export function bandParts(t: Todo, cols: number, compact = false): Seg[] {
   const head: Seg[] = [{ t: `To-do ${t.n}`, b: true }, ...(t.auto ? [{ t: ' auto', dim: true }] : [])]
   const text = t.text.replace(/\s+/g, ' ').trim()
   const more: Seg[] = t.total > 1 ? [{ t: compact ? ` +${t.total - 1}` : `  +${t.total - 1} more`, dim: true }] : []
-  const from: Seg[] = !compact && t.from ? [{ t: `  from ${t.from}`, dim: true }] : []
+  const from: Seg[] = !compact && t.from ? [{ t: `  left by ${t.from}`, dim: true }] : []
   const full = [...head, { t: '  ' + text }, ...more, ...from]
   if (widthOf(full) <= cols) return full
   const room = cols - widthOf(head) - 2 - widthOf(more)

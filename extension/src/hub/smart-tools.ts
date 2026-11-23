@@ -8,9 +8,12 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { execFile } from 'child_process'
+import { writeJsonAtomic } from '../fs-utils'
+import { JEV } from './picker'
 import type { ChatProfile, Installed, SmartRecord } from './types'
 import type { HubService } from './hub-service'
-import { FLAGGED, PROFILES, toolInventory, cleanProfile, defaultProfile, readProfiles, saveProfile } from './tools'
+import { ALWAYS, FLAGGED, GATED, PROFILES, toolInventory, cleanProfile, defaultProfile, readProfiles, saveProfile } from './tools'
 import { LIBRARY } from './local'
 
 export type Pick = { name: string; kind: 'plugin' | 'skill' | 'asset'; rule: string; held?: boolean }
@@ -83,6 +86,89 @@ export function withGoal(p: ChatProfile, text: string, inv: Installed[]): ChatPr
   return { ...p, plugins, skills }
 }
 
+export type Precedence = 'always' | 'auto' | 'never'
+const PRECEDENCE = path.join(os.homedir(), '.claude', 'switchboard', 'tool-precedence.json')
+
+/** Kenneth's per-tool precedence: always (never turned off) or never (off unless on by hand or tool_on); unset is auto and left out. */
+export function readPrecedence(file = PRECEDENCE): Record<string, 'always' | 'never'> {
+  try {
+    const m = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>
+    return Object.fromEntries(Object.entries(m).filter(([, v]) => v === 'always' || v === 'never')) as Record<string, 'always' | 'never'>
+  } catch { return {} }
+}
+
+export function setPrecedence(name: string, value: Precedence, file = PRECEDENCE): Record<string, 'always' | 'never'> {
+  const m: Record<string, 'always' | 'never'> = readPrecedence(file)
+  if (value === 'auto') delete m[name]; else m[name] = value
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  writeJsonAtomic(file, m)
+  return m
+}
+
+/** Jev's chance (0 to 1) that each candidate tool helps with the task; a name it did not answer for is missing. */
+export type JevAsk = (task: string, items: Array<{ name: string; about: string }>) => Promise<Record<string, number> | undefined>
+// Below this a tool is off; unsure counts as needed.
+const NOT_NEEDED = 0.3
+const JEV_MS = 3000
+const PRESET = { name: 'switchboard-tools', model: 'typesafe/jev-1.13', description: 'Which plugins and skills help with the first message of a chat', state_fields: ['task'], display_fields: [], thresholds: {}, rules: [] }
+// The 32k-token context holds about this many one-line questions.
+const JEV_MAX = 250
+
+/** One Jev request: a noul question per tool, all answered in parallel on the same task (about 0.6 s for 180); undefined when Jev is missing, slow or fails. */
+const viaJev: JevAsk = async (task, items) => {
+  if (!fs.existsSync(JEV)) return undefined
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-tools-'))
+  try {
+    const used = items.slice(0, JEV_MAX)
+    const questions = Object.fromEntries(used.map((i, n) => [`t${n}`, { type: 'noul', instructions: `Could the tool "${i.name.split('@')[0]}" (${i.about || 'no description'}) be of real use for doing \`task\`? Answer yes if the task might call on it, even a little; no only when it is clearly unrelated.` }]))
+    fs.writeFileSync(path.join(dir, 'preset.json'), JSON.stringify({ ...PRESET, questions }))
+    fs.writeFileSync(path.join(dir, 'items.json'), JSON.stringify([{ _id: '0', task: task.slice(0, 1500) }]))
+    // No Keychain read here: jev.py looks its own key up inside the time limit.
+    const out = await new Promise<string | undefined>(done => execFile('python3', [JEV, 'ask', '--preset', path.join(dir, 'preset.json'), '--input', path.join(dir, 'items.json'), '--timeout', '3'],
+      { timeout: JEV_MS, maxBuffer: 4 << 20, env: process.env }, (err, o) => done(err ? undefined : String(o))))
+    const res: Record<string, number> = {}
+    for (const line of out?.split('\n') ?? []) {
+      try {
+        const r = JSON.parse(line) as Record<string, unknown>
+        used.forEach((i, n) => { if (typeof r[`t${n}`] === 'number') res[i.name] = r[`t${n}`] as number })
+      } catch { /* summary line or noise */ }
+    }
+    return Object.keys(res).length ? res : undefined
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+}
+
+/**
+ * A new chat's profile from its first message: Jev says per plugin and enabled skill whether the task needs it, and a confident no
+ * turns it off. The regex picks, ALWAYS plugins and precedence "always" stay on; "never" is off. Jev down or slow: the regex-only
+ * start (withGoal). No message: all on. why: Jev's line per candidate, else the regex rule.
+ */
+export async function jevStart(start: ChatProfile, text: string, inv: Installed[], prec: Record<string, 'always' | 'never'>, ask: JevAsk = viaJev): Promise<{ profile: ChatProfile; why: Record<string, string> }> {
+  const base = withGoal(start, text, inv)
+  const why: Record<string, string> = {}
+  const regex = pickTools(text, undefined, inv)
+  for (const k of regex) why[k.name] = k.rule
+  const fixed = new Set(regex.map(k => k.name))
+  const out = (p: ChatProfile) => {
+    const plugins = { ...p.plugins }, skills = { ...p.skills }
+    for (const [n, v] of Object.entries(prec)) for (const m of [plugins, skills]) if (n in m) m[n] = v === 'always'
+    return { profile: { ...p, plugins, skills }, why }
+  }
+  if (!text.trim()) return out(base)
+  const cand = usable(inv).filter(i => i.kind !== 'asset' && !i.held && !fixed.has(i.name) && !prec[i.name] && !(i.kind === 'plugin' && (ALWAYS.includes(short(i.name)) || Object.hasOwn(GATED, short(i.name)))))
+  let got: Record<string, number> | undefined
+  try { got = cand.length ? await ask(text, cand.map(i => ({ name: i.name, about: (i.description ?? '').replace(/\s+/g, ' ').slice(0, 200) }))) : undefined } catch { got = undefined }
+  if (!got) return out(base)
+  const plugins = { ...base.plugins }, skills = { ...base.skills }
+  for (const i of cand) {
+    const p = got[i.name]
+    if (p === undefined) continue
+    const no = p < NOT_NEEDED
+    why[i.name] = `Jev: ${no ? 'not needed' : 'needed'} (${p.toFixed(2)})`
+    if (no) (i.kind === 'plugin' ? plugins : skills)[i.name] = false
+  }
+  return out({ ...base, plugins, skills })
+}
+
 /**
  * picks applied to a profile. A prompt that fires nothing, or a subagent start (merge), keeps the last set;
  * otherwise what it turned on before and no longer wants goes off. Held tools stay off and are listed.
@@ -92,7 +178,8 @@ export function applyPicks(p: ChatProfile, inv: Installed[], picks: Pick[], prev
   const plugins = { ...p.plugins }, skills = { ...p.skills }, assets = { ...(p.assets ?? {}) }
   const of = (k: Pick['kind']) => (k === 'plugin' ? plugins : k === 'skill' ? skills : assets)
   const on: Record<string, string> = keep ? { ...prev?.on } : {}
-  const why: Record<string, string> = keep ? { ...prev?.why } : {}
+  // Jev's start lines outlive a prompt's own picks.
+  const why: Record<string, string> = keep ? { ...prev?.why } : Object.fromEntries(Object.entries(prev?.why ?? {}).filter(([, v]) => v.startsWith('Jev:')))
   const refused = new Set(keep ? prev?.refused ?? [] : [])
   const library = new Set(keep ? prev?.library ?? [] : [])
   let changed = false
@@ -127,13 +214,16 @@ export function readSmart(ids: string[], dir = PROFILES): Record<string, SmartRe
   return out
 }
 
+/** A new chat's start picks, kept so the panel can show why each tool is on or off. */
+export const saveSmartStart = (id: string, why: Record<string, string>, dir = PROFILES): void => { if (ID.test(id) && Object.keys(why).length) writeSmart(id, { why, on: {}, refused: [], library: [], pending: false, at: Date.now() }, dir) }
+
 function writeSmart(id: string, r: SmartRecord, dir: string): void {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   fs.writeFileSync(smartFile(id, dir), `${JSON.stringify(r, null, 2)}\n`, { mode: 0o600 })
 }
 
 /** One hook payload against a chat's profile; the saved profile when picks changed it, else undefined. */
-export function smartEvent(payload: Record<string, unknown>, profile: ChatProfile, inv: Installed[], dir = PROFILES, index = '', now = Date.now()): ChatProfile | undefined {
+export function smartEvent(payload: Record<string, unknown>, profile: ChatProfile, inv: Installed[], dir = PROFILES, index = '', now = Date.now(), prec: Record<string, 'always' | 'never'> = {}): ChatProfile | undefined {
   const id = typeof payload.session_id === 'string' ? payload.session_id : ''
   if (!ID.test(id)) return undefined
   const ev = payload.hook_event_name
@@ -146,6 +236,8 @@ export function smartEvent(payload: Record<string, unknown>, profile: ChatProfil
   if (ev === 'UserPromptSubmit' && !payload.agent_id) picks = pickTools(String(payload.prompt ?? '').replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ''), undefined, inv, index)
   else if (ev === 'SubagentStart' && typeof payload.agent_type === 'string') { picks = pickTools('', payload.agent_type, inv, index); merge = true }
   else return undefined
+  // A tool set to never stays off for the prompt's picks too.
+  picks = picks.filter(k => prec[k.name] !== 'never')
   if (!picks.length && !prev) return undefined
   const r = applyPicks(profile, inv, picks, prev, now, merge)
   writeSmart(id, r.record, dir)
@@ -169,7 +261,7 @@ export async function smartHook(hub: HubService, payload: Record<string, unknown
   if ((hub.get().chats.find(c => c.sessionId === id)?.ai ?? 'claude') !== 'claude') return
   const inv = await toolInventory(hub, id)
   const index = await fs.promises.readFile(path.join(LIBRARY, 'INDEX.md'), 'utf8').catch(() => '')
-  const profile = smartEvent(payload, readProfiles([id])[id] ?? defaultProfile(inv), inv, PROFILES, index)
+  const profile = smartEvent(payload, readProfiles([id])[id] ?? defaultProfile(inv), inv, PROFILES, index, Date.now(), readPrecedence())
   const tools = hub.get().tools
   if (tools) hub.set({ tools: { ...tools, chats: profile ? { ...tools.chats, [id]: profile } : tools.chats, smart: { ...tools.smart, ...readSmart([id]) } } })
 }

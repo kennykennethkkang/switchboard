@@ -108,7 +108,8 @@ export function readmeLine(md: string): string | undefined {
 }
 
 function sentence(text: string): string | undefined {
-  const t = redact(text).replace(/@\w+.*$/gm, '').replace(/\s+/g, ' ').trim()
+  // a colon that opens a numbered list ends the sentence, or it reads "...package: 1."
+  const t = redact(text).replace(/@\w+.*$/gm, '').replace(/\s+/g, ' ').trim().replace(/:\s+1[.)]\s[\s\S]*$/, '.')
   if (!t) return undefined
   const end = t.search(/[.!?](\s|$)/)
   const one = end > 20 ? t.slice(0, end + 1) : t

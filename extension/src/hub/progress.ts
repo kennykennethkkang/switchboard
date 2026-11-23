@@ -286,6 +286,8 @@ export function toolTarget(tool: string, input: Payload): string | undefined {
   if (tool === 'Bash') t = str(input.command)?.slice(0, 40)
   else if (tool === 'WebFetch') { try { t = new URL(String(input.url)).host } catch { t = undefined } }
   else if (tool === 'Agent' || tool === 'Task') t = str(input.subagent_type) ?? str(input.description)
+  else if (tool === 'WebSearch') t = str(input.query)
+  else if (tool === 'Skill') t = str(input.skill)
   else t = str(input.pattern) ?? path?.split('/').filter(Boolean).slice(-2).join('/')
   return t ? plainText(t).slice(0, 48).trim() || undefined : undefined
 }
@@ -470,7 +472,8 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
   // Compact and resume send SessionStart on the same chat; only a new one or /clear starts over.
   const base: ChatProgress = prev && !(event === 'SessionStart' && RESET.has(String(payload.source)))
     ? prev
-    : { sessionId, cwd: str(payload.cwd) ?? '', state: 'working', roles: [], tasks: [], startedAt: now, at: now }
+    // A subagent's own hook says nothing about the lead (cache-keeper's fork pings an idle chat); seen() wakes it if one is really busy.
+    : { sessionId, cwd: str(payload.cwd) ?? '', state: str(payload.agent_id) ? 'idle' : 'working', roles: [], tasks: [], startedAt: now, at: now }
   // A resumed chat is a new process: the old one's background subagents are gone and send no SubagentStop.
   const p: ChatProgress = event === 'SessionStart' && payload.source === 'resume' ? { ...base, at: now, running: undefined, waiting: undefined, jobs: undefined, subJobs: undefined } : { ...base, at: now }
   const role = str(payload.agent_type)
@@ -527,9 +530,9 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
     case 'UserPromptSubmit': {
       if (sub) return p
       // Kenneth's own asks, for the done receipt; mod prompts, task notifications and bare reminders are not his.
-      const said = cut(String(payload.prompt ?? '').replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ''), ASKED_ITEM)
+      const said = cut(askedText(String(payload.prompt ?? '').replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')) ?? '', ASKED_ITEM)
       // covered scores the old asks by index, so a new one drops them.
-      const q: ChatProgress = said && !/^(Switchboard:|<task-notification>)/.test(said) ? { ...p, asked: [...(p.asked ?? []), said].slice(-ASKED_MAX), covered: undefined } : p
+      const q: ChatProgress = said ? { ...p, asked: [...(p.asked ?? []), said].slice(-ASKED_MAX), covered: undefined } : p
       // While limited the prompt may fail with no hook at all; the warning stays until real progress.
       return q.limited ? q : { ...q, state: 'working', ...NO_ASK, waiting: undefined }
     }
@@ -660,9 +663,23 @@ const WRAPPED = /<(pasted_content|cross-session-message|system-reminder|task-not
 const NUDGE = /^your claude ai usage limit has reset\b|^(is there )?anything else( (to do|left|that needs doing|that needs to be done|to work on))?( here| now)?$|^(please )?(do|finish) (what is|what s|whatever is) left$|^is (everything|it all|that all|it) (done|finished)\b|^(it )?(seems|looks) like (the )?\w+ (is|got) stuck( please fix( it)?)?$/
 // The standing ask for a full commit message, never a task.
 const COMMIT_ASK = /\b(make|write|put|give)( me)?( the| a)? full commit message\b/
+/** The to-do run prompt's first line (runMessage in todo.ts). */
+export const RUN_PROMPT = 'Switchboard to-do, in this order:'
+// Prompts Switchboard sends a chat itself: to-do runs, handoffs and resumes, check-backs, stuck notices, card links.
+const MACHINE_START = new RegExp(`^(Switchboard:|<task-notification>|${RUN_PROMPT}|Usage limit reset\\. Continue where you stopped|Continue from \\S+\\.md: read it first|Check back: look at progress on open work|Run the aar skill now on this chat so far|Handoff from (Claude|Codex|Hermes) in |Subagent .+ \\(.+\\) has been quiet \\d+ min\\.)`)
+const MACHINE_END = /(rerun it with a timeout if it is still needed\.|run_in_background and a check on its output\.|The chat has repeated .+ six times in a row; break that loop\.)$/
+// The pipeline line takes a first prompt's place after the person's own words.
+const SEED = /\s*A saved pipeline seeded \.switchboard\/stages\/.*$/
+/** The words a person typed, or undefined when the whole prompt is Switchboard's own. */
+export function askedText(text: string): string | undefined {
+  const t = text.replace(SEED, '').trim()
+  return !t || MACHINE_START.test(t) || MACHINE_END.test(t) ? undefined : t
+}
 /** text without wrapped blocks, or undefined when nothing human is left or it only nudges the chat. ask: a raw request, which must also read like a task. */
 export function workText(text: string, ask = false): string | undefined {
-  const t = plainText(text).replace(WRAPPED, ' ').replace(/\s+/g, ' ').trim()
+  const raw = plainText(text).replace(WRAPPED, ' ').replace(/\s+/g, ' ').trim()
+  const t = ask ? askedText(raw) : raw
+  if (!t) return undefined
   const w = t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
   if (!w || NUDGE.test(w)) return undefined
   // ponytail: keyword rules; a quick model call fits better if they let junk through

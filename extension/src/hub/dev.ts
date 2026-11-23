@@ -10,6 +10,7 @@ import * as path from 'path'
 import { run } from './local'
 import { tailscaleBin } from './lan'
 import { projectName } from './projects'
+import type { ScreenSnap } from './screen'
 import type { OwnedStuck } from './stuck'
 import type { DevProject, Server } from './types'
 
@@ -132,21 +133,34 @@ export async function postWindow(w: Win, body: Record<string, unknown>): Promise
   try { return (await postLocal(w.port, '/hub', { token: w.hubToken, ...body }, 2000)).ok } catch { return false }
 }
 
-/** The stuck items of the chats another window owns, or undefined when it does not answer. */
-export function readOwnedStuck(w: Win, ms = 2000): Promise<OwnedStuck | undefined> {
+/** GET path from another window's hub: the parsed JSON on a 200, else undefined (no answer, timeout, bad JSON). */
+function getWindow(w: Win, path: string, ms: number): Promise<unknown> {
   return new Promise(resolve => {
-    const done = (v?: OwnedStuck) => { clearTimeout(timer); resolve(v) }
-    const req = http.request({ host: '127.0.0.1', port: w.port, path: '/hub/stuck', method: 'GET', agent: false, headers: { 'x-switchboard-token': w.hubToken } }, res => {
+    const done = (v?: unknown) => { clearTimeout(timer); resolve(v) }
+    const req = http.request({ host: '127.0.0.1', port: w.port, path, method: 'GET', agent: false, headers: { 'x-switchboard-token': w.hubToken } }, res => {
       let text = ''
       res.setEncoding('utf8')
       res.on('data', c => { text += c })
-      res.on('end', () => { try { const v = JSON.parse(text); done(res.statusCode === 200 && Array.isArray(v?.owned) && Array.isArray(v?.stuck) ? v : undefined) } catch { done() } })
+      res.on('end', () => { try { done(res.statusCode === 200 ? JSON.parse(text) : undefined) } catch { done() } })
       res.on('error', () => done())
     })
     const timer = setTimeout(() => { req.destroy(); done() }, ms)
     req.on('error', () => done())
     req.end()
   })
+}
+
+/** The stuck items of the chats another window owns, or undefined when it does not answer. */
+export async function readOwnedStuck(w: Win, ms = 2000): Promise<OwnedStuck | undefined> {
+  const v = await getWindow(w, '/hub/stuck', ms) as OwnedStuck | undefined
+  return Array.isArray(v?.owned) && Array.isArray(v?.stuck) ? v : undefined
+}
+
+/** A chat's screen from whichever of wins holds its terminal (only that one answers 200). */
+export async function readScreenElsewhere(session: string, wins: Win[], ms = 2000): Promise<(ScreenSnap & { typing: boolean }) | undefined> {
+  const q = `/hub/chat/screen?${new URLSearchParams({ session, ansi: '1' })}`
+  const all = await Promise.all(wins.map(w => getWindow(w, q, ms) as Promise<(ScreenSnap & { typing: boolean }) | undefined>))
+  return all.find(s => typeof s?.text === 'string')
 }
 
 /** Runs a hub-* command in another window, as its panel would; false when it did not take it.

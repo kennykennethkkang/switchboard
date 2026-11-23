@@ -7,6 +7,11 @@
   container-type: inline-size; overflow: hidden;
 }
 .rp *, .rp *::before, .rp *::after { box-sizing: border-box; }
+/* A project chat's research, in its Chats page column. */
+.rp[data-inline] {
+  position: relative; inset: auto; height: min(560px, 72vh); margin-top: 12px;
+  border: 1px solid var(--hub-hair); border-radius: 12px; background: var(--hub-surface);
+}
 .rp-shell {
   position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column;
   animation: rp-enter 620ms var(--rp-spring) both, rp-fade 220ms var(--hub-ease-out) both;

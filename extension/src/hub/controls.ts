@@ -49,6 +49,9 @@ export function readControls(s: Record<string, unknown>): ClaudeControls {
   }
 }
 
+/** Chat terminal env for the layout: Claude Code drops fullscreen machine-wide after two launches die early, and the env var overrides that. */
+export const tuiEnv = (tui: ClaudeControls['tui']): Record<string, string> => (tui === 'fullscreen' ? { CLAUDE_CODE_NO_FLICKER: '1' } : {})
+
 /**
  * terminal.integrated.commandsToSkipShell with the command added, so its keybinding works while a terminal
  * has focus; undefined when nothing changes (already there, taken out on purpose with -id, or not a list).

@@ -71,17 +71,57 @@ export function Flags({ list }: { list?: Flag[] }) {
 
 export const Dot = ({ n }: { n: GraphNode }) => <i className="mk-dot" style={{ background: toneOf(n) }} aria-hidden />
 
-/** Body text with each [[name]] as a chip that opens the note, or a struck chip when nothing has that name. */
+/** Body text with light Markdown (headings, lists, fences, **bold**, `code`) and each [[name]] as a chip that opens the note, or a struck chip when nothing has that name. */
 export function NoteText({ g, text, onOpen }: { g: MemoryGraph; text: string; onOpen: (id: string) => void }) {
   const find = (name: string) => { const s = name.toLowerCase(); return g.nodes.find(n => n.label.toLowerCase() === s || n.aliases?.some(a => a.toLowerCase() === s)) }
-  return <p className="mk-text">{text.split(/(\[\[[^\]]+\]\])/).map((part, i) => {
-    const m = part.match(/^\[\[([^\]]+)\]\]$/)
-    if (!m) return part
-    const hit = find(m[1])
+  const link = (name: string) => {
+    const hit = find(name)
     return hit
-      ? <button key={i} type="button" className="mk-wl" onClick={() => onOpen(hit.id)}><Dot n={hit} />{m[1]}</button>
-      : <span key={i} className="mk-wl" data-broken="" title="No note has this name">{m[1]}</span>
-  })}</p>
+      ? <button type="button" className="mk-wl" onClick={() => onOpen(hit.id)}><Dot n={hit} />{name}</button>
+      : <span className="mk-wl" data-broken="" title="No note has this name">{name}</span>
+  }
+  const inline = (s: string): ReactNode[] => {
+    const parts = s.split(/(\[\[[^\]]+\]\]|\*\*[^*\n]+\*\*|`[^`\n]+`)/)
+    return parts.map((p, i) => {
+      let m = p.match(/^\[\[([^\]]+)\]\]$/)
+      if (m) {
+        // the comma or full stop after a chip stays on its line
+        const tail = parts[i + 1]?.match(/^[,.;:!?)]+/)?.[0] ?? ''
+        if (tail) parts[i + 1] = parts[i + 1].slice(tail.length)
+        return <span key={i} className="mk-nw">{link(m[1])}{tail}</span>
+      }
+      if ((m = p.match(/^\*\*(.+)\*\*$/))) return <strong key={i}>{inline(m[1])}</strong>
+      if ((m = p.match(/^`(.+)`$/))) return <code key={i}>{m[1]}</code>
+      return p
+    })
+  }
+  const blocks: ReactNode[] = []
+  let para: string[] = [], list: string[] = [], ordered = false, fence: string[] | null = null
+  const flush = () => {
+    if (para.length) blocks.push(<p key={blocks.length}>{inline(para.join('\n'))}</p>)
+    if (list.length) { const L = ordered ? 'ol' : 'ul'; blocks.push(<L key={blocks.length}>{list.map((l, i) => <li key={i}>{inline(l)}</li>)}</L>) }
+    para = []; list = []
+  }
+  for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) {
+      if (fence) { blocks.push(<pre key={blocks.length}>{fence.join('\n')}</pre>); fence = null } else { flush(); fence = [] }
+      continue
+    }
+    if (fence) { fence.push(line); continue }
+    const head = line.match(/^#{1,6}\s+(.*)$/)
+    const item = line.match(/^\s*([-*+]|\d+[.)])\s+(.*)$/)
+    if (!line.trim()) flush()
+    else if (head) { flush(); blocks.push(<p key={blocks.length} className="mk-h">{inline(head[1])}</p>) }
+    else if (item) {
+      const num = /\d/.test(item[1])
+      if (para.length || (list.length && num !== ordered)) flush()
+      ordered = num; list.push(item[2])
+    } else if (list.length && /^\s/.test(line)) list[list.length - 1] += ' ' + line.trim()
+    else { if (list.length) flush(); para.push(line) }
+  }
+  if (fence) blocks.push(<pre key={blocks.length}>{fence.join('\n')}</pre>)
+  flush()
+  return <div className="mk-text">{blocks}</div>
 }
 
 export function Search({ value, onChange, label, inputRef, onEnter }: { value: string; onChange: (v: string) => void; label: string; inputRef?: RefObject<HTMLInputElement | null>; onEnter?: () => void }) {
@@ -128,6 +168,10 @@ export function NoteReader({ g, node, home, flags, onOpen, innerRef, children }:
   g: MemoryGraph; node: GraphNode; home: (n: GraphNode) => string; flags: Map<string, Flag[]>; onOpen: (id: string) => void; innerRef?: RefObject<HTMLElement | null>; children?: ReactNode
 }) {
   const rel = useMemo(() => relations(g, node.id), [g, node])
+  const own = useRef<HTMLElement>(null)
+  const ref = innerRef ?? own
+  // A new note starts at its title: the notebook scrolls the article, the map its panel.
+  useEffect(() => { const el = ref.current; if (el) { el.scrollTop = 0; if (el.parentElement) el.parentElement.scrollTop = 0 } }, [node.id, ref])
   const typed = (t: string) => rel.typed.find(x => x.title === t)?.list
   const chips = (title: string, list?: GraphNode[]) => list?.length ? (
     <section className="nb-rel">
@@ -137,7 +181,7 @@ export function NoteReader({ g, node, home, flags, onOpen, innerRef, children }:
   ) : null
   const plain = new Set(['Superseded by', 'Contradicts', 'Contradicted by'])
   return (
-    <article ref={innerRef} tabIndex={-1} className="nb-read" aria-label={node.label}>
+    <article ref={ref} tabIndex={-1} className="nb-read" aria-label={node.label}>
       {children}
       <p className="nb-kicker"><Dot n={node} />{node.kind === 'project' ? 'Project' : `${kindLabel(node)} in ${home(node)}`}</p>
       <h1>{shortLabel(node)}</h1>

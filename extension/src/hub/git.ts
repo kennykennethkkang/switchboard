@@ -4,6 +4,7 @@
  */
 import { execFile } from 'child_process'
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 import { cliPath } from './ais'
 import { excludeWorktrees } from './advanced'
@@ -442,6 +443,9 @@ export function endedWorktrees(seen: Map<string, number | undefined>, chats: { l
   return ended
 }
 
+/** Chats for the sweep: a chat killed without SessionEnd (a window reload) keeps its progress row, so its worktree counts as live until a resume or the row goes stale. */
+export const sweepChats = (chats: { live: boolean; cwd: string }[], progress: { cwd: string }[]) => [...chats, ...progress.map(p => ({ live: true, cwd: p.cwd }))]
+
 /** Folders under <repo>/.claude/worktrees for the repos these chats run in, plus any other repo roots given (every known project). */
 export function worktreeDirs(cwds: string[], extra: string[] = []): string[] {
   const roots = new Set([...cwds.map(c => WT_DIR.exec(c)?.[1].replace(/[\\/]\.claude[\\/]worktrees[\\/][^\\/]+$/, '') ?? c), ...extra])
@@ -497,6 +501,240 @@ export async function cleanWorktree(wt: string, pr: (main: string, branch: strin
   return true
 }
 
+/** True for a worktree folder (real path) that a live chat runs in. held: counts a chat the live flag misses (a Codex terminal still open). */
+export const liveIn = (chats: { live: boolean; cwd: string; sessionId?: string }[], held: (sessionId: string) => boolean = () => false) => (wt: string) =>
+  chats.some(c => { if (!c.live && !(c.sessionId && held(c.sessionId))) return false; const d = realOf(c.cwd); return d === wt || d.startsWith(wt + path.sep) })
+
+/** Worktree chats (sessionId to cwd) that merge back once the chat ends: queued by Approve, or by Merge into main while the chat runs. A reload drops it; Merge all picks those up. */
+export const mergeOnEnd = new Map<string, string>()
+export const inWorktree = (cwd: string) => WT_DIR.test(cwd)
+/** Takes the queued worktrees whose chat has ended off the queue and returns [sessionId, folder] pairs. */
+export function endedMerges(queue: Map<string, string>, live: (wt: string) => boolean): [string, string][] {
+  const out: [string, string][] = []
+  for (const [id, cwd] of queue) {
+    const wt = WT_DIR.exec(cwd)?.[1]
+    if (!wt || !fs.existsSync(wt)) { queue.delete(id); continue }
+    if (live(realOf(wt))) continue
+    queue.delete(id)
+    out.push([id, wt])
+  }
+  return out
+}
+
+export type Check = (dir: string) => Promise<{ ok: boolean; text: string }>
+const CHECK_MS = 10 * 60_000
+
+/** The repo's own checks: the root package.json's typecheck and test scripts, run with the lockfile's package manager. No package.json: nothing to run. */
+export const repoChecks: Check = async dir => {
+  let scripts: Record<string, string>
+  try { scripts = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).scripts ?? {} } catch { return { ok: true, text: 'no checks found' } }
+  const pm = fs.existsSync(path.join(dir, 'pnpm-lock.yaml')) ? 'pnpm' : fs.existsSync(path.join(dir, 'yarn.lock')) ? 'yarn' : 'npm'
+  const bin = await cliPath(pm) ?? pm
+  const run = ['typecheck', 'test'].filter(s => scripts[s])
+  for (const s of run) {
+    const r = await exec(bin, ['run', s], CHECK_MS, dir)
+    if (!r.ok) return { ok: false, text: `${pm} run ${s} failed` }
+  }
+  return { ok: true, text: run.length ? `${run.join(' and ')} passed` : 'no checks found' }
+}
+
+/** The worktree's work as one binary patch against where it forked from main's HEAD: its commits plus every uncommitted and new file. */
+async function worktreePatch(main: string, wt: string): Promise<Ran> {
+  const head = (await git(wt, ['rev-parse', 'HEAD'])).out.trim()
+  const base = (await git(main, ['merge-base', 'HEAD', head])).out.trim()
+  if (!head || !base) return { ok: false, out: '', err: 'no common commit with main' }
+  // A throwaway index, so the worktree's own index is never touched.
+  const idx = path.join(os.tmpdir(), `sb-merge-${process.pid}-${Date.now()}`)
+  const inIdx = (args: string[]) => new Promise<Ran>(done => execFile('git', ['-C', wt, ...args], { timeout: SLOW, maxBuffer: 8 << 20, windowsHide: true, env: { ...ENV, GIT_INDEX_FILE: idx } },
+    (err, out, e) => done({ ok: !err, out: String(out), err: String(e) || err?.message || '' })))
+  try {
+    for (const args of [['read-tree', 'HEAD'], ['add', '-A']]) { const r = await inIdx(args); if (!r.ok) return r }
+    const tree = await inIdx(['write-tree'])
+    if (!tree.ok) return tree
+    return await git(wt, ['diff', '--binary', base, tree.out.trim()], SLOW)
+  } finally { fs.rmSync(idx, { force: true }) }
+}
+
+/** Gitlinks (nested repos) in the patch that main does not track as one: the patch carries only their commit id, and removing the folder deletes them. */
+async function newGitlinks(main: string, patch: string): Promise<string[]> {
+  const links = new Set<string>()
+  let file = ''
+  for (const l of patch.split('\n')) {
+    const d = /^diff --git a\/.* b\/(.*)$/.exec(l)
+    if (d) file = d[1]
+    else if (/^(new file mode|new mode|index \S+) 160000$/.test(l)) links.add(file)
+  }
+  const out: string[] = []
+  for (const f of links) if (!(await git(main, [LIT, 'ls-files', '-s', '--', f])).out.startsWith('160000')) out.push(f)
+  return out
+}
+
+/** Patch files the main checkout already holds byte for byte (copied in by hand), so the apply skips them instead of clashing. */
+function sameInMain(main: string, wt: string, patch: string): string[] {
+  // lstat, so a link is compared as a link and a dangling one is not "missing"; mode counts too.
+  const sig = (f: string) => {
+    let s: fs.Stats
+    try { s = fs.lstatSync(f) } catch { return 'none' }
+    if (s.isSymbolicLink()) return `link:${fs.readlinkSync(f)}`
+    if (!s.isFile()) return undefined
+    return `file:${s.mode & 0o111 ? 'x' : '-'}:${fs.readFileSync(f).toString('base64')}`
+  }
+  // git C-quotes names with non-ASCII bytes or odd characters: "caf\303\251".
+  const unq = (s: string) => {
+    if (!s.startsWith('"')) return s
+    const esc: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 }
+    const b: number[] = []
+    for (let i = 1; i < s.length - 1; i++) {
+      if (s[i] !== '\\') { b.push(...Buffer.from(s[i])); continue }
+      const o = /^[0-7]{3}/.exec(s.slice(i + 1))
+      if (o) { b.push(parseInt(o[0], 8)); i += 3 } else { i++; b.push(esc[s[i]] ?? s.charCodeAt(i)) }
+    }
+    return Buffer.from(b).toString('utf8')
+  }
+  const files: { a?: string; b?: string; ren?: boolean }[] = []
+  for (const l of patch.split('\n')) {
+    if (l.startsWith('diff --git ')) {
+      // Backreference: only an unrenamed file has the same name twice, so spaces in it cannot mislead the split.
+      const d = /^diff --git (?:"a\/(.*)" "b\/\1"|a\/(.*) b\/\2)$/.exec(l)
+      const f = d ? (d[1] !== undefined ? unq(`"${d[1]}"`) : d[2]) : undefined
+      files.push({ a: f, b: f })
+    }
+    const r = /^rename (from|to) (.*)$/.exec(l)
+    if (r && files.length) Object.assign(files[files.length - 1], { [r[1] === 'from' ? 'a' : 'b']: unq(r[2]), ren: true })
+  }
+  const out: string[] = []
+  for (const { a, b, ren } of files) {
+    // Glob characters would make --exclude skip other files too.
+    if (!a || !b || (ren ? a === b : a !== b) || /[*?[\\]/.test(a + b)) continue
+    const s = sig(path.join(main, b))
+    if (s === undefined || s !== sig(path.join(wt, b))) continue
+    // A rename is merged only once the old name is gone from main too; -R matches the old name, so exclude both.
+    if (ren && (sig(path.join(main, a)) !== 'none' || sig(path.join(wt, a)) !== 'none')) continue
+    out.push(...(ren ? [a, b] : [b]))
+  }
+  return out
+}
+
+const mergeLock = (main: string) => path.join(main, '.git', 'switchboard-merge.lock')
+const ranFile = (main: string) => path.join(main, '.git', 'switchboard-merge-ran')
+// Touched before every step, so only a lock nobody touched for longer than one worktree's checks is from a crash.
+const LOCK_STALE_MS = 2 * CHECK_MS + 5 * 60_000
+/** One merge-all per repo across every window. The token lets a run drop only its own lock. */
+function takeLock(main: string): string | undefined {
+  const f = mergeLock(main), token = `${process.pid}-${Math.random().toString(36).slice(2)}`
+  try { if (Date.now() - fs.statSync(f).mtimeMs > LOCK_STALE_MS) fs.rmSync(f, { force: true }) } catch { /* none */ }
+  try { fs.writeFileSync(f, token, { flag: 'wx' }); return token } catch { return undefined }
+}
+const touchLock = (main: string) => { try { const t = new Date(); fs.utimesSync(mergeLock(main), t, t) } catch { /* gone */ } }
+function dropLock(main: string, token: string): void {
+  try { if (fs.readFileSync(mergeLock(main), 'utf8') === token) fs.rmSync(mergeLock(main), { force: true }) } catch { /* gone */ }
+}
+/** When any window last finished a merge-all in this repo (0: never). */
+export const lastMergeRun = (main: string) => { try { return fs.statSync(ranFile(main)).mtimeMs } catch { return 0 } }
+
+// Rebuilt by an install, so not worth a copy.
+const REBUILT = new Set(['node_modules', '.next', 'dist', 'build', 'out', '.turbo', 'coverage'])
+/** Copies the worktree's gitignored files (env files, local settings, notes) next to its patch, since the patch leaves them out. */
+async function saveIgnored(wt: string, dir: string): Promise<void> {
+  const r = await git(wt, ['ls-files', '-o', '-i', '--exclude-standard', '--directory', '-z'])
+  if (!r.ok) throw new Error(why(r))
+  for (const f of r.out.split('\0').filter(Boolean)) {
+    if (f.replace(/\/$/, '').split('/').some(p => REBUILT.has(p))) continue
+    fs.cpSync(path.join(wt, f), path.join(dir, f), { recursive: true })
+  }
+}
+
+/**
+ * Merge all: every worktree under <main>/.claude/worktrees with no live chat goes into the main checkout as uncommitted changes, so
+ * Kenneth commits it like any other work. Checks run on main first, then after each worktree; one that breaks them, does not apply
+ * cleanly or changes while its checks run is undone and kept. A merged worktree is removed; its patch and gitignored files stay in
+ * .git/switchboard-merged. live is asked again before each removal. Never commits, never pushes. only: just that worktree (Merge back).
+ */
+export async function mergeWorktrees(root: string, live: (wt: string) => boolean, check: Check = repoChecks, only?: string): Promise<GitResult> {
+  const main = (await worktreeOf(root))?.main ?? root
+  const all = (await git(main, ['worktree', 'list', '--porcelain'])).out.split('\n\n').map(b => b.split('\n')[0].replace(/^worktree /, ''))
+    .filter(w => WT_DIR.test(w) && fs.existsSync(w)).map(realOf).filter(w => !only || w === realOf(only))
+  const idle = all.filter(w => !live(w))
+  if (!idle.length) return no(all.length ? 'Every worktree still has a chat running in it' : 'No worktrees to merge')
+  const token = takeLock(main)
+  if (!token) return no('A merge is already running for this repo')
+  try {
+    const first = await check(main)
+    if (!first.ok) return no(`Checks already fail in the main checkout (${first.text}), so nothing was merged`)
+    const merged: string[] = [], kept: string[] = []
+    const undo = async (name: string, patch: string, skip: string[], why1: string) => {
+      const back = await git(main, ['apply', '-R', '--binary', ...skip.map(f => `--exclude=${f}`)], SLOW, patch)
+      kept.push(back.ok ? `${name}: ${why1}, undone` : `${name}: ${why1}, and undoing it failed (${why(back)}); check main`)
+    }
+    for (const wt of idle) {
+      const name = path.basename(wt)
+      touchLock(main)
+      if (!(await unlockStale(main, wt))) { kept.push(`${name}: a chat holds it`); continue }
+      const p = await worktreePatch(main, wt)
+      if (!p.ok) { kept.push(`${name}: ${why(p)}`); continue }
+      const nested = await newGitlinks(main, p.out)
+      if (nested.length) { kept.push(`${name}: holds a nested git repo (${nested.join(', ')}) that would be lost`); continue }
+      const skip = sameInMain(main, wt, p.out)
+      if (p.out.trim()) {
+        const a = await git(main, ['apply', '--binary', ...skip.map(f => `--exclude=${f}`)], SLOW, p.out)
+        if (!a.ok) { kept.push(`${name}: clashes with main (${why(a)})`); continue }
+        const c = await check(main)
+        touchLock(main)
+        if (!c.ok) { await undo(name, p.out, skip, c.text); continue }
+      }
+      // Anything written there while the checks ran would go with the folder.
+      const again = await worktreePatch(main, wt)
+      if (live(wt) || !again.ok || again.out !== p.out) {
+        const reason = live(wt) ? 'a chat started in it' : 'it changed while merging'
+        if (p.out.trim()) await undo(name, p.out, skip, reason); else kept.push(`${name}: ${reason}`)
+        continue
+      }
+      const dir = path.join(main, '.git', 'switchboard-merged', `${name}-${Date.now()}`)
+      try {
+        fs.mkdirSync(dir, { recursive: true })
+        if (p.out.trim()) fs.writeFileSync(path.join(dir, 'work.patch'), p.out)
+        await saveIgnored(wt, path.join(dir, 'ignored'))
+      } catch (err) {
+        merged.push(`${name} (folder stayed: could not copy its ignored files, ${(err as Error).message})`)
+        continue
+      }
+      const branch = (await git(wt, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
+      // Forced: its work is in main and its ignored files are copied. The branch goes only if git sees it merged, so unmerged commits keep a ref.
+      const rm = await git(main, ['worktree', 'remove', '--force', wt])
+      if (rm.ok && branch && branch !== 'HEAD') await git(main, ['branch', '-d', branch])
+      merged.push(rm.ok ? name : `${name} (folder stayed: ${why(rm)})`)
+    }
+    const text = [merged.length ? `Merged ${merged.join(', ')} into the main checkout as uncommitted changes; ${first.text}` : 'Nothing merged',
+      kept.length ? `Kept ${kept.join('; ')}` : '', idle.length < all.length ? `${plural(all.length - idle.length, 'worktree')} with a running chat left alone` : '']
+    return { ok: merged.length > 0, text: text.filter(Boolean).join('. ') + '. Nothing was committed or pushed' }
+  } finally {
+    try { fs.writeFileSync(ranFile(main), String(Date.now())) } catch { /* next run just repeats */ }
+    dropLock(main, token)
+  }
+}
+
+export const QUIET_MS = 15 * 60_000
+export type MergeClock = { seen: Set<string>; since: Map<string, number>; fired: Map<string, number> }
+/**
+ * Repo roots due an automatic merge-all: worktrees on disk and 15 minutes since the last chat this window had not seen started there.
+ * After a reload every chat is new, so the clock starts over. One run per quiet spell, in any window (ranAt: the repo's last run).
+ */
+export function mergeDue(m: MergeClock, chats: { sessionId: string; cwd: string }[], roots: string[], now = Date.now(),
+  dirsOf = (r: string) => worktreeDirs([], [r]), ranAt: (r: string) => number = lastMergeRun): string[] {
+  for (const c of chats) {
+    if (m.seen.has(c.sessionId)) continue
+    m.seen.add(c.sessionId)
+    const r = roots.find(r => c.cwd === r || c.cwd.startsWith(r + path.sep))
+    if (r) m.since.set(r, now)
+  }
+  return roots.filter(r => {
+    const since = m.since.get(r) ?? m.since.set(r, now).get(r)!
+    if (now - since < QUIET_MS || ranAt(r) >= since || m.fired.get(r) === since || !dirsOf(r).length) return false
+    m.fired.set(r, since)
+    return true
+  })
+}
+
 export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView, 'sessionId' | 'busy' | 'result'>> {
   const [s, heads, log, stash] = await Promise.all([status(root), branches(root), git(root, ['log', '-15', '--format=%h%x09%s%x09%ar']), git(root, ['stash', 'list', '--format=%gd'])])
   const remote = (s.branch && (await config(root, `branch.${s.branch}.remote`))) || 'origin'
@@ -516,7 +754,7 @@ export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView
   return {
     merge, ...(lanes ? { lanes } : {}), ...(outgoing ? { outgoing } : {}), ship,
     ...(p ? { pending: { text: leftovers(p.text, ship.files), last: p.last, at: p.at } } : {}),
-    ...(await worktreeOf(root) ? { worktree: true } : {}),
+    ...await (async () => { const w = await worktreeOf(root), n = worktreeDirs([], [w?.main ?? root]).length; return { ...(w ? { worktree: true } : {}), ...(n ? { worktrees: n } : {}) } })(),
     name: path.basename(root), branch: s.branch, upstream: s.upstream, ahead: s.ahead, behind: s.behind, files: s.files, branches: heads, sync: syncAction(s),
     log: log.out.split('\n').filter(Boolean).map(l => { const [hash, subject, when] = l.split('\t'); return { hash, subject: subject ?? '', when: when ?? '' } }),
     stashes: stash.out.split('\n').filter(Boolean).length, github, pr, ...(ci ? { ci } : {}), at: Date.now(),
@@ -562,12 +800,13 @@ async function unparkFiles(moved: Parked[]): Promise<void> {
 /** One button press. Refuses rather than guesses; confirmed comes from the in-page confirm. */
 /** Holds off an update reload while the op runs. */
 /** inUse: a live chat runs in this folder (merge-back then keeps the worktree). */
-export async function gitOp(root: string, c: GitCmd, gh?: string, inUse = false): Promise<GitResult> {
+/** live: which worktrees a running chat holds, for merge-all and an uncommitted merge-back. */
+export async function gitOp(root: string, c: GitCmd, gh?: string, inUse = false, live: (wt: string) => boolean = () => true): Promise<GitResult> {
   const release = hold()
-  try { return await runOp(root, c, gh, inUse) } finally { release() }
+  try { return await runOp(root, c, gh, inUse, live) } finally { release() }
 }
 
-async function runOp(root: string, c: GitCmd, gh?: string, inUse = false): Promise<GitResult> {
+async function runOp(root: string, c: GitCmd, gh: string | undefined, inUse: boolean, live: (wt: string) => boolean): Promise<GitResult> {
   // Any op may change the branch's PR and run; look again after it.
   prs.clear()
   runs.clear()
@@ -755,8 +994,13 @@ async function runOp(root: string, c: GitCmd, gh?: string, inUse = false): Promi
       if (!c.confirmed) return no('Confirm the merge first')
       const w = await worktreeOf(root)
       if (!w) return no('This is not a worktree, so there is nothing to merge back')
+      if (s.files.length) {
+        // Uncommitted work goes the Merge all way (commits ride along in its patch), never while a chat can still write there.
+        if (!WT_DIR.test(realOf(w.wt))) return no('Only Switchboard worktrees under .claude/worktrees merge back from here')
+        if (inUse || live(realOf(w.wt))) return no('A chat is still running in it; Merge back once it ends')
+        return mergeWorktrees(root, live, repoChecks, w.wt)
+      }
       if (!s.branch) return no('The worktree is on a detached HEAD, so nothing was merged')
-      if (s.files.length) return no(`Commit the ${plural(s.files.length, 'changed file')} in the worktree first`)
       const head = (await git(w.main, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
       if (!head || head === 'HEAD') return no('The main checkout is on a detached HEAD, so nothing was merged')
       const m = await git(w.main, ['merge', '--no-edit', s.branch], SLOW)
@@ -774,6 +1018,7 @@ async function runOp(root: string, c: GitCmd, gh?: string, inUse = false): Promi
       await git(w.main, ['branch', '-d', s.branch])
       return { ok: true, text: `Merged ${s.branch} into ${head} and removed the worktree. Nothing was pushed` }
     }
+    case 'merge-all': return c.confirmed ? mergeWorktrees(root, live) : no('Confirm the merge first')
     case 'stash': {
       if (!s.files.length) return no('Nothing to stash')
       const r = await git(root, ['stash', 'push', '-u', '-m', `Switchboard ${new Date().toISOString().slice(0, 16)}`])

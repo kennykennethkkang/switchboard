@@ -4,6 +4,7 @@ import * as os from 'os'
 import * as path from 'path'
 import type { WindowColor } from './types'
 import { withLock } from '../fs-utils'
+import { isResearch } from './research'
 
 export const PALETTE: WindowColor[] = ['violet', 'amber', 'teal', 'rose', 'lime', 'cobalt']
 const FILE = path.join(os.homedir(), '.claude', 'switchboard', 'colors.json')
@@ -16,17 +17,20 @@ export const SHADES: Record<WindowColor, { light: string; dark: string; bar: [st
   rose: { light: '#b8306f', dark: '#ff7ab3', bar: ['#5c2140', '#3e2030'] },
   lime: { light: '#4a7d12', dark: '#9bd65a', bar: ['#2f4614', '#27331a'] },
   cobalt: { light: '#2f5fd0', dark: '#7ea2ff', bar: ['#1f3566', '#1f2a43'] },
+  // The Research window only, so it never looks like a project.
+  slate: { light: '#5b6474', dark: '#9aa4b5', bar: ['#2a2f38', '#23272e'] },
 }
 
 /**
  * A saved folder keeps its color unless an earlier live window already has it and a free one exists; a new folder gets the
  * first color no other live window has, wrapping when all are taken.
  */
-export function assignColors(saved: Record<string, WindowColor>, live: string[]): { colors: Record<string, WindowColor>; changed: boolean } {
+export function assignColors(saved: Record<string, WindowColor>, live: string[], research: (ws: string) => boolean = isResearch): { colors: Record<string, WindowColor>; changed: boolean } {
   const colors = { ...saved }
   let changed = false
   const kept = new Set<WindowColor>()
-  for (const ws of live) {
+  for (const ws of live.filter(w => research(w))) colors[ws] = 'slate'
+  for (const ws of live.filter(w => !research(w))) {
     const c = colors[ws]
     if (c && !kept.has(c)) { kept.add(c); continue }
     const used = new Set([...kept, ...live.map(w => colors[w]).filter(Boolean)])

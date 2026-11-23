@@ -87,4 +87,27 @@ describe('the Screen routes', () => {
     assert.equal((await get(`/hub/chat/keys?session=s1&${t()}`)).status, 404)
     assert.equal((await post(`/hub/chat/screen?session=s1&${t()}`, '{}')).status, 404)
   })
+
+  it('reads the screen from whichever other window holds the terminal (the VS Code panel path)', async () => {
+    const http = await import('http')
+    const { tokenHeader } = await import('../src/hub/routes')
+    const { readScreenElsewhere } = await import('../src/hub/dev')
+    const serve = async (h: HubService, c: ChatReads) => {
+      const server = http.createServer(async (req, res) => { const r = await handleHub(h, req.method, req.url, '', undefined, undefined, undefined, undefined, c, tokenHeader(req.headers)) as HubReply; res.writeHead(r.status).end(r.body) })
+      await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+      return server
+    }
+    const holder = new HubService(), other = new HubService()
+    const a = await serve(holder, chat()), b = await serve(other, chat({ screen: async () => undefined }))
+    const win = (h: HubService, s: typeof a) => ({ pid: 1, port: (s.address() as { port: number }).port, hubToken: h.token, workspace: '/r' })
+    try {
+      const wins = [win(other, b), win(holder, a)]
+      assert.equal((await readScreenElsewhere('s1', wins))?.text, 'claude is here')
+      assert.equal(await readScreenElsewhere('nope', wins), undefined)
+      // A wrong token or a dead port is no screen, not an error.
+      assert.equal(await readScreenElsewhere('s1', [{ ...win(holder, a), hubToken: 'x' }, { ...win(holder, a), port: 1 }], 300), undefined)
+    } finally {
+      for (const s of [a, b]) { s.closeAllConnections(); await new Promise(r => s.close(r)) }
+    }
+  })
 })

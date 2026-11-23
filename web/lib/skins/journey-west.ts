@@ -3,7 +3,7 @@ import type { CourtColors, Skin } from '.'
 // Drawn in code; font credit in public/skins/journey-west/CREDITS.md.
 // Day: vermilion lacquer, jade and gamboge under a clear morning sky.
 export const courtColors: CourtColors = {
-  ink: '#1a1423', ink2: '#3b2a3a', red_dk: '#8a2626', red: '#cf3f33', red_lt: '#f07856', gold_dk: '#a5621a', gold: '#e8a92a', gold_lt: '#f8d96a',
+  ink: '#1a1423', ink2: '#3b2a3a', red_dk: '#8a2626', red: '#cf3f33', red_lt: '#ff8a5c', gold_dk: '#a5621a', gold: '#e8a92a', gold_lt: '#f8d96a',
   jade_dk: '#256b55', jade: '#3fa275', jade_lt: '#8fd8a6', peach_dk: '#c25c76', peach: '#f29ea8', peach_lt: '#fcd6d0', cloud: '#fffaf0', cloud_sh: '#d6d6ea',
   blue: '#3f5fa0', blue_lt: '#7aa0d8', sky: '#b4d2f0', brown_dk: '#5a3a2a', brown: '#8a5a3c', skin: '#f4c79a', plum: '#6b4a7a',
   wood_dk: '#5f281c', wood: '#93503a', wood_lt: '#b86e48', rail: '#b8321a', stone_dk: '#b6ae9f', stone: '#dcd5c6', stone_ln: '#c8c0af',
@@ -20,7 +20,8 @@ const night: CourtColors = {
 }
 
 export const journeyWest: Skin = {
-  id: 'journey-west', name: 'Journey West', info: 'The pilgrims on the road west: each chat a traveler, each role a disciple.',
+  id: 'journey-west', art: 'court', name: 'Journey West', info: 'The pilgrims on the road west: each chat a traveler, each role a disciple.',
+  family: { id: 'journey-west', name: 'Journey to the West', preset: 'Pilgrim Road' },
   palette: { bg: '#1e2348', ink: '#f8f4ea', accent: '#e8a92a', active: '#ffc53d', done: '#6fe39a', warn: '#ff5a4a', panel: '#641c22', trim: '#e8a92a' },
   court: { colors: courtColors, bands: ['#8cb4ea', '#9dc0ee', '#b0ccf0', '#c4d8f0', '#d9e0ee', '#ecdfe2', '#fad6cc'] },
   night: {
@@ -39,5 +40,7 @@ export const journeyWest: Skin = {
       mode: { item: 'Golden crow and jade rabbit', hint: 'The court works day and night' },
     },
   },
+  // Lacquer plate, gold leaf edge, rice paper text.
+  chrome: { plate: '#5a1a1c', edge: '#e8a92a', text: '#fff3dc', mute: '#f6cf8e', font: 'Silkscreen, ui-monospace, Menlo, monospace', radius: 2 },
   font: "Silkscreen, ui-monospace, Menlo, monospace",
 }

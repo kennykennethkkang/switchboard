@@ -40,3 +40,6 @@
 
 @media (pointer: coarse) { .sc-src > summary { min-height: 44px; box-sizing: border-box; } }
 @media (prefers-reduced-motion: reduce) { .sc-site::before, .sc-bar > b { transition: none; } }
+.sc-more > summary { cursor: pointer; width: fit-content; font: 500 13px/1.4 var(--hub-sans); color: var(--hub-mute); padding: 6px 0; }
+.sc-more > summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; border-radius: 4px; }
+@media (hover: hover) and (pointer: fine) { .sc-more > summary:hover { color: var(--hub-ink); } }

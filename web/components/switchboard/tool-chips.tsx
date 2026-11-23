@@ -11,7 +11,7 @@ export const chip = (on: boolean, flagged = false) => ({
 }) as const
 
 // Mirrors ALWAYS in extension/src/hub/tools.ts: on in every chat, so superpowers planning is never lost.
-const LOCKED = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
+export const LOCKED = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
 
 const link = { font: 'inherit', padding: 0, border: 0, background: 'none', color: 'var(--hub-blue)', cursor: 'pointer', textTransform: 'inherit' } as const
 

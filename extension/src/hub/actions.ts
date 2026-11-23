@@ -34,7 +34,8 @@ import { trustFolder, trustedWindowRoots } from './trust'
 import { openChatTerminal, tags } from './terminals'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
 import { FLAGGED, chatSettings, cleanProfile, clearIndefinite, defaultProfile, handoffSettings, indefiniteOn, nameNote, saveProfile, savedProfile, startProfile, syncIndefinite, toolsNote, uiSdkNote } from './tools'
-import { withGoal } from './smart-tools'
+import { jevStart, readPrecedence, saveSmartStart, withGoal } from './smart-tools'
+import { tuiEnv } from './controls'
 import { editor } from '../editor'
 import { kitDir } from '../constants'
 
@@ -45,7 +46,7 @@ const OWN_CHAT = { CLAUDE_CODE_CHILD_SESSION: null, SWITCHBOARD_CHAT: '1' }
 /** A chat terminal's env: no child marker, and the AWS profile picked for its folder (Sign-ins). */
 const chatEnv = (cwd: string): Record<string, string | null> => {
   const p = profileFor(hub.get().signIns.projects, cwd), b = browserFor(hub.get().signIns.browsers ?? {}, cwd)
-  return { ...OWN_CHAT, ...(p && validProfileName(p) ? { AWS_PROFILE: p } : {}), ...browserEnv(chromeChoice(undefined, b, knownChrome()).dir, writeOpenChrome()) }
+  return { ...OWN_CHAT, ...tuiEnv(hub.get().controls.claude.tui), ...(p &&validProfileName(p) ? { AWS_PROFILE: p } : {}), ...browserEnv(chromeChoice(undefined, b, knownChrome()).dir, writeOpenChrome()) }
 }
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
 /** Auto trust, only inside this window's workspace while trusted, or another live trusted window's (trust.ts). */
@@ -211,10 +212,13 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   const title = todo ? `To-do ${todo.n}: ${named}` : named
   // A profile the panel sent is Kenneth's pick; the default one takes what the first message names.
   const start = startProfile(inv, tools)
-  const profile = start && !tools ? withGoal(start, text ?? '', inv) : start
+  // Claude only: Codex has no tools profile and no hook to record why.
+  const jev = start && !tools && ai === 'claude' ? await jevStart(start, text ?? '', inv, readPrecedence()) : undefined
+  const profile = jev?.profile ?? (start && !tools ? withGoal(start, text ?? '', inv) : start)
+  const about = Object.fromEntries(inv.filter(i => i.description).map(i => [i.name, i.description!]))
   // Codex has no hook to read the brief from, so it rides in front of the first message.
   // Codex has no --append-system-prompt: Claude's system notes ride in the brief's block, which the row name skips (ais.ts withoutBrief).
-  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
+  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
   const lead = [withBrief(hub.get(), where, undefined), notes && `Switchboard notes: ${notes}`].filter(Boolean).join('\n')
   const first = withPointer(ai === 'claude' ? '' : [lead, text].filter(Boolean).join('\n\n'), rulesState.ready[ai], rulesState.kit)
   if (ai === 'codex') {
@@ -245,9 +249,10 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
+    if (sessionId && jev) saveSmartStart(sessionId, jev.why)
     const fx = ultracodeFlags({ effort: picked.effort, ultracode: picked.ultracode, settings })
     const message = picked.ultrathink ? withUltrathink(text ?? '') : text ?? ''
-    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings: fx.settings, model: picked.model, effort: fx.effort, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name))) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings: fx.settings, model: picked.model, effort: fx.effort, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
@@ -296,10 +301,10 @@ const toolsState = () => hub.get().tools ?? { flagged: FLAGGED, pick: null, chat
 /** Shows a chat's saved profile in the panel at once, before the next refresh reads it back. */
 export const setChatProfile = (sessionId: string, p: ChatProfile) => hub.set({ tools: { ...toolsState(), chats: { ...toolsState().chats, [sessionId]: p } } })
 
-/** The New chat form's Pick tools: the all-on defaults as chips to toggle before Start; with the folder, its project skills and design references too. */
+/** The New chat form's Pick tools: the same Jev pick a new chat gets, as chips to toggle before Start; with the folder, its project skills and design references too. */
 export async function pickTools(goal: string, folder?: string): Promise<void> {
   const inv = await chatInventory(folder)
-  const profile = withGoal(defaultProfile(inv), goal, inv)
+  const { profile } = await jevStart(defaultProfile(inv), goal, inv, readPrecedence())
   hub.set({ tools: { ...toolsState(), pick: { goal, folder, profile } } })
 }
 

@@ -165,9 +165,9 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
       {(over > 0 || files.busy) && <p role="status" style={{ ...caps, textTransform: 'none', color: over > 0 ? 'var(--hub-red)' : undefined }}>{over > 0 ? `${over} characters over the ${MAX_MESSAGE} limit with the file paths` : 'Uploading, Start waits for it'}</p>}
       <div className="nc-foot" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <button type="button" role="switch" className="hub-switch" aria-checked={research} onClick={() => toResearch(!research)}
-          title="Starts in the Research space (~/Documents/Research) for questions, not code. Skips worktrees, pipelines and the finishing steps."><span aria-hidden />Research</button>
+          title="For questions that belong to no project. Runs in its own Research window, a tab beside your project windows, where its sources and answer show as it works. Research inside a project chat shows on that chat's page instead."><span aria-hidden />Research</button>
         {research
-          ? <span style={{ color: 'var(--hub-mute)', fontSize: 13 }}>Folder: <b style={{ color: 'var(--hub-ink)', fontWeight: 500 }}>Research space</b></span>
+          ? <span style={{ color: 'var(--hub-mute)', fontSize: 13 }}>Opens in the <b style={{ color: 'var(--hub-ink)', fontWeight: 500 }}>Research window</b>, a tab beside your projects</span>
           : <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
         <label htmlFor="folder" style={{ color: 'var(--hub-mute)', fontSize: 13 }}>Project</label>
         <select id="folder" value={path} onChange={e => setPath(e.target.value)} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }}>

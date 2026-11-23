@@ -270,3 +270,18 @@ test('a qa or engineer report never replaces the research answer', () => {
   run = reduceResearch(run, said('**Status: done.**\n\n## Findings\n1. a bug', 'QA research window change'), S, 2000)
   assert.match(run.answer ?? '', /^\*\*Answer:\*\* yes/)
 })
+
+test('/deep-research typed as a slash command starts a real run, even with no web tools', async () => {
+  const { isRealResearch } = await import('./research')
+  t = 0
+  const run = fold([
+    user('<command-message>deep-research</command-message>\n<command-name>/deep-research</command-name>\n<command-args>Which licenses does SQLite use?</command-args>'),
+    user('Base directory for this skill: /x/skills/deep-research\n\n# Deep research'),
+    start('orchestrator', 'Bash', 'curl -sL https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md'),
+    said('**Answer:** public domain.\n\n## Sources\n[1] https://sqlite.org/copyright.html'),
+  ])
+  assert.equal(run.status, 'done')
+  assert.equal(run.question, 'Which licenses does SQLite use?')
+  assert.ok(isRealResearch(run))
+  assert.match(run.answer ?? '', /^\*\*Answer:\*\*/)
+})

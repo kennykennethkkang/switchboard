@@ -7,7 +7,8 @@ import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { addTodo, afterEnd, afterFinish, autoStartPlan, acceptSuggestion, claimItems, clearGone, commitCovered, dropped, editTodo, emptyDoc, filterAsk, finishItem, laterOnly, laterPrompt, laterTitled, mergeDocs, parseDoc, parseTitled, readDoc, restoreTicked, storeFor, todoFinished, toolStep, upcoming } from '../src/hub/todo'
+import { execFileSync } from 'child_process'
+import { addTodo, afterEnd, afterFinish, autoStartPlan, acceptSuggestion, changelogFiles, claimItems, clearGone, commitCovered, dropped, editTodo, emptyDoc, filterAsk, finishItem, laterOnly, laterPrompt, laterTitled, mergeDocs, parseDoc, parseTitled, readDoc, restoreTicked, shippedSince, storeFor, todoFinished, toolStep, upcoming } from '../src/hub/todo'
 import type { ChatProgress, TodoDoc, TodoItem } from '../src/hub/types'
 
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-home-'))
@@ -137,6 +138,34 @@ describe('stale suggestions', () => {
     assert.equal(await commitCovered(s, { sha: 'abc1234', message: 'x' }, async () => 'none', 300), undefined)
     assert.equal(await commitCovered(s, { sha: 'abc1234', message: 'x' }, async () => { throw new Error('offline') }, 300), undefined)
     assert.equal((await readDoc(s)).ticked?.length, 1)
+  })
+
+  it('shippedSince: first look records only; later looks give the new head and only unseen release notes', () => {
+    const first = shippedSince({}, '/r', 'h1', ['Old line one about the map', 'Old line two about sync'])
+    assert.equal(first.was, undefined)
+    assert.deepEqual(first.notes, [])
+    const next = shippedSince(first.seen, '/r', 'h2', ['Design library in Tools has All and None', 'Old line one about the map', 'Old line two about sync'])
+    assert.equal(next.was, 'h1')
+    assert.deepEqual(next.notes, ['Design library in Tools has All and None'])
+    const same = shippedSince(next.seen, '/r', 'h2', ['Design library in Tools has All and None', 'Old line one about the map', 'Old line two about sync'])
+    assert.equal(same.was, undefined)
+    assert.deepEqual(same.notes, [])
+    assert.deepEqual(same.seen, next.seen)
+    // Past the room, the rest wait for the next look instead of being lost.
+    const many = ['note number one is here', 'note number two is here', 'note number three is here']
+    const a = shippedSince(first.seen, '/r', 'h1', many, 30)
+    assert.deepEqual(a.notes, ['note number one is here'])
+    const b = shippedSince(a.seen, '/r', 'h1', many, 30)
+    assert.deepEqual(b.notes, ['note number two is here'])
+  })
+
+  it('changelogFiles: tracked root and one-down CHANGELOGs only, never vendored, deeper or untracked', async () => {
+    const root = fs.mkdtempSync(path.join(HOME, 'cl-'))
+    execFileSync('git', ['init', '-q'], { cwd: root })
+    const files = ['CHANGELOG.md', 'extension/CHANGELOG.md', 'vendor/CHANGELOG.md', 'a/b/CHANGELOG.md', 'untracked/CHANGELOG.md']
+    for (const f of files) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), '# c\n') }
+    execFileSync('git', ['add', ...files.slice(0, 4)], { cwd: root })
+    assert.deepEqual(await changelogFiles(root), ['CHANGELOG.md', 'extension/CHANGELOG.md'].map(f => path.join(root, f)))
   })
 
   it('kept survives a read from disk and a merge with an older device\'s newer copy', () => {

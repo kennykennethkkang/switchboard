@@ -143,7 +143,9 @@ async function releaseAll($: EngineInterface, session: string) {
 
 const WRITES = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
-const held = (what: string) => ({ deny: `repo-rules: the guard failed, so the ${what} was held.` })
+// Only reached when the pure check says the call breaks a rule, so a failure elsewhere never holds a clean call.
+const held = (what: string, err: { kind: string; message?: string }) =>
+  ({ deny: `repo-rules: the guard failed (${err.kind}${err.message ? `: ${err.message}` : ''}), so the ${what} was held.` })
 
 async function checkBash($: EngineInterface, command: string) {
   const rule = bashRule(command)
@@ -153,23 +155,23 @@ async function checkBash($: EngineInterface, command: string) {
 }
 
 async function checkText($: EngineInterface, path: string, before: string, after: string) {
-  if (!isUnder(path, await roots($)) || !addsEmDash(before, after)) return undefined
+  if (!addsEmDash(before, after) || !isUnder(path, await roots($))) return undefined
   await report($, `an em dash in ${path.split(/[\\/]/).pop()}`).catch(() => undefined)
   return { deny: `repo-rules: ${DASH}` }
 }
 
 export const register: Register = on => {
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => (await checkBash($, e.command)) ?? next(e))
-    .catch(($, e, next) => (next.called ? next(e) : held('command')))
+    .catch(($, e, next) => (next.called || !bashRule(e.command) ? next(e) : held('command', next.error)))
 
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => (await checkText($, e.file_path, e.old_string, e.new_string)) ?? next(e))
-    .catch(($, e, next) => (next.called ? next(e) : held('edit')))
+    .catch(($, e, next) => (next.called || !addsEmDash(e.old_string, e.new_string) ? next(e) : held('edit', next.error)))
 
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
-    if (!isUnder(e.file_path, await roots($))) return next(e)
+    if (!e.content.includes(EM) || !isUnder(e.file_path, await roots($))) return next(e)
     const before = await $.fs.read(e.file_path).catch(() => '')
     return (await checkText($, e.file_path, String(before), e.content)) ?? next(e)
-  }).catch(($, e, next) => (next.called ? next(e) : held('write')))
+  }).catch(($, e, next) => (next.called || !e.content.includes(EM) ? next(e) : held('write', next.error)))
 
   // Registered last so the em dash check answers first.
   on('tool.call', async ($, e, next) => {

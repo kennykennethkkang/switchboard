@@ -4,78 +4,64 @@
 .lv ul { list-style: none; padding: 0; }
 .lv-k { font: 600 13px/1.3 var(--hub-sans); color: var(--hub-mute); }
 .lv-sub { font-size: 13px; color: var(--hub-ash); }
-.lv-sec { display: grid; gap: 8px; }
-.lv-sec > h2 { font: 600 18px/1.3 var(--hub-sans); color: var(--hub-ink); }
 .lv-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.lv-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .lv [data-tone="run"] { --lv-c: var(--hub-blue); --lv-soft: var(--hub-blue-soft); }
 .lv [data-tone="done"] { --lv-c: var(--hub-green); --lv-soft: var(--hub-green-soft); }
 .lv [data-tone="bad"] { --lv-c: var(--hub-red); --lv-soft: var(--hub-red-soft); }
-.lv-headline { font: 600 clamp(20px, 3.2vw, 28px)/1.3 var(--hub-sans); letter-spacing: -0.02em; color: var(--hub-ink); }
-
-/* vote race: name and tag left, count and share right, track under; the leader is green and tagged */
-.lv-bars { display: grid; gap: 12px; }
-.lv-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: baseline; font-size: 16px; }
-.lv-bar-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--hub-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-lead { font: 600 12px/1 var(--hub-sans); padding: 3px 7px; border-radius: 99px; border: 1px solid currentColor; color: var(--hub-ink); }
-.lv-bar-n { text-align: right; font-variant-numeric: tabular-nums; color: var(--hub-mute); font-size: 14px; white-space: nowrap; }
-.lv-bar-n b { font: 700 20px/1 var(--hub-sans); color: var(--hub-ink); }
-.lv-bar-track { grid-column: 1 / -1; height: 14px; border-radius: 99px; background: var(--hub-hair); overflow: hidden; }
-.lv-bar-track > span { display: block; height: 100%; border-radius: 99px; background: var(--hub-ash); transition: width 400ms var(--hub-ease-out, ease-out); }
-.lv-bar[data-lead="true"] .lv-bar-track > span { background: var(--hub-green); }
-
-.lv-quotes { display: grid; gap: 10px; }
-.lv-quotes li { display: grid; gap: 2px; padding-left: 12px; border-left: 2px solid var(--hub-hair-strong); min-width: 0; }
-.lv-quotes q { quotes: none; font-size: 13px; line-height: 1.5; color: var(--hub-body); }
-.lv-quotes q::before { content: '\201C'; } .lv-quotes q::after { content: '\201D'; }
-.lv-quotes em { font-style: normal; font-size: 13px; line-height: 1.5; color: var(--hub-body); }
-.lv-quotes span { font-size: 12px; color: var(--hub-ash); }
-.lv-ticker { max-height: 15em; overflow: hidden; mask-image: linear-gradient(#000 70%, transparent); }
-
-.lv-reports { display: grid; gap: 8px; }
-.lv-reports > li { border: 1px solid var(--hub-hair); border-radius: var(--hub-r-panel, 10px); }
-.lv-reports summary { display: grid; gap: 3px; padding: 12px 14px; cursor: pointer; list-style: none; }
-.lv-reports summary::-webkit-details-marker { display: none; }
-.lv-reports summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; border-radius: 8px; }
 .lv-r-title { font: 600 15px/1.35 var(--hub-sans); color: var(--hub-ink); }
 .lv-r-take { font-size: 14px; line-height: 1.45; color: var(--hub-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.lv-reports details[open] .lv-r-take { -webkit-line-clamp: unset; }
 .lv-r-meta { font-size: 12px; color: var(--hub-ash); }
 .lv-r-body { display: grid; gap: 12px; padding: 12px 14px 16px; border-top: 1px solid var(--hub-hair); max-width: 72ch; }
 .lv-r-body .hub-btn { justify-self: start; }
 .lv-r-q { font-size: 13px; color: var(--hub-mute); }
 
-.lv-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; }
-.lv-board { position: relative; display: grid; gap: 16px; padding: 20px; border-radius: 16px; border: 1px solid var(--hub-hair-strong); background: var(--hub-elev); overflow: hidden; min-width: 0; }
-.lv-board .hub-btn { justify-self: start; }
-.lv-board[data-live="true"] { border-color: var(--lv-c); box-shadow: 0 0 0 1px var(--lv-soft), 0 0 32px -8px var(--lv-c); animation: lv-glow 3.2s ease-in-out infinite; }
-@keyframes lv-glow { 50% { box-shadow: 0 0 0 1px var(--lv-soft), 0 0 48px -6px var(--lv-c); } }
-.lv-board header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.lv-board .lv-k { display: inline-flex; align-items: center; gap: 8px; }
+
 .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lv-c); }
-.lv-board[data-live="true"] .lv-dot { animation: hub-pulse 1.2s ease-in-out infinite; }
 /* outlined, not filled: tone text on the soft tint fell under 4.5:1 in light theme */
 .lv-pill { font: 600 12px/1 var(--hub-sans); padding: 4px 9px; border-radius: 99px; color: var(--lv-c); border: 1px solid var(--lv-c); }
-.lv-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.lv-big b { font: 700 clamp(44px, 9vw, 64px)/1 var(--hub-sans); letter-spacing: -0.03em; color: var(--hub-ink); font-variant-numeric: tabular-nums; }
-.lv-big span { font-size: 15px; color: var(--hub-mute); }
-.lv-verdict-line { font-size: 15px; line-height: 1.55; color: var(--hub-body); }
-.lv-verdict-line strong { color: var(--hub-ink); font-weight: 700; }
-.lv-ring { position: relative; width: 160px; height: 160px; margin: 0 auto; }
-.lv-ring svg { width: 100%; height: 100%; }
-.lv-ring circle { fill: none; stroke-width: 9; }
-.lv-ring-bg { stroke: var(--hub-hair); }
-.lv-ring-fg { stroke: var(--lv-c); stroke-linecap: round; transition: stroke-dasharray 600ms var(--hub-ease-out, ease-out); }
-.lv-ring > div { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
-.lv-ring b { font: 700 34px/1 var(--hub-sans); color: var(--hub-ink); font-variant-numeric: tabular-nums; }
-.lv-ring span { font-size: 13px; color: var(--hub-mute); }
+/* tab strip fills the width; the four tabs share it and shrink at phone width */
+.lv .pk-seg { display: flex; width: 100%; box-sizing: border-box; }
+.lv .pk-seg > button { flex: 1 1 0; min-width: 0; justify-content: center; padding: 5px 6px; }
+.lv .pk-seg .pk-n { margin-left: 0; }
+@media (pointer: coarse) { .lv .pk-seg > button { min-height: 44px; } }
+@media (max-width: 480px) { .lv .pk-seg > button { gap: 3px; font-size: 12px; padding: 5px 2px; } .lv .pk-seg .pk-n { padding: 1px 4px; } }
+/* page-kit layout, tabbed */
+.lv.pk-page { gap: 16px; }
+.lv-idle { font-size: 13px; color: var(--hub-ash); }
+.lv-reps { display: grid; gap: 6px; }
+.lv-rep { border: 1px solid var(--hub-hair); border-radius: 8px; background: var(--hub-card, transparent); min-width: 0; }
+.lv-rep summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.lv-rep summary::-webkit-details-marker { display: none; }
+.lv-rep summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; border-radius: 8px; }
+.lv-rep .lv-r-title { font: 600 14px/1.35 var(--hub-sans); color: var(--hub-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-rep .lv-r-meta { font-size: 12px; color: var(--hub-ash); white-space: nowrap; }
+.lv-rep .lv-r-take { grid-column: 1 / -1; font-size: 13px; line-height: 1.45; color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-rep details[open] .lv-r-title, .lv-rep details[open] .lv-r-take { white-space: normal; }
+.lv-more { justify-self: start; }
+.lv-res { display: grid; gap: 2px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--lv-c, var(--hub-hair)); background: var(--lv-soft, transparent); }
+.lv-res strong { font: 600 15px/1.3 var(--hub-sans); color: var(--hub-ink); }
+.lv-fold > summary { cursor: pointer; font: 500 13px/1.3 var(--hub-sans); color: var(--hub-mute); padding: 8px 0; list-style: none; }
+.lv-fold > summary::before { content: '+ '; color: var(--hub-ash); }
+.lv-fold[open] > summary::before { content: '- '; }
+.lv-fold > summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; border-radius: 4px; }
+.lv-fold[open] { display: grid; gap: 8px; }
 
-@media (max-width: 480px) {
-  .lv-headline { font-size: 19px; }
-  .lv-board { padding: 14px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lv-board[data-live="true"], .lv-board[data-live="true"] .lv-dot { animation: none; }
-  .lv-bar-track > span, .lv-ring-fg { transition: none; }
-}
-@media (pointer: coarse) { .lv .hub-btn, .lv-reports summary { min-height: 44px; } }
+.lv-b { max-width: 880px; }
+.lv-runs { display: grid; gap: 0; border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-surface); }
+.lv-run { display: grid; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--hub-hair); }
+.lv-run:first-child { border-top: 0; }
+.lv-run-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.lv-run .lv-k { display: inline-flex; align-items: center; gap: 8px; }
+.lv-run[data-live="true"] .lv-dot { animation: hub-pulse 1.2s ease-in-out infinite; }
+.lv-run-line { font-size: 13px; line-height: 1.5; color: var(--hub-body); overflow-wrap: anywhere; }
+.lv-run .hub-btn { justify-self: start; }
+.lv-prog { height: 6px; border-radius: 99px; background: var(--hub-hair); overflow: hidden; }
+.lv-prog > span { display: block; height: 100%; border-radius: 99px; background: var(--lv-c); transition: width 400ms var(--hub-ease-out, ease-out); }
+.lv-line { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--hub-hair); font-size: 13px; color: var(--hub-mute); }
+.lv-line b { color: var(--hub-ink); font-weight: 600; }
+.lv-h3 { font: 600 14px/1.3 var(--hub-sans); color: var(--hub-ink); margin-top: 8px; }
+
+@media (max-width: 480px) { .ss-sum li { grid-template-columns: 4.5em minmax(0, 1fr) 2.6em; } .ss-sum .ss-rate { display: none; } }
+@media (prefers-reduced-motion: reduce) { .lv-run[data-live="true"] .lv-dot, .lv-prog > span { animation: none; transition: none; } }
+@media (pointer: coarse) { .lv-rep summary, .lv-fold > summary { min-height: 44px; box-sizing: border-box; display: grid; align-content: center; } .lv-more { min-height: 44px; } }
+.lv-res .hub-btn { justify-self: start; margin-top: 6px; }

@@ -7,13 +7,12 @@ import { execFile } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { keyEnv, keyStore } from './keys'
 import type { AiStatus, AutoPick } from './types'
 
 /** Whether a run gets the auto pick: its own auto (New chat, the Start popover) wins, else the gear's Auto pick per task, on unless false. */
 export const autoOn = (auto: boolean | undefined, gear: boolean | undefined) => auto ?? gear !== false
 
-const JEV = path.join(os.homedir(), '.claude', 'skills', 'claude-x-jev', 'scripts', 'jev.py')
+export const JEV = path.join(os.homedir(), '.claude', 'skills', 'claude-x-jev', 'scripts', 'jev.py')
 const SURE = 0.7
 const CODE = new Set(['engineer', 'qa'])
 const WHY: Record<string, string> = {
@@ -53,7 +52,8 @@ export const codexUsable = (ais: AiStatus[]) => { const c = ais.find(a => a.id =
 
 type Run = (preset: string, input: string) => Promise<string | undefined>
 const viaJev: Run = (preset, input) => new Promise(done => execFile('python3', [JEV, 'ask', '--preset', preset, '--input', input],
-  { timeout: 5000, maxBuffer: 1 << 20, env: { ...process.env, ...keyEnv(keyStore(), process.env) } }, (err, out) => done(err ? undefined : String(out))))
+  // jev.py reads its own OpenRouter key inside the timeout; a cold Keychain read here stalled 4 s first.
+  { timeout: 5000, maxBuffer: 1 << 20 }, (err, out) => done(err ? undefined : String(out))))
 
 import type { Difficulty } from './pick-run'
 export * from './pick-run'

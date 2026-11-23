@@ -112,6 +112,38 @@ test('routes: no line runs through a box it does not start or end at, on the dem
   }
 })
 
+test('components: no README of its own = the blurb of the file other parts import most, never a deep fixture folder', () => {
+  const f = (label: string, about?: string): FlowNode => ({ id: `f:${label}`, kind: 'file', label, ...(about ? { about } : {}) })
+  const map: FlowMap = { project: 'p', builtAt: 0,
+    nodes: [{ id: 'd:kit/tasks/p2/ws', kind: 'folder', label: 'kit/tasks/p2/ws', about: 'Orders and stock for a small shop.' },
+      f('kit/a.ts', 'A.'), f('kit/mods/hook.ts', 'Runs the mod hooks.'), f('kit/tasks/p2/ws/shop.ts', 'The shop.'), ...['main', 'b', 'c', 'd', 'e', 'f'].map(n => f(`src/${n}.ts`))],
+    edges: [{ from: 'f:src/main.ts', to: 'f:kit/mods/hook.ts', kind: 'import', n: 3 }, { from: 'f:kit/tasks/p2/ws/shop.ts', to: 'f:kit/a.ts', kind: 'import', n: 9 }] }
+  const kit = components(map).parts.find(p => p.id === 'c:kit')!
+  assert.equal(kit.about, 'hook.ts: Runs the mod hooks.')
+})
+
+test('routes: lines into or out of one box land at different heights, so arrows do not stack', () => {
+  const { parts, links } = components(demoAppMap())
+  const { at } = layers(parts, links)
+  const paths = routeLinks(parts, links, at)
+  for (const side of ['from', 'to'] as const) {
+    for (const p of parts) {
+      const ys = links.filter(l => l[side] === p.id).map(l => { const pts = paths.get(`${l.from}>${l.to}`)!; return (side === 'from' ? pts[0] : pts[pts.length - 1]).y })
+      assert.equal(new Set(ys).size, ys.length, `${side} ${p.id}`)
+      for (const y of ys) assert.ok(y > at.get(p.id)!.y + 8 && y < at.get(p.id)!.y + 80, `${side} ${p.id} inside the side`)
+    }
+  }
+})
+
+test('layers: parts with no links between them sit in a wide grid, not one tall column', () => {
+  const parts = Array.from({ length: 18 }, (_, i) => ({ id: `c:m${i}`, path: `m${i}`, name: `m${i}`, files: [], chats: [], tools: [], notes: [], depth: 0 }))
+  const { at, cols } = layers(parts, [])
+  const xs = new Set([...at.values()].map(p => p.x)), ys = new Set([...at.values()].map(p => p.y))
+  assert.equal(cols, xs.size)
+  assert.ok(xs.size >= 3 && ys.size <= 6, `${xs.size} x ${ys.size}`)
+  assert.equal(new Set([...at.values()].map(p => `${p.x},${p.y}`)).size, 18)
+})
+
 test('routes: every turn is a right angle, out of the right side, into the left', () => {
   const { parts, links } = components(demoAppMap())
   const { at } = layers(parts, links)

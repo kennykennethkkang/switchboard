@@ -189,6 +189,6 @@ describe('terminal tags', () => {
 
   it('maps every window color to an ansi color', () => {
     assert.equal(ANSI.violet, 'terminal.ansiMagenta')
-    assert.equal(Object.keys(ANSI).length, 6)
+    assert.equal(Object.keys(ANSI).length, 7)
   })
 })

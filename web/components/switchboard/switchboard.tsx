@@ -8,7 +8,7 @@ import { ApproveBar } from './approve'
 import { approveBlock } from '@/lib/approve'
 import { defaultCommands, switcherItems, type SwitchItem } from '@/lib/switcher'
 import { chatShown, isBusy } from '@/lib/chat-state'
-import { CODER_PAGES, isMap, pageOf, pageTitle, type Page } from '@/lib/route'
+import { CODER_PAGES, isMap, pageOf, pageTitle, pageBlurb, type Page } from '@/lib/route'
 import { dayNumbers, hubCounts, nowLanes, picked } from '@/lib/now'
 import { todayView } from '@/lib/today'
 import { projectOf } from '@/lib/flow-map'
@@ -24,7 +24,7 @@ import { ChangesPanel } from './changes'
 import { GitPanel } from './git-panel'
 import { ShipCard } from './ship-card'
 import { TodoPanel } from './todo-panel'
-import { busiestTodo, finishUp, openCount, planFolder, upNext, withHome } from '@/lib/todo'
+import { busiestTodo, finishUp, openCount, planFolder, todoChips, upNext, withHome } from '@/lib/todo'
 import { JevCard } from './jev-card'
 import { LivePage, liveCount } from './live-page'
 import { Switcher } from './switcher'
@@ -34,9 +34,11 @@ import { NewChat } from './new-chat'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import { demoSplit } from '@/lib/hub-demo'
 import { Gear, type Section } from './gear'
-import { PhoneAddress, PhoneQr } from './phone-qr'
+import { PhoneAddress, PhoneMail, PhoneQr } from './phone-qr'
 import { DevRows, onMac } from './dev-rows'
 import { Terminals } from './terminals'
+import { PlanPage } from './plan-page'
+import { ShipPage } from './ship-page'
 import { StuckStrip } from './stuck-strip'
 import { Jarvis } from './jarvis'
 import { ChatMenu } from './chat-menu'
@@ -54,7 +56,9 @@ import './needs.css'
 import { CardStages } from './stages'
 import { FirstRunCard, SimpleHome, ViewChoice, type Step } from './simple-home'
 import { readyChat, ticked } from '@/lib/simple-home'
-import { ResearchOffers } from './research-offer'
+import { ResearchOffers, ResearchTracker } from './research-offer'
+import { ResearchPanel } from './research-panel'
+import { ResearchPage, ResearchSignal } from './research-library'
 // Its own chunk with three in it, loaded on the first open.
 const MemoryView = lazy(() => import('./memory').then(m => ({ default: m.MemoryView })))
 const FlowMapView = lazy(() => import('./flow-map').then(m => ({ default: m.FlowMapView })))
@@ -239,6 +243,7 @@ export function Switchboard() {
                 <span style={{ font: '600 18px/1.2 var(--hub-mono)', color: 'var(--hub-ink)', letterSpacing: '0.08em' }}>Code {hub.phoneUrls.code.slice(0, 3)} {hub.phoneUrls.code.slice(3)}</span>
                 <span style={{ font: '400 12px/1.4 var(--hub-sans)', color: 'var(--hub-mute)' }}>Type an address, then this code</span>
               </span>}
+              {phoneLinks.length > 0 && <PhoneMail url={(phoneLinks.find(l => l.name === 'Tailscale') ?? phoneLinks[0]).url} />}
               {phoneLinks.some(l => l.url.startsWith('http:')) && <span style={{ font: '400 12px/1.5 var(--hub-sans)', color: 'var(--hub-ash)', maxWidth: 220 }}>
                 Copy buttons on the phone need HTTPS. Turn on HTTPS Certificates in the Tailscale admin console, DNS page.</span>}
               {!phoneLinks.length && <span style={{ font: '400 12px/1.5 var(--hub-sans)', color: 'var(--hub-ash)' }}>{
@@ -251,7 +256,7 @@ export function Switchboard() {
       </button>
   const header = (
     <header className="hub-top">
-      <h1 className="hub-page-title">{!coder && view === 'now' ? 'Home' : pageTitle(view)}</h1>
+      <div className="hub-page-head"><h1 className="hub-page-title">{!coder && view === 'now' ? 'Home' : pageTitle(view)}</h1><p className="hub-page-sub">{pageBlurb(view)}</p></div>
       {isDemo && <span className="hub-note" title="Sample data: no editor window is connected">Sample data</span>}
       {/* fixed by the bottom bar, where the eye is after a click, not up in the header */}
       {inert && <span role="status" className="hub-note hub-inert-note">Only works inside VS Code</span>}
@@ -295,7 +300,7 @@ export function Switchboard() {
   const gear = <Gear key={gearAt.n} hub={hub} send={send} start={gearAt.at} problem={problem} folder={todoAt} />
   const filter = (projectChips.length > 1 || projects.length > 0) && <ProjectFilter projects={projectChips} picked={projects} tint={projectTint} busy={name => cards.filter(c => isBusy(chatShown(c.progress, hub.stuck, c.chat.sessionId)) && projectName(c.chat) === name).length} onChange={pickProjects} />
   const dev = <DevRows dev={(hub.dev ?? []).filter(d => inProjects({ cwd: d.folder, project: d.repo }, projects))} tailscale={hub.tailscale} isVSCode={isVSCode} send={send} />
-  const chatCards = <ChatCards looping={Object.entries(hub.tools?.chats ?? {}).filter(([, p]) => p.indefinite).map(([id]) => id)} editor={editorName(hub)} cards={rail} all={hub.progress} stuck={hub.stuck} cache={hub.cache} waits={hub.waits} held={held} links={chipsOf} onUnlink={(from, to) => send({ type: 'hub-unlink', from, to })} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
+  const chatCards = <ChatCards looping={Object.entries(hub.tools?.chats ?? {}).filter(([, p]) => p.indefinite).map(([id]) => id)} editor={editorName(hub)} cards={rail} all={hub.progress} stuck={hub.stuck} cache={hub.cache} waits={hub.waits} todoChips={id => todoChips(hub.todos ?? {}, id)} held={held} links={chipsOf} onUnlink={(from, to) => send({ type: 'hub-unlink', from, to })} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
     top={c => coder && <CardStages hub={hub} sessionId={c.chat.sessionId} send={send} />}
     extra={c => c.progress?.state === 'done' && approveBar(c.chat.sessionId, true)}
     summaries={hub.summaries} onSummary={(sessionId, refresh) => send({ type: 'hub-summary', sessionId, ...(refresh ? { refresh } : {}) })} onCopy={copy}
@@ -313,7 +318,7 @@ export function Switchboard() {
   const place = placeOf(current?.chat.cwd, windows)
   const message = current && ((tools: ReactNode) => <MessageBox key={current.chat.sessionId} chat={current.chat} send={send} upload={upload} problem={problem} tools={tools} />)
   const picture = current
-    ? <ChatPicture chat={current.chat} progress={current.progress} stuckItems={hub.stuck} all={hub.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models} demo={isDemo} links={chipsOf(current.chat.sessionId)}
+    ? <ChatPicture chat={current.chat} progress={current.progress} stuckItems={hub.stuck} all={hub.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models} demo={isDemo} repo={hub.repo} links={chipsOf(current.chat.sessionId)}
         profile={hub.tools?.chats[current.chat.sessionId]} flagged={hub.tools?.flagged} smart={hub.tools?.smart?.[current.chat.sessionId]} globalOff={hub.tools?.globalOff} onProfile={tools => send({ type: 'hub-chat-tools', sessionId: current.chat.sessionId, tools })} onCommand={send} onIndefinite={on => send({ type: 'hub-indefinite', sessionId: current.chat.sessionId, on })}
         place={place} message={message} menu={<><button type="button" className="hub-btn" onClick={read(current.chat)} title="Live screen, what this chat produced, and its transcript">{vscodeBridge?.isVSCode ? 'Outputs' : 'Screen and outputs'}</button><ChatMenu chat={current.chat} starred={starred.includes(current.chat.sessionId)} send={send} onMac={isVSCode} inPicture {...waitProps(current.chat)} /></>}
         installed={hub.installed} connections={hub.connections} onInstalled={() => openGear('Installed')}
@@ -354,6 +359,7 @@ export function Switchboard() {
   // Research offers sit under the Needs you items; hubCounts counts them.
   const needsWith = <>{stuck}<ResearchOffers hub={hub} send={send} /></>
   const choice = sb.coderView === undefined && <ViewChoice onPick={on => send({ type: 'hub-coder-view', on })} />
+  const tracker = <ResearchTracker hub={hub} send={send} onOpen={openChat} />
   const pages: Record<Exclude<Page, `map-${string}`>, ReactNode> = {
     now: coder
       ? <>{choice}{run && !run.dismissed && <FirstRunCard run={run} onStep={step} onHide={hideRun} compact ready={toApprove && { name: toApprove.name, open: () => openChat(toApprove.id) }} />}
@@ -362,20 +368,14 @@ export function Switchboard() {
       : <>{choice}<SimpleHome hub={hub} send={send} run={run} onStep={step} onHide={hideRun} onProject={() => step('project')} asking={panel !== 'none'} needs={needsWith} needsCount={needsCount} working={lanes.working} done={lanes.done} onOpen={openChat} onDone={onDone} tint={tintOf} /></>,
     chats: <div className="hub-chats">
       <aside className="hub-rail" aria-label="Chats">{filter}{chatCards}{history}{coder && <Snapshots hub={hub} send={send} />}</aside>
-      <div className="hub-chat-main">{current && <button type="button" className="hub-btn cp-back" onClick={toRail}>‹ Back to chats</button>}{picture}</div>
+      <div className="hub-chat-main">{current && <button type="button" className="hub-btn cp-back" onClick={toRail}>‹ Back to chats</button>}{picture}{current && <ResearchPanel key={`rp-${current.chat.sessionId}`} sessionId={current.chat.sessionId} hub={hub} inline />}</div>
     </div>,
-    plan: <>
-      {todo && <div id="hub-todo">{todo}</div>}
-      {todayCard}
-      {coder && jev}
-    </>,
+    plan: <PlanPage hub={hub} folder={plan.folder} todo={todo} today={todayCard} jev={coder && jev} />,
     live: <LivePage smart={hub.smart} mirofish={hub.mirofish} crowd={hub.crowdAb} reports={hub.mirofishReports} sourceChecks={hub.sourceChecks} send={send} />,
-    ship: <>
-      {dev}<Terminals hub={hub} send={send} />
-      {current && <div id="hub-git" style={{ display: 'grid', gap: 12 }}>{changes}{git}</div>}
-      {!current && <p style={{ margin: 0, color: 'var(--hub-ash)' }}>No chat picked. Open one on Chats and its changes and git show here.</p>}
-    </>,
+    ship: <ShipPage hub={hub} cards={shown} pickedId={currentId} onPick={id => { setPick({ id, key: false }); writeStore(CHAT_KEY, id) }}
+      dev={dev} terminals={<Terminals hub={hub} send={send} />} tracker={tracker} changes={changes} git={git} />,
     settings: gear,
+    research: <ResearchPage onChat={openChat} />,
   }
 
   return (
@@ -398,6 +398,7 @@ export function Switchboard() {
       {mapView}
       {coder && isMap(page) && <MapBar page={page} go={go} onBack={() => go(back.current)} />}
       {chatView}
+      <ResearchSignal items={isDemo ? undefined : hub.research ?? []} go={go} page={view} />
     </div>
   )
 }

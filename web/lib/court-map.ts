@@ -51,10 +51,12 @@ const rimOf = (n: CourtNode, p: P): P => {
 }
 const hits = (a: CourtNode, b: CourtNode, m = 0) => a.x - m < b.x + b.w && b.x - m < a.x + a.w && a.y - m < b.y + b.h && b.y - m < a.y + a.h
 // Liang-Barsky clip against the rect grown by MARGIN.
-function segHits(p: P, q: P, n: CourtNode) {
+function segHits(p: P, q: P, n: CourtNode, m = MARGIN) {
+  // Most calls miss by a mile: skip the clip (and its arrays) when the segment's box clears the grown rect. Touching was never a hit.
+  if (Math.max(p[0], q[0]) <= n.x - m || Math.min(p[0], q[0]) >= n.x + n.w + m || Math.max(p[1], q[1]) <= n.y - m || Math.min(p[1], q[1]) >= n.y + n.h + m) return false
   const dx = q[0] - p[0], dy = q[1] - p[1]
   let t0 = 0, t1 = 1
-  for (const [pp, qq] of [[-dx, p[0] - (n.x - MARGIN)], [dx, n.x + n.w + MARGIN - p[0]], [-dy, p[1] - (n.y - MARGIN)], [dy, n.y + n.h + MARGIN - p[1]]]) {
+  for (const [pp, qq] of [[-dx, p[0] - (n.x - m)], [dx, n.x + n.w + m - p[0]], [-dy, p[1] - (n.y - m)], [dy, n.y + n.h + m - p[1]]]) {
     if (pp === 0) { if (qq <= 0) return false; continue }
     const r = qq / pp
     if (pp < 0) t0 = Math.max(t0, r); else t1 = Math.min(t1, r)
@@ -62,6 +64,10 @@ function segHits(p: P, q: P, n: CourtNode) {
   }
   return true
 }
+type Span = [number, number, number, number]
+// The box [x0, y0, x1, y1] around every span; near: n comes within m of it (1px slack so a touch still counts).
+const around = (s: Span[]): Span | undefined => s.length ? [Math.min(...s.map(b => b[0])), Math.min(...s.map(b => b[1])), Math.max(...s.map(b => b[2])), Math.max(...s.map(b => b[3]))] : undefined
+const near = (n: CourtNode, s: Span | undefined, m: number) => !!s && n.x - m - 1 < s[2] && s[0] - m - 1 < n.x + n.w && n.y - m - 1 < s[3] && s[1] - m - 1 < n.y + n.h
 const side = (a: P, b: P, c: P) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]))
 const crosses = (p: P, q: P, r: P, s: P) => side(p, q, r) * side(p, q, s) < 0 && side(r, s, p) * side(r, s, q) < 0
 
@@ -170,14 +176,16 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     // Nor may the bridge run under this yard's own realm stack.
     const stack = (n: CourtNode): CourtNode => ({ ...n, x: rim.w && mid(hub)[0] > n.x + n.w / 2 ? n.x + PLQ : n.x + size.w + DOCK, y: n.y + (whole.h - rim.h) / 2, w: rim.w, h: rim.h })
     const fits = (n: CourtNode) => !rim.w || !segHits(mid(hub), aim(n), stack(n))
-    const straight = place(nodes, links, home, angle, 1.4, d0, whole, spot, aim, fits, reserved)
+    // Everything aim and fits read, for place's memo.
+    const look = () => JSON.stringify([aspect, rim, side, size.w, whole.h, mid(hub)])
+    const straight = place(look(), nodes, links, home, angle, 1.4, d0, whole, spot, aim, fits, reserved)
     let spotFor = straight.fit ? straight.n : undefined
     // Outermost siblings first: they have the most open sky past them.
     const sibs = [...yardsOf.get(key) ?? []].sort((a, b) => Math.hypot(...sub(mid(b), mid(home))) - Math.hypot(...sub(mid(a), mid(home))))
     for (const y of spotFor ? [] : sibs) {
       hub = y
       const [dx, dy] = sub(mid(y), mid(home))
-      const t = place(nodes, links, y, Math.atan2(dy, dx / aspect), 0.9, 200, whole, spot, aim, fits, reserved, 3000)
+      const t = place(look(), nodes, links, y, Math.atan2(dy, dx / aspect), 0.9, 200, whole, spot, aim, fits, reserved, 3000)
       if (t.fit) { spotFor = t.n; break }
     }
     if (!spotFor) { hub = home; spotFor = straight.n }
@@ -240,9 +248,9 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const home = nodes.find(n => n.id === from)!, a = at(ring - (from === 'garden' ? 2 : 1))
     for (const k of ks) {
       // A crowded shelf hangs the place off a sibling place, like a yard off a yard, rather than flinging it far out.
-      let t = place(nodes, links, home, a, 1.4, 260, ISLE, spot, mid, undefined, reserved), up = home
+      let t = place(String(aspect), nodes, links, home, a, 1.4, 260, ISLE, spot, mid, undefined, reserved), up = home
       for (const sib of t.fit ? [] : nodes.filter(n => (PLACES as readonly string[]).includes(n.kind) && n !== home)) {
-        const [dx, dy] = sub(mid(sib), mid(council)), o = place(nodes, links, sib, Math.atan2(dy, dx / aspect), 1.2, 200, ISLE, spot, mid, undefined, reserved, 3000)
+        const [dx, dy] = sub(mid(sib), mid(council)), o = place(String(aspect), nodes, links, sib, Math.atan2(dy, dx / aspect), 1.2, 200, ISLE, spot, mid, undefined, reserved, 3000)
         if (o.fit) { t = o; up = sib; break }
       }
       const n: CourtNode = { ...t.n, id: k, kind: k, label: PLACE_NAME[k], parent: up.id, ...extra[k] }
@@ -264,27 +272,59 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
   return { nodes, links, ties, bounds: { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }, petition }
 }
 
+/** Past search answers by their inputs: a state-only hub update repeats every search, so the layout comes back without searching. Exported so tests can clear it. */
+export const courtMemo = new Map<string, { n: CourtNode; fit: boolean }>()
+// look: everything the aim and ok callbacks read (and the stage aspect spot uses), since functions cannot go in the key.
+function place(look: string, ...a: Parameters<typeof search>): ReturnType<typeof search> {
+  const [nodes, links, home, a0, half, d0, size, , , , sky = [], reach = 40000] = a
+  const big = nodes.filter(n => n.kind !== 'desk'), bridges = links.filter(l => big.some(n => n.id === l.to))
+  const key = JSON.stringify([look, big.map(b => [b.x, b.y, b.w, b.h]), big.indexOf(home), bridges.map(l => l.points), a0, half, d0, size, sky.map(b => [b.x, b.y, b.w, b.h]), reach])
+  const was = courtMemo.get(key)
+  if (was) return was
+  if (courtMemo.size > 500) courtMemo.clear()
+  const got = search(...a)
+  courtMemo.set(key, got)
+  return got
+}
+
 // Walks outward from the pavilion, fanning side to side within its sector, until the island and its bridge clear everything placed so far.
 // fit: false when nothing fits within reach; n is then the last spot tried.
 // ponytail: greedy O(chats^2) search; fine for a hundred chats.
-function place(nodes: CourtNode[], links: CourtLink[], home: CourtNode, a0: number, half: number, d0: number, size: { w: number; h: number }, spot: (a: number, d: number) => P, aim: (n: CourtNode) => P = mid, ok: (n: CourtNode) => boolean = () => true, sky: CourtNode[] = [], reach = 40000): { n: CourtNode; fit: boolean } {
+function search(nodes: CourtNode[], links: CourtLink[], home: CourtNode, a0: number, half: number, d0: number, size: { w: number; h: number }, spot: (a: number, d: number) => P, aim: (n: CourtNode) => P = mid, ok: (n: CourtNode) => boolean = () => true, sky: CourtNode[] = [], reach = 40000): { n: CourtNode; fit: boolean } {
   const big = nodes.filter(n => n.kind !== 'desk'), bridges = links.filter(l => big.some(n => n.id === l.to))
   // Rays from the pavilion's center: two of them never cross, so outer islands just thread the gaps between inner ones.
   const from = mid(home), offsets = [0], at = (a: number, d: number): P => { const [x, y] = spot(a, d); return [from[0] + x, from[1] + y] }
   for (let k = 1; k * 0.03 <= half; k++) offsets.push(k * 0.03, -k * 0.03)
-  let n = box('', 'courtyard', at(a0, d0), size, '')
-  for (let d = d0; d < d0 + reach; d += Math.max(40, Math.round(d * 0.02))) for (const o of offsets) {
-    n = box('', 'courtyard', at(a0 + o, d), size, '')
-    if (!ok(n)) continue
-    const to = aim(n)
-    // Islands keep GAP apart, wider than two bridge margins, so later bridges fit between them.
-    if (big.some(b => hits(n, b, GAP)) || sky.some(b => hits(n, b, 8))) continue
-    if (bridges.some(l => segHits(l.points[0], l.points[1], n))) continue
-    if (big.some(b => b !== home && segHits(from, to, b))) continue
-    if (bridges.some(l => crosses(from, to, l.points[0], l.points[1]))) continue
-    return { n, fit: true }
+  // Speedups that never change the answer: a spot clear of the box around all islands (or bridges) skips checking each one,
+  // and the island or bridge that blocked a ray last time is tried first, since it usually blocks it further out too.
+  const isles = around(big.map(b => [b.x, b.y, b.x + b.w, b.y + b.h])), skies = around(sky.map(b => [b.x, b.y, b.x + b.w, b.y + b.h]))
+  const roads = around(bridges.map(({ points: [p, q] }) => [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])]))
+  const walls = big.filter(b => b !== home)
+  const wall: Array<CourtNode | undefined> = [], cross: Array<CourtLink | undefined> = []
+  // A bridge aimed at the island's center runs along its ray, so a wall it cuts blocks that ray for good. box() rounds the center
+  // by under 1px, hence the 1px deeper test on the true ray. Without this a search that never fits walks all 18000 spots.
+  const dead: boolean[] = [], straight = aim === mid
+  let n = box('', 'courtyard', at(a0, d0), size, ''), alive = offsets.length, last = d0
+  for (let d = d0; d < d0 + reach; d += Math.max(40, Math.round(d * 0.02))) {
+    last = d
+    for (let i = 0; alive && i < offsets.length; i++) {
+      if (dead[i]) continue
+      const o = offsets[i]
+      n = box('', 'courtyard', at(a0 + o, d), size, '')
+      if (!ok(n)) continue
+      const to = aim(n)
+      // Islands keep GAP apart, wider than two bridge margins, so later bridges fit between them.
+      if (near(n, isles, GAP) && big.some(b => hits(n, b, GAP)) || near(n, skies, 8) && sky.some(b => hits(n, b, 8))) continue
+      if (near(n, roads, MARGIN) && bridges.some(l => segHits(l.points[0], l.points[1], n))) continue
+      if (wall[i] && segHits(from, to, wall[i]!) || (wall[i] = walls.find(b => segHits(from, to, b)))) {
+        if (straight && segHits(from, at(a0 + o, d), wall[i]!, MARGIN - 1)) dead[i] = true, alive--
+        continue
+      }
+      if (cross[i] && crosses(from, to, cross[i]!.points[0], cross[i]!.points[1]) || (cross[i] = bridges.find(l => crosses(from, to, l.points[0], l.points[1])))) continue
+      return { n, fit: true }
+    }
   }
-  return { n, fit: false }
+  return { n: box('', 'courtyard', at(a0 + offsets[offsets.length - 1], last), size, ''), fit: false }
 }
 
 /** Base of a yard's landmark in world px: low in the free slot after its k desks, so it clears the plate above. */

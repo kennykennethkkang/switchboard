@@ -21,7 +21,7 @@ export function StatusBar({ meters, dev, onDev, awake, onAwake, calls, onCalls, 
   return (
     <footer className="sb" data-narrow={narrow || undefined} aria-label="Status">
       <span className="sb-meters">
-        {meters.map(m => <span key={m.kind} className="hub-limit" data-level={m.level} title={m.reset || undefined}>
+        {meters.map(m => <span key={m.kind} className="hub-limit" data-level={m.level} data-codex={m.kind.startsWith('codex_') || undefined} title={m.reset || undefined}>
           <i aria-hidden><b style={{ transform: `scaleX(${Math.min(100, m.percent ?? 0) / 100})` }} /></i>
           {m.label} {m.level === 'out' ? 'out' : m.percent === undefined ? 'no data' : `${m.percent}%`}
           {m.reset && <span className="sr-only">, {m.reset}</span>}

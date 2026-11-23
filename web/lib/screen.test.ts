@@ -1,7 +1,7 @@
 /** The Screen tab's fetches and its poll: once a second while visible, backing off when there is no screen. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fitScale, KEY_LABELS, loadScreen, pollScreen, sendKeys, type Screen } from './screen'
+import { fitScale, KEY_LABELS, loadScreen, pollScreen, readable, sendKeys, type Screen } from './screen'
 
 const SCREEN: Screen = { cols: 80, rows: 24, text: 'hi', running: true, at: 1, typing: false }
 const settle = () => new Promise<void>(r => setImmediate(r))
@@ -120,4 +120,34 @@ test('fitScale: fits the width, but text stays between 11px and 14px', () => {
 test('KEY_LABELS: every key the Mac allows has a button label and a spoken name', () => {
   assert.deepEqual(Object.keys(KEY_LABELS).sort(), ['ctrl-c', 'down', 'enter', 'esc', 'left', 'right', 'tab', 'up'])
   for (const [short, name] of Object.values(KEY_LABELS)) assert.ok(short && name)
+})
+
+test('readable: drops box frames and side bars, keeps every word and the tree marks', () => {
+  const screen = [
+    '╭──────────────────────────────╮',
+    '│ ✻ Claude Code      ~/demo-app│',
+    '╰──────────────────────────────╯',
+    '',
+    '> fix the failing checkout test',
+    '  ⎿  Read 1 file',
+    '',
+    '',
+    '',
+    '● Edit(src/cart.ts) +12 -3',
+    '──────────────────────────────── Chat name ─',
+    'cost                tokens       agent time',
+    '│ >                              │',
+  ].join('\n')
+  assert.equal(readable(screen), [
+    '✻ Claude Code  ~/demo-app',
+    '',
+    '> fix the failing checkout test',
+    '  ⎿  Read 1 file',
+    '',
+    '● Edit(src/cart.ts) +12 -3',
+    'Chat name',
+    'cost  tokens  agent time',
+    '>',
+  ].join('\n'))
+  assert.equal(readable(''), '')
 })

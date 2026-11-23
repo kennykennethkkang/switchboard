@@ -15,6 +15,8 @@ Secrets: code that sends repo files to a model lists secret-looking files (.env*
 
 Shared tree: never run git stash, git checkout -- <file> or git reset in the working tree: other chats and parallel engineers have uncommitted edits there. For a clean baseline use `git show HEAD:<path>` or `git worktree add <scratch>/base HEAD`.
 
+Build output: switchboard/extension/kit/ is rewritten from ../claude-mods on every extension build. Edit rules.md, agents/ and skills/ in ../claude-mods/kit/<same path>, and a mod at extension/kit/mods/<mod> in ../claude-mods/<mod>, then run `claude plugin test ./<mod>` there.
+
 Usual kit: superpowers:test-driven-development, superpowers:systematic-debugging, superpowers:verification-before-completion, ponytail, context7, claude-api for anything Claude or Anthropic, run to see the app working, e2e-testing when writing Playwright tests, ui-sdk for keyboard, focus, popups, drag and drop and ARIA when the project has @ui-sdk/* or the UI needs those behaviors (a page with no build step loads cdn.jsdelivr.net/npm/@ui-sdk/web@<exact version>/browser/web.js and web.css, never the unpinned ui-sdk.dev/web.js), plus the bland and aws-core skills when the task touches them.
 
 <!-- switchboard generic copy -->

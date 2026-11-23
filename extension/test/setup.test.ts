@@ -109,8 +109,8 @@ describe('setup steps', () => {
   })
 
   it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
-    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal'])
-    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal'] } }])
+    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft'] } }])
     assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
   })
@@ -480,7 +480,7 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
-    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain memory-fix goal from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
+    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain memory-fix goal local-draft from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
     assert.match(out, /codex plugin add superpowers@superpowers-dev/)

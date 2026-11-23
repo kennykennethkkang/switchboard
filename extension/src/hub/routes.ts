@@ -47,6 +47,13 @@ import { todoTool, type TodoCall } from './todo'
 import { toolOn } from './tools'
 import { projectId, readGraph, recall, recentGraph, type MemoryGraph } from './graph'
 import { offerResearch } from './research'
+import { LIBRARY, readResearch } from './research-library'
+
+/** The browser's hub-research-read: the saved markdown in the reply, or why not. */
+export function researchReadReply(root: string, id: string): HubReply {
+  try { return { status: 200, body: readResearch(root, id), contentType: 'text/markdown; charset=utf-8' } }
+  catch (err) { return { status: 400, body: (err as Error).message } }
+}
 import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './flowmap'
 import { readGroups, splitAsks } from './split'
 import { readRuns, type RunDetail } from './runs'
@@ -87,14 +94,14 @@ const picks: Check = v => Array.isArray(v) && v.length > 0 && v.length <= 4 && v
 const flags = (v: unknown) => obj(v) && Object.values(v).every(bool)
 const profile: Check = v => obj(v) && flags(v.plugins) && flags(v.skills) && (v.assets === undefined || flags(v.assets))
 const SETTING_KEYS: SettingKey[] = ['autoCompactEnabled', 'autoCompactWindow', 'autoContinueAtUsageLimit', 'remoteControlAtStartup', 'agentPushNotifEnabled', 'inputNeededNotifEnabled', 'model', 'effortLevel', 'tui', 'statusLine']
-const GIT_OPS: GitOp[] = ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship', 'push', 'merge-back']
+const GIT_OPS: GitOp[] = ['sync', 'commit', 'commit-push', 'switch', 'create', 'undo', 'discard', 'pr', 'stash', 'pop', 'delete-branch', 'rerun', 'ship', 'push', 'merge-back', 'merge-all']
 // The request body has a size cap too, so the count stays modest; web/lib/ship-card.ts says the same before sending.
 const MAX_PATHS = 1000
 const SPLIT_MAX = 8000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort', 'autoPick']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort', 'autoPick', 'autoMerge']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -106,6 +113,10 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-mirofish-report': { simId: str },
   'hub-live-dismiss': { kind: oneOf('mirofish', 'crowd'), id: slug },
   'hub-research-dismiss': { sessionId: slug },
+  'hub-research-open': { sessionId: slug },
+  'hub-research-read': { reqId: str, id: str },
+  'hub-research-seen': { id: str },
+  'hub-research-delete': { id: str },
   'hub-web': { phone: bool },
   'hub-toggle': { kind: oneOf('mod', 'plugin', 'skill'), name: str, enabled: bool },
   'hub-setting': { key: oneOf(...SETTING_KEYS), value: any(bool, num, str, oneOf(null)) },
@@ -117,6 +128,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool) },
   'hub-split': { reqId: str, path: str, text: v => typeof v === 'string' && v.length <= SPLIT_MAX },
   'hub-pick-tools': { text: str, path: opt(str) },
+  'hub-tool-precedence': { name: str, value: oneOf('always', 'auto', 'never') },
   'hub-advanced': { path: str, on: bool },
   'hub-coder-view': { on: bool },
   'hub-first-run': { dismissed: bool },
@@ -382,6 +394,7 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     if (!hub.runner) return { status: 503, body: '' }
     let c: unknown
     try { c = JSON.parse(body) } catch { return { status: 400, body: '' } }
+    if (obj(c) && c.type === 'hub-research-read' && typeof c.id === 'string') return researchReadReply(LIBRARY, c.id)
     const problem = commandProblem(c)
     if (problem) return { status: 400, body: problem }
     try {

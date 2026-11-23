@@ -7,7 +7,6 @@
  */
 
 import * as fs from 'fs'
-import * as path from 'path'
 import { ClaudeHookDef, ClaudeHookEntry } from './protocol'
 import { HOOK_COMMAND_MARKER } from './discovery'
 import { writeJsonAtomic } from './fs-utils'

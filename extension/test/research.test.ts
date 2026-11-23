@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { OFFER_MS, RESEARCH_ROOT, addOffer, dropOffer, ensureResearchRoot, isResearch } from '../src/hub/research'
+import { OFFER_MS, RESEARCH_ROOT, ResearchSaves, addOffer, dropOffer, ensureResearchRoot, isResearch, researchNote, researchProject, saveResearchMemory, trimReport } from '../src/hub/research'
 import { buildGraph, recall, slugOf } from '../src/hub/graph'
 import { HubService, emptyHub } from '../src/hub/hub-service'
 import { commandProblem, handleHub, type HubReply } from '../src/hub/routes'
@@ -158,5 +158,81 @@ describe('recall scope', () => {
     assert.equal(all.status, 200)
     assert.match(all.body, /agent-ui/)
     assert.equal((await hit('&scope=other')).status, 400)
+  })
+})
+
+describe('project research memory', () => {
+  const root = path.join(tmp, 'Research')
+  it('finds the project for a chat, worktrees included, and none for the Research space', () => {
+    const projects = ['/r/app', '/r/app-two', root]
+    assert.equal(researchProject('/r/app/.claude/worktrees/x', projects, root), '/r/app')
+    assert.equal(researchProject('/r/app-two', projects, root), '/r/app-two')
+    assert.equal(researchProject(path.join(root, 'q'), projects, root), undefined)
+    assert.equal(researchProject('/elsewhere', projects, root), undefined)
+  })
+
+  it('makes a reference note named from the question, with the answer line', () => {
+    const n = researchNote({ question: 'Which push service works on iOS?', answer: '**Answer:** APNs via ntfy.\n\n## Sources\n[1] https://ntfy.sh', chat: 'Push chat', date: '2026-11-22' })
+    assert.match(n.name, /^research-which-push-service-works-on-ios-[0-9a-f]{6}$/)
+    assert.notEqual(n.name, researchNote({ question: 'Which push service works on iOS today and why?', answer: 'x', date: '2026-11-22' }).name)
+    assert.match(n.text, /type: reference/)
+    assert.match(n.text, /part-of: project-research/)
+    assert.match(n.text, /\[1\] https:\/\/ntfy.sh/)
+    assert.match(n.line, /\(research-which-push-service-works-on-ios-[0-9a-f]{6}\.md\): APNs via ntfy\./)
+  })
+
+  it('saves into the project memory and indexes each note once', () => {
+    const home = path.join(tmp, 'home')
+    const r = { question: 'Best tide api', answer: '**Answer:** NOAA.', date: '2026-11-22' }
+    const file = saveResearchMemory('/r/app', r, s => s.replace('NOAA', 'NOAA CO-OPS'), home)
+    saveResearchMemory('/r/app', r, s => s, home)
+    const dir = path.dirname(file)
+    assert.equal(dir, path.join(home, '.claude', 'projects', '-r-app', 'memory'))
+    const index = fs.readFileSync(path.join(dir, 'MEMORY.md'), 'utf8')
+    assert.equal(index.match(/research-best-tide-api-[0-9a-f]{6}\.md/g)?.length, 1)
+    assert.equal(index.match(/project-research\.md/g)?.length, 1)
+    assert.ok(fs.existsSync(path.join(dir, 'project-research.md')))
+  })
+
+  it('leaves an archived note archived and does not rewrite the same report', () => {
+    const home = path.join(tmp, 'home2')
+    const r = { question: 'Old question', answer: '**Answer:** yes.', date: '2026-11-20' }
+    const file = saveResearchMemory('/r/app', r, s => s, home)
+    const first = fs.statSync(file).mtimeMs
+    saveResearchMemory('/r/app', { ...r, date: '2026-11-22' }, s => s, home)
+    assert.match(fs.readFileSync(file, 'utf8'), /Checked 2026-11-20/)
+    assert.equal(fs.statSync(file).mtimeMs, first)
+    fs.mkdirSync(path.join(path.dirname(file), 'archive'))
+    fs.renameSync(file, path.join(path.dirname(file), 'archive', path.basename(file)))
+    saveResearchMemory('/r/app', { ...r, answer: '**Answer:** no.' }, s => s, home)
+    assert.ok(!fs.existsSync(file))
+  })
+
+  it('trims a long report but keeps its Sources section', () => {
+    const text = `**Answer:** x\n${'a'.repeat(9000)}\n## Sources\n[1] https://example.com/a`
+    const out = trimReport(text)
+    assert.ok(out.length <= 6100)
+    assert.match(out, /## Sources\n\[1\] https:\/\/example\.com\/a$/)
+    assert.equal(trimReport('short'), 'short')
+  })
+
+  it('saves a finished research run once from the extension, a coding chat never', () => {
+    let t = 0
+    const ev = (sessionId: string, type: string, payload: Record<string, unknown>) => ({ time: ++t, type, payload, sessionId })
+    const saves = new ResearchSaves()
+    const done = (e: ReturnType<typeof ev>) => saves.feed(e)?.answer
+    done(ev('p', 'message', { agent: 'orchestrator', role: 'user', content: 'How tall is it?' }))
+    done(ev('p', 'tool_call_start', { agent: 'orchestrator', tool: 'Skill', args: 'deep-research' }))
+    assert.equal(done(ev('p', 'message', { agent: 'orchestrator', role: 'assistant', content: 'Looking more.' })), undefined)
+    assert.match(done(ev('p', 'message', { agent: 'orchestrator', role: 'assistant', content: '**Answer:** 330 m.\n\n## Sources\n[1] https://example.com' }))!, /330 m/)
+    assert.equal(done(ev('p', 'agent_complete', { name: 'orchestrator' })), undefined)
+    done(ev('c', 'message', { agent: 'orchestrator', role: 'user', content: 'Fix the login bug' }))
+    done(ev('c', 'tool_call_start', { agent: 'orchestrator', tool: 'WebFetch', args: '', inputData: { url: 'https://docs.example.com' } }))
+    assert.equal(done(ev('c', 'message', { agent: 'orchestrator', role: 'assistant', content: 'Fixed.\n\n## Findings\n- cookie' })), undefined)
+    assert.equal(done(ev('c', 'agent_complete', { name: 'orchestrator' })), undefined)
+  })
+
+  it('no longer takes a hub-research-save from a view', () => {
+    assert.ok(commandProblem({ type: 'hub-research-save', sessionId: 's-1', question: 'q', answer: 'a' }))
   })
 })

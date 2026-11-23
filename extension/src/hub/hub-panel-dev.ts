@@ -1,10 +1,8 @@
 import * as vscode from 'vscode'
-import * as path from 'path'
 import { hub } from './hub-service'
 import { listServers } from './local'
 import { startDev, stopDev } from './actions'
-import { projectName } from './projects'
-import { awakePid, devHome, devRows, knownDev, needsWindow, postWindow, readDev, readWindows, sendHome, serve, tailnet } from './dev'
+import { awakePid, devHome, devRows, knownDev, postWindow, readDev, readWindows, serve, tailnet } from './dev'
 import type { WebviewToExtensionMessage } from '../protocol'
 import { refuse, type HubReply } from './hub-panel-shared'
 

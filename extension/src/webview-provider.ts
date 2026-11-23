@@ -9,6 +9,7 @@ import {
   BRIDGE_INIT_MAX_RETRIES, BRIDGE_INIT_RETRY_MS, DEFAULT_DEV_PORT, NONCE_LENGTH, NONCE_CHARS,
   WEBVIEW_BG_COLOR, WEBVIEW_LOADING_TEXT, WEBVIEW_LOADING_TEXT_DIM,
 } from './constants'
+import { isResearch } from './hub/research'
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/
 
@@ -65,11 +66,15 @@ export class VisualizerPanel implements vscode.Disposable {
 
   /** The chat a Research window follows; the bundle renders its panel instead of the hub. */
   private readonly research?: string
+  /** The hub tab of the Research window: titled Research and opened on the reports. */
+  private readonly reports: boolean
 
   private constructor(panel: vscode.WebviewPanel | vscode.WebviewView, extensionUri: vscode.Uri, research?: string) {
     this.panel = panel
     this.extensionUri = extensionUri
     this.research = research
+    this.reports = !research && 'viewColumn' in panel && isResearch(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath)
+    if (this.reports) panel.title = 'Research'
     VisualizerPanel.live.add(this)
 
     this.panel.webview.html = this.getHtml()
@@ -114,20 +119,15 @@ export class VisualizerPanel implements vscode.Disposable {
     return VisualizerPanel.instance
   }
 
-  /** A chat's Research panel, moved into its own compact always-on-top window. */
+  /** A chat's Research panel, as an editor tab beside the chat. */
   static async research(extensionUri: vscode.Uri, sessionId: string, title: string): Promise<VisualizerPanel> {
     const panel = vscode.window.createWebviewPanel(VisualizerPanel.researchViewType, title,
-      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, { ...webviewOptions(extensionUri), retainContextWhenHidden: true })
+      { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }, { ...webviewOptions(extensionUri), retainContextWhenHidden: true })
     panel.iconPath = {
       light: vscode.Uri.joinPath(extensionUri, 'media', 'icon-light.svg'),
       dark: vscode.Uri.joinPath(extensionUri, 'media', 'icon-dark.svg'),
     }
-    const view = new VisualizerPanel(panel, extensionUri, sessionId)
-    // The move acts on the active editor, so the new tab must be it.
-    for (const cmd of ['workbench.action.moveEditorToNewWindow', 'workbench.action.enableCompactAuxiliaryWindow', 'workbench.action.enableWindowAlwaysOnTop']) {
-      try { await vscode.commands.executeCommand(cmd) } catch { /* older VS Code: stays a tab */ }
-    }
-    return view
+    return new VisualizerPanel(panel, extensionUri, sessionId)
   }
 
   /** The columns where an editor tab of this extension host is on screen. */
@@ -245,7 +245,7 @@ export class VisualizerPanel implements vscode.Disposable {
     <div class="dot" style="margin-top: 8px;">●</div>
     <div style="margin-top: 8px; font-size: 10px; color: ${WEBVIEW_LOADING_TEXT_DIM};">localhost:${port}</div>
   </div>
-  <iframe id="app-frame" src="http://localhost:${port}${this.research ? `/?research=${encodeURIComponent(this.research)}` : ''}" style="display:none;"></iframe>
+  <iframe id="app-frame" src="http://localhost:${port}${this.research ? `/?research=${encodeURIComponent(this.research)}` : this.reports ? '/#research' : ''}" style="display:none;"></iframe>
   <script nonce="${nonce}">
     (function() {
       const vscode = acquireVsCodeApi();
@@ -331,7 +331,7 @@ export class VisualizerPanel implements vscode.Disposable {
   </style>
 </head>
 <body>
-  <div id="root"${this.research && SAFE_ID.test(this.research) ? ` data-research="${this.research}"` : ''}></div>
+  <div id="root"${this.research && SAFE_ID.test(this.research) ? ` data-research="${this.research}"` : this.reports ? ' data-page="research"' : ''}></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`

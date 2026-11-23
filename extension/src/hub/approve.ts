@@ -8,7 +8,7 @@ import * as path from 'path'
 import { closeChatTerminal } from './ais'
 import { isResearch } from './research'
 import { CHAT_PREFIX } from './terminal-tags'
-import type { ChatProgress, DoneCheck } from './types'
+import type { ChatProgress, ChatRow, DoneCheck } from './types'
 
 const DONE_CHECK = path.join(os.homedir(), '.claude', 'switchboard', 'done-check')
 
@@ -120,6 +120,16 @@ export async function closeApproved<T extends Term>(pids: number[], terminals: r
 /** Approve leaves the chat running: it works mid-turn, or a question or permission prompt still waits, which a stale click must not kill. */
 export const staysOpenOnApprove = (p: ChatProgress | undefined) =>
   !!p && ((p.state === 'working' && !p.waiting) || (p.state === 'needs-you' && (!!p.ask || !!p.asks?.length)))
+
+// A research chat sits this long idle for a follow-up, then closes as approved; a new prompt restarts the clock.
+export const RESEARCH_IDLE_MS = 10 * 60 * 1000
+
+/** Live research chats idle past RESEARCH_IDLE_MS with no prompt waiting and nothing still running, background jobs included. Pure. */
+export function idleResearch(chats: ChatRow[], progress: ChatProgress[], now = Date.now()): string[] {
+  return chats.filter(c => c.live && isResearch(c.cwd) && c.status === 'idle' && c.updatedAt !== undefined && now - c.updatedAt >= RESEARCH_IDLE_MS)
+    .filter(c => { const p = progress.find(x => x.sessionId === c.sessionId); return !staysOpenOnApprove(p) && !approvalBlock(p, now) && !p?.ask && !p?.asks?.length && !p?.jobs?.length && !p?.subJobs?.length })
+    .map(c => c.sessionId)
+}
 
 /** closeApproved again while a chat is still running, up to tries; true once every chat's terminal closed. */
 export async function closeApprovedRetry<T extends Term>(pids: number[], terminals: readonly T[], o?: Parameters<typeof closeChatTerminal>[2], isOurs: (t: T) => boolean = ourTerminal, tries = 3): Promise<boolean> {

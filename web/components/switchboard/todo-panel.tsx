@@ -1,6 +1,6 @@
 'use client'
 // To-do: chips up top, then Decide, Running, one Queue grouped by project, Waiting and Done.
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useId, useState, type ReactNode } from 'react'
 import { useDraft } from '@/hooks/use-draft'
 import type { ArchivedChat, ChatRow, TodoList, WindowInfo } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
@@ -10,6 +10,7 @@ import { shownProjects } from '@/lib/todo-view'
 import { baseName } from '@/lib/path'
 import { panel, caps } from './look'
 import { ItemRow, Shipped } from './todo-rows'
+import { ForceOpen } from './plan-page'
 import { MAX, refocus, useTodoOps, type Ops } from './todo-ops'
 import './todo-panel.css'
 
@@ -124,7 +125,9 @@ const pausedTag = (folder: string, ctx: Ctx) => autopilot(ctx.todos[folder] ?? {
 const nextId = (folder: string, ctx: Ctx) => autopilot(ctx.todos[folder] ?? { todo: [] }, ctx.autoStart, ctx.ops.live).starts.find(id => !ctx.ops.busy.has(id))
 
 function Block({ k, title, n, hint, fold, children }: { k: Section; title: string; n: number; hint?: string; fold: Fold; children: ReactNode }) {
-  return <details id={fold.id(k) || undefined} className="tdx-block" open={fold.open(k)} onToggle={e => fold.set(k, e.currentTarget.open)}>
+  // Forced open (narrow Plan, headers hidden): the saved fold choice stays untouched.
+  const force = useContext(ForceOpen)
+  return <details id={fold.id(k) || undefined} data-sec={k} className="tdx-block" open={force || fold.open(k)} onToggle={e => { if (!force) fold.set(k, e.currentTarget.open) }}>
     <summary className="tdx-h">{title}<span className="hub-todo-n">{n}</span>{hint && <span className="tdx-keys">{hint}</span>}</summary>
     {children}
   </details>
@@ -132,8 +135,8 @@ function Block({ k, title, n, hint, fold, children }: { k: Section; title: strin
 
 function Done({ folder, rows, ops, older }: { folder: string; rows: Data['done']; ops: Ops; older?: number }) {
   if (!rows.length) return null
-  return <details className="tdo-fold">
-    <summary>{rows.length} done this week{rows.some(t => 'shipped' in t && t.shipped) ? ', some by commit' : ''}</summary>
+  return <details className="tdo-fold" data-sec="done" data-proj={baseName(folder)}>
+    <summary>{baseName(folder)}: {rows.length} done this week{rows.some(t => 'shipped' in t && t.shipped) ? ', some by commit' : ''}</summary>
     <ul role="list" aria-label={`${baseName(folder)}: done`} className="tdo-list">{rows.map(t => <Shipped key={t.id} t={t} onBack={() => ops.restore(folder, t.id)} />)}</ul>
     {!!older && <p className="tdo-foot">{older} older done {older === 1 ? 'item' : 'items'} hidden</p>}
   </details>
@@ -159,13 +162,17 @@ function InboxView({ folders, ctx }: { folders: string[]; ctx: Ctx }) {
       <ul role="list" aria-label="Waiting" className="tdx-list">{waiting.map(({ f, r }) => <ItemRow key={r.t.id} folder={f} row={r} ops={ops} project={many} />)}</ul>
     </Block>}
     {per.map(({ f, d }) => <Done key={f} folder={f} rows={d.done} ops={ops} older={olderOf(ctx.todos[f], d.done.length)} />)}
-    {per.filter(p => !p.a.queue.length).map(({ f }) => <PilotOnly key={f} folder={f} ctx={ctx} />)}
+    <Idle folders={per.filter(p => !p.a.queue.length).map(p => p.f)} ctx={ctx} />
   </>
 }
 
-/** A project with nothing queued still gets its Auto-run switch, in one quiet line. */
-function PilotOnly({ folder, ctx }: { folder: string; ctx: Ctx }) {
-  return <div className="tdx-lanehead" data-quiet><span className="tdx-pname">{baseName(folder)}</span><PilotCtl folder={folder} ops={ctx.ops} todos={ctx.todos} autoStart={ctx.autoStart} /></div>
+/** Projects with nothing queued fold into one line; each keeps its Auto-run switch inside. */
+function Idle({ folders, ctx }: { folders: string[]; ctx: Ctx }) {
+  if (!folders.length) return null
+  return <details className="tdo-fold" data-sec="queue">
+    <summary>{folders.length} {folders.length === 1 ? 'project' : 'projects'} with nothing queued: {folders.map(baseName).join(', ')}</summary>
+    {folders.map(f => <div key={f} className="tdx-lanehead" data-quiet><span className="tdx-pname">{baseName(f)}</span><PilotCtl folder={f} ops={ctx.ops} todos={ctx.todos} autoStart={ctx.autoStart} /></div>)}
+  </details>
 }
 
 const Up = ({ down }: { down?: boolean }) => <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={down ? { transform: 'rotate(180deg)' } : undefined}><path d="M3 7.5 6 4.5l3 3" /></svg>
@@ -221,7 +228,7 @@ function QueueGroup({ folder, rows, all, ctx }: { folder: string; rows: Row[]; a
       <button type="button" className="hub-btn sm" data-dir={1} disabled={i === shownTop.length - 1} aria-label={`Move down: ${title(r)}`} title="Move down" onClick={() => go(1)}><Up down /></button>
     </span>
   }
-  return <div className="tdx-group">
+  return <div className="tdx-group" data-proj={baseName(folder)}>
     <div className="tdx-lanehead">
       <span className="tdx-pname">{baseName(folder)}{pausedTag(folder, ctx)}<span className="tdx-meta">{rows.length} queued{topAll.length > 1 && <span className="tdx-dragnote"> · drag to reorder</span>}</span></span>
       <PilotCtl folder={folder} ops={ops} todos={ctx.todos} autoStart={ctx.autoStart} />

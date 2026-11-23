@@ -4,7 +4,7 @@
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { fitScale, type Screen } from '@/lib/screen'
+import { fitScale, readable, type Screen } from '@/lib/screen'
 
 export default function ScreenXterm({ screen, fit }: { screen: Screen; fit: boolean }) {
   const holder = useRef<HTMLDivElement>(null), pane = useRef<HTMLDivElement>(null), term = useRef<Terminal | null>(null)
@@ -51,8 +51,10 @@ export default function ScreenXterm({ screen, fit }: { screen: Screen; fit: bool
     return () => ro.disconnect()
   }, [fit, screen.cols, screen.rows])
   return (
-    <div ref={pane} className="cv-xt" role="region" tabIndex={0} aria-label={`Terminal screen, ${screen.cols} by ${screen.rows}. Copy it to read it as text.`}>
-      <div className="cv-xt-size" style={size ? { width: size.w * size.k, height: size.h * size.k } : undefined}>
+    <div ref={pane} className="cv-xt" role="region" tabIndex={0} aria-label={`Terminal screen, ${screen.cols} by ${screen.rows}`}>
+      {/* What a screen reader reads: xterm's own rows are drawn for the eye only. */}
+      <pre className="sr-only">{readable(screen.text)}</pre>
+      <div className="cv-xt-size" aria-hidden style={size ? { width: size.w * size.k, height: size.h * size.k } : undefined}>
         <div className="cv-xt-box" style={size ? { transform: `scale(${size.k})` } : undefined}>
           <div ref={holder} className="cv-xt-term" />
         </div>

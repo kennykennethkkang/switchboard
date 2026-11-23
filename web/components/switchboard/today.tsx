@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { needsLines, todayLine, tokenText, type Today } from '@/lib/today'
 import type { TaskTotals } from '@/lib/progress'
 import type { DailyTrend } from '@/lib/hub-types'
@@ -9,20 +9,22 @@ import { TaskBar } from './chat-cards'
 
 const lab = { font: '500 13px/1.6 var(--hub-sans)', color: 'var(--hub-ash)', margin: 0 } as const
 const KEY = 'hub-today-open'
+/** The Plan page's rail keeps the card open and drops its toggle. */
+export const RailCtx = createContext(false)
 
 /** One card on top: what is next, what got approved today, what runs, and what today cost. tasks: summed over the open chats. next: the project's top hand step and first Up next item. */
 export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?: TaskTotals; next?: { you?: string; up?: string }; trend?: DailyTrend; /** Unused: the heading counts its own list. switchboard.tsx still passes it. */ needsCount?: number }) {
   const sum = [today.tokens !== undefined ? `${tokenText(today.tokens)} tokens today` : '', today.openCostUsd !== undefined ? `open chats $${today.openCostUsd.toFixed(2)}` : ''].filter(Boolean).join(' · ')
   const jev = today.jev, needs = needsLines(today, next?.you)
   // Collapsed by default: Now already shows the same things. The choice sticks per browser.
-  const [open, setOpen] = useState(false)
+  const rail = useContext(RailCtx), [stored, setOpen] = useState(false), open = rail || stored
   useEffect(() => { try { setOpen(localStorage.getItem(KEY) === '1') } catch {} }, [])
   const toggle = () => setOpen(o => { try { localStorage.setItem(KEY, o ? '0' : '1') } catch {} return !o })
   const head = { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 12px', margin: 0, font: '600 14px/1.4 var(--hub-sans)', color: 'var(--hub-ink)' } as const
   return (
     <section aria-label="Today" className="hub-today" style={panel}>
       <h2 style={{ ...head, margin: 0 }}>
-        <button type="button" aria-expanded={open} className="hub-link" onClick={toggle} style={{ font: 'inherit', color: 'inherit', padding: '4px 0', minHeight: 32 }}>{open ? '▾' : '▸'} Today</button>
+        {rail ? <span>Today</span> : <button type="button" aria-expanded={open} className="hub-link" onClick={toggle} style={{ font: 'inherit', color: 'inherit', padding: '4px 0', minHeight: 32 }}>{open ? '▾' : '▸'} Today</button>}
         <span style={{ font: '400 13px/1.4 var(--hub-sans)', color: 'var(--hub-mute)' }} title="Tokens: today's input, output and cache writes. Open chats: what the chats open now have cost since they started.">{open ? sum : todayLine(today, needs.length)}</span>
       </h2>
       {open && <>

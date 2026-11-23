@@ -4,6 +4,7 @@
  * Feed posts from the usage mods come through ingest(); what the extension gathers itself comes through set(). Every
  * change fires onChange, which extension.ts throttles into `hub-state`.
  */
+import { onMidTurn } from './idle'
 import { approvalBlock, closingPick, stampedChats } from './approve'
 import { isTempDir } from './temp'
 import * as crypto from 'crypto'
@@ -35,7 +36,7 @@ const PROGRESS_STALE_MS = 24 * 60 * 60 * 1000
 const MAX_INBOX = 20
 // A chat's mod polls its inbox every 2 seconds; quiet longer than this, a message would sit unread.
 /** The folder a session ran in: the first cwd in its transcript, wherever under the projects folder it sits. */
-function cwdFromTranscript(projects: string, sessionId: string): string | undefined {
+export function cwdFromTranscript(projects: string, sessionId: string): string | undefined {
   if (!/^[\w-]+$/.test(sessionId)) return undefined
   try {
     for (const d of fs.readdirSync(projects)) {
@@ -716,6 +717,11 @@ export class HubService {
 
   owns(sessionId: string): boolean { return this.owned.has(sessionId) }
 
+  /** A live chat this window owns is mid-turn. A reload that takes over a minute (VS Code's terminal reconnect grace) kills it. */
+  midTurn(): boolean {
+    return this.state.chats.some(c => c.live && this.owned.has(c.sessionId) && this.state.progress.find(p => p.sessionId === c.sessionId)?.state === 'working')
+  }
+
   /** Subagent jobs a transcript says ended leave the chat's progress, so every window drops them on the same fact whatever events it saw. */
   endSubJobs(finished: Set<string>, now = Date.now()): void {
     if (!finished.size || !this.state.progress.some(p => p.subJobs?.some(j => finished.has(j.id)))) return
@@ -958,3 +964,4 @@ export class HubService {
 
 /** The window's one hub, read by the hook server, the discovery file and the panel. */
 export const hub = new HubService()
+onMidTurn(() => hub.midTurn())

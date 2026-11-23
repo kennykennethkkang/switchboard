@@ -4,7 +4,8 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { approvalBlock, APPROVE_OPTIONS, APPROVE_QUESTION, closingPick, approvedFields, closeApproved, closeApprovedRetry, staysOpenOnApprove, LIVE_SUB_MS, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
+import { approvalBlock, APPROVE_OPTIONS, APPROVE_QUESTION, closingPick, approvedFields, closeApproved, closeApprovedRetry, idleResearch, RESEARCH_IDLE_MS, staysOpenOnApprove, LIVE_SUB_MS, ourTerminal, readDoneCheck, stampedChats } from '../src/hub/approve'
+import { RESEARCH_ROOT } from '../src/hub/research'
 import { isTempDir } from '../src/hub/temp'
 import { HubService } from '../src/hub/hub-service'
 import type { ChatProgress } from '../src/hub/types'
@@ -137,7 +138,7 @@ describe('HubService temp filter', () => {
     hub.hook({ hook_event_name: 'SubagentStart', session_id: 'r2', cwd, agent_id: 'a1', agent_type: 'engineer' })
     hub.hook({ hook_event_name: 'PostToolUse', session_id: 'r2', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_response: { answers: { [Q]: 'Approve' } } }, 1000)
     const row = JSON.parse(fs.readFileSync(log, 'utf8').trim())
-    assert.deepEqual(row, { at: 1000, sessionId: 'r2', why: 'the chat is still working' })
+    assert.deepEqual(row, { at: 1000, sessionId: 'r2', why: 'subagents still running: a1' })
   })
   it('keeps the approval log to its last 50 lines', () => {
     const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
@@ -306,5 +307,19 @@ describe('strings the hub parses are in the kit rules', () => {
   it('names the standup sections and the commit message headings', () => {
     for (const s of ['For you', 'Commit message:', 'Commit message (<repo folder name>):']) assert.ok(rules.includes(s), s)
     assert.match(rules, /standup: done, for you, left, risks/)
+  })
+})
+
+describe('idleResearch', () => {
+  const now = 10_000_000
+  const row = (id: string, o: Record<string, unknown> = {}) => ({ pid: 1, sessionId: id, cwd: RESEARCH_ROOT, status: 'idle', updatedAt: now - RESEARCH_IDLE_MS, link: '', live: true, why: [], ...o })
+  it('closes a research chat idle past the wait, and only that', () => {
+    const chats = [row('done'), row('fresh', { updatedAt: now - 60_000 }), row('busy', { status: 'busy' }), row('project', { cwd: '/repo' }), row('gone', { live: false }), row('asking')]
+    const asking = { sessionId: 'asking', cwd: RESEARCH_ROOT, state: 'needs-you', roles: [], tasks: [], startedAt: 0, at: 0, ask: { kind: 'question' } }
+    assert.deepEqual(idleResearch(chats, [asking as never], now), ['done'])
+  })
+  it('keeps one whose subagent still runs a background job', () => {
+    const p = { sessionId: 'job', cwd: RESEARCH_ROOT, state: 'idle', roles: [], tasks: [], startedAt: 0, at: 0, subJobs: [{ id: 'b1' }] }
+    assert.deepEqual(idleResearch([row('job')], [p as never], now), [])
   })
 })

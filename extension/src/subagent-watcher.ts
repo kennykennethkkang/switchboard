@@ -11,7 +11,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { AgentEvent, SubagentState, WatchedSession, emitSubagentSpawn } from './protocol'
+import { SubagentState, WatchedSession, emitSubagentSpawn } from './protocol'
 import { SESSION_ID_DISPLAY, ORCHESTRATOR_NAME, generateSubagentFallbackName, resolveSubagentChildName } from './constants'
 import { readNewFileLines } from './fs-utils'
 import { TranscriptParser } from './transcript-parser'

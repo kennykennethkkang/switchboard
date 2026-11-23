@@ -12,7 +12,7 @@ test('sorts live chats into done today, needs you (with the question) and workin
   const t = todayView(cards, h.history, h.live, now, h.jev)
   // Waiting on Kenneth's approval is not done.
   assert.deepEqual(t.done, [])
-  assert.deepEqual(t.approve, ['Hub AIs and Starred', 'Finished receipt'])
+  assert.deepEqual(t.approve, ['Hub AIs and Starred', 'Cookie banner (worktree)', 'Finished receipt'])
   assert.deepEqual(t.jev, { runs: 2, costUsd: 0.0184 })
   assert.deepEqual(t.needs, [{ name: 'Outfit picker copy', question: "Keep 'Closet' or rename it to 'Wardrobe'?" }, { name: 'Search filters', question: 'Approve this chat as finished?' }])
   assert.deepEqual(t.working, ['Fix login redirect v4', 'Fix login (worktree)', 'Accurate Done state'])

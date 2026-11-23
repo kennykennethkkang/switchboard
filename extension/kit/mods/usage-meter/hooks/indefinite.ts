@@ -12,7 +12,9 @@ import { feed, ind, indDone, indStopped } from './state'
 export const IND_READ_MS = 5_000
 export const IND_ASK_MS = 15 * 60_000
 export const IND_DONE = /^Run indefinitely: done\s*$/m
-export const IND_ROUND = 'Run indefinitely is on. Do another round: audit the project for bugs, errors, user problems and hard-to-use parts; fix them; add components that would help this project; run the checks; dispatch role subagents as needed. Decide everything yourself and note decisions. Never commit. When nothing is left you can improve, end with the line `Run indefinitely: done`.'
+// Kept word for word with Switchboard's extension/src/hub/indefinite.ts.
+export const IND_DESIGN = 'If the round changes UI or UX, build two versions on localhost behind a toggle: Safe (proven patterns from the project and the design library) and Explore (a bolder take from ~/.claude/switchboard/design-md/SOURCES.md); have a qa agent that built neither run crowd-ab and a MiroFish sim on both, keep the winner, log both results in .switchboard/design-rounds.md, and start the next UI round from the winner with a fresh Safe and Explore pair.'
+export const IND_ROUND = `Run indefinitely is on. Do another round: audit the project for bugs, errors, user problems and hard-to-use parts; fix them; add components that would help this project; run the checks; dispatch role subagents as needed. ${IND_DESIGN} Decide everything yourself and note decisions. Never commit. When nothing is left you can improve, end with the line \`Run indefinitely: done\`.`
 export const IND_ASK_RULE = 'Run indefinitely is on: ask every question only the user can answer now, in one AskUserQuestion round before you start work; after that, decide yourself and note what you decided. Never end a turn with open tasks you can do yourself.'
 export type IndCfg = { onAt: number; maxHours?: number; maxCostUsd?: number; gate?: string }
 export const IND_GATE_MS = 600_000
@@ -48,7 +50,7 @@ export async function runGate($: EngineInterface, gate: string, cwd?: string): P
 }
 // A /goal file at the project root steers its rounds; its Check line is the gate when the hub sets none, and the done line alone cannot pass it.
 export const goalPath = (root: string, id: string) => `${root}/.switchboard/goals/${id}.md`
-export const goalRound = (file: string) => `Run indefinitely is on with a goal in ${file}. Do another round toward it: build or fix what is still missing, test every function it names against how it should work, run its check and the project checks, dispatch role subagents as needed. Decide everything yourself and note decisions in the goal file. Never commit. When every point in the goal works with no issues and its check passes, end with the line \`Run indefinitely: done\`.`
+export const goalRound = (file: string) => `Run indefinitely is on with a goal in ${file}. Do another round toward it: build or fix what is still missing, test every function it names against how it should work, run its check and the project checks, dispatch role subagents as needed. ${IND_DESIGN} Decide everything yourself and note decisions in the goal file. Never commit. When every point in the goal works with no issues and its check passes, end with the line \`Run indefinitely: done\`.`
 /** A fresh chat copies the /goal file of the chat it took over from (the note path ends -<id8>.md); returns the new path. */
 export async function carryGoal($: EngineInterface, note: string): Promise<string | undefined> {
   const old = /-([0-9a-f]{8})\.md$/.exec(note)?.[1]

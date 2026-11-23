@@ -25,6 +25,13 @@ describe('window colors', () => {
     assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8'))).sort(), ['/a', '/b'])
   })
 
+  it('gives the Research window slate and leaves the palette to projects', () => {
+    const r = '/home/Documents/Research'
+    const { colors } = assignColors({ [r]: 'violet' }, [r, '/a'], ws => ws === r)
+    assert.equal(colors[r], 'slate')
+    assert.equal(colors['/a'], 'violet')
+  })
+
   it('keeps a saved color and gives a new folder the first one no live window uses', () => {
     const saved = { '/a': 'violet', '/b': 'amber' } as const
     const { colors, changed } = assignColors({ ...saved }, ['/b', '/c', '/a'])

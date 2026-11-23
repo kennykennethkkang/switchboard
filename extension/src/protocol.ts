@@ -3,6 +3,7 @@ import type { MemoryGraph } from './hub/graph'
 import type { RunDetail } from './hub/runs'
 import type { FlowMap } from './hub/flowmap'
 import type { ChatOutputs, ChatTranscript } from './hub/chat-view'
+import type { ScreenSnap } from './hub/screen'
 /**
  * Message protocol between VS Code extension host and webview.
  *
@@ -44,6 +45,7 @@ export interface SessionInfo {
 // ─── Extension → Webview Messages ────────────────────────────────────────────
 
 export type ExtensionToWebviewMessage =
+  | { type: 'research-read'; reqId: string; body?: string; problem?: string }
   | { type: 'connection-status'; status: 'connected' | 'disconnected' | 'watching'; source: string }
   | { type: 'agent-event'; event: AgentEvent }
   | { type: 'agent-event-batch'; events: AgentEvent[] }
@@ -70,8 +72,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'runs'; id: string; runs?: RunDetail[]; problem?: string }
   /** The answer to flowmap-get. */
   | { type: 'flowmap'; id: string; map?: FlowMap; problem?: string }
-  /** The answer to chat-get: the one asked for, a shot as a data URL; none of them for an unknown chat. */
-  | { type: 'chat'; id: string; outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; problem?: string }
+  /** The answer to chat-get: the one asked for, a shot as a data URL; none of them for an unknown chat or a screen no window holds. */
+  | { type: 'chat'; id: string; outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; screen?: ScreenSnap & { typing: boolean }; problem?: string }
 
 export interface VisualizerConfig {
   mode: 'live' | 'replay'
@@ -100,8 +102,8 @@ export type WebviewToExtensionMessage =
   | { type: 'runs-get'; id: string; sessionId: string; role: string }
   /** The Flow map asks for cwd's map; answered by 'flowmap' with the same id. */
   | { type: 'flowmap-get'; id: string; cwd: string }
-  /** The chat view asks for a chat's outputs, a transcript page or one screenshot; answered by 'chat' with the same id. */
-  | { type: 'chat-get'; id: string; sessionId: string; what: 'outputs' | 'transcript' | 'shot'; before?: number; path?: string }
+  /** The chat view asks for a chat's outputs, a transcript page, one screenshot or its terminal screen; answered by 'chat' with the same id. */
+  | { type: 'chat-get'; id: string; sessionId: string; what: 'outputs' | 'transcript' | 'shot' | 'screen'; before?: number; path?: string }
   | { type: 'hub-send'; sessionId: string; text: string }
   | { type: 'hub-answer'; sessionId: string; askId: string; choice: Choice }
   | { type: 'hub-rc'; on: boolean; sessionId?: string }
@@ -111,6 +113,13 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-live-dismiss'; kind: 'mirofish' | 'crowd'; id: string }
   /** Kenneth turned down the Research mode offer for this chat. */
   | { type: 'hub-research-dismiss'; sessionId: string }
+  /** The home's Research tracker: open this chat's research tab. */
+  | { type: 'hub-research-open'; sessionId: string }
+  /** Reads a saved research run; research-read comes back with the same reqId. */
+  | { type: 'hub-research-read'; reqId: string; id: string }
+  /** Marks a saved research run seen, or moves it to the trash. */
+  | { type: 'hub-research-seen'; id: string }
+  | { type: 'hub-research-delete'; id: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
@@ -123,6 +132,7 @@ export type WebviewToExtensionMessage =
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
+  | { type: 'hub-tool-precedence'; name: string; value: 'always' | 'auto' | 'never' }
   /** Advanced mode on or off for one project (an absolute path from the project list). */
   | { type: 'hub-advanced'; path: string; on: boolean }
   /** Coder view on (every page and control) or off (the Simple view); global, kept in globalState and company.json. */

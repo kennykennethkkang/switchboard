@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import * as fs from 'fs'
 import { VisualizerPanel } from './webview-provider'
 import { JsonlEventSource } from './event-source'
 import { WebviewToExtensionMessage } from './protocol'
@@ -15,13 +16,16 @@ import type { AgentRuntime, AgentRuntimeMode } from './session-runtime'
 import { withSkipShell } from './hub/controls'
 import { orphanTab } from './orphan-tab'
 import { hub } from './hub/hub-service'
+import { LIBRARY, listResearch, readResearch } from './hub/research-library'
 import { SliceUploads, chatLabel } from './hub/uploads'
-import { setResearchOpener } from './hub/research-window'
+import { setResearchOpener, sweepResearch } from './hub/research-window'
 import { readGraph } from './hub/graph'
 import { readRuns } from './hub/runs'
 import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './hub/flowmap'
 import { readGroups } from './hub/split'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs } from './hub/chat-view'
+import { readScreenElsewhere, readWindows } from './hub/dev'
+import { readScreen } from './hub/screen'
 
 const log = createLogger('Extension')
 
@@ -63,6 +67,17 @@ async function startRuntimes(
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  hub.set({ research: listResearch(LIBRARY) })
+  // Another window saves, marks seen or deletes a report: relist here too.
+  try {
+    fs.mkdirSync(LIBRARY, { recursive: true })
+    let relist: NodeJS.Timeout | undefined
+    const w = fs.watch(LIBRARY, { recursive: true }, () => {
+      clearTimeout(relist)
+      relist = setTimeout(() => hub.set({ research: listResearch(LIBRARY) }), 300)
+    })
+    context.subscriptions.push({ dispose: () => { clearTimeout(relist); w.close() } })
+  } catch (err) { log.warn('Research library watch failed:', err) }
   log.info('Extension activated')
 
   // The hub and the Activity Bar view first: a click on the Switchboard icon resolves the view at once,
@@ -77,6 +92,9 @@ export async function activate(context: vscode.ExtensionContext) {
     })
     return panel
   })
+  // Chats killed without a SessionEnd hook still lose their research tab.
+  const sweep = setInterval(() => sweepResearch(new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId))), 60_000)
+  context.subscriptions.push({ dispose: () => clearInterval(sweep) })
   startSelfUpdate(context, kitDir())
   watchCloseForMove(context)
 
@@ -204,6 +222,11 @@ export async function activate(context: vscode.ExtensionContext) {
       promptHookSetupIfNeededForClaude(context)
     },
   })
+
+  // Research tabs are not revived after a reload: VS Code would otherwise keep a blank one with no chat behind it.
+  context.subscriptions.push(vscode.window.registerWebviewPanelSerializer(VisualizerPanel.researchViewType, {
+    async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) { webviewPanel.dispose() },
+  }))
 
   // A tab left over from an earlier extension host is replaced with a live one. Checked a moment after
   // activation and after each tab switch, so a tab VS Code is still reviving gets the chance first.
@@ -361,8 +384,17 @@ function wirePanel(panel: VisualizerPanel): void {
         const codex = () => hub.get().progress.find(p => p.sessionId === sessionId)
         const read = what === 'outputs' ? chatOutputs(sessionId).then(o => { const p = o ? undefined : codex(); return { outputs: o ?? (p && progressOutputs(p)) } })
           : what === 'transcript' ? chatTranscript(sessionId, before).then(t => ({ transcript: t ?? (codex() ? { messages: [], before: null, transcript: 'unsupported' as const } : undefined) }))
+          // The screen: this window's terminal, else whichever other window holds it. Typing stays in the real terminal next to the panel.
+          : what === 'screen' ? readScreen(sessionId, true).then(async s => s ?? readScreenElsewhere(sessionId, readWindows().filter(w => w.pid !== process.pid))).then(s => ({ screen: s && { ...s, typing: false } }))
           : chatOutputs(sessionId).then(o => o ? chatShot(o.shots, file ?? '') : undefined).then(s => ({ shot: s && `data:${s.type};base64,${s.bytes.toString('base64')}` }))
         void read.then(r => panel.postMessage({ type: 'chat', id, ...r }), err => panel.postMessage({ type: 'chat', id, problem: (err as Error).message }))
+        break
+      }
+
+      case 'hub-research-read': {
+        const { reqId, id } = message
+        try { panel.postMessage({ type: 'research-read', reqId, body: readResearch(LIBRARY, id) }) }
+        catch (err) { panel.postMessage({ type: 'research-read', reqId, problem: (err as Error).message }) }
         break
       }
 

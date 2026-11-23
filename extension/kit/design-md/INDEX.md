@@ -4,6 +4,8 @@ When to reach for which entry. Each folder holds a DESIGN.md with tokens (colors
 
 Format: `folder`: vibe. Use it when.
 
+For website or app UI, also browse the live sites in SOURCES.md (components, text animation, fonts, 3D and scroll, colors, sections, backgrounds, inspiration, sounds).
+
 ## Dev tools and dark product UI
 - `linear.app`: near-black, one lavender accent, hairline panels. A dense dark app that should feel crafted and calm.
 - `vercel`: black and white duet, mesh gradient at hero only. Developer platform pages, deploy or status UI.

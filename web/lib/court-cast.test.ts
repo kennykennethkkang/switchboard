@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CAST, ICONS, LOOKS, OVERLAYS, badgeOf, castOf } from './court-cast'
+import { CAST, ICONS, LOOKS, OVERLAYS, SEA, badgeOf, castOf } from './court-cast'
 import { courtColors } from './skins/journey-west'
 
 const ROLES = ['lead', 'engineer', 'qa', 'designer', 'researcher', 'ops', 'growth']
@@ -30,7 +30,7 @@ test('silhouettes differ', () => {
 
 test('grids fit the 12x16 sprite with valid letters', () => {
   const keys = new Set(Object.keys(courtColors))
-  for (const [role, l] of Object.entries(CAST)) {
+  for (const [role, l] of [...Object.entries(CAST), ...Object.entries(SEA)]) {
     assert.equal(l.body?.length, 11, `${role} body rows`)
     assert.ok((l.hat ?? []).length <= 2, `${role} hat`)
     assert.ok((l.itemY ?? 3) + (l.item ?? []).length <= 14, `${role} item overflows`)
@@ -41,8 +41,18 @@ test('grids fit the 12x16 sprite with valid letters', () => {
       for (const ch of row) assert.ok(ch === '.' || BASE.has(ch) || ch in (l.pal ?? {}), `${role} letter ${ch}`)
     }
     const { name, tag, ...look } = l
-    assert.deepEqual(LOOKS[role], look, `${name} (${tag}) look`)
+    if (CAST[role] === l) assert.deepEqual(LOOKS[role], look, `${name} (${tag}) look`)
   }
+})
+
+test('the Dragon Palace cast is its own, with Wukong kept as the visitor', () => {
+  const names = ROLES.map(r => castOf(r, SEA).name)
+  assert.equal(new Set(names).size, ROLES.length)
+  assert.equal(castOf('lead', SEA).name, 'Ao Guang')
+  assert.equal(castOf('kit:engineer', SEA).name, 'Sun Wukong')
+  assert.equal(castOf('librarian', SEA).name, 'Shrimp Soldier')
+  for (const r of Object.keys(SEA)) assert.ok(CAST[r], `${r} is a known role`)
+  for (const r of ROLES.filter(r => SEA[r])) assert.notEqual(castOf(r, SEA).name, castOf(r).name, r)
 })
 
 test('overlays and icons use real colors', () => {

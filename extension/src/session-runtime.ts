@@ -15,6 +15,24 @@ import { VisualizerPanel } from './webview-provider'
 import { hub } from './hub/hub-service'
 import { SESSION_ID_DISPLAY, STATUS_MESSAGE_DURATION_MS } from './constants'
 import type { TypedDisposable, TypedEvent } from './typed-event-emitter'
+import { ResearchSaves, researchProject, saveResearchMemory } from './hub/research'
+import { redact } from './hub/brain'
+import { createLogger } from './logger'
+
+const log = createLogger('Research')
+const researchSaves = new ResearchSaves()
+
+/** Every event a panel would get: a project chat's finished research report goes to that project's memory. */
+export function saveResearch(event: AgentEvent): void {
+  const run = researchSaves.feed(event)
+  if (!run || !event.sessionId) return
+  const chat = hub.get().chats.find(c => c.sessionId === event.sessionId)
+  const project = chat && researchProject(chat.cwd, hub.get().projects.map(p => p.path))
+  // Research-space chats save to the vault themselves; only project chats land in project memory.
+  if (!project) return
+  try { saveResearchMemory(project, { question: run.question ?? run.lastUser ?? '', answer: run.answer ?? '', chat: chat.name, date: new Date().toISOString().slice(0, 10) }, redact) }
+  catch (err) { log.warn('Research memory save failed:', err) }
+}
 
 export type AgentRuntimeMode = 'claude' | 'codex'
 
@@ -73,10 +91,10 @@ export function wireWatcherToPanel(
 
   subs.push(watcher.onEvent((event) => {
     if (event.sessionId && hub.isHeadless(event.sessionId)) return
-    const panels = VisualizerPanel.ready()
-    if (panels.length === 0) return
     const transformed = options.transformEvent ? options.transformEvent(event) : event
-    if (transformed) for (const panel of panels) panel.sendEvent(transformed)
+    if (!transformed) return
+    saveResearch(transformed)
+    for (const panel of VisualizerPanel.ready()) panel.sendEvent(transformed)
   }))
 
   subs.push(watcher.onSessionDetected((sessionId) => {

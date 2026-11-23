@@ -1,5 +1,5 @@
 /* Now page and the bottom status bar. */
-.now { display: grid; gap: 16px; min-width: 0; }
+.now { display: grid; gap: 20px; min-width: 0; }
 
 .now-day { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-surface); overflow: hidden; }
 .now-day > div { display: flex; flex-direction: column-reverse; gap: 6px; padding: 12px 14px; min-width: 0; }
@@ -7,7 +7,7 @@
 .now-day dd { margin: 0; font: 600 18px/1.1 var(--hub-sans); color: var(--hub-ink); font-variant-numeric: tabular-nums; }
 .now-day dt { font-size: 12px; color: var(--hub-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.now-lanes { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.now-lanes { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 .now-lane { display: grid; gap: 10px; min-width: 0; }
 .now-lane-head { display: flex; align-items: center; gap: 8px; margin: 0; font: inherit; }
 .now-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 99px; font: 500 12px/1 var(--hub-sans); }
@@ -119,6 +119,8 @@
   .sb-meters { gap: 10px; }
   .sb .sb-toggle { border-color: var(--hub-hair); border-radius: 99px; }
 }
+/* Phone: Codex meters only show when close to the limit, so the Claude ones clear the chips. */
+@media (max-width: 480px) { .sb .hub-limit[data-codex]:not([data-level='high'], [data-level='out']) { display: none; } }
 @media (pointer: coarse) { .sb-btn { height: auto; min-height: 44px; } .sb { height: calc(48px + env(safe-area-inset-bottom)); } .sb .hub-ship-chip { line-height: 42px; } }
 /* Bottom tab bar under 760: the bar sits on top of it, so the nav takes the safe area. */
 @media (max-width: 760px) {

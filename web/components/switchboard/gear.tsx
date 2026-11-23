@@ -15,8 +15,8 @@ import { SignIns } from './sign-ins'
 import { Credits } from './credits'
 import { Health } from './health'
 import { SpendLimits } from './spend-limits'
+import { ToolPrecedence } from './tool-precedence'
 import { PhoneAlerts, phoneAlertsShown } from './phone-alerts'
-import { label } from './look'
 import { ADVANCED_HINT } from './stages'
 import { advancedRows, raiseLine, raisesFor } from '@/lib/stages-ui'
 import './gear.css'
@@ -186,6 +186,8 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Learn automatically" on={sb.learn !== false} onChange={next => own('learn', next)} /> },
     { section: 'Chats', label: 'Stop a chat\'s dev servers when it ends', hint: 'When a chat ends for good, the dev servers and test browsers it started stop too. Never port 3000 or 3131, a chat waiting out a usage limit, or anything another live chat uses.',
       control: <Switch label="Stop a chat's dev servers when it ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
+    { section: 'Chats', label: 'Merge worktrees automatically', hint: 'After 15 minutes with no new chat in a repo, every worktree without a running chat goes into the main checkout as uncommitted changes, the same as Merge all worktrees on the Git card. The repo\'s checks run after each one, and one that breaks them is undone and kept. Never commits or pushes.',
+      control: <Switch label="Merge worktrees automatically" on={sb.autoMerge !== false} onChange={next => own('autoMerge', next)} /> },
     { section: 'Chats', label: 'Show agent browsers', hint: 'Browsers agents drive through Playwright open in a window you can see. Off runs them headless, so nothing lands on your screen. Applies to chats started after the change.',
       control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
     { section: 'Chats', label: 'Chat notices', hint: `Done, question, stuck and AWS sign-in notices. System sends them to the Mac or Windows notification center only, where they fade on their own. ${ed} pop-up adds one with a Show button, gone after about 10 seconds once ${ed} has focus. Status bar adds a line there for 20 seconds. The Needs you strip always shows them.`,
@@ -309,6 +311,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         <Line row={{ section: 'Installed', label: 'Export kit', hint: 'Roles, skills, plugins and mods as one folder you can copy to another Mac.',
           control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-kit-export' })}>Export</button> }} />
         <Sweep hub={hub} send={send} />
+        <ToolPrecedence hub={hub} send={send} />
         <h4 style={sub}>Installed</h4>
         {installed()}
       </>

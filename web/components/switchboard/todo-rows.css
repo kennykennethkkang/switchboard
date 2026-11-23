@@ -79,3 +79,11 @@
 .tdx-pop-acts { display: flex; gap: 8px; justify-content: flex-end; }
 @media (max-width: 720px) { .tdx-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; } }
 @media (prefers-reduced-motion: no-preference) { .tdx-pop { animation: tdx-pop 140ms var(--hub-ease-out); } @keyframes tdx-pop { from { opacity: 0; transform: translateY(-4px); } } }
+
+/* Row cues: inline chips. */
+.tdx-cues { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.tdx-cue { display: inline-flex; align-items: center; max-width: 100%; padding: 2px 7px; border-radius: 4px; font: 500 11px/1.3 var(--hub-sans); color: var(--hub-mute); box-shadow: inset 0 0 0 1px var(--hub-hair-strong); overflow-wrap: anywhere; }
+.tdx-cue[data-k='waits'] { color: var(--hub-yellow); background: var(--hub-yellow-soft); box-shadow: none; }
+.tdx-cue[data-k='running'] { color: var(--hub-blue); background: var(--hub-blue-soft); box-shadow: none; }
+.tdx-cue-go { padding: 4px 0; min-height: 24px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.tdx-cue-go:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; border-radius: 3px; }

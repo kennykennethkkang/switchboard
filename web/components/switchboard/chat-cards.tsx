@@ -7,7 +7,7 @@ import { stuckTone } from '@/lib/stuck'
 import { chatShown, isBusy } from '@/lib/chat-state'
 import { summaryView } from '@/lib/summary'
 import { cacheChip } from '@/lib/cache'
-import { byWindow, windowOf } from '@/lib/windows'
+import { byWindow } from '@/lib/windows'
 import { busyLine, projectLeft, sayLeft, timeLeft } from '@/lib/eta'
 import { archiveChains, filterChains, historyCount, liveVersion, projectName, splitVersion } from '@/lib/archive'
 import { caps, label } from './look'
@@ -15,8 +15,9 @@ import { ALMOST, STATE, WINDOW_VAR, ago, almostDone, coverage, missedCount } fro
 import { Warn } from './approve'
 import { chip } from './tool-chips'
 import { chipText, type LinkChip } from '@/lib/wait-links'
-import { diagnosis } from '@/lib/stuck'
+import type { TodoChip } from '@/lib/todo'
 import { replyAge, waiting } from '@/lib/rail'
+import { WorktreeMark } from './worktree-merge'
 
 type WindowTabs = { mac: boolean; live: boolean }
 type TabOp = Extract<HubCommand, { type: 'hub-window-tab' }>['op']
@@ -122,11 +123,11 @@ export function CopyCommit({ text, onCopy, small }: { text: string; onCopy: (tex
 /** all: every chat's progress (hub.progress), the history behind the estimates, so the cards and the chat page agree. */
 /** stuck: hub.stuck, for the Stuck note in the meta line. cache: hub.cache, for the warm/cold chip. */
 /** held: chats the usage pause holds. links: a chat's wait chips; onUnlink: the x on a Waiting on chip. */
-export function ChatCards({ looping = [], cards, all = [], waits = [], held = [], links, onUnlink, stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, extra, top, onSelect, tabs, onTab, summaries, onSummary, onCopy, send, editor = 'VS Code' }: { looping?: string[]; send?: (c: HubCommand) => void; editor?: string; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; held?: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; menu?: (chat: ChatRow) => ReactNode; /** Under a card, outside its button: the Approve bar. */ extra?: (card: Card) => ReactNode; /** Right under the card, above Summary: the stage line. */ top?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; tabs?: WindowTabs; onTab?: (op: TabOp, workspace?: string) => void }) {
+export function ChatCards({ looping = [], cards, all = [], waits = [], held = [], links, onUnlink, todoChips, stuck, cache, selected, windows = [], here, empty = 'No chats yet. Start one with New chat.', starred = [], menu, extra, top, onSelect, tabs, onTab, summaries, onSummary, onCopy, send, editor = 'VS Code' }: { looping?: string[]; send?: (c: HubCommand) => void; editor?: string; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; all?: ChatProgress[]; waits?: HandoffWait[]; selected?: string; windows?: WindowInfo[]; here?: string; empty?: string; starred?: string[]; held?: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; /** The To-do run and Left chips of a chat: todo.ts todoChips. */ todoChips?: (id: string) => TodoChip[]; menu?: (chat: ChatRow) => ReactNode; /** Under a card, outside its button: the Approve bar. */ extra?: (card: Card) => ReactNode; /** Right under the card, above Summary: the stage line. */ top?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; tabs?: WindowTabs; onTab?: (op: TabOp, workspace?: string) => void }) {
   if (!cards.length) return <p style={{ color: 'var(--hub-ash)', margin: 0, padding: 4 }}>{empty}</p>
   const groups = byWindow(cards, windows, here)
   const now = Date.now()
-  const more = { looping, waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, top, onSelect, all, now, summaries, onSummary, onCopy }
+  const more = { looping, send, waits, held, links, onUnlink, todoChips, stuck, cache, selected, starred, menu, extra, top, onSelect, all, now, summaries, onSummary, onCopy }
   if (!groups.some(g => g.window)) return <CardList cards={cards} label="Chats" {...more} />
   // Native tabs only work on a Mac with One window on since VS Code started.
   const tabOff = !tabs?.mac ? 'Windows as tabs need macOS' : !tabs.live ? `Turn on One window in Settings, then quit and reopen ${editor}` : undefined
@@ -166,7 +167,7 @@ export function ChatCards({ looping = [], cards, all = [], waits = [], held = []
 
 /** stripe: the window color down each card's left edge. grouped: the group heading names the project, so the card does not. */
 /** all: every chat's progress, the history behind each estimate. */
-function CardList({ looping, cards, label, stripe, grouped, waits, held, links, onUnlink, stuck, cache, selected, starred, menu, extra, top, onSelect, all, now, summaries, onSummary, onCopy }: { looping: string[]; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; held: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; stuck?: StuckItem[]; cache?: CacheKeep[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; extra?: (card: Card) => ReactNode; top?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
+function CardList({ send, looping, cards, label, stripe, grouped, waits, held, links, onUnlink, todoChips, stuck, cache, selected, starred, menu, extra, top, onSelect, all, now, summaries, onSummary, onCopy }: { send?: (c: HubCommand) => void; looping: string[]; cards: Card[]; summaries?: Record<string, ChatSummary>; onSummary?: (id: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>; label: string; stripe?: string; grouped?: boolean; waits: HandoffWait[]; held: string[]; links?: (id: string) => LinkChip[]; onUnlink?: (from: string, to: string) => void; todoChips?: (id: string) => TodoChip[]; stuck?: StuckItem[]; cache?: CacheKeep[]; selected?: string; starred: string[]; menu?: (chat: ChatRow) => ReactNode; extra?: (card: Card) => ReactNode; top?: (card: Card) => ReactNode; onSelect: (id: string, key: boolean) => void; all: ChatProgress[]; now: number }) {
   return (
     <ul role="list" aria-label={label} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6 }}>
       {cards.map(({ chat, progress }) => {
@@ -221,7 +222,7 @@ function CardList({ looping, cards, label, stripe, grouped, waits, held, links, 
               {outs.map(c => <span key={c.id} className="hub-wait-gap"><span className="sr-only">{chipText(c)}</span></span>)}
             </button>
             {outs.length > 0 && <span className="hub-wait-at" style={stripe ? { left: 15 } : undefined}>
-              {outs.map(c => <span key={c.id} className="hub-chip hub-wait" data-dir="out" title={chipText(c)}><i aria-hidden /><span aria-hidden>{chipText(c)}</span>
+              {outs.map(c => <span key={c.id} className="hub-chip hub-wait" data-dir="out" title={chipText(c)}><i aria-hidden /><button type="button" className="hub-wait-go" style={{ pointerEvents: 'auto', background: 'none', border: 0, padding: 0, color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSelect(c.id, false)}>{chipText(c)}</button>
                 {onUnlink && <button type="button" className="hub-wait-x" aria-label={`Stop waiting on ${c.name}`} onClick={() => onUnlink(chat.sessionId, c.id)}>
                   <svg aria-hidden width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1.5 1.5l5 5M6.5 1.5l-5 5" /></svg>
                 </button>}
@@ -229,8 +230,13 @@ function CardList({ looping, cards, label, stripe, grouped, waits, held, links, 
             </span>}
             </div>
             {tasks.length > 0 && !finished && <div className="sr-only"><TaskBar done={done} total={tasks.length} label={`Tasks done in ${origin || projectName(chat)}`} /></div>}
+            {todoChips && todoChips(chat.sessionId).length > 0 && <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 4px' }}>
+              {todoChips(chat.sessionId).map(c => <button key={`${c.k}${c.item}`} type="button" className="hub-chip" data-k={c.k} style={{ cursor: 'pointer', color: c.k === 'run' ? 'var(--hub-blue)' : 'var(--hub-mute)' }}
+                onClick={() => { const el = document.querySelector<HTMLElement>(`[data-item="${CSS.escape(c.item)}"]`); el?.scrollIntoView({ block: 'center' }); el?.querySelector<HTMLElement>('.tdx-title')?.focus({ preventScroll: true }) }}>{c.text}</button>)}
+            </span>}
             {menu && <span className="hub-more-at">{menu(chat)}</span>}
             {top?.({ chat, progress })}
+            <WorktreeMark cwd={chat.cwd} />
             {onSummary && <SummaryFold id={chat.sessionId} name={origin || projectName(chat)} summary={summaries?.[chat.sessionId]} onAsk={refresh => onSummary(chat.sessionId, refresh)} onCopy={onCopy} />}
             {extra?.({ chat, progress })}
           </li>

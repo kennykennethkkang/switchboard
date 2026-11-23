@@ -9,7 +9,7 @@ import { fileName, loadOutputs, loadShot, loadTranscript, type ChatMessage, type
 import { chatStory, groupMessages, parseReport, trivial, type Story, type Tone } from '@/lib/chat-story'
 import { demoChat } from '@/lib/hub-demo'
 import type { HubState } from '@/lib/hub-types'
-import { KEY_LABELS, loadScreen, PHONE_SCREEN, pollScreen, sendKeys, type Screen, type ScreenInput, type ScreenKey } from '@/lib/screen'
+import { KEY_LABELS, loadScreen, readable, PHONE_SCREEN, pollScreen, sendKeys, type Screen, type ScreenInput, type ScreenKey } from '@/lib/screen'
 import { demoScreen, demoType, NO_TYPING } from '@/lib/screen-demo'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import './chat-view.css'
@@ -223,9 +223,17 @@ function usePhone() {
   return on
 }
 
+// Terminal: the screen drawn with its colors. Text: the same screen as wrapped plain text, easier to read in a
+// narrow pane and the one screen readers get (it sits hidden under the terminal too). Kept per browser.
+type Look = 'terminal' | 'text'
+const LOOK_KEY = 'sb-screen-look'
+const savedLook = (): Look => { try { return localStorage.getItem(LOOK_KEY) === 'text' ? 'text' : 'terminal' } catch { return 'terminal' } }
+
 // The chat's terminal as the Mac sees it, polled while this tab is open. Keeps the last screen when a read fails.
 function ScreenTab({ sessionId, demo, copy }: { sessionId: string; demo?: HubState; copy: (what: string, text: string) => void }) {
   const fit = usePhone()
+  const [look, setLook] = useState<Look>(savedLook)
+  const pickLook = (l: Look) => { setLook(l); try { localStorage.setItem(LOOK_KEY, l) } catch { /* private window: just this visit */ } }
   const [s, setS] = useState<Screen>()
   // Why the latest read gave no screen: null when the terminal is gone, else the reason.
   const [miss, setMiss] = useState<null | string>()
@@ -262,18 +270,23 @@ function ScreenTab({ sessionId, demo, copy }: { sessionId: string; demo?: HubSta
   }
   if (!s) {
     if (miss === undefined) return <p className="cv-mute" role="status">Reading the screen…</p>
-    if (miss === null) return <p className="cv-mute">No terminal for this chat on this Mac. Chats started before this window loaded, ended chats and Codex chats have none.</p>
+    if (miss === null) return <p className="cv-mute">No terminal for this chat on this Mac. Chats started before their window loaded, ended chats and Codex chats have none.</p>
     return <p className="cv-mute" role="alert">Could not read the screen. {miss}</p>
   }
   const state = miss !== undefined ? 'gone' : s.running ? 'run' : 'idle'
   const label = miss === null ? 'Terminal closed. Last screen.' : miss ? `${miss} Last screen.` : s.running ? 'Running' : 'Nothing running'
   return (
-    <div className="cv-scr" data-fit={fit || undefined}>
+    <div className="cv-scr" data-fit={fit || undefined} data-look={look}>
       <div className="cv-scr-h">
         <small role="status" data-s={state}><span className="cv-scr-dot" aria-hidden />{label}</small>
+        <div role="group" aria-label="Show the screen as" className="cv-seg">
+          {(['terminal', 'text'] as const).map(l => <button key={l} type="button" aria-pressed={look === l} onClick={() => pickLook(l)}>{l === 'terminal' ? 'Terminal' : 'Text'}</button>)}
+        </div>
         <button type="button" className="hub-btn" aria-label="Copy the screen as text" onClick={() => copy('Screen', s.text)}><Ic d={COPY} />Copy</button>
       </div>
-      <Suspense fallback={<p className="cv-mute cv-xt-wait" role="status">Drawing the terminal…</p>}><ScreenXterm screen={s} fit={fit} /></Suspense>
+      {look === 'text'
+        ? <pre className="cv-txt" tabIndex={0} aria-label="Terminal screen as text">{readable(s.text) || ' '}</pre>
+        : <Suspense fallback={<p className="cv-mute cv-xt-wait" role="status">Drawing the terminal…</p>}><ScreenXterm screen={s} fit={fit} /></Suspense>}
       {state === 'gone' ? null
         : s.typing ? (
           <div className="cv-bar">
@@ -288,7 +301,7 @@ function ScreenTab({ sessionId, demo, copy }: { sessionId: string; demo?: HubSta
             {problem && <p className="cv-err-line" role="alert">{problem}</p>}
           </div>
         )
-        : <p className="cv-mute cv-ro">{s.running ? 'Typing from here is off. To turn it on, open VS Code settings on the Mac and tick Switchboard: Screen Typing.' : 'Nothing is running in this terminal, so there is nothing to type into.'}</p>}
+        : <p className="cv-mute cv-ro">{vscodeBridge?.isVSCode ? 'Read only here. Type in the chat\'s own terminal.' : s.running ? 'Typing from here is off. To turn it on, open VS Code settings on the Mac and tick Switchboard: Screen Typing.' : 'Nothing is running in this terminal, so there is nothing to type into.'}</p>}
     </div>
   )
 }
@@ -308,8 +321,8 @@ export function ChatView({ sessionId, name, demo: demoNow, onClose, onCopy }: Pr
     return () => { stop = true }
   }, [sessionId, demo])
   const copy = async (what: string, text: string) => setSaid(await onCopy(text) ? `${what} copied` : 'The clipboard is not available here')
-  // The VS Code panel sits next to the real terminal, so only the app gets a Screen tab; it comes first and opens first.
-  const tabs: Array<[Tab, string]> = [...(vscodeBridge?.isVSCode ? [] : [['screen', 'Screen'] as [Tab, string]]), ['outputs', 'Outputs'], ['transcript', 'Transcript']]
+  // Screen comes first; the app opens on it, the VS Code panel (next to the real terminal) on Outputs.
+  const tabs: Array<[Tab, string]> = [['screen', 'Screen'], ['outputs', 'Outputs'], ['transcript', 'Transcript']]
   const arrow = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
     e.preventDefault()
@@ -324,7 +337,7 @@ export function ChatView({ sessionId, name, demo: demoNow, onClose, onCopy }: Pr
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="cv-in">
         <div className="cv-h">
-          <div><h2 id="cv-title" tabIndex={-1}>{name}</h2>{tab !== 'screen' && <small>Read only</small>}</div>
+          <div><h2 id="cv-title" tabIndex={-1}>{name}</h2>{(tab !== 'screen' || vscodeBridge?.isVSCode) && <small>Read only</small>}</div>
           <button type="button" className="cv-icon cv-x" aria-label={`Close ${name}`} onClick={onClose}><Ic d={CLOSE} /></button>
         </div>
         <div role="tablist" aria-label="Chat view" className="cv-tabs" onKeyDown={arrow}>

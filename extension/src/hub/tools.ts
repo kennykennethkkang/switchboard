@@ -92,11 +92,19 @@ export function nameNote(name: string): string | undefined {
   return n ? `Address the user as ${n}. Speak to ${n} like a composed, quietly witty personal AI aide: brief, warm, capable. Use the name when talking to ${n} directly, not in every line. This is for chat replies only, never files, code or commits, and it never overrides the rules or formats the user set.` : undefined
 }
 
-/** TOOLS_NOTE plus the design references left on, for --append-system-prompt. */
-export function toolsNote(p: ChatProfile, held?: Set<string>): string {
+// Off tools named in the note, at most this many.
+const NOTE_MAX = 15
+
+/** TOOLS_NOTE plus what is off (GATED bundles with their use, then any other plugin or skill, with info's line for it) and the design references left on, for --append-system-prompt. */
+export function toolsNote(p: ChatProfile, held?: Set<string>, info: Record<string, string> = {}): string {
   const refs = Object.entries(p.assets ?? {}).filter(([, on]) => on).map(([k]) => k)
   // Held ones need Approve, not tool_on, so they stay out of the line.
-  const off = Object.entries(p.plugins).filter(([k, on]) => !on && Object.hasOwn(GATED, short(k)) && !held?.has(k)).map(([k]) => `${short(k)} (${GATED[short(k)]})`)
+  const offs = [...Object.entries(p.plugins), ...Object.entries(p.skills)].filter(([k, on]) => !on && !held?.has(k) && !FLAGGED.includes(k))
+  const label = (k: string) => { const use = GATED[short(k)] ?? info[k]?.replace(/\s+/g, ' ').slice(0, 60); return use ? `${short(k)} (${use})` : short(k) }
+  const gated = offs.filter(([k]) => Object.hasOwn(GATED, short(k))).map(([k]) => label(k))
+  const rest = offs.filter(([k]) => !Object.hasOwn(GATED, short(k))).map(([k]) => label(k))
+  const all = [...gated, ...rest], off = all.slice(0, NOTE_MAX)
+  if (all.length > NOTE_MAX) off.push(`and ${all.length - NOTE_MAX} more`)
   return [TOOLS_NOTE,
     off.length ? `Off until needed, turn on with tool_on when the task calls for it: ${off.join(', ')}.` : '',
     refs.length ? `Before any UI, styling or web design work, read these design references first: ${refs.join(', ')}.` : ''].filter(Boolean).join(' ')

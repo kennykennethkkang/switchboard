@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyPatch, controlPatch, readControls } from '../src/hub/controls'
+import { applyPatch, controlPatch, readControls, tuiEnv } from '../src/hub/controls'
 
 const LINE = 'node "/k/claude-mods/kit/statusline.mjs"'
 
@@ -71,5 +71,16 @@ describe('readControls', () => {
 
   it('reads fable back', () => {
     assert.equal(readControls({ model: 'fable' }).model, 'fable')
+  })
+})
+
+describe('tuiEnv', () => {
+  // Claude Code turns fullscreen off machine-wide after two launches die early; the env var overrides that.
+  it('forces fullscreen for chats when the control picks it', () => {
+    assert.deepEqual(tuiEnv('fullscreen'), { CLAUDE_CODE_NO_FLICKER: '1' })
+  })
+
+  it('leaves the default layout alone', () => {
+    assert.deepEqual(tuiEnv('default'), {})
   })
 })

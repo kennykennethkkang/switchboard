@@ -1,5 +1,202 @@
 # Changelog
 
+## 0.21.150
+
+- Run indefinitely rounds that touch UI build a Safe and an Explore version behind a toggle, test both with crowd-ab and a MiroFish sim, keep the winner and log it in .switchboard/design-rounds.md
+- Design library ships SOURCES.md, a list of inspiration sites the Explore version draws from (library stamp local-3)
+
+## 0.21.149
+
+- Research chats close on their own, as approved, after 10 idle minutes with nothing waiting; ask a follow-up before then to keep one open
+- The Research window's tab is titled Research and opens on the research reports, and the window has its own slate color instead of a project's
+
+## 0.21.148
+
+- Merge back also skips renamed files and files with non-ASCII names that main already holds the same, instead of calling them a clash
+
+## 0.21.147
+
+- Kit rules: the code review qa pass goes to qa-codex by default, and one engineer part on disjoint files goes to engineer-codex, so Codex usage stops sitting idle
+
+## 0.21.146
+
+- Approving a chat that ran in a worktree merges its work into main as uncommitted changes once the chat ends; the band above the Approve question says so
+- Merge into main pressed while a worktree chat waits on you queues the merge instead of refusing
+- Merge back and Merge all skip files main already holds byte for byte, so a worktree copied in by hand merges and goes away instead of being kept as a clash
+
+## 0.21.145
+
+- hub_recall scores 1-2 letter query words ("a", "in", "do") as whole words only, so notes with many aliases stop outranking the note a question names
+
+## 0.21.144
+
+- Every map theme has its own cast: Neon Harbor (Harbor Boss, Netrunner, Bug Hunter, Tagger, Info Broker, Dock Mech, Hawker, Courier) and Orbital Fleet (Captain, Flight Engineer, Safety Officer, Holo Designer, Science Officer, Deck Chief, Comms Officer, Cadet) no longer borrow the Journey to the West characters
+- Lantern Sea is its own world: Harbor Master, Lamp Smith, Night Watch, Lantern Painter, Stargazer, Ferryman, Koi Spirit and Firefly Child, drawn as anime ink characters with their own work moves and live lantern light
+- Theme menu: Journey West (Pilgrim Road) and Dragon Palace sit under one Journey to the West group, same cast in two looks; arrow keys open the menu from the button
+- Lantern Sea figures bake at half the canvas cost, so a busy map no longer rebakes every frame
+
+## 0.21.143
+
+- Screen tab now shows in the VS Code Switchboard panel, read only; it reads the chat's terminal from this window or whichever window holds it
+- Terminal / Text toggle on the Screen tab, kept per browser; Text wraps the screen at a reading size and drops box drawing, keeping every word
+- Screen readers get the readable text
+- Research reports are named by the local day, not the UTC one
+
+## 0.21.142
+
+- Research page: every window relists the library when any window saves, marks seen or deletes a report, so a report shows in all windows at once
+- The browser app no longer shows sample reports on the Research page while its window runs an older Switchboard
+
+## 0.21.141
+
+- Research page in the left rail, in both views: finished reports newest first, read in place, opened on the hub's own data, and deletable (moved to a `.trash` folder)
+- Finished research is saved from the hooks in every window, so a report lands even when no Research view is open; the "Research finished" toast shows once for each new report and goes away on its own
+- The browser app reads a report's markdown through `/hub/command`
+
+## 0.21.140
+
+- A finished chat no longer sits on Working when cache-keeper pings it, so its window takes the next update reload instead of waiting forever
+
+## 0.21.139
+
+- A project chat's finished research report reaches its project memory even when no Switchboard view is open: the extension folds the events and saves, the view no longer does
+
+## 0.21.138
+
+- Research typed as /deep-research now saves its report to the project memory, even when the run only used Bash and no web tools
+
+## 0.21.137
+
+- Chat terminals start in fullscreen when Controls has the layout on fullscreen, even after Claude Code turned fullscreen off on its own following two early exits
+
+## 0.21.136
+
+- Agents map on a phone: name tags no longer stack on other labels when the court is crowded, and the details sheet opens above the tool belt instead of covering it
+
+## 0.21.135
+
+- Lantern Sea map: the tea garden and armory get smooth drawings like the other ring places: tea bushes with a stone lantern, and a lit tool rack
+
+## 0.21.134
+
+- Lantern Sea map: islands and bridges stay sharp up to max zoom; the court bakes denser, and once zoomed in past it the view rebakes at full density after the zoom settles
+
+## 0.21.133
+
+- Lantern Sea map: each agent is drawn as its own character (Tang Sanzang, Wukong, Erlang Shen, Nezha, Guanyin, Sha Wujing, Bajie, pilgrim) with its own prop and work move, plus live light: fire wheels, a third-eye scan, a spinning staff trail, willow dew and halos
+
+## 0.21.132
+
+- Worktree cleanup: a chat killed by a window reload (no SessionEnd) keeps its worktree while its progress row lasts, so resuming it no longer fails with "folder is gone"; only a chat that ended cleanly takes the 2 minute fast path
+
+## 0.21.131
+
+- Research chats (Research switch, board Research desk, moved offers) start in the window that has ~/Documents/Research open, opening one if needed, so their Research tab fills
+- The Research tab opens on its own only for Research-space chats; a project chat's research shows inline under the chat on its Chats page
+- The Research panel keeps every chat's searches and sources from the moment the page loads, so a panel opened later is not empty
+- A project chat's finished research report is saved to that project's Claude memory as a research note
+
+## 0.21.130
+
+- Learn and self-improve: a role or skill counts as a new version only after 30 approved held-out results; self-improve reruns enough times that 30 passes are reachable at 80%
+
+## 0.21.129
+
+- Agents map: a new theme, Lantern Sea, drawn as smooth illustrated art instead of pixels. Night islands on a moonlit sea, lantern keepers at lit desks whose lamp pulses with the chat's state, a shape per state in each bubble (dots, pause, check, cross, bang), and sky lanterns that rise when a chat finishes. Picked by Kenneth over Painted Diorama and Low-poly Calm after crowd A/B
+- Map themes: the belt's Theme item opens a picker to choose any theme, with its colors and a line about it; it no longer only cycles
+- Map themes: each theme now restyles the labels, plates, legend, top bar and side panel in its own colors and font, and has its own finish celebration (peach petals, rising bubbles, neon sparks, a star burst, sky lanterns)
+- Map art kits can draw high resolution, smooth art: a kit sets res and smooth, and can redraw figures, badges, bubbles, desks, landmarks, gates and places through new optional hooks; the pixel themes look the same
+- Abyss is now the Dragon Palace: a Journey to the West undersea court with its own palette, art and sea cast (Ao Guang, Turtle Chancellor, Dragon Princess, Patrol Yaksha, Crab General, Carp Spirit, Shrimp Soldier; Wukong stays as engineer).
+
+## 0.21.128
+
+- New chat's Pick tools shows the same Jev pick a chat gets at start, not only keyword picks
+- Auto pick: the role label Jev call no longer reads every saved key from the Keychain first (a cold read stalled new chats about 4 s); jev.py looks up its own key
+
+## 0.21.127
+
+- Live: source checks in Results fold their sources behind "Show N sources". Phone status bar hides the Codex meters unless they are near the limit, so the meters no longer run under Keep awake
+- Merge back: a worktree chat's band (in the open chat) and the Git card fold its work into main even when it is uncommitted, the same way as Merge all: checks first, undone if they break, nothing committed or pushed. It waits while the chat runs, says so for a worktree outside .claude/worktrees, and keeps a worktree that holds a nested git repo instead of deleting it (Merge all and the automatic merge too). Its chat card shows Worktree, not merged
+- Smart select: a new Claude chat asks Jev once which plugins and skills its first message needs and turns the rest off for that chat; core plugins, keyword picks and Always on stay, Never stays off, and a slow or failed Jev keeps today's set. The chat's note lists what is off so it can call tool_on
+- Settings, Installed: Smart select per tool sets each tool to Always on, Auto or Never, with Jev's last reason ("needed, 91% sure"). Picked by Kenneth after crowd A/B and a MiroFish run
+- Clean up: about 95 unused imports and locals removed across the extension and web, and an import cycle through idle.ts broken
+
+## 0.21.126
+
+- Pages: Live, Plan, Ship and the Map's Code mode reworked; each opens with a row of key numbers, and every page has a one-line subtitle under its title
+- Live: one column with tabs Running, Results, Reports and Smart, each with a count; Running lists only runs still going, a stalled MiroFish run sits at the top of Results with Dismiss
+- Plan: two columns with Today and Jev in a side rail on wide screens, status tabs and project chips on phones; every done line names its project and projects with nothing queued fold into one line
+- Ship: pick any chat, grouped by project, to see its uncommitted files, commits ahead, PR, CI and the next step; on phones the list folds behind Switch chat
+- Code map: starts on a list of parts ranked by recent changes (Graph one click away), says how long ago each part changed in words, and uses "used by / uses" throughout
+- Shell: pages sit in a centred column with even spacing, and the status bar no longer covers the last row. Picked by Kenneth after crowd A/B and a MiroFish run
+
+## 0.21.125
+
+- Updates: a window holds its update reload while one of its own chats is mid-turn. VS Code drops a reloading window's terminals after a minute, so a slow reload (85 s on 2026-11-22) killed busy chats
+- Resume: a chat a reload dropped from every list resumes in the folder its transcript names, instead of "That chat's folder is gone"
+
+## 0.21.124
+
+- To-do: ticking a chat's Release, Merge back, Ship or Publish item also ticks that chat's missed asks that share a distinctive word with it; to-do run prompts never become missed asks and old ones are cleared
+- To-do shipped check: reads tracked CHANGELOG.md files one folder down (extension/CHANGELOG.md, never vendor or node_modules), sends at most 1500 characters of new notes per look, and remembers the commits and release lines it has seen across reloads, saved only after the check succeeds
+
+## 0.21.123
+
+- Kit: the designer role, like qa, ends with its full Report again when a hook makes it reply after the Report, so the lead never gets a "report stands" stub
+
+## 0.21.122
+
+- Agents map: two new themes, Orbital Fleet (planets on station decks, nebula, warp lanes, a ringed gas giant) and Neon Harbor (rooftop platforms, a synthwave grid and skyline, light rails); Orbital Fleet is the new default and the belt's Theme item cycles all four. Picked by Kenneth after crowd A/B
+- Themes are now a system: a skin names an art kit (web/components/switchboard/art) whose hooks redraw islands, halls, bridges, realms, sky and motion; adding a theme is a skin file plus a kit file
+- Realm labels take their theme's realm colors
+
+## 0.21.121
+
+- Research tabs close when their chat ends, and any whose chat has not been live for 2 minutes; a Research tab left from before a VS Code reload no longer sits there blank
+- The Research tracker moved from Now to Ship, above Changes
+
+## 0.21.120
+
+- Code map: lines into or out of one part land at spread points with one fixed arrowhead size, corners rounded, thinner strokes; links back to an earlier column are dashed; links keep 12 px clear of every box
+- Code map: hover counts sit at the end of each link by the box it touches, so they no longer stack mid-route
+- Code map: a part with no README reads as the file other parts import most ("hook.ts: ...") instead of a nested folder blurb such as a bench fixture; a part with no blurb lists its files
+- Code map: a repo with no imports between parts lays out as a grid, not one tall column
+
+## 0.21.119
+
+- To-do no longer feeds itself: a to-do chat's own run prompt ("Switchboard to-do, in this order: ...") and other Switchboard prompts (handoff, resume, usage limit, pipeline seeds) no longer count as your asks, so they are never suggested back as missed work. Rows already nested this way heal on the next load and take their real item text and title
+- Suggestions that repeat work finished in the last week are dropped instead of shown
+- A to-do chat that reaches Done has its own items checked against its report: covered ones are ticked, the rest stay as Stopped instead of vanishing
+- To-do rows show what they wait on: "Waits on X" (jumps to that row), "Running in X" (only while that chat is live) and "From X"; chat cards show "To-do N" for a to-do run and "→ N to To-do" for lines a chat left. Picked over a rail layout by crowd A/B
+- Terminal: the wait band says "Waiting on X to finish, then this to-do runs" and "Sends N lines to To-do" (chat-wait 0.2.6); the to-do band says "left by X" (todo-band 0.2.3)
+- Agents map: new Abyss Station theme (undersea station, domes, kelp, bubbles, sonar ping for needs you, submarine arrival), now the default; the belt's Theme button switches to Journey West and remembers it
+- Journey West upgrade: sun and moon, mountain range and cloud sea, 4-frame walk, idle breathing, somersault-cloud arrival, lamp light on working desks, needs-you ripple, staff and lanterns at the council hall, 600 ms day/night fade
+- Map speed: layout is cached, so a state update costs about 0.4 ms instead of 180 to 340 ms; no per-frame blur or pattern rebuilds; ambient motion holds still on a quiet board. Stuck and Needs you colors are further apart, and belt tips stay on screen on a phone
+- Phone popup: type your email and Send link opens a draft in your mail app with your Tailscale device link and the steps; the address stays in that panel
+
+## 0.21.118
+
+- Merge all worktrees: a Git card button folds every worktree with no running chat into the main checkout as uncommitted changes (committed and uncommitted work alike), then removes it. The repo's typecheck and test scripts run first and after each one; a worktree that breaks them, or clashes with main, is undone and kept. One that changes while its checks run, or gains a chat (open Codex terminals count), is undone and kept too. The patch and the worktree's gitignored files (not node_modules or build output) are copied to .git/switchboard-merged before the folder goes. One run per repo at a time across windows. Never commits or pushes
+- Merge worktrees automatically (gear, on by default): runs Merge all after 15 minutes with no new chat in the repo, once per quiet spell in any window, with a notice saying what went in and what stayed
+
+## 0.21.117
+
+- Home shows a Research tracker while any chat does web research: which chat it is for, who is searching (the chat or its researcher), what it is reading, and your ask, with Open research and Chat buttons
+- Fewer false "Move it to Research?" offers: asks about the Research panel, tab or tracker, and "what is going on", no longer count as research (usage-meter 0.6.6)
+
+## 0.21.116
+
+- Split asks on New chat splits again: the message is cut into numbered pieces and Haiku only groups piece numbers, so each ask keeps your own words and comes back in 6 to 8 s; the deadline is 20 s (25 s in the editor and from the browser or phone). The pre-check also catches "1. ... 2. ..." on one line, "also" after a break or comma, and "Second"/"Third"
+
+## 0.21.115
+
+- Memory note panel: notes render Markdown, the panel scrolls back to the top when you open another note, and the close button stays pinned while you scroll
+
+## 0.21.114
+
+- Research opens as a VS Code tab beside the chat instead of a floating always-on-top window
+- Research also opens on any web search or fetch from a chat in ~/Documents/Research
+
 ## 0.21.113
 
 - Agent drawer: opens on one plain sentence about what the agent did and how it went, then fact chips, How it went (Changed, Checked, Still open), what it was asked, files, and every tool call folded under Details

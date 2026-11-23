@@ -1,4 +1,5 @@
-/** Reload gate: a window reloads for an update only after IDLE_MS with no typing, no hold (Commit, Push) and no open ask. */
+/** Reload gate: a window reloads for an update only after IDLE_MS with no typing, no hold (Commit, Push), no open ask
+ * and no chat of its own mid-turn. */
 import type * as vscode from 'vscode'
 import { openCount } from './questions'
 
@@ -16,7 +17,11 @@ export function hold(): () => void {
   return () => { if (!done) { done = true; holds-- } }
 }
 
-export const idle = (now = Date.now()) => holds === 0 && now - last >= IDLE_MS && openCount(now) === 0
+// hub-service registers its own check; importing it here made a cycle (tools -> local -> self-update -> idle -> hub-service -> tools).
+let midTurn = () => false
+export const onMidTurn = (fn: () => boolean) => { midTurn = fn }
+
+export const idle = (now = Date.now()) => holds === 0 && now - last >= IDLE_MS && openCount(now) === 0 && !midTurn()
 
 /** VS Code events that mean someone is at this window. Terminal keystrokes are not observable (onDidWriteTerminalData is proposed API). */
 export function watchActivity(vs: typeof vscode): vscode.Disposable[] {

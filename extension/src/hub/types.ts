@@ -95,7 +95,7 @@ export type CheckBack = { everyMin: 10 | 30 | 60; count: number; lastAt?: number
 /** Smart toggle per chat (smart-tools.ts): why: rule per pick; on: what it switched on itself; refused: held picks; library: design library paths it picked; pending: waits for the next start or resume. */
 export type SmartRecord = { why: Record<string, string>; on: Record<string, string>; refused: string[]; library: string[]; pending: boolean; at: number }
 /** smart: by session id. globalOff: skills ~/.claude/settings.json turns off everywhere. */
-export type ToolsState = { flagged: string[]; pick: { goal: string; folder?: string; profile: ChatProfile } | null; chats: Record<string, ChatProfile>; smart?: Record<string, SmartRecord>; globalOff?: string[] }
+export type ToolsState = { flagged: string[]; pick: { goal: string; folder?: string; profile: ChatProfile } | null; chats: Record<string, ChatProfile>; smart?: Record<string, SmartRecord>; globalOff?: string[]; /** Per-tool precedence from tool-precedence.json (unset is auto): always is never turned off, never is off unless turned on by hand. */ precedence?: Record<string, 'always' | 'never'> }
 /** A sweep result. review: DO_NOT_INSTALL or a HIGH or CRITICAL issue, or an add that could not be scanned. top: the worst issues, at most 5.
  * hold: held at intake; it stays off until approvedDigest matches its files. Only intake sets it and nothing clears it. offFailed: claude plugin disable failed, so it may still be on. */
 export type SweepIssue = { id: string; severity: string; file?: string; line?: number; finding: string }
@@ -233,6 +233,8 @@ export type HubState = {
   stuck?: StuckItem[]
   /** Chats the usage meter thinks are worth a research run: a score from 0 to 1 and a one-line reason, newest last; an older extension sends none. */
   researchOffers?: { sessionId: string; score: number; reason: string; at: number }[]
+  /** Finished research runs, newest first, from ~/.claude/switchboard/research (research-library.ts); summary is the report's Answer line. */
+  research?: { id: string; question: string; project?: string; chat: string; sessionId: string; at: number; sources: number; summary: string; seen: boolean }[]
   /** First-run checklist, each step done or not; dismissed hides the card. An older extension sends none. */
   firstRun?: { github: boolean; claude: boolean; project: boolean; chat: boolean; approved: boolean; dismissed?: boolean }
   /** source-check runs, newest first: each source with its band, score 0 to 100 and reasons; report: the HTML report path. An older extension sends none. */
@@ -244,7 +246,7 @@ export type HubState = {
 export type StuckItem = { id: string; kind: 'agent' | 'job' | 'process'; sessionId: string; what: string; since: number; cpu?: number; rss?: number; pid?: number; started?: number; command?: string; last?: string }
 
 /** A palette key, not a hex: the panel picks the theme's shade. */
-export type WindowColor = 'violet' | 'amber' | 'teal' | 'rose' | 'lime' | 'cobalt'
+export type WindowColor = 'violet' | 'amber' | 'teal' | 'rose' | 'lime' | 'cobalt' | 'slate'
 export type WindowInfo = { workspace: string; name: string; color: WindowColor }
 
 /** One uncommitted file in a chat's folder. diff: from the first hunk, capped; note: why there is none (binary, too big). */
@@ -253,13 +255,15 @@ export type ChangedFile = { path: string; added: number; removed: number; status
 export type Changes = { sessionId: string; cwd: string; files: ChangedFile[]; at: number; problem?: string }
 /** One file git status lists, relative to the repo root. from: a rename's old path. */
 export type RepoFile = { path: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'; from?: string }
-export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun' | 'ship' | 'push' | 'merge-back'
+export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun' | 'ship' | 'push' | 'merge-back' | 'merge-all'
 /** Git ops only the Mac may run: the phone hides them and the app's proxy refuses them. push (fast-forward only) is the phone's. */
-export const MAC_ONLY_GIT: ReadonlySet<GitOp> = new Set<GitOp>(['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch', 'merge-back'])
+export const MAC_ONLY_GIT: ReadonlySet<GitOp> = new Set<GitOp>(['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch', 'merge-back', 'merge-all'])
 /** sync: the one sync button (Publish branch, Pull N, Push N or Fetch). github: the repo's page, from the branch's remote (origin by default). pr: the branch's open PR when gh can tell. busy: the op running now; result: the last one's outcome. */
 export type RepoView = {
   /** A Claude worktree (own-worktree chat): Merge back merges its branch into the main checkout. */
   worktree?: boolean
+  /** Folders under the main checkout's .claude/worktrees: Merge all worktrees shows when there are any. */
+  worktrees?: number
   sessionId: string; name: string; branch?: string; upstream?: string; ahead: number; behind: number; files: RepoFile[]; branches: string[]
   sync: { kind: 'publish' | 'pull' | 'push' | 'fetch'; label: string }
   log: { hash: string; subject: string; when: string }[]; stashes: number; github?: string
@@ -291,7 +295,7 @@ export type KeepSetting = 'autoCompactEnabled' | 'autoCompactWindow' | 'autoCont
 export type SettingKey = KeepSetting | 'remoteControlAtStartup' | 'agentPushNotifEnabled' | 'inputNeededNotifEnabled' | 'model' | 'effortLevel' | 'tui' | 'statusLine'
 export type ClaudeControls = { model?: 'fable' | 'opus' | 'sonnet' | 'haiku'; effortLevel?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; tui: 'default' | 'fullscreen'; statusLine: boolean; push: boolean; needInput: boolean }
 /** Switchboard's own switches, kept in VS Code's globalState. idleMinutes null: never hide. */
-export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; /** Claude chat permissions: bypass (default), ask or auto; unset reads askClaude. */ claudeMode?: 'bypass' | 'ask' | 'auto'; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. Read only when notices is unset. */ toasts?: boolean; /** Where agent notices go: the Mac or Windows notification center (unset), a VS Code pop-up, or the status bar. */ notices?: 'system' | 'toast' | 'status'; /** Where VS Code toasts show (workbench.notifications.position); unset is top right. */ noticeSpot?: 'top-right' | 'bottom-left' | 'bottom-right'; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string; /** Coder view: every page and control; off is the Simple view, unset too, and unset also shows the first-run choice. Global, saved in company.json by hub-coder-view. */ coderView?: boolean; /** Auto pick per task: new chats and Start runs get their model and effort picked from the task; off only when false. */ autoPick?: boolean }
+export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; /** Claude chat permissions: bypass (default), ask or auto; unset reads askClaude. */ claudeMode?: 'bypass' | 'ask' | 'auto'; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. Read only when notices is unset. */ toasts?: boolean; /** Where agent notices go: the Mac or Windows notification center (unset), a VS Code pop-up, or the status bar. */ notices?: 'system' | 'toast' | 'status'; /** Where VS Code toasts show (workbench.notifications.position); unset is top right. */ noticeSpot?: 'top-right' | 'bottom-left' | 'bottom-right'; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string; /** Coder view: every page and control; off is the Simple view, unset too, and unset also shows the first-run choice. Global, saved in company.json by hub-coder-view. */ coderView?: boolean; /** Auto pick per task: new chats and Start runs get their model and effort picked from the task; off only when false. */ autoPick?: boolean; /** Merge every idle worktree into main after 15 minutes with no new chat in the repo; off only when false. */ autoMerge?: boolean }
 export type SwitchboardKey = keyof SwitchboardControls
 /** rulesNote: what the last rules and roles sync did, one line. */
 export type Controls = { claude: ClaudeControls; switchboard: SwitchboardControls; statusLineReady: boolean; rulesNote?: string }

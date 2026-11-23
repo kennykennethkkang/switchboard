@@ -10,7 +10,7 @@ import * as path from 'path'
 import { execFile } from 'child_process'
 import { ghPath, git, repoRoot } from './git'
 import { cloneTarget, repoTop } from './projects'
-import { MISSED, missed, plainText, workText } from './progress'
+import { MISSED, RUN_PROMPT, missed, plainText, workText } from './progress'
 import { writeJsonAtomic } from '../hook-entries'
 import { foldPathCase } from '../fs-utils'
 import { createLogger } from '../logger'
@@ -220,15 +220,20 @@ function closeKin(d: TodoDoc, t: TodoItem, now: number): TodoDoc {
   if (!t.from) return d
   const mine = keys(t.text)
   const kin = (d.suggested ?? []).filter(s => {
-    if (s.from !== t.from) return false
+    if (s.from !== t.from || s.why === 'missed') return false
     const k = keys(s.text), n = k.filter(w => mine.includes(w)).length
     return n >= 2 && n / k.length >= 0.5
   })
-  return kin.reduce((o, s) => dismissSuggestion(o, s.id, now), d)
+  // The chat's own asks it was flagged as missing: its follow-up (a Release or Merge back) being done means they shipped.
+  // Shares a distinctive word with the follow-up too, so an unrelated ask the chat skipped stays.
+  const asks = /^(release|merge|ship|publish)\b/i.test(t.text) ? (d.suggested ?? []).filter(s => s.from === t.from && s.why === 'missed' && keys(s.text).some(w => mine.includes(w))) : []
+  return asks.reduce((o, s) => tickSuggestion(o, s, undefined, now), kin.reduce((o, s) => dismissSuggestion(o, s.id, now), d))
 }
 export function startTodo(d: TodoDoc, id: string, chat: string | undefined, now = Date.now()): TodoDoc {
   return { ...d, todo: d.todo.map(x => { if (x.id !== id) return x; const { chat: _c, host: _h, stopped: _s, ...rest } = x; return { ...rest, at: now, ...(chat ? { chat, host: hostId() } : {}) } }) }
 }
+/** Not started and marked stopped: the item stays on the list, and only Start again runs it. */
+const stopItem = (d: TodoDoc, id: string, now: number): TodoDoc => ({ ...d, todo: startTodo(d, id, undefined, now).todo.map(x => (x.id === id ? { ...x, stopped: true as const } : x)) })
 
 /** A handoff: the item follows its chat to the fresh one. */
 export function moveChat(d: TodoDoc, from: string, to: string, now = Date.now()): TodoDoc {
@@ -344,6 +349,9 @@ const questionLike = (t: string) => QUESTION.test(t.toLowerCase().replace(/[^a-z
 /** Paths that are never a to-do project: test and cache dirs. */
 export const junkPath = (p: string) => [path.join(os.homedir(), '.cache'), os.tmpdir(), '/tmp', '/private/tmp', '/var/folders'].some(j => { const f = foldPathCase(p), q = foldPathCase(j); return f === q || f.startsWith(q + path.sep) })
 
+/** The item ticked in the last week with the same words as text: todo_add's twin check and the suggestion filter. */
+const twinOf = (d: TodoDoc, text: string, now: number) => d.ticked?.find(t => now - t.at < RECENT_MS && words(t.text) === words(text))
+
 /** This chat's lines as suggestions, skipping junk, a tombstone, a known id and text an open item or suggestion already says; then prune. */
 function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why: (t: string) => TodoWhy, idOf = leftId, strict = true, titles: Record<string, string> = {}): TodoDoc {
   const add: TodoItem[] = [], had = d.suggested ?? [], name = chatName(p.sessionId)
@@ -351,7 +359,7 @@ function suggest(d: TodoDoc, p: ChatProgress, texts: string[], now: number, why:
     const text = workText(raw)
     if (!text || (strict && !actionLine(text))) continue
     const id = idOf(p.sessionId, text)
-    if (Object.hasOwn(d.removed, id) || [...d.todo, ...had, ...add].some(l => l.id === id || sameWork(l.text, text))) continue
+    if (Object.hasOwn(d.removed, id) || [...d.todo, ...had, ...add].some(l => l.id === id || sameWork(l.text, text)) || twinOf(d, text, now)) continue
     const short = shortOf(text, titles[raw] ?? titles[text])
     add.push({ id, text, at: now, from: p.sessionId, ...(name ? { name } : {}), why: why(text), ...(short ? { short } : {}) })
   }
@@ -390,17 +398,25 @@ function tickWith(d: TodoDoc, id: string, shipped: { sha: string; subject: strin
   return out.ticked ? { ...out, ticked: out.ticked.map(x => (x.id === id ? { ...x, shipped } : x)) } : out
 }
 const shippedCache = new Map<string, { key: string; src: ShippedSources }>()
-const clMtime = (root: string) => { try { return fs.statSync(path.join(root, 'CHANGELOG.md')).mtimeMs } catch { return 0 } }
+/** Tracked CHANGELOG.md at the root and one folder down (Switchboard's is extension/CHANGELOG.md), not a vendored one. */
+export async function changelogFiles(root: string): Promise<string[]> {
+  const r = await git(root, ['ls-files', '--', 'CHANGELOG.md', '*/CHANGELOG.md'])
+  const vendored = new Set(['vendor', 'third_party', 'node_modules'])
+  const ok = (f: string) => { const p = f.split('/'); return p[p.length - 1] === 'CHANGELOG.md' && p.length <= 2 && !vendored.has(p[0]) }
+  return r.ok ? r.out.split('\n').filter(ok).map(f => path.join(root, f)).filter(f => fs.existsSync(f)) : []
+}
+const clMtime = (files: string[]) => files.map(f => { try { return fs.statSync(f).mtimeMs } catch { return 0 } }).join(',')
 /** The repo's last 300 commit subjects and CHANGELOG lines; cached per HEAD and CHANGELOG mtime, and a failed git log is not cached. */
 async function shippedSources(root: string): Promise<ShippedSources | undefined> {
   const head = (await git(root, ['rev-parse', '-q', '--verify', 'HEAD'])).out.trim()
-  const key = `${head}:${clMtime(root)}`
+  const files = await changelogFiles(root)
+  const key = `${head}:${files.join(',')}:${clMtime(files)}`
   const hit = shippedCache.get(root)
   if (hit && hit.key === key) return hit.src
   const r = head ? await git(root, ['log', '-n', '300', '--format=%h%x09%ct%x09%s']) : undefined
   if (!r?.ok) return hit?.src
   const commits = r.out.split('\n').flatMap(l => { const [sha, ct, ...x] = l.split('\t'); return sha && x.length ? [{ sha, subject: x.join('\t'), at: Number(ct) * 1000 }] : [] })
-  const changelog = (() => { try { return fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').split('\n').map(l => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim()).filter(l => l.length > 20 && !l.startsWith('#')) } catch { return [] } })()
+  const changelog = files.flatMap(f => { try { return fs.readFileSync(f, 'utf8').split('\n').map(l => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim()).filter(l => l.length > 20 && !l.startsWith('#')) } catch { return [] } })
   const src = { commits, changelog }
   shippedCache.set(root, { key, src })
   return src
@@ -412,8 +428,35 @@ function tickLater(folder: string, s: TodoStore): void {
     if (!src) return
     const d = await readDoc(s)
     if (tickShipped(d, src) !== d) await changeTodo(folder, x => tickShipped(x, src))
-    await afterCommit(folder, s)
+    await afterShipped(folder, s, src)
   }).catch(err => log.warn('Shipped check failed:', err))
+}
+
+/** The item a to-do run prompt wraps, nested wrappers included; undefined for any other text. */
+export function runItem(text: string): string | undefined {
+  if (!text.startsWith(RUN_PROMPT)) return undefined
+  let t = text
+  while (t.startsWith(RUN_PROMPT)) t = t.slice(RUN_PROMPT.length).replace(/^\s*(\d+\.\s+)?/, '')
+  return t.split(' (id ')[0].trim()
+}
+/** Run prompts an older build let into the list as items, suggestions or ticked rows: the item they wrap takes the text, or the row goes when it is empty or repeats an open or ticked one. */
+function unwrapRuns(d: TodoDoc, now: number): TodoDoc {
+  const nested = (x: { text: string }) => runItem(x.text) !== undefined
+  if (!d.todo.some(nested) && !d.suggested?.some(nested) && !d.ticked?.some(nested)) return d
+  // The title came from the wrapped text, so it is cut again from the item's own text.
+  const retext = <T extends { text: string; short?: string }>(o: T, x: string): T => { const { short: _s, ...rest } = o; const s = shortOf(x); return { ...rest, text: x, ...(s ? { short: s } : {}) } as T }
+  let out: TodoDoc = d.ticked ? { ...d, ticked: d.ticked.map(t => { const x = runItem(t.text); return x === undefined ? t : retext(t, x) }) } : d
+  const repeat = (text: string, id: string) => !text || out.todo.some(o => o.id !== id && sameWork(o.text, text)) || (out.ticked ?? []).some(k => sameWork(k.text, text))
+  for (const t of d.todo) {
+    const x = runItem(t.text)
+    if (x !== undefined) out = repeat(x, t.id) ? removeItem(out, t.id, now) : { ...out, todo: out.todo.map(o => (o.id === t.id ? retext(o, x) : o)) }
+  }
+  for (const s of d.suggested ?? []) {
+    const x = runItem(s.text)
+    // A missed ask that is a run prompt was never an ask: the run started items already on the list.
+    if (x !== undefined) out = s.why === 'missed' || repeat(x, s.id) ? dismissSuggestion(out, s.id, now) : { ...out, suggested: out.suggested?.map(o => (o.id === s.id ? retext(o, x) : o)) }
+  }
+  return out
 }
 
 /**
@@ -422,7 +465,8 @@ function tickLater(folder: string, s: TodoStore): void {
  * added and nobody accepted (no -ok id); accepted and typed items stay. Order free: the same set prunes the same on every
  * machine. Drops are tombstoned, so sync keeps them gone. d itself when nothing goes.
  */
-export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
+export function prune(input: TodoDoc, now = Date.now()): TodoDoc {
+  const d = unwrapRuns(input, now)
   const open = new Set(d.todo.map(t => t.id))
   const pointsAt = (x: TodoItem) => [...x.text.matchAll(/\b[0-9a-f]{8}(?:-ok)?\b/g)].some(m => m[0] !== x.id && open.has(m[0]))
   let out = d
@@ -434,10 +478,10 @@ export function prune(d: TodoDoc, now = Date.now()): TodoDoc {
   }
   const kept: TodoItem[] = []
   for (const s of byAge(d.suggested ?? [])) {
-    if (handStep(s) || !workText(s.text, s.why === 'missed') || (s.why === 'missed' ? questionLike(s.text) : !actionLine(s.text)) || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
+    if (handStep(s) || !workText(s.text, s.why === 'missed') || (s.why === 'missed' ? questionLike(s.text) || chatty(s.text) : !actionLine(s.text)) || pointsAt(s) || [...out.todo, ...kept].some(l => sameWork(l.text, s.text))) out = dismissSuggestion(out, s.id, now)
     else kept.push(s)
   }
-  const n = d.todo.length + (d.suggested?.length ?? 0) - out.todo.length - (out.suggested?.length ?? 0)
+  const n = input.todo.length + (input.suggested?.length ?? 0) - out.todo.length - (out.suggested?.length ?? 0)
   return n ? { ...out, cleared: n } : out
 }
 const addLeft = (d: TodoDoc, p: ChatProgress, texts: string[], now: number, titles?: Record<string, string>) => suggest(d, p, texts, now, whyLeft, leftId, true, titles)
@@ -448,7 +492,7 @@ const handStep = (t: TodoItem) => t.why === 'you' && !!t.from && t.id.replace(/-
 
 const missedId = (chat: string, text: string) => leftId(chat, `missed\n${text}`)
 // Talk to the chat, not work: call me, carry on from a handoff, how is it going, a system notice pasted into a turn.
-const CHATTY = /^(cross session idle notice|switchboard stopped|subagent .* (has been quiet|no new output)|agent message from|developer reload window|(please )?(complete|do|finish) (what s|what is|everything) (left|remaining))\b|^(please )?(give me a (phone )?call|call me|phone me|ring me|text me)\b|^(please )?(continue|carry on|pick up|resume) (from|with) |^(so )?(what s|what is|how s|how is|how are|where are|where s|are you|is it) (the )?(status|progress|it going|things going|going|we at|you at|done|finished|up to)\b/
+const CHATTY = /^(switchboard to do in this order|cross session idle notice|switchboard stopped|subagent .* (has been quiet|no new output)|agent message from|developer reload window|(please )?(complete|do|finish) (what s|what is|everything) (left|remaining))\b|^(please )?(give me a (phone )?call|call me|phone me|ring me|text me)\b|^(please )?(continue|carry on|pick up|resume) (from|with) |^(so )?(what s|what is|how s|how is|how are|where are|where s|are you|is it) (the )?(status|progress|it going|things going|going|we at|you at|done|finished|up to)\b/
 const chatty = (t: string) => CHATTY.test(t.toLowerCase().replace(/[^a-z0-9/]+/g, ' ').trim())
 /** Kenneth's requests Jev found the Done list does not cover, as suggestions; one Jev now scores covered goes. */
 export function addMissed(d: TodoDoc, p: ChatProgress, now = Date.now()): TodoDoc {
@@ -511,7 +555,8 @@ export function afterFinish(d: TodoDoc, p: ChatProgress, doneIds: string[], now 
   // Older docs hold auto added Left items in todo; those and the suggestions both follow the chat's latest Left.
   for (const l of out.todo) if (l.from === p.sessionId && !l.chat && l.id === leftId(p.sessionId, l.text) && !fresh.has(l.id)) out = removeItem(out, l.id, now)
   for (const l of out.suggested ?? []) if (l.from === p.sessionId && l.id === leftId(p.sessionId, l.text) && !fresh.has(l.id)) out = dismissSuggestion(out, l.id, now)
-  for (const t of out.todo.filter(x => x.chat === p.sessionId)) out = texts.some(l => mentions(l, t.text)) ? startTodo(out, t.id, undefined, now) : removeItem(out, t.id, now)
+  // Held and not done: open again if its Left names it, else stopped, so only Start again runs it.
+  for (const t of out.todo.filter(x => x.chat === p.sessionId)) out = texts.some(l => mentions(l, t.text)) ? startTodo(out, t.id, undefined, now) : stopItem(out, t.id, now)
   return addLeft(out, p, add ?? texts, now, titles)
 }
 
@@ -656,7 +701,7 @@ export function runMessage(items: TodoItem[]): string {
     const n = t.before ? items.findIndex(x => x.id === t.before) : -1
     return `${i + 1}. ${t.text} (id ${t.id}${n >= 0 ? `, needed first for ${n + 1}` : ''})`
   })
-  return ['Switchboard to-do, in this order:', ...lines, '',
+  return [RUN_PROMPT, ...lines, '',
     "Do prerequisites first. When you find something that must be done before an item, add it to the to-do with the switchboard todo_add tool (before_id: that item's id) as a prerequisite, do it, then continue. Mark each item done with todo_done (its id) when it is finished."].join('\n')
 }
 
@@ -694,7 +739,7 @@ export function toolStep(d: TodoDoc, c: TodoCall, now = Date.now(), id = ID()): 
   const dup = d.todo.find(t => repeats(t.text, text))
   if (dup) return { doc: d, said: `Already on the list as ${dup.id}: ${dup.text}` }
   // Done in the last week, same words: a twin would run again. Looser wording is a new item.
-  const twin = d.ticked?.find(t => now - t.at < RECENT_MS && words(t.text) === words(text))
+  const twin = twinOf(d, text, now)
   if (twin) { const n = Math.floor((now - twin.at) / 864e5); return { doc: d, said: `Already done ${n ? `${n} day${n === 1 ? '' : 's'} ago` : 'today'} as ${twin.id}: ${twin.text}. Not added.` } }
   const to = c.before ? findItem(d, c.before) : undefined
   const more: Partial<TodoItem> = { ...(to ? { before: to.id } : {}), ...(to?.chat ? { chat: to.chat, host: to.host } : {}), ...(to?.run && to.chat && to.chat === c.session ? { run: to.run, ...(to.auto ? { auto: true as const } : {}) } : {}), ...(c.session ? { from: c.session.slice(0, 64) } : {}), ...(c.session && chatName(c.session) ? { name: chatName(c.session) } : {}), ...(c.needsOk ? { needsOk: true } : {}) }
@@ -1008,7 +1053,8 @@ type Ask = (prompt: string, ms: number) => Promise<string>
 async function coveredIds(d: TodoDoc, p: ChatProgress, ask: Ask, withAsked: boolean): Promise<string[]> {
   const left = leftTexts(p)
   // Its own missed lines are its asks, which the evidence repeats; Jev's score in addMissed judges those.
-  const open = [...d.todo.filter(l => !l.chat), ...(d.suggested ?? []).filter(l => !(l.why === 'missed' && l.from === p.sessionId))].filter(l => !left.some(t => mentions(t, l.text)))
+  // A Done chat judges the items it held too: its report is the evidence.
+  const open = [...d.todo.filter(l => !l.chat || (withAsked && l.chat === p.sessionId)), ...(d.suggested ?? []).filter(l => !(l.why === 'missed' && l.from === p.sessionId))].filter(l => !left.some(t => mentions(t, l.text)))
   const q = withAsked ? p : { ...p, asked: [] }
   if (!open.length || !(q.report?.done.length || q.asked?.length)) return []
   return parseDoneIds(await ask(finishPrompt(open, q), 60_000).catch(() => ''), open.map(l => l.id))
@@ -1050,19 +1096,39 @@ export async function commitCovered(s: TodoStore, c: { sha: string; message: str
   return updateDoc(s, d => ids.reduce((o, id) => tickWith(o, id, shipped, now), d))
 }
 
-// The HEAD each repo had when this window last looked, so only commits made since are judged.
-const commitSeen = new Map<string, string>()
-/** New commits since the last look feed commitCovered. The first look only records HEAD, so a restart judges nothing. */
-async function afterCommit(folder: string, s: TodoStore): Promise<void> {
+export type ShippedSeen = Record<string, { head?: string; cl?: string[] }>
+export const shippedSeenFile = () => path.join(os.homedir(), '.claude', 'switchboard', 'todo-shipped-seen.json')
+const lineKey = (l: string) => crypto.createHash('sha1').update(l).digest('hex').slice(0, 10)
+/**
+ * What shipped since the last look: the new HEAD and the CHANGELOG lines not seen before. Kept on disk, since windows
+ * reload after every release and an in-memory HEAD lost every commit made in between. The first look only records.
+ */
+/** room: characters of new notes to judge this look; the rest stay unseen for the next one. */
+export function shippedSince(seen: ShippedSeen, root: string, head: string, changelog: string[], room = 1500): { seen: ShippedSeen; was?: string; notes: string[] } {
+  const prev = seen[root], cl = changelog.map(lineKey), known = new Set(prev?.cl ?? [])
+  const fresh = prev ? [...new Set(changelog.filter((_, i) => !known.has(cl[i])))] : []
+  const notes: string[] = []
+  for (const l of fresh) { if (notes.length && notes.join('\n').length + l.length > room) break; notes.push(l) }
+  const later = new Set(fresh.slice(notes.length).map(lineKey))
+  return { seen: { ...seen, [root]: { head, cl: [...new Set(cl.filter(k => !later.has(k)))] } }, was: prev?.head && prev.head !== head ? prev.head : undefined, notes }
+}
+const readSeen = (file: string): ShippedSeen => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return {} } }
+/** New commits and release notes since the last look feed commitCovered; marked seen only once the model answered. */
+async function afterShipped(folder: string, s: TodoStore, src: ShippedSources, file = shippedSeenFile()): Promise<void> {
   const root = s.root!
   const head = (await git(root, ['rev-parse', '-q', '--verify', 'HEAD'])).out.trim()
-  const was = commitSeen.get(root)
-  if (head) commitSeen.set(root, head)
-  if (!head || !was || was === head) return
-  const r = await git(root, ['log', '-n', '5', '--format=%B%x00', `${was}..${head}`])
-  const message = r.ok ? r.out.split('\0').map(x => x.trim()).filter(Boolean).join('\n\n') : ''
-  if (!message) return
-  const d = await commitCovered(s, { sha: head, message }, askFilter)
+  if (!head) return
+  const seen = readSeen(file)
+  const r = shippedSince(seen, root, head, src.changelog)
+  if (JSON.stringify(r.seen[root]) === JSON.stringify(seen[root])) return
+  const log = r.was ? await git(root, ['log', '-n', '5', '--format=%B%x00', `${r.was}..${head}`]) : undefined
+  const commits = log?.ok ? log.out.split('\0').map(x => x.trim()).filter(Boolean).join('\n\n').slice(0, 1400) : ''
+  const notes = r.notes.join('\n')
+  const message = [commits, notes && (commits ? `Release notes:\n${notes}` : notes)].filter(Boolean).join('\n\n')
+  let failed = false
+  const d = message ? await commitCovered(s, { sha: commits ? head : 'CHANGELOG', message }, (q, ms) => askFilter(q, ms).catch(err => { failed = true; throw err })) : undefined
+  // A failed call leaves the lines unseen, so the next look judges them again. Fresh read: another window may have written other repos.
+  if (!failed) writeJsonAtomic(file, { ...readSeen(file), [root]: r.seen[root] })
   if (d) { show(folder, d); laterSync(folder, s) }
 }
 

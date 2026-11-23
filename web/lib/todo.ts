@@ -154,3 +154,31 @@ function heldNote(held: Map<string, Held>): string {
 /** One Plan page lane per project with to-do items or a chain in it. */
 export const pilotLanes = (todos: Record<string, TodoList>, autoStart: boolean, live: (chat?: string) => boolean) =>
   Object.entries(todos).map(([folder, l]) => ({ folder, pilot: autopilot(l, autoStart, live) })).filter(x => x.pilot.steps.length > 0)
+
+/** The small cues on an item row. to: the item it waits on, or the chat it runs in or came from. */
+export type Cue = { k: 'waits' | 'running' | 'from'; text: string; to?: string }
+export function rowCues(t: TodoItem, list: TodoList, chats: ChatRow[]): Cue[] {
+  const named = (id: string) => chats.find(c => c.sessionId === id)?.name
+  const pre = list.todo.filter(x => x.before === t.id)
+  const out: Cue[] = []
+  if (pre.length) out.push({ k: 'waits', text: `Waits on ${pre.map(x => x.short ?? x.text).join(', ')}`, to: pre[0].id })
+  // A gone chat shows as the row's STOPPED badge, not as running.
+  const run = t.chat ? chats.find(c => c.sessionId === t.chat && c.live) : undefined
+  if (run) out.push({ k: 'running', text: `Running in ${run.name ?? 'a chat'}`, to: run.sessionId })
+  const from = t.name ?? (t.from ? named(t.from) : undefined)
+  if (t.from && from) out.push({ k: 'from', text: `From ${from}`, to: t.from })
+  return out
+}
+
+/** The To-do links on a chat card: the run it is (To-do N) and the lines it left (→ N to To-do). */
+export type TodoChip = { k: 'run' | 'left'; text: string; folder: string; item: string }
+export function todoChips(todos: Record<string, TodoList>, chatId: string): TodoChip[] {
+  return Object.entries(todos).flatMap(([folder, l]) => {
+    const run = l.todo.filter(t => t.chat === chatId)
+    const left = [...l.suggested ?? [], ...l.todo].filter(t => t.from === chatId && t.chat !== chatId)
+    return [
+      ...run.map(t => ({ k: 'run' as const, text: t.run ? `To-do ${t.run}` : 'To-do', folder, item: t.id })),
+      ...(left.length ? [{ k: 'left' as const, text: `→ ${left.length} to To-do`, folder, item: left[0].id }] : []),
+    ]
+  })
+}

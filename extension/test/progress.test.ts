@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { step, settle, finishedJobs, RUNNING_CAP_MS, commitMessage, commitMessages, commitTargets, fillBox, fillRepos, leftovers, mergeCommit, pendingAt, shouldNotify, notifyKey, notifyStep, canPrefill, plainText, askKeys, otherText, OTHER_MAX, dropAsk, askedQuestion, standup, doneText, almostDone, missed, todayText, newerVersion, trendText, desktopNotice, workText, indefiniteText } from '../src/hub/progress'
+import { step, settle, finishedJobs, RUNNING_CAP_MS, commitMessage, commitMessages, commitTargets, fillBox, fillRepos, leftovers, mergeCommit, pendingAt, shouldNotify, notifyKey, notifyStep, canPrefill, plainText, askKeys, otherText, OTHER_MAX, dropAsk, askedQuestion, standup, doneText, almostDone, missed, todayText, newerVersion, trendText, desktopNotice, workText, indefiniteText, askedText } from '../src/hub/progress'
 import { coverageItems, parseScores } from '../src/hub/coverage'
 import { commandProblem } from '../src/hub/routes'
 import { HubService } from '../src/hub/hub-service'
@@ -11,6 +11,12 @@ const run = (events: Record<string, unknown>[]) => events.reduce((p, e, i) => st
 
 test('a fresh chat is working', () => {
   assert.equal(run([ev('SessionStart')])?.state, 'working')
+})
+
+test('a subagent hook on a chat with no row (cache-keeper fork on an idle chat) does not make it working', () => {
+  assert.equal(step(undefined, ev('SubagentStop', { agent_id: 'a1' }), 1000)?.state, 'idle')
+  // A real background subagent still calling tools (row lost on a reload) makes it busy again.
+  assert.equal(step(undefined, ev('PreToolUse', { agent_id: 'q1', agent_type: 'qa', tool_name: 'Read' }), 1000)?.state, 'working')
 })
 
 test('roles: start marks active, stop marks done, order kept', () => {
@@ -1196,4 +1202,43 @@ test('TaskCompleted completes a listed task; TaskCreated leaves the TaskCreate c
     ev('TaskCreated', { task_id: '1', task_subject: 'Build it' }), ev('TaskCompleted', { task_id: '1', task_subject: 'Build it' })])
   assert.deepEqual(p?.tasks.map(t => [t.id, t.subject, t.status]), [['1', 'Build it', 'completed']])
   assert.ok(p?.tasks[0].doneAt)
+})
+
+test('machine prompts Switchboard sends a chat are never asked, so they are never missed or suggested', () => {
+  const sent = [
+    'Switchboard to-do, in this order: 1. Fix worktrees and merge if not merged so I can commit (id 4d7d52a4-ok, needed first for 2) 2. Write the release notes (id 0b1c2d3e) Do prerequisites first. When you find something that must be done before an item, add it to the to-do with the switchboard todo_add tool (before_id: that item\'s id) as a prerequisite, do it, then continue. Mark each item done with todo_done (its id) when it is finished.',
+    'Switchboard to-do, in this order: 1. Switchboard to-do, in this order: 1. Write the release notes (id 0b1c2d3e) Do prerequisites first.',
+    'Switchboard: the usage limit reset. Continue where you left off; if you need the user, ask with AskUserQuestion.',
+    'Usage limit reset. Continue where you stopped; resume any subagents cut off with SendMessage.',
+    'Continue from 2026-11-22-1200-switchboard-handoff-ab12cd34.md: read it first, recreate every open task in it with the task tools before any other work, then carry on.',
+    'Check back: look at progress on open work and continue or report.',
+    'Run the aar skill now on this chat so far, then carry on.',
+    'Handoff from Codex in Switchboard (/Users/k/Documents/GitHub/Switchboard). Goal: add the CSV export. Last summary: - done. Files touched: (none recorded). Read the repo state, check the work so far, then carry on.',
+    'Subagent engineer (a1b2c3) has been quiet 12 min. Check its last output; if it is waiting or looping, SendMessage it to continue with a narrower next step, or stop it and redo the step yourself.',
+    'Switchboard stopped npm test for 31 min (pid 4312). If it is still needed, rerun it with a timeout, or with run_in_background and a check on its output.',
+    'Background job "Run the extension tests" for 9 min (npm test). Stop it (TaskStop or KillShell), then rerun it with a timeout if it is still needed. The chat has repeated Read six times in a row; break that loop.',
+    'Switchboard: Kenneth wants you to wait for Armasu. Call chats_wait with chats ["abc"] and reason "card link". When it finishes clean, continue on your own; otherwise stop and ask Kenneth.',
+  ]
+  for (const text of sent) assert.equal(askedText(text), undefined, text)
+  assert.equal(run([ev('SessionStart'), ...sent.map(prompt => ev('UserPromptSubmit', { prompt }))])?.asked, undefined)
+  assert.equal(workText(sent[0], true), undefined)
+})
+
+test('a person\'s own words that only start like a machine prompt stay asked', () => {
+  const human = [
+    'Switchboard is slow on big repos, look into it',
+    'Continue from the notes and add the CSV export',
+    'Check back on the CI config tomorrow',
+    'Run the aar skill on the todo chat when it finishes',
+    'Switchboard to-do board should show the hold reason',
+  ]
+  for (const text of human) assert.equal(askedText(text), text, text)
+  assert.deepEqual(run([ev('SessionStart'), ...human.map(prompt => ev('UserPromptSubmit', { prompt }))])?.asked, human)
+})
+
+test('a pipeline seed line after a person\'s prompt is cut off and the prompt stays', () => {
+  const seed = 'A saved pipeline seeded .switchboard/stages/run-1/ (stages.json and a CONTEXT.md per stage, every status todo). Run it with the stages skill.'
+  assert.equal(askedText(`Fix the login bug\n\n${seed}`), 'Fix the login bug')
+  assert.equal(workText(`Fix the login bug ${seed}`, true), 'Fix the login bug')
+  assert.equal(askedText(seed), undefined)
 })

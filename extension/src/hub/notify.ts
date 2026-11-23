@@ -100,6 +100,12 @@ export function notifyIndefiniteDone(sessionId: string, usage?: string, reason?:
   toast(false, indefiniteText(title, usage, reason), 'Show', () => focusChat(sessionId))
 }
 
+/** Automatic merge-all finished: what went into main and what stayed. */
+export function notifyMerged(project: string, text: string): void {
+  mac(`${project}: worktrees`, text)
+  toast(false, `Switchboard: ${project}: ${text}`)
+}
+
 /** An AWS session about to end, with one tap to sign in again in its Chrome profile. */
 export function notifyAwsExpiry(profile: string, leftMs: number, signIn: () => void): void {
   const label = hub.get().aws.find(a => a.name === profile)?.label
@@ -130,3 +136,9 @@ export function dailyTrend(now = Date.now()): DailyTrend {
   return trendOf(readArchive(), now)
 }
 
+/** A research run was saved: a notice that opens the hub, and a phone push when phone mode is on. */
+export function notifyResearchDone(question: string): void {
+  const text = `Research done: ${question}`
+  toast(false, text, 'View', () => void vscode.commands.executeCommand('agentVisualizer.open'))
+  if (hub.get().controls.switchboard.phone) void sendPush('Research', text)
+}

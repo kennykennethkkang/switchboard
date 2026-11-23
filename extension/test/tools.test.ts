@@ -80,7 +80,8 @@ test('saveProfile and readProfiles round trip; resume finds the settings file', 
   const file = saveProfile(id, p, dir)
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), profileSettings(p))
   assert.deepEqual(readProfiles([id, 'missing'], dir), { [id]: p })
-  assert.equal(resumeSettingsArg(id, dir, '', 'posix'), ` --settings '${file}'`)
+  // Tools the profile has off ride the resume note, names only.
+  assert.match(resumeSettingsArg(id, dir, '', 'posix'), new RegExp(`^ --settings '${file}' --append-system-prompt '.*tool_on when the task calls for it: a, phone\\.'$`))
   assert.equal(resumeSettingsArg('abc', dir), '')
   assert.throws(() => saveProfile('../x', p, dir))
 })

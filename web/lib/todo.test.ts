@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { aiPath, autopilot, busiestTodo, upNext, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, startable, holdOf, HELD, withHome } from './todo'
+import { aiPath, autopilot, busiestTodo, upNext, pilotLanes, planFolder, stepLabel, moved, finishUp, inside, openCount, ordered, runIds, runLanded, runTargets, startable, holdOf, HELD, withHome, rowCues, todoChips } from './todo'
 import { demoHub } from './hub-demo'
 import type { ChatRow, TodoItem, TodoList } from './hub-types'
 
@@ -232,5 +232,32 @@ describe('upNext', () => {
     assert.equal(upNext(list, c => c === 'live')?.text, 'CSV')
     assert.equal(upNext(list, () => false)?.text, 'Stripe')
     assert.equal(upNext({ todo: [{ id: 'r', text: 'Stripe', at: 1, chat: 'live' }] }, c => c === 'live'), undefined)
+  })
+})
+
+describe('row and chat cues', () => {
+  const chats = [{ sessionId: 'c1', name: 'Auth', live: true }, { sessionId: 'c2', name: 'Billing chat' }] as ChatRow[]
+  const list: TodoList = { todo: [
+    { id: 'p', text: 'Add the API key', at: 1, chat: 'c1', run: 2 },
+    { id: 'x', text: 'Wire the billing page', at: 1, before: 'p', from: 'c2', name: 'Billing' },
+    { id: 's', text: 'Check push alerts', at: 1, stopped: true },
+    { id: 'g', text: 'Move the preset', at: 1, chat: 'c2' },
+  ] }
+  it('rowCues: what the item waits on, its running chat and the chat that left it', () => {
+    assert.deepEqual(rowCues(list.todo[1], list, chats), [{ k: 'from', text: 'From Billing', to: 'c2' }])
+    assert.deepEqual(rowCues(list.todo[0], list, chats), [{ k: 'waits', text: 'Waits on Wire the billing page', to: 'x' }, { k: 'running', text: 'Running in Auth', to: 'c1' }])
+    // The row's STOPPED badge and its meta line already say it; no chip repeats them.
+    assert.deepEqual(rowCues(list.todo[2], list, chats), [])
+  })
+  it('rowCues: running only while that chat is live', () => {
+    assert.deepEqual(rowCues(list.todo[3], list, chats), [])
+  })
+  it('rowCues: a from name only when one is known', () => {
+    assert.deepEqual(rowCues({ id: 'y', text: 'x', at: 1, from: 'gone' }, list, chats), [])
+  })
+  it('todoChips: the to-do run a chat is, and how many lines it left', () => {
+    const todos = { '/w': { todo: [{ id: 'r', text: 'Ship it', at: 1, chat: 'c1', run: 4 }], suggested: [{ id: 'l1', text: 'Add a test', at: 1, from: 'c1' }, { id: 'l2', text: 'Docs', at: 1, from: 'c1' }] } }
+    assert.deepEqual(todoChips(todos, 'c1'), [{ k: 'run', text: 'To-do 4', folder: '/w', item: 'r' }, { k: 'left', text: '→ 2 to To-do', folder: '/w', item: 'l1' }])
+    assert.deepEqual(todoChips(todos, 'c9'), [])
   })
 })

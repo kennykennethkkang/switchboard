@@ -17,14 +17,13 @@ import { chainVersion, codexNote, handoffFile, planLabel, projectName } from './
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import { readGroups } from './split'
-import { held, line } from './sweep'
-import { cleanWorktree, endedWorktrees, worktreeDirs } from './git'
+import { cleanWorktree, endedMerges, endedWorktrees, gitOp, liveIn, mergeDue, mergeOnEnd, sweepChats, worktreeDirs, type MergeClock } from './git'
 import { learnTick, usageOk } from './learn'
 import { rememberChats } from './reap'
 import { autoStartPlan, changeTodo, claimTodo, holdReason, holdShown, START_GRACE_MS, clearGoneChats, loadTodos, runLabel, runMessage, projectOf, startTodo } from './todo'
 import { follow, outcomeIn } from '../../ask/chats.mjs'
 import { randomUUID } from 'crypto'
-import { notifyIndefiniteDone } from './notify'
+import { notifyIndefiniteDone, notifyMerged } from './notify'
 import { CHECK_BACK_TEXT, dueCheckBacks, hasOpenWork } from './checkback'
 
 const log = createLogger('Hub')
@@ -51,11 +50,27 @@ export function codexPanel(d: {
         ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
     }), ais, doneChecks })
     startWaits()
-    // Every known repo is scanned, a chat or not; a worktree whose chat just ended goes at once, others after 10 idle minutes.
+    // Every known repo is scanned, a chat or not; a worktree whose chat ended (SessionEnd) goes at once, others after 10 idle minutes.
     const fast: string[] = []
     const roots = hub.get().projects.map(p => p.path)
-    for (const w of [...endedWorktrees(wtSeen, chats, Date.now(), worktreeDirs(chats.map(c => c.cwd), roots), fast), ...fast]) {
+    for (const w of [...endedWorktrees(wtSeen, sweepChats(chats, hub.get().progress), Date.now(), worktreeDirs(chats.map(c => c.cwd), roots), fast), ...fast]) {
       void cleanWorktree(w).then(gone => { if (gone) log.info(`Removed merged worktree ${w}`) }).catch(err => log.warn('Worktree cleanup failed:', err))
+    }
+    for (const [id, wt] of endedMerges(mergeOnEnd, liveIn(chats, codexTied))) {
+      void gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, w => liveIn(hub.get().chats, codexTied)(w))
+        .then(m => {
+          // Another merge holds the repo: try again next tick.
+          if (/^A merge is already running/.test(m.text)) { mergeOnEnd.set(id, wt); return }
+          log.info(`Merge back of ${wt}: ${m.text}`); notifyMerged(projectName(wt), m.text)
+        })
+        .catch(err => log.warn('Merge back failed:', err))
+    }
+    if (hub.get().controls.switchboard.autoMerge !== false) {
+      for (const r of mergeDue(mergeClock, chats, roots)) {
+        void gitOp(r, { op: 'merge-all', confirmed: true }, undefined, false, wt => liveIn(hub.get().chats, codexTied)(wt))
+          .then(m => { log.info(`Auto merge in ${r}: ${m.text}`); if (m.ok || !/^(No worktrees|Every worktree|A merge is already running)/.test(m.text)) notifyMerged(projectName(r), m.text) })
+          .catch(err => log.warn('Auto merge failed:', err))
+      }
     }
     refreshStages(chats)
     void syncTerminals(chats).catch(err => log.warn('Terminal list failed:', err))
@@ -156,6 +171,8 @@ export function codexPanel(d: {
 
   // Worktree folders with a live chat, so one that ends is cleaned up.
   const wtSeen = new Map<string, number | undefined>()
+  // Merge all on its own after 15 quiet minutes per repo (mergeDue).
+  const mergeClock: MergeClock = { seen: new Set(), since: new Map(), fired: new Map() }
 
   // To-do items started in this window (auto or Run), never auto-started again: a chat that keeps failing to start would loop.
   const autoTried = new Set<string>()

@@ -116,9 +116,13 @@ export function components(map: FlowMap, mem?: MemoryGraph, cwd?: string): Parts
     p.files.push(f.label)
     parts.set(id, p)
   }
+  // without its own README a part reads as the file other parts import most; a nested folder's README (a test fixture, one skin) misleads
+  const usedFrom = new Map<string, number>()
+  for (const e of map.edges) if (e.kind === 'import' && partOf.get(e.from) && partOf.get(e.from) !== partOf.get(e.to)) usedFrom.set(e.to, (usedFrom.get(e.to) ?? 0) + e.n)
   for (const p of parts.values()) {
     p.files.sort()
-    p.about = byId.get(`d:${p.path}`)?.about ?? map.nodes.filter(n => n.kind === 'folder' && n.about && n.id.startsWith(`d:${p.path}/`)).sort((x, y) => x.id.length - y.id.length)[0]?.about ?? files.filter(f => partOf.get(f.id) === p.id && f.about).sort((a, b) => a.label.length - b.label.length)[0]?.about
+    const face = files.filter(f => partOf.get(f.id) === p.id && f.about).sort((a, b) => (usedFrom.get(b.id) ?? 0) - (usedFrom.get(a.id) ?? 0) || a.label.length - b.label.length)[0]
+    p.about = byId.get(`d:${p.path}`)?.about ?? (face && `${face.label.split('/').pop()}: ${face.about}`)
   }
   const linkMap = new Map<string, PartLink>()
   const touched = new Map<string, Map<string, number>>()
@@ -176,6 +180,11 @@ export const PART_W = 232, PART_H = 88
 
 /** Layout A: one column per flow depth, entry on the left, each column centred on the tallest. */
 export function layers(parts: Part[], links: PartLink[] = []): { at: Map<string, { x: number; y: number }>; cols: number } {
+  if (!links.length) {
+    // no flow to show (a repo of separate mods): a grid about as wide as a screen, not one column zoomed to nothing
+    const rows = Math.ceil(Math.sqrt(parts.length * 1.7))
+    return { at: new Map(parts.map((p, i) => [p.id, { x: Math.floor(i / rows) * (PART_W + 120), y: (i % rows) * (PART_H + 32) }])), cols: Math.ceil(parts.length / rows) }
+  }
   const cols = new Map<number, Part[]>()
   for (const p of parts) cols.set(p.depth, [...(cols.get(p.depth) ?? []), p])
   const keys = [...cols.keys()].sort((a, b) => a - b), tall = Math.max(1, ...[...cols.values()].map(c => c.length))
@@ -219,13 +228,26 @@ const GAP = 120
 export function routeLinks(parts: Part[], links: PartLink[], at: Map<string, Pt>): Map<string, Pt[]> {
   const boxes = parts.map(p => ({ id: p.id, ...at.get(p.id)! }))
   const top = Math.min(...boxes.map(b => b.y)), bottom = Math.max(...boxes.map(b => b.y + PART_H))
+  // ports: a box's lines spread down its side in the order of their far ends, so arrows do not stack on one point
+  const port = (side: 'from' | 'to') => {
+    const by = new Map<string, PartLink[]>(), off = new Map<PartLink, number>()
+    for (const l of links) by.set(l[side], [...(by.get(l[side]) ?? []), l])
+    const far = (l: PartLink) => { const o = at.get(side === 'from' ? l.to : l.from)!; return o.y + o.x / 1e4 }
+    for (const ls of by.values()) {
+      const step = Math.min(12, (PART_H - 32) / Math.max(1, ls.length - 1))
+      ls.sort((p, q) => far(p) - far(q)).forEach((l, i) => off.set(l, (i - (ls.length - 1) / 2) * step))
+    }
+    return off
+  }
+  const outOff = port('from'), inOff = port('to')
   const plan = links.map(l => {
     const a = at.get(l.from)!, b = at.get(l.to)!
-    const y1 = a.y + PART_H / 2, y2 = b.y + PART_H / 2, g1 = a.x + PART_W + GAP / 2, g2 = b.x - GAP / 2
+    const y1 = a.y + PART_H / 2 + outOff.get(l)!, y2 = b.y + PART_H / 2 + inOff.get(l)!, g1 = a.x + PART_W + GAP / 2, g2 = b.x - GAP / 2
     if (g1 === g2) return { l, y1, y2, g1, g2, yc: undefined as number | undefined }
     const lo = Math.min(g1, g2), hi = Math.max(g1, g2)
     const block = boxes.filter(x => x.x < hi && x.x + PART_W > lo)
-    const free = (y: number) => !block.some(x => y > x.y - 4 && y < x.y + PART_H + 4)
+    // 12px clear of any box, so a passing line never reads as touching it
+    const free = (y: number) => !block.some(x => y > x.y - 12 && y < x.y + PART_H + 12)
     const cands = [y1, y2, top - 24, bottom + 24, ...block.flatMap(x => [x.y - 16, x.y + PART_H + 16])].filter(free)
     const yc = cands.sort((p, q) => Math.abs(p - y1) + Math.abs(p - y2) - Math.abs(q - y1) - Math.abs(q - y2) || p - q)[0]
     return { l, y1, y2, g1, g2, yc }
@@ -239,7 +261,7 @@ export function routeLinks(parts: Part[], links: PartLink[], at: Map<string, Pt>
     return (k: number, i: number) => off.get(`${k}\n${i}`) ?? 0
   }
   const gapOff = spreadOut(i => [plan[i].g1, plan[i].g2], 8, 48)
-  const rowOff = spreadOut(i => (plan[i].yc === undefined ? [] : [plan[i].yc!]), 6, 12)
+  const rowOff = spreadOut(i => (plan[i].yc === undefined ? [] : [plan[i].yc!]), 5, 8)
   const out = new Map<string, Pt[]>()
   plan.forEach(({ l, y1, y2, g1, g2, yc }, i) => {
     const a = at.get(l.from)!, b = at.get(l.to)!

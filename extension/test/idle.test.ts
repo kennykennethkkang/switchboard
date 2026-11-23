@@ -51,3 +51,25 @@ test('idle: an open ask question keeps it busy until answered', () => {
   answerQuestion(id, [0])
   assert.equal(idle(t + 1000), true)
 })
+
+test('idle: a live chat this window owns that is mid-turn keeps it busy; a reload would kill it', async () => {
+  const { hub } = await import('../src/hub/hub-service')
+  const t = Date.now() + 30 * IDLE_MS
+  const id = 'c0ffee00-0000-4000-8000-000000000001'
+  const row = { pid: 1, sessionId: id, cwd: '/Users/x/proj', link: '', live: true, why: [] }
+  hub.set({ chats: [row] })
+  hub.hook({ session_id: id, cwd: '/Users/x/proj', hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+  assert.equal(idle(t), false, 'mid-turn')
+  hub.hook({ session_id: id, cwd: '/Users/x/proj', hook_event_name: 'Stop' })
+  assert.equal(idle(t), true, 'turn ended')
+  const other = 'c0ffee00-0000-4000-8000-000000000002'
+  hub.set({ chats: [row, { ...row, sessionId: other }] })
+  hub.hook({ session_id: other, cwd: '/Users/x/proj', hook_event_name: 'UserPromptSubmit', prompt: 'there' }, Date.now(), true)
+  assert.equal(idle(t), true, 'another window owns it: a mirror')
+  hub.hook({ session_id: other, cwd: '/Users/x/proj', hook_event_name: 'SessionEnd' }, Date.now(), true)
+  hub.hook({ session_id: id, cwd: '/Users/x/proj', hook_event_name: 'SessionEnd' })
+  hub.hook({ session_id: id, cwd: '/Users/x/proj', hook_event_name: 'UserPromptSubmit', prompt: 'once more' })
+  hub.set({ chats: [{ ...row, live: false }] })
+  assert.equal(idle(t), true, 'its process is gone: nothing to kill')
+  hub.set({ chats: [] })
+})

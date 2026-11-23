@@ -127,15 +127,19 @@ async function note($: EngineInterface, e: { permission_mode?: unknown; session_
   return next(e as never)
 }
 
+const commandOf = (e: unknown) => String((e as { command?: unknown }).command ?? '')
+
 export const register: Register = on => {
   on('classic.UserPromptSubmit', note as never).catch(($, e, next) => next(e))
   on('classic.PostToolUse', note as never).catch(($, e, next) => next(e))
 
+  // Pure check first, so the .catch can re-judge without $: a failure there never holds a clean call.
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const w = { cwd: await $.session.cwd().catch(() => undefined), home: await $.env.get('HOME').catch(() => undefined) }
-    const why = hardDeny(String((e as unknown as { command?: unknown }).command ?? ''), w)
+    const command = commandOf(e)
+    const why = hardDeny(command) ?? hardDeny(command, { cwd: await $.session.cwd().catch(() => undefined), home: await $.env.get('HOME').catch(() => undefined) })
     return why ? { deny: `bash-approve: always refused (${why}). Do it another way or ask the user to run it.` } : next(e)
-  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'bash-approve: the check failed, so the call was held.' }))
+  }).catch(($, e, next) => (next.called || !hardDeny(commandOf(e)) ? next(e)
+    : { deny: `bash-approve: the check failed (${next.error.kind}${next.error.message ? `: ${next.error.message}` : ''}), so the call was held.` }))
 
   // Core's verdict first: a deny stands, and so does an ask from a settings rule or with Ask before actions on. Other asks become an allow, but only in a mode that does not prompt; default, plan or an unknown mode keep the ask.
   on('tool.check', { tool: 'Bash' }, async ($, e, next) => {

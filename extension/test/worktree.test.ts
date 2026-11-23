@@ -6,7 +6,8 @@ import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { newChatCommand, repoTop } from '../src/hub/projects'
-import { addWorktree, cleanWorktree, endedWorktrees, gitOp, readRepo, worktreeDirs } from '../src/hub/git'
+import { addWorktree, cleanWorktree, endedWorktrees, gitOp, liveIn, mergeDue, mergeWorktrees, QUIET_MS, readRepo, sweepChats, worktreeDirs, type MergeClock } from '../src/hub/git'
+import { MAC_ONLY_GIT } from '../src/hub/types'
 import { excludeWorktrees } from '../src/hub/advanced'
 import { commandProblem } from '../src/hub/routes'
 
@@ -55,7 +56,7 @@ describe('worktree chats', () => {
   it('refuses outside a worktree and with uncommitted files', async () => {
     assert.match((await gitOp(main, { op: 'merge-back', confirmed: true })).text, /not a worktree/i)
     fs.writeFileSync(path.join(wt, 'b.txt'), 'x\n')
-    assert.match((await gitOp(wt, { op: 'merge-back', confirmed: true })).text, /Commit/)
+    assert.match((await gitOp(wt, { op: 'merge-back', confirmed: true })).text, /still running/)
     fs.rmSync(path.join(wt, 'b.txt'))
   })
 
@@ -154,6 +155,21 @@ describe('kept worktree cleanup', () => {
     assert.deepEqual(endedWorktrees(seen, [], 6 * MIN, [wt]), [])
     assert.deepEqual(endedWorktrees(seen, [], 16 * MIN, [wt]), [fs.realpathSync.native(wt)])
     fs.rmSync(wt, { recursive: true })
+  })
+
+  it('keeps the worktree of a chat killed without SessionEnd while its progress row stays', () => {
+    const seen = new Map<string, number | undefined>()
+    const wt = path.join(main, '.claude', 'worktrees', 'killed')
+    const MIN = 60_000
+    const fast: string[] = []
+    endedWorktrees(seen, sweepChats([{ live: true, cwd: wt }], [{ cwd: wt }]), 0)
+    assert.deepEqual(endedWorktrees(seen, sweepChats([{ live: false, cwd: wt }], [{ cwd: wt }]), 3 * MIN, [], fast), [])
+    assert.deepEqual(endedWorktrees(seen, sweepChats([{ live: false, cwd: wt }], [{ cwd: wt }]), 30 * MIN, [], fast), [])
+    assert.deepEqual(fast, [])
+    // SessionEnd drops the row: the fast path takes it.
+    endedWorktrees(seen, sweepChats([], []), 31 * MIN, [], fast)
+    endedWorktrees(seen, sweepChats([], []), 33 * MIN, [], fast)
+    assert.deepEqual(fast, [wt])
   })
 
   it('treats case twins of one worktree as one', () => {
@@ -264,5 +280,111 @@ describe('merged worktree cleanup', () => {
     endedWorktrees(seen, [], 30_000 + 3 * MIN, [], fast)
     assert.deepEqual(fast, [real])
     fs.rmSync(w, { recursive: true })
+  })
+})
+
+describe('merge all worktrees', () => {
+  let tmp = '', main = ''
+  const add = (slug: string) => { const w = path.join(main, '.claude', 'worktrees', slug); sh(main, 'worktree', 'add', '-q', '-b', `worktree-${slug}`, w); return w }
+  const pass = async () => ({ ok: true, text: 'checks passed' })
+  before(() => {
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-wtall-')))
+    main = path.join(tmp, 'repo')
+    fs.mkdirSync(main)
+    sh(main, 'init', '-q', '-b', 'main')
+    sh(main, 'config', 'user.email', 't@t'); sh(main, 'config', 'user.name', 'T'); sh(main, 'config', 'commit.gpgsign', 'false')
+    fs.writeFileSync(path.join(main, 'a.txt'), '1\n')
+    sh(main, 'add', '.'); sh(main, 'commit', '-qm', 'init')
+    excludeWorktrees(main)
+  })
+  after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+
+  it('needs a confirm and refuses from the phone', async () => {
+    assert.match((await gitOp(main, { op: 'merge-all' })).text, /Confirm/)
+    assert.ok(MAC_ONLY_GIT.has('merge-all'))
+  })
+
+  it('folds uncommitted and committed work into main uncommitted, skips live and clashing ones', async () => {
+    const one = add('one'), two = add('two'), busy = add('busy'), clash = add('clash')
+    fs.writeFileSync(path.join(one, 'new.txt'), 'new\n')
+    fs.writeFileSync(path.join(two, 'b.txt'), 'b\n'); sh(two, 'add', '.'); sh(two, 'commit', '-qm', 'b')
+    fs.writeFileSync(path.join(busy, 'busy.txt'), 'x\n')
+    fs.writeFileSync(path.join(clash, 'a.txt'), 'clash\n')
+    fs.writeFileSync(path.join(main, 'a.txt'), 'main edit\n')
+    const r = await mergeWorktrees(main, w => w === busy, pass)
+    assert.equal(r.ok, true, r.text)
+    assert.match(r.text, /Merged one, two/)
+    assert.match(r.text, /Kept clash: clashes with main/)
+    assert.match(r.text, /1 worktree with a running chat/)
+    assert.equal(fs.readFileSync(path.join(main, 'new.txt'), 'utf8'), 'new\n')
+    assert.equal(fs.readFileSync(path.join(main, 'b.txt'), 'utf8'), 'b\n')
+    assert.equal(fs.readFileSync(path.join(main, 'a.txt'), 'utf8'), 'main edit\n')
+    assert.equal(sh(main, 'log', '--format=%s'), 'init')
+    assert.ok(!fs.existsSync(one) && !fs.existsSync(two))
+    assert.ok(fs.existsSync(busy) && fs.existsSync(clash))
+    // two's commit is not in main's history, so its branch stays.
+    assert.match(sh(main, 'branch', '--list', 'worktree-two'), /worktree-two/)
+    assert.ok(fs.readdirSync(path.join(main, '.git', 'switchboard-merged')).some(f => f.startsWith('one-')))
+    sh(main, 'checkout', '--', 'a.txt')
+  })
+
+  it('undoes a worktree that breaks the checks and keeps it', async () => {
+    const bad = add('bad')
+    fs.writeFileSync(path.join(bad, 'bad.txt'), 'bad\n')
+    const r = await mergeWorktrees(main, () => false, async d => fs.existsSync(path.join(d, 'bad.txt')) ? { ok: false, text: 'npm run test failed' } : { ok: true, text: 'ok' })
+    assert.match(r.text, /Kept .*bad: npm run test failed, undone/)
+    assert.ok(!fs.existsSync(path.join(main, 'bad.txt')))
+    assert.ok(fs.existsSync(bad))
+  })
+
+  it('merges nothing when the checks already fail on main', async () => {
+    const r = await mergeWorktrees(main, () => false, async () => ({ ok: false, text: 'pnpm run test failed' }))
+    assert.equal(r.ok, false)
+    assert.match(r.text, /already fail/)
+  })
+
+  it('keeps a worktree written to while its checks run, and copies ignored files of merged ones', async () => {
+    const late = add('late'), ign = add('ign')
+    fs.writeFileSync(path.join(late, 'l.txt'), 'l\n')
+    fs.writeFileSync(path.join(ign, '.gitignore'), '*.local\nnode_modules/\n')
+    fs.writeFileSync(path.join(ign, 'secrets.local'), 's\n')
+    fs.mkdirSync(path.join(ign, 'node_modules')); fs.writeFileSync(path.join(ign, 'node_modules', 'x.js'), '')
+    const r = await mergeWorktrees(main, () => false, async d => { if (d === main && fs.existsSync(path.join(main, 'l.txt'))) fs.writeFileSync(path.join(late, 'more.txt'), 'm\n'); return { ok: true, text: 'ok' } })
+    assert.match(r.text, /late: it changed while merging, undone/)
+    assert.ok(fs.existsSync(path.join(late, 'more.txt')) && !fs.existsSync(path.join(main, 'l.txt')))
+    assert.ok(!fs.existsSync(ign))
+    const saved = fs.readdirSync(path.join(main, '.git', 'switchboard-merged')).find(f => f.startsWith('ign-'))!
+    assert.equal(fs.readFileSync(path.join(main, '.git', 'switchboard-merged', saved, 'ignored', 'secrets.local'), 'utf8'), 's\n')
+    assert.ok(!fs.existsSync(path.join(main, '.git', 'switchboard-merged', saved, 'ignored', 'node_modules')))
+    fs.rmSync(path.join(main, '.gitignore'), { force: true })
+  })
+
+  it('holds a lock another run touched recently, and counts a held Codex chat as live', async () => {
+    fs.writeFileSync(path.join(main, '.git', 'switchboard-merge.lock'), 'other')
+    assert.match((await mergeWorktrees(main, () => false, pass)).text, /already running/)
+    fs.rmSync(path.join(main, '.git', 'switchboard-merge.lock'))
+    const wt = path.join(main, '.claude', 'worktrees', 'late')
+    assert.equal(liveIn([{ live: false, cwd: wt, sessionId: 'c' }], id => id === 'c')(wt), true)
+    assert.equal(liveIn([{ live: false, cwd: wt, sessionId: 'c' }])(wt), false)
+  })
+
+  it('runs automatically after 15 quiet minutes, once per quiet spell in any window', () => {
+    const m: MergeClock = { seen: new Set(), since: new Map(), fired: new Map() }
+    const dirs = () => ['/r/.claude/worktrees/x']
+    let ran = 0
+    const due = (chats: { sessionId: string; cwd: string }[], now: number, d = dirs) => mergeDue(m, chats, ['/r'], now, d, () => ran)
+    assert.deepEqual(due([{ sessionId: 'a', cwd: '/r' }], 1), [])
+    assert.deepEqual(due([], QUIET_MS), [])
+    // A new chat starts the clock over.
+    assert.deepEqual(due([{ sessionId: 'b', cwd: '/r/sub' }], QUIET_MS), [])
+    assert.deepEqual(due([], 2 * QUIET_MS), ['/r'])
+    // Not again while it runs, even when a folder goes.
+    assert.deepEqual(due([], 2 * QUIET_MS + 5000, () => ['/r/.claude/worktrees/y']), [])
+    // Another window already ran it after this quiet spell began.
+    const m2: MergeClock = { seen: new Set(), since: new Map(), fired: new Map() }
+    mergeDue(m2, [], ['/r'], 0, dirs, () => 0)
+    ran = 5
+    assert.deepEqual(mergeDue(m2, [], ['/r'], 2 * QUIET_MS, dirs, () => ran), [])
+    assert.deepEqual(mergeDue(m2, [], ['/r'], 3 * QUIET_MS, () => [], () => 0), [])
   })
 })

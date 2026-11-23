@@ -16,7 +16,7 @@ export const ALMOST = { label: 'Ready for your OK', color: 'var(--hub-yellow)', 
 export const ORDER = ['researcher', 'engineer', 'qa', 'designer', 'ops', 'growth']
 export const ago = (at: number, now = Date.now()) => formatDuration(now - at, 'ago')
 export const WINDOW_VAR: Record<WindowColor, string> = {
-  violet: 'var(--hub-w-violet)', amber: 'var(--hub-w-amber)', teal: 'var(--hub-w-teal)', rose: 'var(--hub-w-rose)', lime: 'var(--hub-w-lime)', cobalt: 'var(--hub-w-cobalt)',
+  violet: 'var(--hub-w-violet)', amber: 'var(--hub-w-amber)', teal: 'var(--hub-w-teal)', rose: 'var(--hub-w-rose)', lime: 'var(--hub-w-lime)', cobalt: 'var(--hub-w-cobalt)', slate: 'var(--hub-w-slate)',
 }
 export const placeOf = (cwd: string | undefined, windows: WindowInfo[] = []) => {
   const w = cwd ? windowOf(cwd, windows) : undefined

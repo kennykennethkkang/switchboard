@@ -5,6 +5,7 @@
 import { vscodeBridge } from './vscode-bridge'
 import { downReason } from './hub-remote'
 import type { Report } from './hub-types'
+import type { Screen } from './screen'
 
 export type ChatQuestion = { question: string; answer?: string }
 export type ChatReport = { id: string; label: string; role?: string; text: string }
@@ -16,7 +17,7 @@ export type ChatOutputs = {
 }
 export type ChatMessage = { role: 'you' | 'claude' | 'tool' | 'subagent'; text: string }
 export type ChatTranscript = { messages: ChatMessage[]; before: number | null; transcript?: 'unsupported'; codex?: true }
-export type ChatAnswer = { outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; problem?: string }
+export type ChatAnswer = { outputs?: ChatOutputs; transcript?: ChatTranscript; shot?: string; screen?: Screen; problem?: string }
 export type ChatAsk = { before?: number; path?: string }
 
 const get = async (path: string, q: Record<string, string>, f: typeof fetch) =>

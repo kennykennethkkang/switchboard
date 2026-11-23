@@ -15,10 +15,13 @@ import { hubCounts } from '@/lib/now'
 import { PLACES, PLATE, buildCourt, markSpot, courtSummary, plainWord, YARD_TAG_CAP, forcedSpot, freeSpot, type Box as Box4, chatOf, courtEvents, fitCourt, lod, type Court, type CourtNode, type CourtState } from '@/lib/court-map'
 import { askChoice } from '@/lib/ask'
 import { optionSmart, smartMarkText } from '@/lib/smart'
-import { END_S, THAW_S, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
+import { END_S, THAW_S, arrivals, heldChats, nextPause, pauseLine, ropeAwake, ropesBusy, ropesOf, endedRopes, thawAt, type PauseFx, type Rope, type Thaw } from '@/lib/board-fx'
 import { BASKET, CARP, pixCanvas } from '@/lib/sprites/carp'
-import { MODE_KEY, SKIN_KEY, journeyWest, lookOf, readPick, type CourtColors as C, type Mode } from '@/lib/skins'
-import { BoardTools, beltCounts } from './board-tools'
+import { LEGACY_SKIN_KEY, MODE_KEY, SKINS, SKIN_KEY, lookOf, readPick, skinById, type Chrome, type CourtColors as C, type Mode } from '@/lib/skins'
+import { ell, glowAt, lantern, puff, sparkle } from './board-art'
+import { REALM, kitOf, type ArtKit, type FigureBox, type FigurePose, type Realm } from './art'
+import { figurePad, makeCache, type Sized } from './art/pad'
+import { BoardTools, DEFAULT_CHROME, beltCounts, chromeOf } from './board-tools'
 import { SummaryFold } from './chat-cards'
 import { ModelEffort } from './model-effort'
 import { fiveHourUse, runFields, startPicks, type RunPicks } from '@/lib/model-effort'
@@ -29,15 +32,22 @@ import './smart-select.css'
 
 type View = { x: number; y: number; z: number }
 type Box = { x: number; y: number; w: number; h: number; id: string }
-type Frame = { ox: number; oy: number; cx: number; cy: number; cv: HTMLCanvasElement; sig: string }
+// q: canvas px per art px; smooth kits bake denser so islands stay sharp at max zoom. px, py: a detail bake's top left in art px.
+type Frame = { ox: number; oy: number; cx: number; cy: number; cv: HTMLCanvasElement; sig: string; res: number; q: number; px: number; py: number }
+type Part = { x: number; y: number; w: number; h: number; q: number }
 export type Send = (m: Extract<HubCommand, { type: 'hub-answer' | 'hub-focus-chat' | 'hub-rc' | 'hub-rc-server' | 'hub-learn' | 'hub-key-test' | 'hub-new-chat' | 'hub-send' | 'hub-todo-remove' }>) => void
 // World units per art pixel; the art is drawn at whole-number device pixels per art pixel once zoomed in.
-const ART = 2, WALK = 90, STEP_HZ = 4, MAX_Z = 3
+const ART = 2, WALK = 90, STEP_HZ = 4, MAX_Z = 3, BAKE_PX = 16e6
+const resOf = (kit: ArtKit) => kit.res ?? ART
 // One-off sprite moves, seconds: a tap hop, a finish cheer, a lead and new subagent walking to meet.
-type Fx = { kind: 'hop' | 'cheer' | 'meet' | 'move'; at: number; lead?: string; from?: string; to?: string }
-const DUR: Record<Fx['kind'], number> = { hop: 0.45, cheer: 1.6, meet: 2, move: 2.4 }
+type Fx = { kind: 'hop' | 'cheer' | 'meet' | 'move' | 'arrive'; at: number; lead?: string; from?: string; to?: string }
+const DUR: Record<Fx['kind'], number> = { hop: 0.45, cheer: 1.6, meet: 2, move: 2.4, arrive: 1.5 }
+// Walk cycle: step, pass, other step, pass; the body lifts a pixel on each pass.
+const WALK_LEGS = [1, 0, 2, 0], walkFrame = (t: number) => t ? Math.floor(t * 8) % 4 : 0
 const CONFETTI = ['gold_lt', 'jade_lt', 'red_lt', 'peach', 'sky'] as const
-const PIX = (s: number) => `400 ${s}px Silkscreen, ui-monospace, monospace`
+// Label look of the skin being drawn; draw() sets it each frame.
+let CH: Chrome = DEFAULT_CHROME
+const PIX = (s: number) => `400 ${s}px ${CH.font}`
 const SANS = (s: number, w = 600) => `${w} ${s}px 'Hanken Grotesk', system-ui, sans-serif`
 const WORD: Record<CourtState, string> = { working: 'RUN', waiting: 'WAIT', stuck: 'STUCK', done: 'DONE', needs: 'ASK', idle: 'IDLE' }
 const SAY: Record<CourtState, string> = { working: 'working', waiting: 'waiting', stuck: 'stuck', done: 'done', needs: 'needs you', idle: 'idle' }
@@ -49,32 +59,25 @@ const KINDS: Record<CourtNode['kind'], string> = { council: 'Council Hall', pavi
 const BIG = new Set<CourtNode['kind']>(['council', 'pavilion', 'window', 'courtyard', 'realm', ...PLACES])
 const isPlace = (k: CourtNode['kind']) => (PLACES as readonly string[]).includes(k)
 // The board is always dark: --hub-w-* from .hub-dark in globals.css.
-const WIN: Record<string, string> = { violet: '#a08bff', amber: '#f2b24c', teal: '#4fd1c9', rose: '#ff7ab3', lime: '#9bd65a', cobalt: '#7ea2ff' }
+const WIN: Record<string, string> = { violet: '#a08bff', amber: '#f2b24c', teal: '#4fd1c9', rose: '#ff7ab3', lime: '#9bd65a', cobalt: '#7ea2ff', slate: '#9aa4b5' }
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 const folder = (p = '') => p.replace(/^\/Users\/[^/]+/, '~')
-const PLATE_BG = 'rgba(16,17,17,.94)', MUTE = '#a29cae', TEXT = '#f4f1ea'
-// Realm palettes: a chat's yard drawn as its own AI's realm, or another AI's annex docked on its rim.
-type Realm = { top: string; rim: string; dk: string; hi: string; glow: string }
-const REALM: Record<string, Realm> = {
-  codex: { top: '#2a3550', rim: '#48608e', dk: '#141b2c', hi: '#5ad1ff', glow: '#c4f2ff' },
-  jev: { top: '#3b2d5e', rim: '#6c55a6', dk: '#1d1533', hi: '#b6f26e', glow: '#e6ffc4' },
-  perplexity: { top: '#0e4a50', rim: '#1f8a92', dk: '#072a2e', hi: '#7ff0e6', glow: '#d8fffa' },
-  gemini: { top: '#232a6e', rim: '#4b5fd0', dk: '#121640', hi: '#a9c1ff', glow: '#fff3c4' },
-  claude: { top: '#5a2c1e', rim: '#b8603f', dk: '#2c140d', hi: '#f0a07a', glow: '#ffe2cf' },
-}
-// Fixed palettes, not skin colors: the skin's reds also paint courtyards, so a Claude realm in them read as another yard.
-const realmOf = (ai?: string): Realm => REALM[ai ?? ''] ?? REALM.codex
+let PLATE_BG = CH.plate, MUTE = CH.mute, TEXT = CH.text
+// With chrome set, the hub's own vars are remapped so the header, legend and side panel follow it.
+const chromeVars = (h: Chrome) => ({ '--hub-card': h.plate, '--hub-canvas': h.plate, '--hub-elev': h.plate, '--hub-ink': h.text, '--hub-body': h.text, '--hub-mute': h.mute, '--hub-hair-strong': h.edge, '--hub-hair': h.edge, '--c-plate': h.plate, '--c-edge': h.edge, '--c-text': h.text, '--c-font': h.font, '--c-radius': `${h.radius}px` })
+const useChrome = (ch: Chrome) => { CH = ch; PLATE_BG = ch.plate; MUTE = ch.mute; TEXT = ch.text }
+// Realm palettes come from the art kit; with no kit (plaques, labels) the court palette is used.
+const realmOf = (ai?: string, kit?: ArtKit): Realm => { const P = kit?.realms ?? REALM; return P[ai ?? ''] ?? P.codex }
 
 function realmDesk(g: G, x: number, y: number, lit: boolean, R: Realm, c: C) {
   rect(g, x, y + 1, 24, 9, c.ink); rect(g, x + 1, y, 22, 9, R.rim); rect(g, x + 1, y, 22, 1, R.hi); rect(g, x + 1, y + 6, 22, 3, R.dk)
   rect(g, x + 4, y + 2, 11, 4, '#08101c'); rect(g, x + 5, y + 3, 1 + (lit ? 6 : 3), 1, R.hi); rect(g, x + 18, y + 2, 3, 3, lit ? R.glow : R.dk)
   if (lit) { g.globalAlpha = 0.3; rect(g, x + 15, y - 2, 9, 8, R.hi); g.globalAlpha = 1 }
 }
-function ell(g: G, x: number, y: number, rx: number, ry: number, col: string, a = 1) { g.globalAlpha = a; g.fillStyle = col; g.beginPath(); g.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, 7); g.fill(); g.globalAlpha = 1 }
 // Where a realm's landmark stands, in art px of the baked frame; a yard's goes in its free slot after k desks.
-const markAt = (n: CourtNode, A: (x: number) => number, B: (y: number) => number, k?: number) => {
+const markAt = (n: CourtNode, A: (x: number) => number, B: (y: number) => number, res: number, k?: number) => {
   if (k !== undefined) { const [x, y] = markSpot(n, k); return [Math.round(A(x)), Math.round(B(y))] as const }
-  return [Math.round(A(n.x + n.w / 2) - (n.w / ART / 2) * 0.66), Math.round(B(n.y + n.h / 2) + 2)] as const
+  return [Math.round(A(n.x + n.w / 2) - (n.w / res / 2) * 0.66), Math.round(B(n.y + n.h / 2) + 2)] as const
 }
 const deskCount = (court: Court, n: CourtNode) => court.nodes.filter(d => d.kind === 'desk' && d.parent === n.id).length
 // Claude a spark on a plinth, Codex a terminal monolith, Jev a balance, Perplexity a lighthouse, Gemini twin spires under a spark.
@@ -111,10 +114,18 @@ function landmark(g: G, ai: string | undefined, bx: number, by: number, R: Realm
     for (let i = 0; i < 4; i++) rect(g, bx - 4, by - 12 + i * 3, 8, 1, R.rim)
   }
 }
+// A realm's gate: two posts, a lintel in the realm's light, and the yard's shrine box on top. The AI badge is drawn after it.
+function gate(g: G, gx: number, gy: number, R: Realm, yardAi: string | undefined, c: C) {
+  for (const px of [gx - 11, gx + 8]) { rect(g, px - 1, gy - 18, 5, 20, c.ink); rect(g, px, gy - 17, 3, 18, R.hi) }
+  rect(g, gx - 15, gy - 23, 30, 6, c.ink); rect(g, gx - 14, gy - 22, 28, 2, R.hi); rect(g, gx - 14, gy - 20, 28, 2, R.dk)
+  rect(g, gx - 5, gy - 31, 10, 9, c.ink); rect(g, gx - 4, gy - 30, 8, 7, c[AI_KEY[yardAi ?? 'claude'] ?? 'red_lt'])
+}
 // An annex islet in its own sky, a gate where it meets its courtyard, the origin AI's badge on the lintel.
-function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x: number) => number, B: (y: number) => number, k?: number) {
-  const R = realmOf(n.ai), x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = n.w / ART / 2, ry = n.h / ART / 2
-  ell(g, x, y + 6, rx * 1.65, ry * 1.8, R.rim, 0.24); ell(g, x, y + 4, rx * 1.25, ry * 1.35, R.hi, 0.12)
+function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x: number) => number, B: (y: number) => number, k: number | undefined, kit: ArtKit, res: number) {
+  const R = realmOf(n.ai, kit), x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = n.w / res / 2, ry = n.h / res / 2
+  if (kit.realmShell) kit.realmShell(g, x, y, rx, ry, n.ai, R, c)
+  else {
+  ell(g, x, y + 6, rx * 1.65, ry * 1.8, R.rim, 0.24); kit.realmHalo(g, x, y, rx, ry, R, c)
   for (let i = 0; i < 18; i++) { const a = i * 2.4, d = 1.15 + (i % 4) * 0.14; rect(g, x + Math.cos(a) * rx * d, y + 4 + Math.sin(a) * ry * d * 1.2, 1, 1, R.glow) }
   const depth = Math.round(ry * 0.45), bot = y + ry + depth
   for (const [dx, h] of [[-0.55, 9], [-0.2, 17], [0.15, 12], [0.5, 8]]) {
@@ -126,18 +137,20 @@ function realmIsle(g: G, n: CourtNode, yard: CourtNode | undefined, c: C, A: (x:
   if (n.ai === 'jev') { for (let gx = -rx; gx < rx; gx += 5) for (let gy = -ry; gy < ry; gy += 5) if (((gx + gy) / 5) % 2 === 0 && (gx / rx) ** 2 + (gy / ry) ** 2 < 0.7) rect(g, x + gx, y + gy, 5, 5, R.dk) }
   else if (n.ai === 'perplexity') for (let i = 1; i < 5; i++) { g.strokeStyle = R.rim; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, rx * i / 5, ry * i / 5, 0, 0, 7); g.stroke() }
   else for (let gx = -rx; gx < rx; gx += 6) for (let gy = -ry; gy < ry; gy += 5) if ((gx / rx) ** 2 + (gy / ry) ** 2 < 0.72) rect(g, x + gx, y + gy, 3, 1, R.rim)
-  const [mx, my] = markAt(n, A, B, k)
-  landmark(g, n.ai, mx, my, R, c)
+  }
+  kit.realmDeco(g, x, y, rx, ry, R, c)
+  const [mx, my] = markAt(n, A, B, res, k)
+  if (kit.landmark) kit.landmark(g, n.ai, mx, my, R, c)
+  else landmark(g, n.ai, mx, my, R, c)
   if (!yard) return
   // Gate halfway between the two rims, on the line between their centers.
-  const rim = (m: CourtNode, ux: number, uy: number, k: number) => { const a = (m.w / ART / 2) * k, b = (m.h / ART / 2) * k, r = a * b / Math.hypot(b * ux, a * uy); return [A(m.x + m.w / 2) + ux * r, B(m.y + m.h / 2) + uy * r] }
+  const rim = (m: CourtNode, ux: number, uy: number, k: number) => { const a = (m.w / res / 2) * k, b = (m.h / res / 2) * k, r = a * b / Math.hypot(b * ux, a * uy); return [A(m.x + m.w / 2) + ux * r, B(m.y + m.h / 2) + uy * r] }
   const yx = A(yard.x + yard.w / 2), yy = B(yard.y + yard.h / 2), L = Math.hypot(x - yx, y - yy) || 1, ux = (x - yx) / L, uy = (y - yy) / L
   const [ox, oy] = rim(yard, ux, uy, 1.08), [ex, ey] = rim(n, -ux, -uy, 1), gx = Math.round((ox + ex) / 2), gy = Math.round((oy + ey) / 2) + 2
-  for (const px of [gx - 11, gx + 8]) { rect(g, px - 1, gy - 18, 5, 20, c.ink); rect(g, px, gy - 17, 3, 18, R.hi) }
-  rect(g, gx - 15, gy - 23, 30, 6, c.ink); rect(g, gx - 14, gy - 22, 28, 2, R.hi); rect(g, gx - 14, gy - 20, 28, 2, R.dk)
-  rect(g, gx - 5, gy - 31, 10, 9, c.ink); rect(g, gx - 4, gy - 30, 8, 7, c[AI_KEY[yard.ai ?? 'claude'] ?? 'red_lt'])
+  if (kit.gate) kit.gate(g, gx, gy, R, yard.ai, c)
+  else gate(g, gx, gy, R, yard.ai, c)
   const ic = aiIcon(yard.ai)
-  if (ic) badge(g, ic, gx - 2, gy - 29, c)
+  if (ic) (kit.badge ?? badge)(g, ic, gx - 2, gy - 29, c)
 }
 
 // Wait ropes between courtyards and the usage pause freeze; timing in lib/board-fx.ts.
@@ -155,13 +168,10 @@ function hourglass(g: G, x: number, y: number, t: number, c: C) {
   if (f > 0.15) rect(g, x, y + 6, 5, 1, c.gold_lt)
   if (t && f < 0.95) rect(g, x + 2, y + 3, 1, 2 + ((t * 4) | 0) % 2, c.gold_lt)
 }
-function lantern(g: G, x: number, y: number, t: number, c: C) {
-  x = Math.round(x); y = Math.round(y)
-  const a = g.globalAlpha, lit = t ? 0.18 + 0.06 * Math.sin(t * 7) : 0.2
-  rect(g, x, y - 3, 1, 3, c.ink)
-  g.globalAlpha = a * lit; g.fillStyle = c.gold_lt; g.beginPath(); g.arc(x + 0.5, y + 4.5, 7, 0, 7); g.fill(); g.globalAlpha = a
-  rect(g, x - 3, y, 7, 9, c.ink); rect(g, x - 2, y + 1, 5, 7, c.red); rect(g, x - 2, y + 1, 5, 1, c.gold); rect(g, x - 2, y + 7, 5, 1, c.gold)
-  rect(g, x - 1, y + 3, 3, 3, c.red_lt); rect(g, x, y + 3, 1, 3, t && Math.sin(t * 11) > 0.6 ? c.cloud : c.gold_lt)
+// Pixel pieces on a finer-res kit draw scaled up about their anchor; the callback gets that origin. At u 1 it is the same draw.
+const grow = (g: G, u: number, x: number, y: number, draw: (ox: number, oy: number) => void) => {
+  if (u === 1) return draw(x, y)
+  g.save(); g.translate(x, y); g.scale(u, u); draw(0, 0); g.restore()
 }
 // Frozen sprites: the same art washed in ice, cached per sprite canvas.
 const icy = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>()
@@ -186,12 +196,12 @@ function frostDesk(g: G, x: number, y: number, a: number) {
   g.restore()
 }
 // A held courtyard freezes over: a sheet on the plaza, an icy rim with icicles; cracks as it thaws.
-function iceYards(g: G, by: Map<string, CourtNode>, held: Set<string>, th: Thaw, A: (x: number) => number, B: (y: number) => number) {
+function iceYards(g: G, by: Map<string, CourtNode>, held: Set<string>, th: Thaw, A: (x: number) => number, B: (y: number) => number, res: number) {
   if (th.ice <= 0) return
   for (const id of held) {
     const n = by.get(`yard:${id}`)
     if (!n) continue
-    const x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = (n.w / ART / 2) * 1.08, ry = (n.h / ART / 2) * 1.1
+    const x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = (n.w / res / 2) * 1.08, ry = (n.h / res / 2) * 1.1
     const oval = (dx: number) => { g.beginPath(); g.ellipse(x, y, rx + dx, ry + dx, 0, 0, 7) }
     g.save(); g.globalAlpha = th.ice
     g.fillStyle = 'rgba(200,236,255,.4)'; oval(0); g.fill()
@@ -257,7 +267,10 @@ function ropeArt(g: G, sp: Span[], A: (x: number) => number, B: (y: number) => n
     g.save(); g.lineCap = 'round'; g.globalAlpha = e === undefined ? (hot ? 1 : 0.45) : t ? 1 - e * e : 1 - e
     const u = e === undefined ? 0 : Math.min(1, e / 0.5), pulse = t && e !== undefined ? Math.sin(u * Math.PI) : 0
     if (pulse > 0) {
-      g.save(); g.globalAlpha = pulse; g.shadowColor = c.jade_lt; g.shadowBlur = 18; g.strokeStyle = c.jade_lt; g.lineWidth = 4; path(); g.stroke(); g.restore()
+      // Layered strokes stand in for shadowBlur, which cost a blur pass per frame.
+      g.save(); g.strokeStyle = c.jade_lt
+      for (const [lw, a] of [[14, 0.12], [9, 0.22], [4, 1]]) { g.globalAlpha = pulse * a; g.lineWidth = lw; path(); g.stroke() }
+      g.restore()
       for (let j = 0; j < 7; j++) { const [px, py] = qp(r, Math.max(0, u - j * 0.03)); rect(g, A(px) - 1.5, B(py) - 1.5, 3, 3, j ? c.jade_lt : c.cloud) }
     }
     if (hot) { g.strokeStyle = e === undefined ? c.gold_dk : c.jade_dk; g.lineWidth = 2.5; path(); g.stroke() }
@@ -298,7 +311,7 @@ const tally = (n: CourtNode) => `${n.runs ?? 0} ${n.runs === 1 ? 'run' : 'runs'}
 const BODY = ['...hhhh...', '..hhhhhh..', '..hssssh..', '..sesses..', '..ssssss..', '...rrrr...', '..rrkkrr..', '.srrkkrrs.', '..rrrrrr..', '..rrrrrr..', '..ff..ff..']
 const LEGS = ['..ff...f..', '...f..ff..']
 // Cast: Journey to the West, one character per role; grid letters and pal in court-cast.ts.
-import { ICONS, LOOKS, badgeOf, cast, castOf, type Icon } from '@/lib/court-cast'
+import { ICONS, badgeOf, cast, castOf, type Cast, type Icon } from '@/lib/court-cast'
 const AI_NAME: Record<string, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini', jev: 'Jev', hermes: 'Hermes', perplexity: 'Perplexity', research: 'Research' }
 const aiName = (ai = 'claude') => AI_NAME[ai] ?? ai
 // Moved from: the chat's handover, or a desk run on another AI than its courtyard's.
@@ -330,11 +343,14 @@ function badge(g: G, ic: Icon, x: number, y: number, c: C) {
   g.drawImage(cv, x - 1, y - 1)
 }
 const sprites = new Map<string, HTMLCanvasElement>()
-function sprite(role: string | undefined, ai: string | undefined, leg: number, c: C) {
-  const r = roleKey(role), key = `${r}|${ai}|${leg}|${c.ink}`
+// Abyss divers wear a glass helmet with a brass collar.
+const HELM = ['...wwwwww...', '..w......w..', '.w........w.', '.w........w.', '.w........w.', '.w........w.', '..w......w..', '...bbbbbb...']
+// set: the kit's own cast, if it has one.
+function sprite(role: string | undefined, ai: string | undefined, leg: number, c: C, helm = false, set?: Record<string, Cast>) {
+  const r = roleKey(role), look = castOf(r, set), key = `${r}|${ai}|${leg}|${c.ink}|${helm}|${look.name}`
   const hit = sprites.get(key)
   if (hit) return hit
-  const [r0, r1] = ROLE_KEY[r], W = 12, H = 16, look = LOOKS[r] ?? {}
+  const [r0, r1] = ROLE_KEY[r], W = 12, H = 16
   const col: Record<string, string> = { h: c.ink2, s: c.skin, e: c.ink, r: c[r0], k: c[AI_KEY[ai ?? ''] ?? 'red_lt'], f: c.ink, g: c.gold, c: c[r1], p: c.peach_dk, w: c.cloud }
   for (const [ch, k] of Object.entries(look.pal ?? {})) col[ch] = c[k!]
   const grid: Array<Array<string | undefined>> = Array.from({ length: H }, () => Array(W).fill(undefined))
@@ -342,6 +358,7 @@ function sprite(role: string | undefined, ai: string | undefined, leg: number, c
   const body = (look.body ?? BODY).slice()
   if (leg) body[10] = LEGS[leg - 1]
   put(body, 3); put(look.hat ?? [], 1); put(look.item ?? [], look.itemY ?? 3)
+  if (helm) HELM.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') grid[y][x] = ch === 'b' ? c.gold : c.blue_lt }))
   const cv = paint(grid, c.ink)
   sprites.set(key, cv)
   return cv
@@ -349,13 +366,6 @@ function sprite(role: string | undefined, ai: string | undefined, leg: number, c
 
 type G = CanvasRenderingContext2D
 const rect = (g: G, x: number, y: number, w: number, h: number, col: string) => { g.fillStyle = col; g.fillRect(x | 0, y | 0, w | 0, h | 0) }
-function cloud(g: G, x: number, y: number, s: number, col: string, sh: string) {
-  const puffs = [[0, 0, 1], [0.9, -0.35, 0.8], [1.7, 0, 0.9], [0.8, 0.3, 0.9]]
-  for (const [fill, dy] of [[sh, 2], [col, 0]] as const) {
-    g.fillStyle = fill
-    for (const [dx, py, r] of puffs) { g.beginPath(); g.arc(x + dx * s, y + py * s + dy, r * s, 0, 7); g.fill() }
-  }
-}
 // Lacquered desk with a scroll and an inkstone; the lamp glows while the role works.
 function desk(g: G, x: number, y: number, lit: boolean, c: C) {
   rect(g, x, y + 1, 24, 9, c.ink); rect(g, x + 1, y, 22, 9, c.brown); rect(g, x + 1, y, 22, 2, c.red_lt); rect(g, x + 1, y + 2, 22, 1, c.red); rect(g, x + 1, y + 8, 22, 2, c.brown_dk)
@@ -369,9 +379,19 @@ function bubble(g: G, x: number, y: number, st: CourtState | undefined, step: nu
   if (st === 'working' || st === 'stuck') { const hot = st === 'stuck'; rect(g, x - 1, y - 7, 1, 4, hot ? c.red : c.gold_dk); rect(g, x, y - 6, 2, 1, hot ? c.red_lt : c.gold); rect(g, x + 1, y - 7, 1, 1, step && !hot ? c.gold_lt : hot ? c.red : c.gold) }
   else if (st === 'waiting') [-2, 0, 2].forEach((d, i) => rect(g, x + d, y - 4, 1, 1, (step + i) % 3 ? c.cloud_sh : c.ink2))
   else if (st === 'done') [[-2, -4], [-1, -3], [0, -4], [1, -5], [2, -6]].forEach(([dx, dy]) => rect(g, x + dx, y + dy, 1, 1, c.jade))
-  else { rect(g, x - 3, y - 8, 7, 7, c.red); rect(g, x, y - 7, 1, 3, c.cloud); rect(g, x, y - 3, 1, 1, c.cloud) }
+  // Needs you in the legend's needs color, so it never reads as stuck.
+  else { rect(g, x - 3, y - 8, 7, 7, c.red_lt); rect(g, x, y - 7, 1, 3, c.ink); rect(g, x, y - 3, 1, 1, c.ink) }
 }
 // Zzz rising off an idle sprite, one letter a second; all three when still.
+// The done burst: pixel bits fanning out from the sprite and dropping as they go.
+function confetti(g: G, x: number, y: number, cheer: number, c: C) {
+  CONFETTI.forEach((col, i) => {
+    for (const j of [0, 1]) {
+      const a = i * 1.26 + j * 0.6, r = 4 + cheer * (12 + j * 4)
+      rect(g, x + Math.cos(a) * r, y - 10 + Math.sin(a) * r * 0.8 + cheer * cheer * 10, 1, 1, c[col])
+    }
+  })
+}
 function zzz(g: G, x: number, y: number, t: number, c: C) {
   const n = t ? Math.floor(t) % 3 : 2
   for (let i = 0; i <= n; i++) {
@@ -430,15 +450,25 @@ function placeArt(g: G, n: CourtNode, island: (n: CourtNode, top: string, rim: s
     rect(g, x - 14, y - 2, 6, 4, c.jade); rect(g, x + 4, y - 11, 7, 4, c.jade)
   }
 }
-function bake(court: Court, c: C, sig: string): Frame {
+function bake(court: Court, c: C, sig: string, kit: ArtKit, part?: Part): Frame {
   const xs: number[] = [], ys: number[] = []
   for (const n of court.nodes) xs.push(n.x, n.x + n.w), ys.push(n.y, n.y + n.h)
   for (const l of court.links) for (const [x, y] of l.points) xs.push(x), ys.push(y)
   const pad = 200, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, x1 = Math.max(...xs) + pad, y1 = Math.max(...ys) + pad
+  // A court too big for BAKE_PX at the kit's res bakes coarser instead of blowing the canvas limit.
+  let res = resOf(kit)
+  const area = (x1 - x0) * (y1 - y0) / (res * res)
+  if (area > BAKE_PX) res *= Math.sqrt(area / BAKE_PX)
+  const w = Math.ceil((x1 - x0) / res), h = Math.ceil((y1 - y0) / res)
+  // Enough canvas px for one per device px at MAX_Z, within what BAKE_PX leaves.
+  const dpr = Math.min(matchMedia('(pointer: coarse)').matches ? COARSE_DPR : MAX_DPR, devicePixelRatio || 1)
+  const q = part?.q ?? (kit.smooth ? Math.max(1, Math.min(MAX_Z * dpr * res, Math.sqrt(BAKE_PX / (w * h)))) : 1)
   const cv = document.createElement('canvas')
-  cv.width = Math.ceil((x1 - x0) / ART); cv.height = Math.ceil((y1 - y0) / ART)
-  const g = cv.getContext('2d')!, A = (x: number) => (x - x0) / ART, B = (y: number) => (y - y0) / ART
-  for (let i = 0; i < (cv.width * cv.height) / 30000; i++) cloud(g, (i * 137) % cv.width, (i * 71) % cv.height, 8 + (i % 4) * 3, 'rgba(251,246,236,.45)', 'rgba(217,212,230,.3)')
+  cv.width = Math.ceil((part?.w ?? w) * q); cv.height = Math.ceil((part?.h ?? h) * q)
+  const g = cv.getContext('2d')!, A = (x: number) => (x - x0) / res, B = (y: number) => (y - y0) / res, u = Math.max(1, ART / res)
+  g.scale(q, q)
+  if (part) g.translate(-part.x, -part.y)
+  kit.bakeSky(g, w, h, c)
   const by = new Map(court.nodes.map(n => [n.id, n]))
   // Bridges: planks with red rail posts.
   for (const l of court.links) {
@@ -446,26 +476,24 @@ function bake(court: Court, c: C, sig: string): Frame {
     const w = by.get(l.from)?.kind === 'council' ? 7 : 5
     for (let i = 1; i < l.points.length; i++) {
       const ax = A(l.points[i - 1][0]), ay = B(l.points[i - 1][1]), bx = A(l.points[i][0]), by2 = B(l.points[i][1])
-      const len = Math.hypot(bx - ax, by2 - ay) || 1, nx = -(by2 - ay) / len, ny = (bx - ax) / len
       g.lineCap = 'butt'
-      for (const [lw, col] of [[w + 2, c.ink], [w, c.wood]] as const) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); g.moveTo(ax, ay + 3); g.lineTo(bx, by2 + 3); g.stroke() }
-      for (let d = 0; d < len; d += 3) {
-        const px = ax + ((bx - ax) * d) / len, py = ay + ((by2 - ay) * d) / len
-        rect(g, px - (nx * w) / 2, py - (ny * w) / 2, 1, 1, c.wood_dk)
-        if (d % 12 < 3) { rect(g, px + nx * (w / 2 + 1), py + ny * (w / 2 + 1) - 2, 1, 2, c.rail); rect(g, px - nx * (w / 2 + 1), py - ny * (w / 2 + 1) - 2, 1, 2, c.rail) }
-      }
-      g.strokeStyle = c.wood_lt; g.lineWidth = w - 2; g.setLineDash([2, 1]); g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by2); g.stroke(); g.setLineDash([])
+      kit.bridgeBase(g, ax, ay, bx, by2, w, c)
+      kit.bridgeDeck(g, ax, ay, bx, by2, w, c)
     }
   }
   const island = (n: CourtNode, top: string, rim: string, plaza: boolean) => {
-    const x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = (n.w / ART / 2) * 1.08, ry = (n.h / ART / 2) * 1.1, depth = Math.min(16, Math.round(ry * 0.3))
-    cloud(g, x - rx * 0.9, y + ry + depth * 0.6, ry * 0.4, c.cloud, c.cloud_sh); cloud(g, x + rx * 0.15, y + ry + depth * 0.9, ry * 0.45, c.cloud, c.cloud_sh)
+    const x = A(n.x + n.w / 2), y = B(n.y + n.h / 2), rx = (n.w / res / 2) * 1.08, ry = (n.h / res / 2) * 1.1, depth = Math.min(16, Math.round(ry * 0.3))
+    const K = kit.islandColors(top, rim, c)
+    top = K.top; rim = K.rim
+    if (kit.island) return kit.island(g, x, y, rx, ry, depth, top, rim, plaza, c)
+    kit.islandUnder(g, x, y, rx, ry, depth, c)
     for (let d = depth; d > 0; d--) { g.fillStyle = d > depth * 0.66 ? c.wood_dk : d > depth * 0.33 ? c.wood : c.wood_lt; g.beginPath(); g.ellipse(x, y + d, rx * (1 - d * 0.012), ry, 0, 0, 7); g.fill() }
     g.fillStyle = c.ink; g.beginPath(); g.ellipse(x, y, rx + 1, ry + 1, 0, 0, 7); g.fill()
     g.fillStyle = rim; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.fill()
     g.fillStyle = top; g.beginPath(); g.ellipse(x, y + 1, rx - 1, ry - 2, 0, 0, 7); g.fill()
     const dots = (rx * ry) / 14
-    for (let i = 0; i < dots; i++) { const a = i * 2.4, r = Math.sqrt(i / dots); rect(g, x + Math.cos(a) * r * rx * 0.9, y + Math.sin(a) * r * ry * 0.85, 1, 1, c.jade_dk) }
+    for (let i = 0; i < dots; i++) { const a = i * 2.4, r = Math.sqrt(i / dots); rect(g, x + Math.cos(a) * r * rx * 0.9, y + Math.sin(a) * r * ry * 0.85, 1, 1, K.dot) }
+    kit.islandTop(g, x, y, rx, ry, c)
     if (!plaza) return
     const px = rx * 0.82, py = ry * 0.76
     g.fillStyle = c.stone_dk; g.beginPath(); g.ellipse(x, y + 1, px, py, 0, 0, 7); g.fill()
@@ -475,61 +503,73 @@ function bake(court: Court, c: C, sig: string): Frame {
   // A hall: walls, a beam in its color, one roof tier per rank.
   const hall = (n: CourtNode, w: number, roof: [string, string, string], walls: string, tiers: number, beam: string, dx = 0) => {
     const x = Math.round(A(n.x + n.w / 2) - w / 2) + dx, y = Math.round(B(n.y + n.h / 2)) - 26
+    if (kit.hall) return kit.hall(g, x, y, w, roof, walls, tiers, beam, c)
     rect(g, x - 1, y + 8, w + 2, 20, c.ink); rect(g, x, y + 8, w, 19, walls)
-    for (let i = 0; i < w; i += 6) rect(g, x + i, y + 12, 1, 15, c.wood_dk)
+    kit.hallWalls(g, x, y, w, c)
     rect(g, x + w / 2 - 4, y + 17, 8, 10, c.wood_dk); rect(g, x, y + 8, w, 2, beam); rect(g, x, y + 10, w, 1, c.azure)
-    for (let t = 0; t < tiers; t++) {
-      const ty = y - t * 9, ex = 6 - t * 2
-      rect(g, x - ex - 1, ty - 1, w + 2 * ex + 2, 10, c.ink); rect(g, x - ex, ty, w + 2 * ex, 8, roof[0])
-      for (let i = x - ex; i < x + w + ex; i += 3) rect(g, i, ty + 3, 1, 5, roof[1])
-      rect(g, x - ex, ty, w + 2 * ex, 1, roof[2]); rect(g, x - ex - 2, ty + 5, 3, 3, roof[0]); rect(g, x + w + ex - 1, ty + 5, 3, 3, roof[0])
-    }
+    kit.hallRoof(g, x, y, w, tiers, roof, c)
   }
   const shipped = court.nodes.reduce((s, n) => s + (n.kind === 'desk' ? n.shipped ?? 0 : 0), 0)
   for (const n of court.nodes) {
     if (n.kind === 'council') {
       island(n, c.jade, c.jade_lt, true); hall(n, 70, [c.roof, c.roof_dk, c.roof_lt], c.hall, 2, c.beam)
+      // The golden-banded staff planted by the hall, lanterns on the eaves; a beacon mast under the sea.
+      const hx = Math.round(A(n.x + n.w / 2)), hy = Math.round(B(n.y + n.h / 2))
+      kit.councilMast(g, hx, hy, c)
       // Gate studs: 9 by 9, one per shipped run.
       const sx = Math.round(A(n.x + n.w / 2)) + 42, sy = Math.round(B(n.y + n.h / 2)) + 4
-      for (let i = 0; i < 81; i++) rect(g, sx + (i % 9) * 3, sy + Math.floor(i / 9) * 3, 2, 2, i < shipped ? c.roof : c.stone_dk)
+      grow(g, u, sx, sy, (sx, sy) => { for (let i = 0; i < 81; i++) rect(g, sx + (i % 9) * 3, sy + Math.floor(i / 9) * 3, 2, 2, i < shipped ? c.roof : c.stone_dk) })
     } else if (n.kind === 'pavilion') {
       // An AI with a realm stands its realm's landmark beside the hall, so pavilion and realm read as one system.
-      const own = REALM[n.ai ?? '']
+      const own = REALM[n.ai ?? ''] ? realmOf(n.ai, kit) : undefined
       island(n, c.jade, c.jade_lt, false); hall(n, 40, [c.azure, c.azure_dk, c.azure_lt], c.wood, 1, c[AI_KEY[n.ai ?? ''] ?? 'cloud'], own ? -10 : 0)
-      if (own) landmark(g, n.ai, Math.round(A(n.x + n.w / 2)) + 28, Math.round(B(n.y + n.h / 2)) + 4, own, c)
+      if (own) (kit.landmark ?? landmark)(g, n.ai, Math.round(A(n.x + n.w / 2)) + 28, Math.round(B(n.y + n.h / 2)) + 4, own, c)
     }
     else if (n.kind === 'window') {
       island(n, c.jade, c.jade_lt, false)
       // Banner on a pole in the window's color; here gets a gold finial.
       const x = Math.round(A(n.x + n.w / 2)) - 10, y = Math.round(B(n.y + n.h / 2)) - 30, flag = WIN[n.color ?? ''] ?? c.stone
-      rect(g, x - 1, y - 1, 4, 34, c.ink); rect(g, x, y, 2, 32, c.wood_dk); rect(g, x - 2, y + 31, 6, 3, c.ink)
-      rect(g, x + 2, y + 1, 22, 15, c.ink); rect(g, x + 3, y + 2, 20, 13, flag); rect(g, x + 3, y + 2, 20, 2, 'rgba(255,255,255,.3)')
-      rect(g, x + 21, y + 8, 3, 3, c.ink)
-      if (n.here) { rect(g, x - 2, y - 4, 6, 4, c.ink); rect(g, x - 1, y - 3, 4, 2, c.gold_lt); badge(g, ICONS.kenneth, x + 10, y + 5, c) }
+      grow(g, u, x, y, (x, y) => {
+        rect(g, x - 1, y - 1, 4, 34, c.ink); rect(g, x, y, 2, 32, c.wood_dk); rect(g, x - 2, y + 31, 6, 3, c.ink)
+        rect(g, x + 2, y + 1, 22, 15, c.ink); rect(g, x + 3, y + 2, 20, 13, flag); rect(g, x + 3, y + 2, 20, 2, 'rgba(255,255,255,.3)')
+        rect(g, x + 21, y + 8, 3, 3, c.ink)
+        if (n.here) { rect(g, x - 2, y - 4, 6, 4, c.ink); rect(g, x - 1, y - 3, 4, 2, c.gold_lt) }
+      })
+      if (n.here) (kit.badge ?? badge)(g, ICONS.kenneth, x + 10, y + 5, c)
     }
-    else if (n.kind === 'courtyard') { if (REALM[n.ai ?? '']) realmIsle(g, n, undefined, c, A, B, deskCount(court, n)); else island(n, c.jade, c.jade_lt, true) }
-    else if (n.kind === 'realm') realmIsle(g, n, by.get(n.parent ?? ''), c, A, B)
-    else if (n.kind === 'garden') {
+    else if (n.kind === 'courtyard') { if (REALM[n.ai ?? '']) realmIsle(g, n, undefined, c, A, B, deskCount(court, n), kit, res); else island(n, c.jade, c.jade_lt, true) }
+    else if (n.kind === 'realm') realmIsle(g, n, by.get(n.parent ?? ''), c, A, B, undefined, kit, res)
+    else if (n.kind === 'garden' && !kit.placeArt) {
       island(n, c.jade, c.jade_lt, false)
       const x = A(n.x + n.w / 2), y = B(n.y + n.h / 2)
-      for (const [dx, dy, r] of [[-18, -6, 8], [-24, -2, 5], [-12, -2, 5]]) { g.fillStyle = c.peach_dk; g.beginPath(); g.arc(x + dx, y + dy, r, 0, 7); g.fill() }
-      g.fillStyle = c.peach; g.beginPath(); g.arc(x - 19, y - 8, 5, 0, 7); g.fill(); rect(g, x - 19, y, 2, 6, c.brown_dk)
-    } else if (n.kind === 'armory') {
+      grow(g, u, x, y, (x, y) => {
+        for (const [dx, dy, r] of [[-18, -6, 8], [-24, -2, 5], [-12, -2, 5]]) { g.fillStyle = c.peach_dk; g.beginPath(); g.arc(x + dx, y + dy, r, 0, 7); g.fill() }
+        g.fillStyle = c.peach; g.beginPath(); g.arc(x - 19, y - 8, 5, 0, 7); g.fill(); rect(g, x - 19, y, 2, 6, c.brown_dk)
+      })
+    } else if (n.kind === 'armory' && !kit.placeArt) {
       island(n, c.stone_dk, c.stone, false)
       const x = Math.round(A(n.x + n.w / 2)) - 22, y = Math.round(B(n.y + n.h / 2)) - 14
-      rect(g, x, y, 44, 18, c.ink); rect(g, x + 1, y + 1, 42, 16, c.wood)
-      const books = [c.cloud, c.gold, c.jade, c.red_lt, c.blue_lt, c.gold_lt, c.peach, c.cloud_sh]
-      for (let s = 0; s < 2; s++) { rect(g, x + 2, y + 8 + s * 8, 40, 1, c.wood_dk); for (let i = 0; i < 8; i++) rect(g, x + 3 + i * 5, y + 2 + s * 8, 3, 6, books[(i + s * 3) % 8]) }
-    } else if (isPlace(n.kind)) placeArt(g, n, island, c, Math.round(A(n.x + n.w / 2)), Math.round(B(n.y + n.h / 2)))
+      grow(g, u, x, y, (x, y) => {
+        rect(g, x, y, 44, 18, c.ink); rect(g, x + 1, y + 1, 42, 16, c.wood)
+        const books = [c.cloud, c.gold, c.jade, c.red_lt, c.blue_lt, c.gold_lt, c.peach, c.cloud_sh]
+        for (let s = 0; s < 2; s++) { rect(g, x + 2, y + 8 + s * 8, 40, 1, c.wood_dk); for (let i = 0; i < 8; i++) rect(g, x + 3 + i * 5, y + 2 + s * 8, 3, 6, books[(i + s * 3) % 8]) }
+      })
+    } else if (isPlace(n.kind)) (kit.placeArt ?? placeArt)(g, n, island, c, Math.round(A(n.x + n.w / 2)), Math.round(B(n.y + n.h / 2)))
   }
-  return { ox: x0, oy: y0, cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2, cv, sig }
+  return { ox: x0, oy: y0, cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2, cv, sig, res, q, px: part?.x ?? 0, py: part?.y ?? 0 }
 }
 // Only what bake draws: big nodes, bridges and the stud count. Timers and states change every second and stay out of it.
 const sigOf = (court: Court, skin: string) => skin + 'v2' + court.nodes.filter(n => BIG.has(n.kind)).map(n => `${n.id}${n.x},${n.y},${n.w},${n.h}${n.color ?? ''}${n.here ? '!' : ''}`).join() + court.links.length +
   court.nodes.reduce((s, n) => s + (n.kind === 'desk' ? n.shipped ?? 0 : 0), 0)
 
 // Sky: dithered bands, dawn at the bottom, on screen so it never ends at the court's edge. One 8px strip, repeated across.
-let sky: { key: string; cv: HTMLCanvasElement } | undefined
+let sky: { key: string; cv: HTMLCanvasElement; pat?: CanvasPattern | null; g?: G } | undefined
+// The repeat pattern is made once per strip and context, not every frame.
+function skyFill(g: G, h: number, bands: string[]) {
+  const cv = skyStrip(h, bands)
+  if (sky!.g !== g || !sky!.pat) { sky!.pat = g.createPattern(cv, 'repeat-x'); sky!.g = g }
+  return sky!.pat!
+}
 function skyStrip(h: number, bands: string[]) {
   const key = h + bands.join()
   if (sky?.key === key) return sky.cv
@@ -577,13 +617,16 @@ function index(court: Court) {
 function text(g: G, s: string, x: number, y: number, font: string, col: string, max: number, align: CanvasTextAlign = 'left') {
   g.font = font; g.fillStyle = col; g.textAlign = align; g.fillText(fit(g, s, max), x, y)
 }
+// A hard pixel shadow under every plate keeps it apart from the busy sky.
+const SHADE = 'rgba(6,4,16,.45)'
 function card(g: G, x: number, y: number, w: number, h: number, edge: string, hot = false) {
-  g.fillStyle = PLATE_BG; g.beginPath(); g.roundRect(x, y, w, h, 4); g.fill()
-  g.strokeStyle = hot ? edge : 'rgba(255,255,255,.14)'; g.lineWidth = hot ? 1.5 : 1; g.stroke()
+  g.fillStyle = SHADE; g.beginPath(); g.roundRect(x + 2, y + 2, w, h, CH.radius); g.fill()
+  g.fillStyle = PLATE_BG; g.beginPath(); g.roundRect(x, y, w, h, CH.radius); g.fill()
+  g.strokeStyle = hot ? edge : CH.edge; g.lineWidth = hot ? 1.5 : 1; g.stroke()
 }
 
 /** inset: CSS px the tool belt (left), bottom bars and the side panel (right) cover, from the last Fit. */
-type St = { court: Court; frame?: Frame; inset?: [number, number, number]; view: View; zc: number; colors: C; bands: string[]; picked?: string; pet?: { id: string; at: number }; hits: Box[]; fx: Map<string, Fx>; hover?: string
+type St = { court: Court; frame?: Frame; /** Smooth kits zoomed past the frame's q: the view rebaked sharp. */ detail?: Frame; detailKey?: string; detailT?: ReturnType<typeof setTimeout>; wake?: () => void; kit: ArtKit; night: boolean; /** Ambient clock: holds still while nothing animates, so the 1 s tick never steps the kelp or stars. */ ta: number; inset?: [number, number, number]; view: View; zc: number; colors: C; chrome?: Chrome; bands: string[]; picked?: string; pet?: { id: string; at: number }; hits: Box[]; fx: Map<string, Fx>; hover?: string
   /** over: any hit under the mouse; ropes: live wait ropes; ends: ropes playing their end flash; waits: chats waiting on another. */
   over?: string; ropes: Rope[]; ends: Map<string, { r: Rope; at: number }>; waits: Set<string> } & PauseFx
 /** Where the petitioning lead is on its path: world point, and whether it still walks. */
@@ -599,19 +642,71 @@ function walker(court: Court, pet: St['pet'], now: number, still: boolean): [num
   return [...path[path.length - 1], false]
 }
 
+// The 12x16 sprite's box from its anchor at the feet: heads run 22 up to 2 down, the tap check uses its 16 px height.
+const SPRITE: FigureBox = { top: 22, bottom: 2, half: 7, tall: 16 }
+// A frozen figure: the kit's figure drawn once per pose, washed in ice, cached by pose and scale. The pad comes from the kit's box.
+const ICE_PX = 3e6
+type IceFig = Sized & { cv: HTMLCanvasElement; box: FigureBox; pad: ReturnType<typeof figurePad> }
+type IceCache = { get(k: string): IceFig | undefined; put(k: string, v: IceFig): void }
+const iceCache = new WeakMap<object, IceCache>()
+function iceFigure(fig: NonNullable<ArtKit['figure']>, g: G, x: number, y: number, k: number, p: FigurePose, c: C): FigureBox {
+  let cache = iceCache.get(fig)
+  if (!cache) { cache = makeCache<IceFig>(ICE_PX); iceCache.set(fig, cache) }
+  // Power-of-two scale so a smooth zoom reuses the bake instead of a new canvas per frame.
+  k = 2 ** Math.ceil(Math.log2(Math.max(k, 0.25)))
+  const key = `${k}|${p.role}|${p.ai}|${p.state}|${p.leg}|${c.ink}`
+  let e = cache.get(key)
+  if (!e) {
+    const q = { ...p, t: 0, frozen: true }
+    const box = fig(document.createElement('canvas').getContext('2d')!, 0, 0, q, c), pad = figurePad(box)
+    const cv = document.createElement('canvas')
+    cv.width = Math.ceil(pad.x * 2 * k); cv.height = Math.ceil((pad.up + pad.down) * k)
+    const o = cv.getContext('2d')!
+    o.setTransform(k, 0, 0, k, pad.x * k, pad.up * k)
+    fig(o, 0, 0, q, c)
+    o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-atop'; o.fillStyle = 'rgba(150,212,245,.55)'; o.fillRect(0, 0, cv.width, cv.height)
+    e = { cv, box, pad, width: cv.width, height: cv.height }
+    cache.put(key, e)
+  }
+  g.drawImage(e.cv, x - e.pad.x, y - e.pad.up, e.pad.x * 2, e.pad.up + e.pad.down)
+  return e.box
+}
+
+// Zoomed in past the frame's q, bake the view (plus a margin) at the zoom once it holds still for 200 ms.
+function detailFor(s: St, F: Frame, k: number, x0: number, y0: number, x1: number, y1: number, inD: boolean) {
+  if (k <= F.q * 1.2) { s.detail = undefined; clearTimeout(s.detailT); s.detailKey = undefined; return }
+  if (inD && s.detail!.q >= k * 0.9) { clearTimeout(s.detailT); s.detailKey = undefined; return }
+  const mx = (x1 - x0) / 4, my = (y1 - y0) / 4, fw = F.cv.width / F.q, fh = F.cv.height / F.q
+  const x = Math.max(0, x0 - mx), y = Math.max(0, y0 - my), w = Math.min(fw, x1 + mx) - x, h = Math.min(fh, y1 + my) - y
+  if (w <= 0 || h <= 0) return
+  const key = `${F.sig}|${k}|${Math.round(x)},${Math.round(y)}`
+  if (key === s.detailKey) return
+  s.detailKey = key; clearTimeout(s.detailT)
+  s.detailT = setTimeout(() => {
+    if (s.frame !== F) return
+    s.detail = bake(s.court, s.colors, F.sig, s.kit, { x, y, w, h, q: Math.min(k, Math.sqrt(BAKE_PX / (w * h))) }); s.wake?.()
+  }, 200)
+}
+
 function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: number, wall: number) {
+  useChrome(s.chrome ?? DEFAULT_CHROME)
   const { court, frame: F, view: v, colors: c } = s, hits: Box[] = []
   s.hits = hits
   g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false
-  const sk = Math.max(1, Math.round(ART * dpr))
-  g.setTransform(sk, 0, 0, sk, 0, 0); g.fillStyle = g.createPattern(skyStrip(Math.ceil(H / sk), s.bands), 'repeat-x')!; g.fillRect(0, 0, W / sk + 1, H / sk + 1)
+  const sk = Math.max(1, Math.round(resOf(s.kit) * dpr))
+  g.setTransform(sk, 0, 0, sk, 0, 0); g.fillStyle = skyFill(g, Math.ceil(H / sk), s.bands); g.fillRect(0, 0, W / sk + 1, H / sk + 1)
+  s.kit.backdrop(g, W / sk, H / sk, s.ta, (v.x * dpr) / sk, c, s.night)
   g.setTransform(1, 0, 0, 1, 0, 0)
   if (!F) return
-  const k = v.z * dpr * ART, X0 = Math.round(v.x * dpr), Y0 = Math.round(v.y * dpr)
+  const k = v.z * dpr * F.res, X0 = Math.round(v.x * dpr), Y0 = Math.round(v.y * dpr), u = Math.max(1, ART / F.res)
   const sx0 = Math.max(0, Math.floor(-X0 / k)), sy0 = Math.max(0, Math.floor(-Y0 / k))
-  const sx1 = Math.min(F.cv.width, Math.ceil((W - X0) / k)), sy1 = Math.min(F.cv.height, Math.ceil((H - Y0) / k))
-  if (sx1 > sx0 && sy1 > sy0) g.drawImage(F.cv, sx0, sy0, sx1 - sx0, sy1 - sy0, X0 + sx0 * k, Y0 + sy0 * k, (sx1 - sx0) * k, (sy1 - sy0) * k)
-  const A = (x: number) => (x - F.ox) / ART, B = (y: number) => (y - F.oy) / ART
+  const sx1 = Math.min(F.cv.width / F.q, Math.ceil((W - X0) / k)), sy1 = Math.min(F.cv.height / F.q, Math.ceil((H - Y0) / k))
+  g.imageSmoothingEnabled = !!s.kit.smooth
+  const D = s.detail, inD = D?.sig === F.sig && sx0 >= D.px && sy0 >= D.py && sx1 <= D.px + D.cv.width / D.q && sy1 <= D.py + D.cv.height / D.q
+  const S = inD ? D : F
+  if (s.kit.smooth) detailFor(s, F, k, sx0, sy0, sx1, sy1, inD)
+  if (sx1 > sx0 && sy1 > sy0) g.drawImage(S.cv, (sx0 - S.px) * S.q, (sy0 - S.py) * S.q, (sx1 - sx0) * S.q, (sy1 - sy0) * S.q, X0 + sx0 * k, Y0 + sy0 * k, (sx1 - sx0) * k, (sy1 - sy0) * k)
+  const A = (x: number) => (x - F.ox) / F.res, B = (y: number) => (y - F.oy) / F.res
   const X = (x: number) => (X0 + A(x) * k) / dpr, Y = (y: number) => (Y0 + B(y) * k) / dpr, cw = W / dpr, ch = H / dpr
   const seen = (n: { x: number; y: number; w: number; h: number }, m = 160) => X(n.x + n.w) > -m && X(n.x) < cw + m && Y(n.y + n.h) > -m && Y(n.y) < ch + m
   const boxOf = (n: CourtNode): Box => ({ x: X(n.x), y: Y(n.y), w: n.w * v.z, h: n.h * v.z, id: n.id })
@@ -620,11 +715,19 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   const step = t ? Math.floor(t * STEP_HZ) % 2 : 0
   const walk = walker(court, s.pet, now, !t)
   // Art px to CSS px; a sprite is tappable once it is at least 12px tall on screen.
-  const P = (a: number) => (X0 + a * k) / dpr, Q = (b: number) => (Y0 + b * k) / dpr, ak = k / dpr, tappable = ak * 16 >= 12
-  const heads = new Map<string, [number, number, number]>()
-  const sprHit = (id: string, x: number, y: number) => {
-    heads.set(id, [P(x), Q(y - 22), Q(y + 2)])
-    if (tappable) hits.push({ x: P(x - 7), y: Q(y - 23), w: 14 * ak, h: 25 * ak, id: `spr:${id}` })
+  const P = (a: number) => (X0 + a * k) / dpr, Q = (b: number) => (Y0 + b * k) / dpr, ak = k / dpr
+  const heads = new Map<string, [number, number, number, number]>()
+  const sprHit = (id: string, x: number, y: number, b: FigureBox) => {
+    heads.set(id, [P(x), Q(y - b.top), Q(y + b.bottom), b.half * ak])
+    if (ak * b.tall >= 12) hits.push({ x: P(x - b.half), y: Q(y - b.top - 1), w: 2 * b.half * ak, h: (b.top + b.bottom + 1) * ak, id: `spr:${id}` })
+  }
+  // A desk's figure at anchor (x, y): the kit's figure hook, or the 12x16 sprite. Returns the box its offsets follow.
+  const figure = (role: string | undefined, ai: string | undefined, x: number, y: number, leg: number, state: CourtState | undefined, frozen: boolean): FigureBox => {
+    const fig = s.kit.figure
+    if (fig) return frozen ? iceFigure(fig, g, x, y, k, { role, ai, leg, state, t: 0, frozen }, c) : fig(g, x, y, { role, ai, leg, state, t, frozen }, c)
+    const sp = sprite(role, ai, leg, c, s.kit.helm, s.kit.cast)
+    g.drawImage(frozen ? iced(sp) : sp, x - 6, y - 14)
+    return SPRITE
   }
   // Live fx by sprite; a meet also moves its lead. Spent ones drop out so the loop can stop.
   const live = new Map<string, [Fx, number]>(), meets = new Map<string, string>()
@@ -647,67 +750,71 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   // Art layer, in art pixels.
   g.setTransform(k, 0, 0, k, X0, Y0)
   // A drifting cloud skips the stretch where it would cover an island (it hid the treasury chest).
-  if (t) for (let i = 0; i < 5; i++) {
-    const x = ((i * 311 + t * (5 + i * 2)) % (F.cv.width + 120)) - 60, y = ((i + 0.5) / 5) * F.cv.height, r = 9 + (i % 3) * 3
+  if (t) for (let i = 0; i < 7; i++) {
+    const x = ((i * 311 + s.ta * (i % 3 ? 5 + i * 2 : 2.5)) % (F.cv.width / F.q + 120)) - 60, y = ((i + 0.5) / 7) * F.cv.height / F.q, r = 9 + (i % 3) * 3
     if (court.nodes.some(n => BIG.has(n.kind) && x + 2.7 * r > A(n.x) && x - r < A(n.x + n.w) && y + 1.4 * r > B(n.y) && y - 1.4 * r < B(n.y + n.h))) continue
-    cloud(g, x, y, r, 'rgba(251,246,236,.8)', 'rgba(217,212,230,.6)')
+    s.kit.drift(g, x, y, r, s.ta, i, c)
   }
   // A working realm's landmark breathes; still under reduced motion (t is 0).
   for (const n of court.nodes) {
     if (!(n.kind === 'realm' || (n.kind === 'courtyard' && REALM[n.ai ?? ''])) || n.state !== 'working' || !seen(n)) continue
-    const [mx, my] = markAt(n, A, B, n.kind === 'courtyard' ? deskCount(court, n) : undefined), R = realmOf(n.ai)
+    const [mx, my] = markAt(n, A, B, F.res, n.kind === 'courtyard' ? deskCount(court, n) : undefined), R = realmOf(n.ai, s.kit)
     ell(g, mx, my - 18, 15, 20, R.glow, 0.16 + (t ? 0.12 * Math.sin(t * 2.4) : 0.06)); ell(g, mx, my - 18, 8, 11, R.hi, 0.18 + (t ? 0.1 * Math.sin(t * 2.4) : 0))
   }
-  if (th) iceYards(g, by, held, th, A, B)
-  for (const n of desks) {
+  if (th) iceYards(g, by, held, th, A, B, F.res)
+  for (let di = 0; di < desks.length; di++) {
+    const n = desks[di]
     if (!seen(n, 40)) continue
     const x = Math.round(A(n.x + n.w / 2)), y = Math.round(B(n.y + n.h / 2)), busy = n.state === 'working' || n.state === 'needs'
     const tea = by.get(n.parent ?? '')?.kind === 'garden', away = !!walk && court.petition?.deskId === n.id
     const ai = n.ai ?? by.get(n.parent ?? '')?.ai
-    let sx = x, sy = y, leg = 0, bob = busy && step ? -1 : 0, cheer = -1, scroll: [number, number] | undefined
+    // Busy roles bounce with the step clock; the rest breathe, a pixel down now and then, each on its own beat.
+    let sx = x, sy = y, leg = 0, bob = busy && step ? -1 : !busy && t && Math.sin(t * 2.2 + di * 1.7) > 0.6 ? 1 : 0, cheer = -1, lift = 0, scroll: [number, number] | undefined
     const fx = live.get(n.id), own = fx?.[0].kind === 'meet' ? fx : undefined, mate = own ? own[0].lead : meets.get(n.id)
     const meet = own ?? (mate ? live.get(mate) : undefined), other = mate ? by.get(mate) : undefined
     if (meet && other) {
       const m = reach(meet[1]), ox = A(other.x + other.w / 2), oy = B(other.y + other.h / 2), dx = ox - x, dy = oy - y, len = Math.hypot(dx, dy) || 1, go = Math.max(0, len / 2 - 8) * m
-      sx = Math.round(x + (dx / len) * go); sy = Math.round(y + (dy / len) * go); leg = m > 0 && m < 1 ? 1 + step : 0; bob = leg && step ? -1 : 0
+      const wf = walkFrame(t), moving = m > 0 && m < 1
+      sx = Math.round(x + (dx / len) * go); sy = Math.round(y + (dy / len) * go); leg = moving ? WALK_LEGS[wf] : 0; bob = moving && wf % 2 ? -1 : 0
       // Together for a beat: the lead holds out the brief.
       if (m === 1 && !own) scroll = [Math.round((x + ox) / 2), Math.round((y + oy) / 2) - 9]
     } else if (fx?.[0].kind === 'hop') bob = -Math.round(Math.sin(Math.PI * fx[1]) * 5)
     else if (fx?.[0].kind === 'cheer') { bob = -Math.round(Math.abs(Math.sin(Math.PI * fx[1] * 3)) * 4); cheer = fx[1] }
+    else if (fx?.[0].kind === 'arrive' && !away) { lift = s.kit.arrive(g, x, y, fx[1], t, c); bob = -lift }
     // Held by the pause: frozen mid pose. Waiting: the lead sits by its hourglass.
     const seat = !n.chatId ? undefined : held.has(n.chatId) && th?.frozen ? 'pause' : n.role === 'lead' && s.waits.has(n.chatId) ? 'wait' : undefined
     if (seat) bob = 0
     if (seat === 'wait') sy += 3
     if (!away) {
-      g.drawImage(seat === 'pause' ? iced(sprite(n.role, ai, leg, c)) : sprite(n.role, ai, leg, c), sx - 6, sy - 14 + bob)
+      const helm = s.kit.helm
+      if (helm && seat !== 'pause') glowAt(g, roleColor(n.role, c), sx, sy - 7 + bob, 13, 0.3 + (t ? 0.08 * Math.sin(t * 2 + di) : 0))
+      if (n.state === 'needs' && !lift) s.kit.ping(g, sx, sy, t, c)
+      const box = figure(n.role, ai, sx, sy + bob, leg, n.state, seat === 'pause')
       // Badges: the AI on the left shoulder, the state on the right.
-      const aic = aiIcon(ai), sb = badgeOf(n.state)
-      if (aic) badge(g, aic, sx - 12, sy - 12 + bob, c)
+      const aic = aiIcon(ai), sb = badgeOf(n.state), bd = s.kit.badge ?? badge
+      if (aic) bd(g, aic, sx - box.half - 5, sy - box.top + 10 + bob, c)
       // A job handed to another AI than its chat's: a gold arrow into the badge.
-      if (aic && fromOf(n, by)) { rect(g, sx - 17, sy - 9 + bob, 4, 1, c.gold_lt); rect(g, sx - 14, sy - 10 + bob, 1, 3, c.gold_lt) }
-      if (sb) badge(g, sb, sx + 7, sy - 12 + bob, c)
-      if (seat === 'pause') iceBlock(g, sx, sy, th!.ice)
-      else if (n.state === 'idle') zzz(g, sx, sy - 14, t, c)
-      else if (!(meet && sx !== x)) bubble(g, sx, sy - 15 + bob, n.state, step, c)
-      if (cheer >= 0) CONFETTI.forEach((col, i) => {
-        for (const j of [0, 1]) {
-          const a = i * 1.26 + j * 0.6, r = 4 + cheer * (12 + j * 4)
-          rect(g, sx + Math.cos(a) * r, sy - 10 + Math.sin(a) * r * 0.8 + cheer * cheer * 10, 1, 1, c[col])
-        }
-      })
-      sprHit(n.id, sx, sy + bob)
+      if (aic && fromOf(n, by)) { rect(g, sx - box.half - 10, sy - box.top + 13 + bob, 4, 1, c.gold_lt); rect(g, sx - box.half - 7, sy - box.top + 12 + bob, 1, 3, c.gold_lt) }
+      if (sb) bd(g, sb, sx + box.half, sy - box.top + 10 + bob, c)
+      if (seat === 'pause') grow(g, u, sx, sy, (ox, oy) => iceBlock(g, ox, oy, th!.ice))
+      else if (n.state === 'idle') (s.kit.zzz ?? zzz)(g, sx, sy - box.top + 8, t, c)
+      else if (!(meet && sx !== x)) { if (s.kit.bubble) s.kit.bubble(g, sx, sy - box.top - 1 + bob, n.state, step, c); else bubble(g, sx, sy - box.top + 7 + bob, n.state, step, c) }
+      if (n.state === 'done' && !lift) (s.kit.sparkle ?? sparkle)(g, sx + box.half - 1, sy - box.top + 2 + bob, t, di, c)
+      if (cheer >= 0) (s.kit.confetti ?? confetti)(g, sx, sy, cheer, c)
+      sprHit(n.id, sx, sy + bob, box)
     }
     const up = by.get(n.parent ?? '')
-    const UR = up?.kind === 'realm' ? realmOf(up.ai) : up?.kind === 'courtyard' ? REALM[up.ai ?? ''] : undefined
-    if (!tea) { if (UR) realmDesk(g, x - 12, y - 2, n.state === 'working', UR, c); else desk(g, x - 12, y - 2, n.state === 'working', c) }
-    if (seat === 'wait' && !tea) hourglass(g, x - 9, y - 1, t, c)
-    if (seat === 'pause' && !tea) frostDesk(g, x - 12, y - 2, th!.ice)
+    const UR = up?.kind === 'realm' || (up?.kind === 'courtyard' && REALM[up.ai ?? '']) ? realmOf(up.ai, s.kit) : undefined
+    if (!tea) { if (s.kit.desk) s.kit.desk(g, x - 12, y - 2, n.state === 'working', UR, c); else if (UR) realmDesk(g, x - 12, y - 2, n.state === 'working', UR, c); else desk(g, x - 12, y - 2, n.state === 'working', c) }
+    // A lit lamp throws a soft pool of light that flickers while the role works.
+    if (!tea && n.state === 'working' && seat !== 'pause') glowAt(g, UR ? UR.glow : c.gold_lt, x + 9, y + 1, 11, t ? 0.32 + 0.1 * Math.sin(t * 5 + di) : 0.38)
+    if (seat === 'wait' && !tea) grow(g, u, x - 9, y - 1, (ox, oy) => hourglass(g, ox, oy, t, c))
+    if (seat === 'pause' && !tea) grow(g, u, x - 12, y - 2, (ox, oy) => frostDesk(g, ox, oy, th!.ice))
     // Typing: hands take turns on the desk and a line of ink grows across the scroll.
     if (!tea && !away && seat !== 'pause' && sx === x && sy === y && n.state === 'working' && t) {
-      rect(g, x + (step ? 1 : -4), y - 2, 3, 1, c.skin)
-      rect(g, x - 6, y + 3, 1 + (Math.floor(t * 6) % 7), 1, c.ink2)
+      grow(g, u, x, y, (ox, oy) => { rect(g, ox + (step ? 1 : -4), oy - 2, 3, 1, c.skin); rect(g, ox - 6, oy + 3, 1 + (Math.floor(t * 6) % 7), 1, c.ink2) })
     }
-    if (scroll) { rect(g, scroll[0] - 3, scroll[1] - 1, 6, 4, c.ink); rect(g, scroll[0] - 2, scroll[1], 4, 2, c.cloud); rect(g, scroll[0] - 3, scroll[1], 1, 2, c.gold_dk); rect(g, scroll[0] + 2, scroll[1], 1, 2, c.gold_dk) }
+    if (scroll) grow(g, u, scroll[0], scroll[1], (ox, oy) => { rect(g, ox - 3, oy - 1, 6, 4, c.ink); rect(g, ox - 2, oy, 4, 2, c.cloud); rect(g, ox - 3, oy, 1, 2, c.gold_dk); rect(g, ox + 2, oy, 1, 2, c.gold_dk) })
     hits.push(boxOf(n))
   }
   tetherArt(g, court, A, B, c)
@@ -716,9 +823,9 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   for (const n of court.nodes) {
     if (n.kind !== 'courtyard' || !n.from || !seen(n, 40)) continue
     const a = aiIcon(n.from), b = aiIcon(n.ai), x = Math.round(A(n.x)) + 4, y = Math.round(B(n.y)) + 2
-    if (a) badge(g, a, x, y, c)
+    if (a) (s.kit.badge ?? badge)(g, a, x, y, c)
     rect(g, x + 7, y + 2, 4, 1, c.gold_lt); rect(g, x + 10, y + 1, 1, 3, c.gold_lt)
-    if (b) badge(g, b, x + 13, y, c)
+    if (b) (s.kit.badge ?? badge)(g, b, x + 13, y, c)
   }
   // The handover itself, once: the old AI's badge rides a cloud from its pavilion to the new one.
   for (const [, [f, p]] of live) {
@@ -727,19 +834,19 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
     if (!a || !b) continue
     const e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2, ax = A(a.x + a.w / 2), ay = B(a.y + a.h / 2) - 30, bx = A(b.x + b.w / 2), by2 = B(b.y + b.h / 2) - 30
     const x = Math.round(ax + (bx - ax) * e), y = Math.round(ay + (by2 - ay) * e - Math.sin(Math.PI * e) * 24)
-    cloud(g, x - 7, y + 4, 4, c.cloud, c.cloud_sh)
-    if (ic) badge(g, ic, x - 2, y - 4, c)
+    puff(g, x - 7, y + 4, 4, c.cloud, c.cloud_sh)
+    if (ic) (s.kit.badge ?? badge)(g, ic, x - 2, y - 4, c)
   }
   const pet = court.petition
   if (pet && walk) {
     g.save(); g.strokeStyle = '#ff5a3c'; g.lineWidth = 1; g.setLineDash([3, 2]); g.lineDashOffset = -t * 8
     g.beginPath(); pet.path.forEach(([x, y], i) => (i ? g.lineTo(A(x), B(y)) : g.moveTo(A(x), B(y)))); g.stroke(); g.restore()
     const d = by.get(pet.deskId), x = Math.round(A(walk[0])), y = Math.round(B(walk[1]))
-    cloud(g, x - 7, y + 2, 4, c.cloud, c.peach_lt)
-    const bob = (walk[2] && step ? -1 : 0) + (live.get(pet.deskId)?.[0].kind === 'hop' ? -Math.round(Math.sin(Math.PI * live.get(pet.deskId)![1]) * 5) : 0)
-    g.drawImage(sprite(d?.role, d?.ai ?? by.get(d?.parent ?? '')?.ai, walk[2] && t ? 1 + step : 0, c), x - 6, y - 14 + bob)
-    bubble(g, x, y - 15 + bob, 'needs', step, c)
-    sprHit(pet.deskId, x, y + bob)
+    puff(g, x - 7, y + 2, 4, c.cloud, c.peach_lt)
+    const wf = walkFrame(t), bob = (walk[2] && wf % 2 ? -1 : 0) + (live.get(pet.deskId)?.[0].kind === 'hop' ? -Math.round(Math.sin(Math.PI * live.get(pet.deskId)![1]) * 5) : 0)
+    const box = figure(d?.role, d?.ai ?? by.get(d?.parent ?? '')?.ai, x, y + bob, walk[2] && t ? WALK_LEGS[wf] : 0, d?.state, false)
+    if (s.kit.bubble) s.kit.bubble(g, x, y + bob - box.top - 1, 'needs', step, c); else bubble(g, x, y + bob - box.top + 7, 'needs', step, c)
+    sprHit(pet.deskId, x, y + bob, box)
   }
   // Selection: dim everything else and ring the pick in gold, before the labels so they stay legible.
   const on = s.picked ? by.get(s.picked) : undefined
@@ -748,10 +855,12 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   const road = on && walk && on.id === pet?.deskId ? heads.get(on.id) : undefined
   if (on && (road || seen(on, 400))) {
     const isle = BIG.has(on.kind), cx0 = road ? road[0] : 0
-    const b = road ? { x: cx0 - 11 * ak, y: road[1] - 2 * ak, w: 22 * ak, h: road[2] - road[1] + 6 * ak } : boxOf(on), cx = b.x + b.w / 2
+    const b = road ? { x: cx0 - (road[3] + 4 * ak), y: road[1] - 2 * ak, w: 2 * (road[3] + 4 * ak), h: road[2] - road[1] + 6 * ak } : boxOf(on), cx = b.x + b.w / 2
     const shape = (dir = false) => isle ? g.ellipse(cx, b.y + b.h / 2 + 4 * v.z, b.w * 0.58, b.h * 0.62, 0, 0, 2 * Math.PI, dir) : g.roundRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 6)
     g.beginPath(); g.rect(0, 0, cw, ch); shape(); g.fillStyle = 'rgba(8,6,18,.5)'; g.fill('evenodd')
-    g.save(); g.shadowColor = c.gold_lt; g.shadowBlur = 14; g.strokeStyle = c.gold_lt; g.lineWidth = 2; g.beginPath(); shape(); g.stroke(); g.restore()
+    g.save(); g.strokeStyle = c.gold_lt
+    for (const [lw, a] of [[12, 0.1], [7, 0.2], [2, 1]]) { g.globalAlpha = a; g.lineWidth = lw; g.beginPath(); shape(); g.stroke() }
+    g.restore()
     // Pixel marker: a gold arrow over the pick, bobbing with the step clock. Off while a hover bubble is up, so it never sits on the tail.
     if (!(s.hover && heads.get(s.hover))) {
     const my = Math.min(b.y, heads.get(on.id)?.[1] ?? b.y) - (isle ? 10 : 8) - step * 2, px = Math.max(3, Math.round(ak * 1.5))
@@ -791,7 +900,8 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       if (forced) { at = forced.at; w = forced.w; taken.push([at[0], at[1], w, h]) }
       if (!at) continue
       const [x, y] = at
-      g.fillStyle = council ? c.red_dk : '#3a2320'; g.beginPath(); g.roundRect(x, y, w, h, 3); g.fill()
+      g.fillStyle = SHADE; g.beginPath(); g.roundRect(x + 2, y + 2, w, h, 3); g.fill()
+      g.fillStyle = council ? c.red_dk : s.kit.plate; g.beginPath(); g.roundRect(x, y, w, h, 3); g.fill()
       g.strokeStyle = edge ?? (council ? c.gold : c.gold_dk); g.lineWidth = edge ? 2 : 1.5; g.stroke()
       text(g, top, x + w / 2, y + 10, big, council ? c.gold_lt : TEXT, w - 10, 'center')
       if (withSub) text(g, sub!, x + w / 2, y + 24, SANS(11, 500), subCol ?? '#e8dccb', w - 10, 'center')
@@ -836,7 +946,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
       for (const d of desks) {
         if (!seen(d)) continue
         const w = Math.min(PLATE.maxW, Math.max(PLATE.minW, d.w * v.z - 6)), x = X(d.x + d.w / 2) - w / 2, y = Y(d.y + d.h) + 2, t = timer(d, wall)
-        const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai) : undefined, rc = HR ? HR.hi : roleColor(d.role, c)
+        const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai, s.kit) : undefined, rc = HR ? HR.hi : roleColor(d.role, c)
         card(g, x, y, w, PLATE.h, HR ? HR.hi : c.red_lt, d.state === 'needs' || !!HR)
         if (HR) { g.globalAlpha = 0.6; g.fillStyle = HR.dk; g.beginPath(); g.roundRect(x + 1, y + 1, w - 2, PLATE.h - 2, 3); g.fill(); g.globalAlpha = 1 }
         rect(g, x, y + 1, 3, PLATE.h - 2, d.state === 'needs' ? c.red_lt : rc)
@@ -863,7 +973,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
         rows.forEach((d, i) => {
           const ry = y + 24 + i * 20, t = timer(d, wall)
           const tw = wid(g, PIX(8), t)
-          const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai) : undefined
+          const up = by.get(d.parent ?? ''), HR = up?.kind === 'realm' ? realmOf(up.ai, s.kit) : undefined
           rect(g, x + 1, ry, w - 2, 1, 'rgba(255,255,255,.07)')
           if (HR) rect(g, x + 1, ry + 1, 3, 18, HR.hi)
           text(g, roleTag(d), x + 8, ry + 10, PIX(8), HR ? HR.hi : roleColor(d.role, c), 62)
@@ -895,11 +1005,16 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
     const capped = tags >= YARD_TAG_CAP && !hot && s.picked !== yard.id
     for (const [max, force, wrap] of capped ? [] : [[180, false, true], [180, false, false], [120, false, false], [90, false, false], [90, true, false]] as const) {
       const lines = [...(realmTitle ? [fit(g, realmTitle, max), fit(g, name, max)] : wrap ? two(max) : [fit(g, name, max)]), ...(note ? [fit(g, note, max)] : [])]
-      const w = Math.max(...lines.map(l => g.measureText(l).width)) + 26, h = 18 + (lines.length - 1) * 12, up = above - (h - 18)
-      const at = force ? [Math.min(Math.max(cx - w / 2, stageBox[0]), stageBox[0] + stageBox[2] - w), up] as const : place([[cx - w / 2, up], [cx - w / 2, below], [cx - w, up], [cx, up], [cx - w, below], [cx, below], ...([[X(yard.x + yard.w) + 4, my], [X(yard.x) - w - 4, my]] as Array<[number, number]>).filter(([x]) => x >= 4 && x + w <= cw - 4)], w, h, yard.id, true)
+      let w = Math.max(...lines.map(l => g.measureText(l).width)) + 26
+      const h = 18 + (lines.length - 1) * 12, up = above - (h - 18)
+      const spots: Array<[number, number]> = [[cx - w / 2, up], [cx - w / 2, below], [cx - w, up], [cx, up], [cx - w, below], [cx, below], ...([[X(yard.x + yard.w) + 4, my], [X(yard.x) - w - 4, my]] as Array<[number, number]>).filter(([x]) => x >= 4 && x + w <= cw - 4)]
+      let at = place(spots, w, h, yard.id, true)
+      // Last try: pushed further out or narrower, but never onto another label (crowded phone Fit stacked them before).
+      const pushed = !at && force ? forcedSpot(spots, w, h, [cx, my + 9], taken, isles, yard.id, stageBox) : undefined
+      if (pushed) { at = pushed.at; w = pushed.w; taken.push([at[0], at[1], w, h]) }
       if (!at) continue
       const [x, y] = at
-      card(g, x, y, w, h, hot || !YR ? c.red_lt : YR.hi, hot); lines.forEach((l, i) => text(g, l, x + 17, y + 9.5 + i * 12, PIX(8), note && i === lines.length - 1 ? noteCol : YR && !i ? YR.hi : TEXT, max + 10))
+      card(g, x, y, w, h, hot || !YR ? c.red_lt : YR.hi, hot); lines.forEach((l, i) => text(g, l, x + 17, y + 9.5 + i * 12, PIX(8), note && i === lines.length - 1 ? noteCol : YR && !i ? YR.hi : TEXT, Math.min(max + 10, w - 22)))
       hits.push({ x, y, w, h, id: yard.id })
       dot = [x + 9, y + 9]
       tags++
@@ -910,7 +1025,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   }
   // Garden task: idle roles, comma list; armory task: "<n> tools".
   for (const n of court.nodes) {
-    if (n.kind === 'realm') plaque(n, n.sub, false, realmOf(n.ai).hi, realmOf(n.ai).glow)
+    if (n.kind === 'realm') plaque(n, n.sub, false, realmOf(n.ai, s.kit).hi, realmOf(n.ai, s.kit).glow)
     else if (n.kind === 'garden') plaque(n, n.task ? `${n.task.split(',').length} resting` : undefined)
     else if (n.kind === 'armory' || isPlace(n.kind)) plaque(n, n.task, false, n.warn ? c.red_lt : undefined)
     // Problem count on a place: memory health, missing keys, proposals waiting.
@@ -968,7 +1083,7 @@ function draw(s: St, g: G, W: number, H: number, dpr: number, t: number, now: nu
   // Hover: a pixel speech bubble over the sprite with its state and task.
   const hh = s.hover ? heads.get(s.hover) : undefined, hn = s.hover ? by.get(s.hover) : undefined
   if (hh && hn) {
-    const st = hn.state ?? 'idle', word = `${castOf(hn.role).name} · ${aiName(hn.ai)} · ${SAY[st]}`.toUpperCase()
+    const st = hn.state ?? 'idle', word = `${castOf(hn.role, s.kit.cast).name} · ${aiName(hn.ai)} · ${SAY[st]}`.toUpperCase()
     const hf = fromOf(hn, by), task = (hf ? `Moved from ${aiName(hf)} · ` : '') + (hn.task ?? hn.raise ?? hn.ask ?? 'Tap to open its chat')
     const w = Math.round(Math.min(240, Math.max(wid(g, PIX(8), word) + 14, wid(g, SANS(12), task)) + 20)), h = 36
     const x = Math.round(Math.max(6, Math.min(cw - w - 6, hh[0] - w / 2))), up = hh[1] - h - 10 > 6, y = Math.round(up ? hh[1] - h - 10 : hh[2] + 10)
@@ -1064,8 +1179,8 @@ function Library({ g, onMemory }: { g: MemoryGraph; onMemory?: () => void }) {
   </>
 }
 
-function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, onClose, onSummary, onCopy, mem, send, ways }: {
-  node: CourtNode; court: Court; hub: HubState; shared: ReturnType<typeof hubCounts>; colors: C; sent: Record<string, string>; onSummary?: BoardWays['onSummary']; onCopy?: BoardWays['onCopy']
+function Panel({ node, court, hub, shared, colors: c, cast: set, sent, onPick, onAnswer, onClose, onSummary, onCopy, mem, send, ways }: {
+  node: CourtNode; court: Court; hub: HubState; shared: ReturnType<typeof hubCounts>; colors: C; cast?: Record<string, Cast>; sent: Record<string, string>; onSummary?: BoardWays['onSummary']; onCopy?: BoardWays['onCopy']
   mem?: GraphHold; send: Send; ways: Pick<BoardWays, 'onMemory' | 'onFlow' | 'onTodo'>
   onPick: (id: string) => void; onAnswer: (sessionId: string, ask: Ask, choice: Choice, said: string) => void; onClose: () => void
 }) {
@@ -1091,7 +1206,7 @@ function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, on
   const placeSub = isPlace(node.kind) ? node.task : undefined
   const title = node.kind === 'realm' ? node.task ?? SAY[node.state ?? 'idle'] : node.kind === 'desk' ? node.task ?? node.ask ?? yard?.label ?? SAY[node.state ?? 'idle'] : node.kind === 'council' ? 'Switchboard' : node.label
   const nf = node.from ?? (node.kind === 'desk' && yard?.ai && node.ai && yard.ai !== node.ai && up?.kind !== 'realm' ? yard.ai : undefined), via = nf ? ` · Moved from ${aiName(nf)}` : ''
-  const sub = node.kind === 'desk' ? `${castOf(node.role).name} · ${aiName(node.ai)}${yard ? ` · ${yard.label}` : ''}${via}${node.raise ? ` · ${node.raise}` : ''}` : node.kind === 'council' ? courtSummary(court)
+  const sub = node.kind === 'desk' ? `${castOf(node.role, set).name} · ${aiName(node.ai)}${yard ? ` · ${yard.label}` : ''}${via}${node.raise ? ` · ${node.raise}` : ''}` : node.kind === 'council' ? courtSummary(court)
     : node.kind === 'courtyard' ? `${aiName(node.ai)} · ${plural(kids.filter(k => k.kind === 'desk').length, 'agent')}${via}` : node.kind === 'pavilion' && !kids.length ? 'No chats yet' : node.kind === 'realm' ? node.sub : node.kind === 'window' ? (node.window ? folder(node.window) : 'Chats outside every open window') : placeSub
   // Split siblings and wait targets, under the courtyard's sub line.
   const sibs = node.kind === 'courtyard' && node.group ? court.nodes.filter(m => m.kind === 'courtyard' && m.group === node.group && m.id !== node.id).map(m => m.label) : []
@@ -1121,7 +1236,7 @@ function Panel({ node, court, hub, shared, colors: c, sent, onPick, onAnswer, on
             onChange={e => setAsk0(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go() }} />
           <ModelEffort ai="claude" value={picks} onChange={setPicks} usage={fiveHourUse(hub, 'claude')} compact />
           <button type="button" className="hub-btn primary sm" disabled={!ask0.trim() || !proj} onClick={go}>Research</button>
-          <p className="bp-said" role="status">{asked && <>Started a research chat: {asked}</>}</p>
+          <p className="bp-said" role="status">{asked && <>Started in the Research window: {asked}</>}</p>
         </div>
       })()}
       {node.kind === 'courtyard' && node.chatId && onSummary && <div className="bp-pad"><SummaryFold id={node.chatId} name={node.label} summary={hub.summaries?.[node.chatId]} onAsk={refresh => onSummary(node.chatId!, refresh)} onCopy={onCopy} /></div>}
@@ -1183,14 +1298,14 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     return () => { stop = true; clearInterval(i) }
   }, [isDemo])
   const court = useMemo(() => buildCourt(shown, { w: stage[0], h: stage[1] }, mem?.graph), [shown, stage, mem?.graph])
-  const [mode, setMode] = useState<Mode>('day')
-  const skin = useMemo(() => lookOf(journeyWest, mode), [mode])
+  const [mode, setMode] = useState<Mode>('day'), [skinId, setSkinId] = useState('journey-west')
+  const skin = useMemo(() => lookOf(skinById(skinId), mode), [skinId, mode])
   const [picked, setPicked] = useState<string>()
   const [sent, setSent] = useState<Record<string, string>>({})
   const canvas = useRef<HTMLCanvasElement>(null), dlg = useRef<HTMLDialogElement>(null)
   const zoomed = useRef(false)
   const st = useRef<St & { fit: boolean; stage: string; wake: () => void; zoom: (dir: number) => void; refit: () => void; show: (id: string, close?: boolean) => void; go: (id: string) => void }>({
-    court, view: { x: 0, y: 0, z: 0.5 }, zc: 0.5, colors: skin.court.colors, bands: skin.court.bands, hits: [], fx: new Map(), fit: false, stage: '', ropes: [], ends: new Map(), waits: new Set(),
+    court, kit: kitOf('court'), night: false, ta: 0, view: { x: 0, y: 0, z: 0.5 }, zc: 0.5, colors: skin.court.colors, bands: skin.court.bands, hits: [], fx: new Map(), fit: false, stage: '', ropes: [], ends: new Map(), waits: new Set(),
     wake: () => {}, zoom: () => {}, refit: () => {}, show: () => {}, go: () => {},
   })
   // A sprite tap hops and opens its details; the panel's Open terminal link is the way to the chat.
@@ -1203,9 +1318,10 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
 
   useEffect(() => {
     let skin = null, mode = null
-    skin = readStore(SKIN_KEY); mode = readStore(MODE_KEY)
-    const p = readPick(skin, mode, matchMedia('(prefers-color-scheme: dark)').matches)
-    setMode(p.mode)
+    skin = readStore(SKIN_KEY) ?? (readStore(LEGACY_SKIN_KEY) === 'ink' ? 'ink' : null); mode = readStore(MODE_KEY)
+    // ?skin=abyss or ?skin=journey-west opens a review link in that theme without saving it.
+    const p = readPick(skin, mode, matchMedia('(prefers-color-scheme: dark)').matches, new URLSearchParams(location.search).get('skin'))
+    setMode(p.mode); setSkinId(p.id)
   }, [])
   useDialog(dlg)
   // Canvas text does not pull in a web font by itself.
@@ -1216,12 +1332,13 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   }, [])
   // The art bakes again only when islands or bridges move; a petition starts its walk when it first shows.
   useEffect(() => {
-    const s = st.current, sig = sigOf(court, `${skin.id}.${mode}`), ev = courtEvents(s.court, court), at = performance.now()
+    const s = st.current, sig = sigOf(court, `${skin.id}.${mode}.${resOf(kitOf(skin.art))}`), ev = courtEvents(s.court, court), at = performance.now()
     for (const m of ev.meet) s.fx.set(m.deskId, { kind: 'meet', at, lead: m.leadId })
     for (const m of ev.move) s.fx.set(`move:${m.yardId}`, { kind: 'move', at, from: m.from, to: m.to })
     for (const id of ev.cheer) s.fx.set(id, { kind: 'cheer', at })
-    s.court = court; s.colors = skin.court.colors; s.bands = skin.court.bands
-    if (court.nodes.length && s.frame?.sig !== sig) s.frame = bake(court, s.colors, sig)
+    for (const id of arrivals(s.court, court)) s.fx.set(id, { kind: 'arrive', at })
+    s.court = court; s.colors = skin.court.colors; s.chrome = chromeOf(skin); s.bands = skin.court.bands; s.kit = kitOf(skin.art); s.night = mode === 'night'
+    if (court.nodes.length && s.frame?.sig !== sig) s.frame = bake(court, s.colors, sig, s.kit)
     const id = court.petition?.deskId
     if (id !== s.pet?.id) s.pet = id ? { id, at: performance.now() } : undefined
     if (s.stage !== `${stage}`) { s.stage = `${stage}`; s.fit = false }
@@ -1244,10 +1361,14 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     let W = 0, H = 0, dpr = 1, onScreen = true, tick = 0
     const t0 = performance.now()
     // Whole device pixels per art pixel once zoomed in; quarter steps below one so the whole court still fits.
+    // The baked frame's res, or the kit's before the first bake.
+    const res = () => s.frame?.res ?? resOf(s.kit)
     const snap = (z: number, down = false) => {
-      const k = z * dpr * ART, r = down ? Math.floor : Math.round
+      // Smooth kits keep the zoom continuous, within the same clamps.
+      if (s.kit.smooth) return Math.min(Math.max(z, 1 / (16 * dpr * res())), MAX_Z)
+      const k = z * dpr * res(), r = down ? Math.floor : Math.round
       // Whole art pixels from 1 up; sixteenths below, so a low Fit zoom is not cut by up to a quarter.
-      return Math.min(k >= 1 ? r(k) : Math.max(1 / 16, r(k * 16) / 16), Math.floor(MAX_Z * dpr * ART)) / (dpr * ART)
+      return Math.min(k >= 1 ? r(k) : Math.max(1 / 16, r(k * 16) / 16), Math.floor(MAX_Z * dpr * res())) / (dpr * res())
     }
     const setZ = (nz: number, cx: number, cy: number) => { const v = s.view; v.x = cx - ((cx - v.x) * nz) / v.z; v.y = cy - ((cy - v.y) * nz) / v.z; v.z = nz }
     const fit = () => {
@@ -1285,7 +1406,9 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
       if (!W || !H) return
       if (following) follow(now)
       if (!s.fit && s.frame) { fit(); s.fit = true }
-      draw(s, g, W, H, dpr, motion.matches ? 0 : (now - t0) / 1000, now, Date.now())
+      const t = motion.matches ? 0 : (now - t0) / 1000
+      if (!t || live()) s.ta = t
+      draw(s, g, W, H, dpr, t, now, Date.now())
     }
     const fading = () => s.ends.size > 0 || s.thaw !== undefined
     const awake = () => ropesBusy(s.ropes, s.view.z, [s.hover, s.over, s.picked].map(id => id ? chatOf(s.court, id) : undefined))
@@ -1305,13 +1428,13 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
       frame(performance.now())
     }
     const zoomAt = (cx: number, cy: number, f: number) => {
-      s.zc = Math.min(MAX_Z, Math.max(0.25 / (dpr * ART), s.zc * f))
+      s.zc = Math.min(MAX_Z, Math.max(0.25 / (dpr * res()), s.zc * f))
       const nz = snap(s.zc)
       if (nz !== s.view.z) setZ(nz, cx, cy)
     }
     s.zoom = dir => {
       following = false
-      const k = s.view.z * dpr * ART, nk = dir > 0 ? (k >= 1 ? Math.floor(k) + 1 : k * 2) : k > 1 ? Math.ceil(k) - 1 : k / 2, nz = snap(nk / (dpr * ART))
+      const k = s.view.z * dpr * res(), nk = dir > 0 ? (k >= 1 ? Math.floor(k) + 1 : k * 2) : k > 1 ? Math.ceil(k) - 1 : k / 2, nz = snap(nk / (dpr * res()))
       setZ(nz, W / dpr / 2, H / dpr / 2); s.zc = nz; frame(performance.now())
     }
     s.refit = () => { following = false; fit(); frame(performance.now()) }
@@ -1383,17 +1506,19 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
       stop(); clearInterval(tick); ro.disconnect(); io.disconnect()
       motion.removeEventListener('change', wake); document.removeEventListener('visibilitychange', wake); offShown?.()
       el.removeEventListener('pointerdown', down); el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.removeEventListener('pointerleave', leave)
-      el.removeEventListener('wheel', wheel)
+      el.removeEventListener('wheel', wheel); clearTimeout(s.detailT)
     }
   }, [])
 
   // Day and night crossfade; the second frame lets the canvas repaint before the new snapshot.
-  const flip = () => {
-    const next: Mode = mode === 'night' ? 'day' : 'night', swap = () => { setMode(next); writeStore(MODE_KEY, next); writeStore(SKIN_KEY, journeyWest.id) }
+  const fade = (swap: () => void) => {
     const vt = (document as Document & { startViewTransition?: (f: () => Promise<void>) => unknown }).startViewTransition
     if (!vt || matchMedia('(prefers-reduced-motion: reduce)').matches) return swap()
     vt.call(document, () => new Promise<void>(done => { flushSync(swap); requestAnimationFrame(() => requestAnimationFrame(() => done())) }))
   }
+  const flip = () => { const next: Mode = mode === 'night' ? 'day' : 'night'; fade(() => { setMode(next); writeStore(MODE_KEY, next) }) }
+  // The belt's theme menu picks a skin with the same crossfade.
+  const reskin = (id: string) => { if (id !== skinId) fade(() => { setSkinId(id); writeStore(SKIN_KEY, id) }) }
   // Aimed after the panel renders, so its size is known.
   const open = (id: string, close?: boolean) => { zoomed.current = !!close; setPicked(id); requestAnimationFrame(() => st.current.show(id, close)) }
   // Closing a card that zoomed in puts the board back to the fit view.
@@ -1409,7 +1534,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
   const deskWhere = (d: CourtNode) => { const up = court.nodes.find(y => y.id === d.parent); return up?.kind === 'realm' ? `${court.nodes.find(y => y.id === up.parent)?.label ?? ''}, ${aiName(up.ai)} realm` : up?.label ?? '' }
   const c = skin.court.colors
   return (
-    <dialog ref={dlg} className="hub hub-dark board" aria-label="Agents" style={{ '--b-bg': skin.court.bands[0], '--b-ink': skin.palette.ink, '--b-font': skin.font, '--b-hot': c.red_lt, '--b-gold': c.gold } as React.CSSProperties}
+    <dialog ref={dlg} className="hub hub-dark board" aria-label="Agents" style={{ '--b-bg': skin.court.bands[0], '--b-ink': skin.palette.ink, '--b-font': skin.font, '--b-hot': c.red_lt, '--b-gold': c.gold, ...(skin.chrome && chromeVars(skin.chrome)) } as React.CSSProperties}
       // Esc is handled on keydown: Chrome only lets a dialog cancel be stopped once per user activation.
       onCancel={e => { e.preventDefault(); if (picked) unpick(); else onClose() }}
       onKeyDown={e => {
@@ -1437,14 +1562,14 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
       <div className="board-stage">
         <canvas ref={canvas} className="board-canvas" aria-hidden />
         {note && <p className="board-note">{note}</p>}
-        <BoardTools skin={skin} night={mode === 'night'} counts={{ ...beltCounts(shown), next: yards.filter(y => y.state === 'needs').length, todo: todoCount, todoAll: court.nodes.find(n => n.kind === 'notice')?.list?.length, changes: files }}
+        <BoardTools skin={skin} night={mode === 'night'} theme={{ pick: reskin }} counts={{ ...beltCounts(shown), next: yards.filter(y => y.state === 'needs').length, todo: todoCount, todoAll: court.nodes.find(n => n.kind === 'notice')?.list?.length, changes: files }}
           on={{ new: onNew, next: () => { if (needs) { open(needs, true); go(needs) } }, todo: onTodo, limits: onLimits, changes: onChanges, mode: flip }} />
         <ul className="board-legend" aria-label="Legend">
           {LEGEND.map(([k, word]) => <li key={k}><i style={{ background: stateColor(k, c) }} />{word}</li>)}
           <li className="board-cast"><details>
             <summary>Cast</summary>
             <dl aria-label="Cast">
-              {Object.entries(ROLE_KEY).map(([r, [k]]) => <div key={r}><dt style={{ color: `color-mix(in srgb, ${c[k]} 55%, #fff)` }}>{castOf(r).name}</dt><dd>{r === 'pilgrim' ? 'any other role' : r}</dd></div>)}
+              {Object.entries(ROLE_KEY).map(([r, [k]]) => <div key={r}><dt style={{ color: `color-mix(in srgb, ${c[k]} 55%, #fff)` }}>{castOf(r, kitOf(skin.art).cast).name}</dt><dd>{r === 'pilgrim' ? 'any other role' : r}</dd></div>)}
               {(['claude', 'codex', 'kenneth'] as const).map(k => <div key={k}><dt>{ICONS[k].name}</dt><dd>{k === 'kenneth' ? 'you' : aiName(k)}</dd></div>)}
               {LEGEND.map(([k, word]) => badgeOf(k) && <div key={k}><dt>{badgeOf(k)!.name}</dt><dd>{word.toLowerCase()}</dd></div>)}
             </dl>
@@ -1459,7 +1584,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
             </button></li>
           ))}
         </ul>
-        {node && <Panel key={node.id} node={node} court={court} hub={shown} shared={shared} colors={c} sent={sent} onPick={open} onAnswer={answer} onClose={unpick} onSummary={onSummary} onCopy={onCopy} mem={mem} send={send} ways={{ onMemory, onFlow, onTodo }} />}
+        {node && <Panel key={node.id} node={node} court={court} hub={shown} shared={shared} colors={c} cast={kitOf(skin.art).cast} sent={sent} onPick={open} onAnswer={answer} onClose={unpick} onSummary={onSummary} onCopy={onCopy} mem={mem} send={send} ways={{ onMemory, onFlow, onTodo }} />}
       </div>
     </dialog>
   )

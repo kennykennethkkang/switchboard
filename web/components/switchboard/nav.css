@@ -1,8 +1,15 @@
 /* Shell: rail on the left, page column beside it. */
 .hub-shell { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-height: 100vh; }
 .hub-col { display: flex; flex-direction: column; min-width: 0; min-height: 100vh; }
-.hub-page { flex: 1; min-width: 0; padding: 20px; display: grid; gap: 12px; align-content: start; }
+.hub-col { --page-max: 1240px; --page-pad: 24px; }
+/* Page body: centered column, 20px between blocks, room under the last one for the status bar. */
+.hub-page { flex: 1; min-width: 0; width: 100%; max-width: var(--page-max); margin-inline: auto; box-sizing: border-box; padding: 24px var(--page-pad) 40px; display: grid; gap: 20px; align-content: start; }
+/* Chats is a split pane and fills the column. */
+.hub-shell[data-page='chats'] .hub-page { max-width: none; padding: 0 0 34px; }
+.hub-col > .hub-top { padding: 14px var(--page-pad); min-height: 64px; box-sizing: border-box; }
+.hub-page-head { display: grid; gap: 2px; min-width: 0; flex: 0 1 auto; }
 .hub-page-title { margin: 0; font: 600 20px/1.2 var(--hub-sans); color: var(--hub-ink); }
+.hub-page-sub { margin: 0; font: 400 13px/1.4 var(--hub-sans); color: var(--hub-mute); }
 .hub-top-acts { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .hub-top .hub-top-find { display: none; }
 .nav-brand { padding: 6px 10px 2px; }
@@ -19,8 +26,14 @@
 }
 .nav-find { width: 100%; border: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-mute); font-weight: 400; }
 .nav-find kbd { margin-left: auto; font: 400 11px/1 var(--hub-mono); color: var(--hub-ash); padding: 3px 5px; border: 1px solid var(--hub-hair); border-radius: 4px; }
-.nav-item[aria-current='page'] { background: var(--hub-elev); color: var(--hub-ink); }
+.nav-item { position: relative; }
+.nav-item > svg { flex: none; opacity: 0.7; }
+.nav-item[aria-current='page'] { background: var(--hub-elev); color: var(--hub-ink); box-shadow: inset 0 0 0 1px var(--hub-hair); }
+.nav-item[aria-current='page'] > svg { opacity: 1; color: var(--hub-blue); }
+/* accent tick on the active row, desktop rail only */
+@media (min-width: 761px) { .nav-item[aria-current='page']::before { content: ''; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--hub-blue); } }
 .nav-n { margin-left: auto; font: 500 12px/1 var(--hub-mono); color: var(--hub-ash); font-variant-numeric: tabular-nums; }
+.nav-item[aria-current='page'] .nav-n:not([data-hot]) { color: var(--hub-mute); }
 .nav-n[data-hot] { min-width: 18px; padding: 3px 5px; box-sizing: border-box; text-align: center; border-radius: 99px; background: var(--hub-red); color: #fff; }
 .nav-find:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
 @media (hover: hover) and (pointer: fine) {
@@ -29,15 +42,15 @@
 }
 
 /* Chats: list column and the picked chat. */
-.hub-chats { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; margin: -20px; }
-.hub-chats > .hub-rail { padding: 16px; background: var(--hub-canvas); min-height: 100%; box-sizing: border-box; }
+.hub-chats { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+.hub-chats > .hub-rail { padding: 16px 16px 20px; background: var(--hub-canvas); border-right: 1px solid var(--hub-hair); min-height: 100%; box-sizing: border-box; }
 .hub-chats > .hub-chat-main { min-width: 0; display: grid; align-content: start; }
 /* The list scrolls inside its own column, so a long Archive or Snapshots list never leaves the chat pane empty. The status bar is 34px, 48px on touch. */
 @media (min-width: 761px) {
   .hub-chats > .hub-rail { position: sticky; top: 0; min-height: 0; max-height: calc(100vh - 34px); overflow-y: auto; }
 }
 @media (min-width: 761px) and (pointer: coarse) { .hub-chats > .hub-rail { max-height: calc(100vh - 48px - env(safe-area-inset-bottom)); } }
-.hub-chats .hub-chat-git { padding: 0 20px 20px; display: grid; gap: 12px; }
+.hub-chats .hub-chat-git { padding: 0 24px 24px; display: grid; gap: 12px; }
 .hub-ship-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .hub-ship-head h2 { margin: 0; font: 600 13px/1 var(--hub-sans); color: var(--hub-mute); }
 
@@ -93,8 +106,15 @@
   .hub-page .hub-filter > * { flex: none; white-space: nowrap; }
   .hub-col { min-height: 0; }
   /* the floating New chat pill (48px, 12px off the status bar) sits over the page end, so the last row scrolls clear of it */
-  .hub-page { padding: 16px 16px 84px; }
-  .hub-chats { grid-template-columns: minmax(0, 1fr); margin: -16px; }
+  .hub-col { --page-pad: 16px; }
+  .hub-page { padding: 16px var(--page-pad) 84px; gap: 16px; }
+  .hub-shell[data-page='chats'] .hub-page { padding: 0 0 84px; }
+  .hub-col > .hub-top { min-height: 0; padding: 10px var(--page-pad); }
+  .hub-page-sub { font-size: 12px; }
+  .hub-col > .hub-top { flex-wrap: nowrap; }
+  .hub-col > .hub-top > .hub-note { flex: none; font-size: 12px; }
+  .hub-page-head { flex: 1 1 0; }
+  .hub-chats { grid-template-columns: minmax(0, 1fr); }
 }
 @media (pointer: coarse) { .nav-find, .nav-item { min-height: 44px; } }
 /* after the 760 block so its 32px floors lose; status bar is 48px here, so the pill and the last row sit higher */
@@ -114,3 +134,6 @@
 @media (hover: hover) and (pointer: fine) { .nav-coder:hover { background: var(--hub-elev); color: var(--hub-ink); } }
 @media (max-width: 760px) { .nav .nav-coder { display: none; } }
 @media (prefers-reduced-motion: reduce) { .nav-find, .nav-item, .map-modes button, .nav-coder > i, .nav-coder > i::after { transition: none; } }
+
+.nav-tight { display: none; }
+@media (max-width: 760px) { .nav-full { display: none; } .nav-tight { display: inline; } }

@@ -1,5 +1,4 @@
 import * as vscode from 'vscode'
-import * as path from 'path'
 import type { WebviewToExtensionMessage } from '../protocol'
 import { hub } from './hub-service'
 import { awsLogin, cliLogin, openLogin } from './actions'

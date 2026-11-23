@@ -54,3 +54,11 @@ export function thawAt(e: number, reduced: boolean): Thaw {
     basket: c(e / 0.15), banner: e < 0.75 ? 1 : c(1 - (e - 0.75) / 0.25), frozen: e < 0.6,
   }
 }
+
+/** Desks of courtyards that were not on the last court: they play the arrival. None on the first court, so opening the map stays calm. */
+export function arrivals(prev: { nodes: Array<{ id: string; kind: string; parent?: string }> } | undefined, next: { nodes: Array<{ id: string; kind: string; parent?: string }> }): string[] {
+  const had = new Set(prev?.nodes.filter(n => n.kind === 'courtyard').map(n => n.id))
+  if (!had.size) return []
+  const fresh = new Set(next.nodes.filter(n => n.kind === 'courtyard' && !had.has(n.id)).map(n => n.id))
+  return next.nodes.filter(n => n.kind === 'desk' && fresh.has(n.parent ?? '')).map(n => n.id)
+}

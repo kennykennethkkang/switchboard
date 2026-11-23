@@ -1,6 +1,6 @@
 import * as http from 'http'
 import * as vscode from 'vscode'
-import { AgentEvent, emitSubagentSpawn } from './protocol'
+import { AgentEvent } from './protocol'
 import {
   ORCHESTRATOR_NAME, PREVIEW_MAX, RESULT_MAX,
   SESSION_ID_DISPLAY, FAILED_RESULT_MAX, HOOK_MAX_BODY_SIZE,

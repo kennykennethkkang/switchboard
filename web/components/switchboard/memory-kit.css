@@ -7,7 +7,19 @@
 .mk-flags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .mk-flag { padding: 2px 6px; border-radius: 4px; font: 500 11px/1.3 var(--hub-sans); letter-spacing: 0.2px; white-space: nowrap; background: var(--hub-yellow-soft); color: var(--hub-yellow); }
 .mk-flag[data-bad] { background: var(--hub-red-soft); color: var(--hub-red); }
-.mk-text { white-space: pre-wrap; overflow-wrap: anywhere; font: 400 15px/1.7 var(--hub-sans); color: var(--hub-body); }
+.mk-text { overflow-wrap: anywhere; font: 400 15px/1.7 var(--hub-sans); color: var(--hub-body); }
+.mk-text > * + * { margin-top: 12px; }
+.mk-text p, .mk-text li { white-space: pre-wrap; }
+.mk-text :is(ul, ol) { margin-bottom: 0; padding-left: 20px; list-style: disc; }
+.mk-text ol { list-style: decimal; }
+.mk-text li + li { margin-top: 4px; }
+.mk-text li::marker { color: var(--hub-ash); }
+.mk-text strong, .mk-text .mk-h { font-weight: 600; color: var(--hub-ink); }
+.mk-text > .mk-h { margin-top: 20px; }
+.mk-text > .mk-h:first-child { margin-top: 0; }
+.mk-text code { padding: 1px 5px; border-radius: 4px; background: var(--hub-elev); font: 13px var(--hub-mono); }
+.mk-text pre { margin-bottom: 0; padding: 10px 12px; border-radius: 8px; background: var(--hub-elev); font: 12.5px/1.55 var(--hub-mono); white-space: pre-wrap; }
+.mk-nw { white-space: nowrap; }
 .mk-wl { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; margin: 0 1px; border-radius: 6px; border: 1px solid var(--hub-hair); background: var(--hub-elev); font: 500 13px/1.6 var(--hub-sans); color: var(--hub-ink); vertical-align: baseline; }
 .mk-wl[data-broken] { border-style: dashed; border-color: var(--hub-red); background: none; color: var(--hub-red); text-decoration: line-through; cursor: help; }
 .mk-find { position: relative; }

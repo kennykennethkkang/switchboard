@@ -25,3 +25,13 @@
 .ss-when { margin-left: auto; color: var(--hub-ash); font-size: 12px; }
 .ss-why { margin: 0; color: var(--hub-mute); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .ss-mark { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px; background: var(--hub-blue-soft); color: var(--hub-blue); font: 500 11px/1.4 var(--hub-sans); vertical-align: 1px; }
+
+.ss-sum { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ss-sum li { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) 3em 4.5em; gap: 10px; align-items: center; font-size: 13px; }
+.ss-sum-k { color: var(--hub-body); }
+.ss-sum-bar { height: 8px; border-radius: 99px; background: var(--hub-hair); overflow: hidden; }
+.ss-sum-bar > i { display: block; height: 100%; border-radius: 99px; background: var(--hub-green); }
+.ss-sum strong { text-align: right; color: var(--hub-ink); font-variant-numeric: tabular-nums; }
+.ss-recent li { padding: 8px 0; }
+.ss-more { margin-top: 8px; }
+@media (pointer: coarse) { .ss-more { min-height: 44px; } }

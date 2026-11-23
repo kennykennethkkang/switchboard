@@ -20,6 +20,7 @@ A panel of synthetic users votes between 2 to 4 options. Default 1000 personas t
   - copy or skill output: pass the text, or `@file.txt`
   - HTML: `@page.html` (tags stripped to visible text)
   - screenshot: Jev reads text only. Read each image yourself and write one neutral, factual description per option with the same fields in the same order (layout, main text, buttons, colors, contrast, size of tap targets). Never say which you prefer in it. Pass those as the options. With `--panel`, the haiku panel gets the same descriptions.
+    Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.
 - Who writes the options: an agent that built neither option (usually qa). The builder of a variant never writes its description or runs crowd-ab on its own work.
 - Labels: `--label` per option, same order, for the report.
 

@@ -7,14 +7,15 @@ export const RESEARCH_AT = 2
 const WORDS: [string, RegExp][] = [
   ['look up', /\blook(ing)? up\b/i],
   ['compare', /\bcompar(e|es|ing|ison)\b/i],
-  ['what is', /\bwhat (is|are)\b/i],
+  ['what is', /\bwhat (is|are)\b(?! (going on|happening|wrong|broken))/i],
   ['how does', /\bhow (does|do)\b/i],
   ['sources', /\b(sources?|cite|citations?)\b/i],
   ['docs', /\bdocs\b|\bdocumentation\b/i],
-  ['research', /\bresearch\w*|\bpapers?\b/i],
+  // "research component" and the like name a Switchboard part, not a research ask.
+  ['research', /\bresearch(?!\s+(?:component|panel|tab|window|mode|tracker|offer|folder|chat|space|page|view|button|feature|card|section|screen)s?\b)\w*|\bpapers?\b/i],
 ]
 const FILE = /(?:[\w.-]+\/)+[\w.*-]+\.\w+|\b[\w-]+\.(?:tsx?|m?js|json|md|py|css|swift|go|rs)\b/g
-const EDIT = /\b(fix|build|refactor|add|implement|rename|bump|rewrite|change|update|delete|remove)\b/gi
+const EDIT = /\b(fix|build|refactor|add|implement|rename|bump|rewrite|change|update|delete|remove|make|open|show)\b/gi
 /** +2 per matched word, -2 per file path and per distinct edit verb. */
 export function researchScore(text: string) {
   const hits = WORDS.filter(([, r]) => r.test(text)).map(([w]) => w)

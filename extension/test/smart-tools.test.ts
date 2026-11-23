@@ -144,3 +144,64 @@ test('withGoal: a first message naming AWS starts the chat with aws-core on; a h
   assert.deepEqual(withGoal(d, 'fix the flaky unit test', inv), d)
   for (const t of ['fix growth of the array', 'dedupe competitors in the engine', 'trace the code pathways', 'amplify the log signal']) assert.deepEqual(withGoal(d, t, inv), d, t)
 })
+
+import { jevStart, readPrecedence, setPrecedence } from '../src/hub/smart-tools'
+import { toolsNote } from '../src/hub/tools'
+
+const jinv: Installed[] = [
+  { kind: 'plugin', name: 'superpowers@x', enabled: true },
+  { kind: 'plugin', name: 'chart-kit@x', enabled: true, description: 'charts' },
+  { kind: 'plugin', name: 'sound@x', enabled: true, description: 'audio tools' },
+  { kind: 'plugin', name: 'mystery@x', enabled: true },
+  { kind: 'plugin', name: 'keepme@x', enabled: true },
+  { kind: 'plugin', name: 'nope@x', enabled: true },
+  { kind: 'skill', name: 'phone', enabled: true, description: 'call me' },
+]
+const scores = (m: Record<string, number>) => async () => m
+
+test('jevStart: confident no goes off, yes and unsure stay on, ALWAYS and precedence win', async () => {
+  const r = await jevStart(defaultProfile(jinv), 'fix the parser', jinv, { 'keepme@x': 'always', 'nope@x': 'never' }, scores({ 'chart-kit@x': 0.9, 'sound@x': 0.05, 'phone': 0.1, 'keepme@x': 0.01 }))
+  assert.equal(r.profile.plugins['superpowers@x'], true)
+  assert.equal(r.profile.plugins['chart-kit@x'], true)
+  assert.equal(r.profile.plugins['sound@x'], false)
+  assert.equal(r.profile.plugins['mystery@x'], true)
+  assert.equal(r.profile.plugins['keepme@x'], true)
+  assert.equal(r.profile.plugins['nope@x'], false)
+  assert.equal(r.profile.skills.phone, false)
+  assert.equal(r.why['sound@x'], 'Jev: not needed (0.05)')
+  assert.equal(r.why['chart-kit@x'], 'Jev: needed (0.90)')
+  assert.equal(r.why['keepme@x'], undefined)
+})
+
+test('jevStart: regex picks stay on over a Jev no; empty message and Jev failure keep today\'s profile', async () => {
+  const withAws: Installed[] = [...inv, { kind: 'plugin', name: 'x@y', enabled: true }]
+  const r = await jevStart(defaultProfile(withAws), 'Deploy the lambda with the AWS CDK', withAws, {}, scores({ 'aws-core@claude-plugins-official': 0.01, 'x@y': 0.01 }))
+  assert.equal(r.profile.plugins['aws-core@claude-plugins-official'], true)
+  assert.equal(r.profile.plugins['x@y'], false)
+  const empty = await jevStart(defaultProfile(jinv), '  ', jinv, { 'nope@x': 'never' }, async () => { throw new Error('no call') })
+  assert.equal(empty.profile.plugins['sound@x'], true)
+  assert.equal(empty.profile.plugins['nope@x'], false)
+  const down = await jevStart(defaultProfile(jinv), 'fix the parser', jinv, {}, async () => undefined)
+  assert.deepEqual(down.profile, defaultProfile(jinv))
+  const boom = await jevStart(defaultProfile(jinv), 'fix the parser', jinv, {}, async () => { throw new Error('x') })
+  assert.deepEqual(boom.profile, defaultProfile(jinv))
+})
+
+test('precedence store: only always and never kept, auto deletes', () => {
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'prec-')), 'p.json')
+  assert.deepEqual(readPrecedence(f), {})
+  setPrecedence('a', 'always', f); setPrecedence('b', 'never', f); setPrecedence('c', 'auto', f)
+  assert.deepEqual(readPrecedence(f), { a: 'always', b: 'never' })
+  setPrecedence('a', 'auto', f)
+  assert.deepEqual(readPrecedence(f), { b: 'never' })
+})
+
+test('toolsNote: lists every off plugin and skill with what it is for, capped', () => {
+  const p = { plugins: { 'sound@x': false, 'chart-kit@x': true }, skills: { phone: false } }
+  const n = toolsNote(p, undefined, { 'sound@x': 'audio tools', phone: 'call me' })
+  assert.match(n, /sound \(audio tools\)/)
+  assert.match(n, /phone \(call me\)/)
+  assert.doesNotMatch(n, /chart-kit/)
+  const many = { plugins: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`p${i}@x`, false])), skills: {} }
+  assert.match(toolsNote(many), /and 25 more/)
+})

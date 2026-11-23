@@ -1,10 +1,12 @@
 'use client'
-// The Research window: one chat's deep research as it happens. Searches, sources, researcher lanes, the answer.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { vscodeBridge, type AgentEvent } from '@/lib/vscode-bridge'
+// One chat's deep research as it happens: searches, sources, researcher lanes, the answer.
+// A Research-space chat gets it as its own tab; a project chat gets it inline on the Chats page.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { vscodeBridge } from '@/lib/vscode-bridge'
 import type { ChatState, HubState } from '@/lib/hub-types'
-import { answerBlocks, citations, elapsedOf, emptyRun, fmtElapsed, inline, isCited, looksLikeAnswer, reduceResearch, siteOf, visibleLanes, type FeedItem, type Lane, type ResearchRun } from '@/lib/research'
+import { answerBlocks, citations, elapsedOf, emptyRun, fmtElapsed, inline, isCited, isRealResearch, looksLikeAnswer, reduceResearch, siteOf, visibleLanes, type FeedItem, type Lane, type ResearchRun } from '@/lib/research'
 import { DEMO_CHAT, DEMO_SESSION, demoScript } from '@/lib/research-demo'
+import { researchRun, startResearchStore, subscribeResearch } from '@/lib/research-store'
 import './research-panel.css'
 
 const DEMO_OK = process.env.NEXT_PUBLIC_DEMO !== '0'
@@ -12,20 +14,13 @@ const LEAD = 'orchestrator'
 const HUES = ['var(--hub-w-cobalt)', 'var(--hub-w-teal)', 'var(--hub-w-amber)', 'var(--hub-w-rose)', 'var(--hub-w-violet)', 'var(--hub-w-lime)']
 const DEMO_LOOP_MS = 15_000
 
-// Events that land before the panel mounts (the webview's replay answers 'ready' fast).
-let held: AgentEvent[] | null = null
-let stopHold: (() => void) | undefined
-/** Start keeping agent events for the panel; call before posting 'ready'. */
-export function holdResearchEvents() {
-  if (held || !vscodeBridge) return
-  held = []
-  stopHold = vscodeBridge.onEvent(e => { held?.push(e) })
-}
-const takeHeld = () => { const out = held ?? []; stopHold?.(); held = null; stopHold = undefined; return out }
+// Dev iframe and localhost: the store starts here, not in webview-entry.
+if (typeof window !== 'undefined') startResearchStore()
 
-function useResearch(sessionId: string, demo: boolean) {
-  const [run, setRun] = useState<ResearchRun>(emptyRun)
-  const [hub, setHub] = useState<HubState | null>(null)
+function useResearch(sessionId: string, demo: boolean, given?: HubState) {
+  const [demoRun, setRun] = useState<ResearchRun>(emptyRun)
+  const live = useSyncExternalStore(subscribeResearch, () => researchRun(sessionId), () => researchRun(sessionId))
+  const [own, setHub] = useState<HubState | null>(null)
   const [take, setTake] = useState(0)
   const [ended, setEnded] = useState(false)
 
@@ -43,17 +38,11 @@ function useResearch(sessionId: string, demo: boolean) {
   }, [demo, take])
 
   useEffect(() => {
-    if (demo || !vscodeBridge) return
-    const bridge = vscodeBridge
-    const early = takeHeld()
-    if (early.length) setRun(r => early.reduce((x, e) => reduceResearch(x, e, sessionId, Date.now()), r))
-    const offEvent = bridge.onEvent(e => setRun(r => reduceResearch(r, e, sessionId, Date.now())))
-    const offHub = bridge.onHub(setHub)
-    const offSession = bridge.onSession(type => { if (type === 'reset') setRun(emptyRun()) })
-    return () => { offEvent(); offHub(); offSession() }
-  }, [demo, sessionId])
+    if (demo || given || !vscodeBridge) return
+    return vscodeBridge.onHub(setHub)
+  }, [demo, given])
 
-  return { run, hub, replay: () => setTake(n => n + 1), ended }
+  return { run: demo ? demoRun : live, hub: given ?? own, replay: () => setTake(n => n + 1), ended }
 }
 
 function useNow(on: boolean) {
@@ -164,9 +153,10 @@ function Answer({ text, drafting }: { text: string; drafting: boolean }) {
 const stateLabel = (status: ResearchRun['status'], chat?: ChatState) =>
   chat === 'needs-you' ? 'Needs you' : status === 'done' ? 'Done' : status === 'running' ? 'Researching' : 'Waiting'
 
-export function ResearchPanel({ sessionId }: { sessionId: string }) {
+/** inline: sits on the Chats page under the chat, and shows nothing until research starts. */
+export function ResearchPanel({ sessionId, inline: inPage, hub: given }: { sessionId: string; inline?: boolean; hub?: HubState }) {
   const demo = DEMO_OK && sessionId === DEMO_SESSION
-  const { run, hub, replay, ended } = useResearch(sessionId, demo)
+  const { run, hub, replay, ended } = useResearch(sessionId, demo, given)
   const chat = hub?.chats.find(c => c.sessionId === sessionId)
   const progress = hub?.progress.find(p => p.sessionId === sessionId)
   // The chat stopping ends the run too, when no lead agent_complete came.
@@ -215,9 +205,10 @@ export function ResearchPanel({ sessionId }: { sessionId: string }) {
   }
 
   const canFocus = !!vscodeBridge?.isVSCode && !demo
+  if (inPage && (status === 'waiting' || !isRealResearch(run))) return null
 
   return (
-    <div className="hub rp" data-status={status}>
+    <div className={inPage ? 'rp' : 'hub rp'} data-status={status} data-inline={inPage || undefined}>
       <div className="rp-shell">
         <header className="rp-head">
           <div className="rp-bar" aria-hidden><span style={{ transform: `scaleX(${status === 'done' ? 1 : lanes.length ? Math.max(0.06, doneLanes / lanes.length) : 0})` }} /></div>

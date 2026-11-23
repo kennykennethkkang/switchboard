@@ -40,6 +40,7 @@ describe('import scanner', () => {
     assert.equal(headerOf('// Small helpers for dates\nexport {}'), 'Small helpers for dates')
     assert.equal(headerOf('"""Loads the config file."""\nimport os'), 'Loads the config file.')
     assert.equal(headerOf('export const x = 1'), undefined)
+    assert.equal(headerOf('/**\n * Builds the standalone web app package:\n *   1. Builds the webview UI\n *   2. Packs it\n */'), 'Builds the standalone web app package.')
     assert.equal(readmeLine('# Web\n\n<!-- note -->\n\nThe Next app that draws the hub.\nMore here.'), 'The Next app that draws the hub.')
   })
 

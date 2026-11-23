@@ -586,3 +586,31 @@ test('plainWord explains the court jargon and nothing else', async () => {
   assert.equal(plainWord('desk'), undefined)
   assert.ok(YARD_TAG_CAP >= 4)
 })
+
+// buildCourt runs on every hub poll: a state-only update must reuse the last layout search and still match a cold build.
+test('a state-only rebuild matches a cold build and is fast; a full build stays under budget', async () => {
+  const { demoHub } = await import('./hub-demo')
+  const { courtMemo } = await import('./court-map')
+  const h = demoHub(NOW)
+  const next: HubState = { ...h, progress: h.progress.map(p => ({ ...p, state: p.state === 'working' ? 'done' : 'working', tasks: p.tasks.map(t => ({ ...t, subject: `${t.subject} 2` })) })) }
+  for (const w of [1280, 400]) {
+    const stage = { w, h: 800 }
+    // One untimed cold build first: the page rebuilds on every poll, so time warm code, not V8 compiling it.
+    courtMemo.clear()
+    buildCourt(h, stage)
+    courtMemo.clear()
+    let t = performance.now()
+    const cold = buildCourt(h, stage)
+    const full = performance.now() - t
+    courtMemo.clear()
+    const coldNext = buildCourt(next, stage)
+    buildCourt(h, stage)
+    t = performance.now()
+    const warmNext = buildCourt(next, stage)
+    const warm = performance.now() - t
+    assert.deepEqual(warmNext, coldNext)
+    assert.deepEqual(buildCourt(h, stage), cold)
+    assert.ok(full < 60, `full build ${full.toFixed(1)}ms at ${w}`)
+    assert.ok(warm < 10, `state-only rebuild ${warm.toFixed(1)}ms at ${w}`)
+  }
+})

@@ -7,16 +7,16 @@ import * as vscode from 'vscode'
 import * as os from 'os'
 import { loadKept, saveKept, setOneWindow, tabTargets, TAB_COMMANDS, type TabKept } from './window-tabs'
 import * as path from 'path'
-import { continueText, hub, pauseText } from './hub-service'
+import { cwdFromTranscript, hub } from './hub-service'
 import { editor, shortEditor } from '../editor'
 import { HistoryScanner } from './history'
 import { readSpend, setSpend } from './spend'
 import { applyPatch, controlPatch, readControls } from './controls'
-import type { ChatRow, DeviceAsk, JarvisReply, RepoView, SwitchboardKey, TodoItem, WindowColor } from './types'
+import type { ChatRow, DeviceAsk, JarvisReply, RepoView, SwitchboardKey, WindowColor } from './types'
 import { SHADES, titleBar, titleBarColors, windowColors } from './colors'
-import { FLAGGED, PROFILES, cleanName, indefiniteOn, readProfiles, withLibrary } from './tools'
-import { globalOff, readSmart, watchTools } from './smart-tools'
-import { connections, ensureWeb, gitState, keepWebRetrying, installed, libraryInventory, listServers, newestPlan, newestPlanFile, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
+import { FLAGGED, PROFILES, cleanName, readProfiles, withLibrary } from './tools'
+import { globalOff, readPrecedence, readSmart, setPrecedence, watchTools } from './smart-tools'
+import { connections, ensureWeb, gitState, keepWebRetrying, installed, libraryInventory, listServers, newestPlan, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
 import { kitDir } from '../constants'
 import { newPanelState } from './hub-panel-state'
 import { refuse } from './hub-panel-shared'
@@ -24,32 +24,33 @@ import { sweepPanel } from './hub-panel-sweep'
 import { signInsPanel } from './hub-panel-signins'
 import { codexPanel } from './hub-panel-codex'
 import { devPanel } from './hub-panel-dev'
-import { awsLogin, answerInTerminal, cliLogin, openLogin, bindCodexTerminals, codexExited, startDev, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, headBranch, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, noteCheckBack, type RunOpts } from './actions'
+import { awsLogin, answerInTerminal, openLogin, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, type RunOpts } from './actions'
 import { dropEffortGuard, keepEffortDefault } from './picks'
 import { buildSmart } from './smart-select'
-import { approvedFields, closeApprovedRetry, readDoneCheck, staysOpenOnApprove, stampedChats } from './approve'
-import { syncTerminals, tags, terminalAction, watchTerminals } from './terminals'
+import { approvedFields, closeApprovedRetry, idleResearch, staysOpenOnApprove } from './approve'
+import { tags, terminalAction, watchTerminals } from './terminals'
 import { signInTerminal } from './codex-login'
-import { AIS, chatTerminal, closeChatTerminal, codexFiles, endedCodex, lastCodexPrompt, lastCodexTurn, readAis, rolloutLines } from './ais'
+import { AIS, chatTerminal, closeChatTerminal } from './ais'
 import { touch } from './idle'
-import { budgetEnd, codexRound, goalCheck, goalFor, goalHandoffLine, roundText, runGate, usageLine, type GateExec } from './indefinite'
-import { archiveRow, backAgain, dueForHandoff, fullCodex, goneRow, idleHandedOff, readArchive, readChains, recordArchive, removeArchive, searchNotes } from './chains'
+import { archiveRow, goneRow, readArchive, readChains, recordArchive, removeArchive, searchNotes } from './chains'
 import { newestNotes, readStarred, starredRows, toggleStar, writeStarred } from './starred'
 import { rcTargets, readChats } from './sessions'
-import { ask, chainVersion, codexNote, crossNote, handoffFile, mergeProjects, planLabel, projectName, repoPlan, type RepoAsk } from './projects'
-import { dismissOffer } from './research'
-import { addAwsProfile, AWS_SESSION_MS, awsProfiles, browserEnv, cacheTimes, chromeChoice, OPEN_CHROME, openChromeScript, browserFor, deleteAwsProfile, dueHeadsUps, moveProfile, parseAwsConfig, profileFor, readAwsConfig, readChrome, readLabels, readPrefs, readSessions, renameAwsProfile, renameLabel, trackSessions, validProfileName, writeLabels, writeOpenChrome, writePrefs, writeSessions } from './aws'
+import { ask, crossNote, mergeProjects, projectName, repoPlan, type RepoAsk } from './projects'
+import { RESEARCH_ROOT, dismissOffer, isResearch } from './research'
+import { LIBRARY, deleteResearch, listResearch, markSeen } from './research-library'
+import { openResearch } from './research-window'
+import { AWS_SESSION_MS, awsProfiles, browserEnv, cacheTimes, chromeChoice, OPEN_CHROME, openChromeScript, browserFor, dueHeadsUps, parseAwsConfig, readAwsConfig, readChrome, readPrefs, readSessions, trackSessions, validProfileName, writeOpenChrome, writeSessions } from './aws'
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import { hasSwitchboardHook, readSettingsFile, removeSwitchboardHooks, writeJsonAtomic } from '../hook-entries'
 import { configureClaudeHooks, configureCodexHooks } from '../hooks-config'
 import { askKeys } from './progress'
 import { answerQuestion, choiceProblem, installAsk } from './questions'
-import { claudeBinary, claudeCall } from './setup'
+import { claudeCall } from './setup'
 import { tryHarden } from './harden'
 import { quickAsk, waitsOn } from './brain'
 import { MOVED, promptText, routeProject } from './route-project'
-import { readGroups, splitAsks } from './split'
+import { splitAsks } from './split'
 import { escalationsByProject, excludeSwitchboard, keepSwitchboardDir, readStages, resetEscalations, setStageStatus, writeCompany } from './advanced'
 import { firstRunOf } from './first-run'
 import type { ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../protocol'
@@ -59,27 +60,23 @@ import { Posters, tickWork } from './posters'
 import { kitHash, rulesState, syncRules, type SyncResult } from './rules'
 import { applyAgentBrowsers, NOTICE_KINDS, NOTICE_SPOTS, noticeSpot, type NoticeSpot } from './background'
 import { CLI_APPS, mergeTenants, readTenants } from './cli-logins'
-import { LOGINS, applyLink, applyLogin, loginFor, pruneLinks, readLinks, readLogins, writeLogins, type LinkCommand, type LoginCommand } from './logins'
+import { LOGINS, pruneLinks, readLinks, readLogins, writeLogins } from './logins'
 import { CODEX_EFFORTS, CODEX_MODELS, setRoleCodex, setRoleModel } from './roles'
 import { installGuard } from './git-guard'
-import { addRepo, confirmApprove, fixBrief, held, line, needsApprove, readSweep, rescan, sweepAll } from './sweep'
-import { keyStatus, keyStore, keyTest, reconcileKeys, removeKey, saveKey, testKey } from './keys'
-import { envSetup, fillRecipes } from './env-setup'
-import { cleanWorktree, endedWorktrees, ghPath, git, gitOp, readRepo, repoRoot } from './git'
+import { keyStatus, reconcileKeys } from './keys'
+import { ghPath, git, gitOp, inWorktree, liveIn, mergeOnEnd, readRepo, repoRoot } from './git'
 import { jevProject } from './jev-project'
 import { mirofishPage, savedReports } from './mirofish'
 import { toEnglish } from './translate'
-import { decideLearn, learnTick, usageOk } from './learn'
+import { decideLearn } from './learn'
 import { showSummary } from './summary'
 import { draftCommit } from './commit-draft'
 import { jarvis } from './jarvis'
 import { installVoice, macVoice, voiceBox } from './voice'
 import { installKeeper, keepApp } from './keeper'
-import { rememberChats } from './reap'
-import { acceptSuggestion, addTodo, chatApproved, autoStartPlan, changeTodo, claimTodo, START_GRACE_MS, clearGoneChats, dismissSuggestion, editTodo, finishItem, loadLocalTodos, loadTodos, extraTodoFolders, moveTodo, replaceRemoteTodo, restoreTicked, runLabel, runMessage, runOrder, projectOf, setPilot, setTodoSync, startTodo, todoFolders } from './todo'
+import { acceptSuggestion, addTodo, chatApproved, changeTodo, START_GRACE_MS, dismissSuggestion, editTodo, finishItem, loadLocalTodos, loadTodos, extraTodoFolders, moveTodo, replaceRemoteTodo, restoreTicked, runMessage, runOrder, projectOf, setPilot, setTodoSync, startTodo, todoFolders } from './todo'
 import { randomUUID } from 'crypto'
 import { dailyTrend, fillDraft, notifyIndefiniteDone, notifyAwsExpiry, notifyPaused, notifyStuck } from './notify'
-import { CHECK_BACK_TEXT, dueCheckBacks, hasOpenWork } from './checkback'
 import { listSnapshots, restoreSnapshot } from './snapshots'
 import { checkHealth, fixHealth } from './health'
 import { listPipelines, savePipeline, seedPipeline, takeSeeded } from './pipelines'
@@ -87,7 +84,7 @@ import { sendPush } from './web-push'
 import { STUCK, byOwner, fixText, loops, sampleDue, type OwnedStuck } from './stuck'
 import { psCost, sampleStuck, stopStuck } from './stuck-sampler'
 import { readUploads, uploadEvents } from './uploads'
-import { awakePid, devHome, devRows, knownDev, needsWindow, postLocal, postWindow, readDev, readFocused, readOwnedStuck, readWindows, sendHome, serve, setAwake, tailnet, writeFocused } from './dev'
+import { devRows, knownDev, needsWindow, postLocal, postWindow, readDev, readFocused, readOwnedStuck, readWindows, sendHome, serve, setAwake, writeFocused } from './dev'
 
 const log = createLogger('Hub')
 // Off stops updates; the note stays.
@@ -152,9 +149,9 @@ const TITLE_KEY = 'switchboard.titleBar'
 const workspace = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 // openExternal lands in Chrome's last used profile, not the folder's pick.
 const openPage = (url: string) => openLogin(url, undefined, browserFor(readPrefs().browsers, workspace() ?? ''))
-const { keys, awsCommand, loginCommand, keyCommand, browserCommand, handle: signInsHandle } = signInsPanel({ refreshAws: f => refreshAws(f), refreshCli: f => refreshCli(f), projectBrowser: () => projectBrowser(), readSignIns: () => readSignIns(), workspace })
-const { served, devFolders, refreshDev, runDev, devRequest, stopServer, handle: devHandle } = devPanel(() => refreshHub())
-const { sweepState, runClaude, sweepJob, sweepOneTool, sweepEverything, approveOne, sweepCall, sweepFix, toggle, handle: sweepHandle } = sweepPanel(() => refreshHub(), workspace)
+const { keys, handle: signInsHandle } = signInsPanel({ refreshAws: f => refreshAws(f), refreshCli: f => refreshCli(f), projectBrowser: () => projectBrowser(), readSignIns: () => readSignIns(), workspace })
+const { served, devFolders, refreshDev, runDev, handle: devHandle } = devPanel(() => refreshHub())
+const { sweepState, sweepCall, handle: sweepHandle } = sweepPanel(() => refreshHub(), workspace)
 const refreshers: Array<(again?: boolean) => Promise<void>> = []
 let onShown = () => {}
 
@@ -293,7 +290,7 @@ export function startHub(context: vscode.ExtensionContext): void {
     const s = hub.get()
     const ids = [...s.chats, ...s.starred].filter(c => (c.ai ?? 'claude') === 'claude').map(c => c.sessionId)
     const chats = Object.fromEntries(Object.entries(readProfiles(ids)).map(([id, p]) => [id, withLibrary(p, lib)]))
-    hub.set({ installed: inv, tools: { flagged: FLAGGED, pick: s.tools?.pick ?? null, chats: { ...s.tools?.chats, ...chats }, smart: { ...s.tools?.smart, ...readSmart(ids) }, globalOff: globalOff() }, sweep: sweepState(), spend: readSpend() })
+    hub.set({ installed: inv, tools: { flagged: FLAGGED, pick: s.tools?.pick ?? null, chats: { ...s.tools?.chats, ...chats }, smart: { ...s.tools?.smart, ...readSmart(ids) }, globalOff: globalOff(), precedence: readPrecedence() }, sweep: sweepState(), spend: readSpend() })
   })
   const refreshInstalled = addRefresher(async () => {
     hub.set({ connections: await connections(REPO_ROOTS) })
@@ -352,7 +349,21 @@ export function startHub(context: vscode.ExtensionContext): void {
   // ps has no -o on Windows; the stuck check runs on macOS and Linux only.
   const stuck = process.platform === 'win32' ? undefined : setInterval(() => { void checkStuck() }, STUCK.sampleMs)
   const heads = setInterval(awsHeadsUp, 5 * 60 * 1000)
-  context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); if (stuck) clearInterval(stuck) } })
+  // Research chats need no Approve: the Research window, which holds their terminals, closes each one left idle.
+  // Per chat, the idle spell already closed; a follow-up starts a new one that closes again.
+  const closed = new Map<string, number | undefined>()
+  const research = setInterval(() => {
+    if (!isResearch(ownWorkspace())) return
+    const chats = hub.get().chats
+    for (const id of closed.keys()) if (!chats.some(c => c.sessionId === id && c.live)) closed.delete(id)
+    for (const id of idleResearch(chats, hub.get().progress)) {
+      const at = chats.find(c => c.sessionId === id)?.updatedAt
+      if (closed.has(id) && closed.get(id) === at) continue
+      closed.set(id, at)
+      approveChat(id)
+    }
+  }, 60_000)
+  context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); clearInterval(research); if (stuck) clearInterval(stuck) } })
   const sub = hub.onChange(() => {
     syncFirstRun()
     if (S.pending || !posters.shown) return
@@ -612,6 +623,12 @@ async function runGit(m: Extract<WebviewToExtensionMessage, { type: 'hub-git' }>
   const chat = hub.get().chats.find(c => c.sessionId === m.sessionId)
   const root = chat?.cwd && fs.existsSync(chat.cwd) ? await repoRoot(chat.cwd) : undefined
   if (!root) return refuse('that chat\'s folder is not in a git repo')
+  if (m.op === 'merge-back' && m.confirmed && chat?.live && inWorktree(chat.cwd)) {
+    mergeOnEnd.set(chat.sessionId, chat.cwd)
+    const r = hub.get().repo
+    if (r?.sessionId === m.sessionId) hub.set({ repo: { ...r, result: { text: 'Merges into main as soon as this chat ends', ok: true, at: Date.now() } } })
+    return true
+  }
   if (gitBusy.has(root)) return refuse('another git command is still running in this repo')
   gitBusy.add(root)
   const mark = (patch: object) => { const r = hub.get().repo; if (r?.sessionId === m.sessionId) hub.set({ repo: { ...r, ...patch } }) }
@@ -619,7 +636,7 @@ async function runGit(m: Extract<WebviewToExtensionMessage, { type: 'hub-git' }>
   try {
     const { sessionId: _s, type: _t, ...cmd } = m
     const inRoot = (cwd?: string) => !!cwd && (cwd === root || cwd.startsWith(root + path.sep))
-    const r = await gitOp(root, cmd, await ghPath(), hub.get().chats.some(c => c.live && inRoot(c.cwd)))
+    const r = await gitOp(root, cmd, await ghPath(), hub.get().chats.some(c => c.live && inRoot(c.cwd)), wt => liveIn(hub.get().chats, codexTied)(wt))
     if (r.open) openPage(r.open)
     mark({ busy: undefined, result: { text: r.text, ok: r.ok, at: Date.now() } })
     return r.ok || refuse(r.text)
@@ -892,6 +909,9 @@ function approveChat(id: string): true | string {
   if (!chat && !p) return refuse('that chat is not listed')
   recordArchive({ ...archiveRow(chat ?? p!, p?.startedAt), ...approvedFields(id, p?.commit) })
   hub.set({ archive: readArchive() })
+  // The worktree's work goes into main once the chat ends (hub-panel-codex runs the queue).
+  const cwd = (chat ?? p!).cwd
+  if (inWorktree(cwd)) mergeOnEnd.set(id, cwd)
   void chatApproved(id, (chat ?? p!).cwd).catch(err => log.warn('Clearing the approved chat\'s missed rows failed:', err))
   // Mid-turn it keeps running; it shows in History and is closed by hand. A needs-you chat with a prompt waiting keeps running too; one with none closes.
   // waiting: the lead's turn ended and only background jobs or subagents keep it marked working.
@@ -1046,6 +1066,18 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-research-dismiss':
       dismissOffer(hub, m.sessionId)
       return true
+    case 'hub-research-open':
+      openResearch(m.sessionId)
+      return true
+    case 'hub-research-seen':
+    case 'hub-research-delete': {
+      try {
+        if (m.type === 'hub-research-seen') markSeen(LIBRARY, m.id)
+        else deleteResearch(LIBRARY, m.id)
+        hub.set({ research: listResearch(LIBRARY) })
+      } catch (err) { return refuse((err as Error).message) }
+      return true
+    }
     case 'hub-mirofish-open':
       void mirofishPage(m.simId).then(r => 'url' in r ? openPage(r.url) : refuse(r.problem), err => refuse(`Could not open MiroFish: ${(err as Error).message}`))
       return true
@@ -1104,7 +1136,8 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       if (m.repo) { void startInNewRepo(m.repo, m).then(problem => { if (problem) refuse(problem) }); return true }
       // Naming the chat waits on a quick model call, so a refusal shows on the Mac but the route has already answered.
       // A window opened for a new repo can get this before its own project scan lists the folder.
-      void (hub.get().projects.some(p => p.path === m.path) ? Promise.resolve() : refreshProjects().catch(() => undefined)).then(() => inHome(m.path, m)).then(sent => {
+      // Research chats start in the Research folder's own window, so its watcher follows them and its tab sits beside the projects.
+      void (hub.get().projects.some(p => p.path === m.path) ? Promise.resolve() : refreshProjects().catch(() => undefined)).then(() => inHome(m.research ? RESEARCH_ROOT : m.path, m)).then(sent => {
         if (sent) return
         // A Claude chat's id is picked here so its waits and group can find it; a new Codex chat's id is only known once it runs.
         void startChat(m.path, m).then(problem => { if (problem) refuse(problem) })
@@ -1117,6 +1150,12 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       if (m.path && !hub.get().projects.some(p => p.path === m.path)) return refuse(`${m.path} is not in the project list`)
       // The set no longer depends on the goal, so an empty one is fine.
       void pickTools(m.text.trim().slice(0, 2000), m.path).catch(err => log.warn('Tool list failed:', err))
+      return true
+    }
+    case 'hub-tool-precedence': {
+      const precedence = setPrecedence(m.name, m.value)
+      const tools = hub.get().tools
+      if (tools) hub.set({ tools: { ...tools, precedence } })
       return true
     }
     case 'hub-chat-tools':
@@ -1208,8 +1247,9 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     }
     case 'hub-resume': {
       const s = hub.get()
-      const cwd = [...s.chats, ...s.starred, ...s.archive].find(c => c.sessionId === m.sessionId)?.cwd
-      return inHome(cwd, m).then(sent => sent ? undefined : resumeChat(m.sessionId, m.ai)).then(problem => {
+      // A reload can drop a cut-off chat from every list; its transcript still names the folder.
+      const cwd = [...s.chats, ...s.starred, ...s.archive].find(c => c.sessionId === m.sessionId)?.cwd ?? cwdFromTranscript(path.join(os.homedir(), '.claude', 'projects'), m.sessionId)
+      return inHome(cwd, m).then(sent => sent ? undefined : resumeChat(m.sessionId, m.ai, undefined, cwd)).then(problem => {
         if (problem) return refuse(problem)
         // Back among the live chats: History stops hiding it. The home window may have done it already.
         removeArchive(m.sessionId)

@@ -146,11 +146,12 @@ export function view(s: Snap, asks: string[], cols: number, now: number, modsOpe
   if (done.length) L.push([{ t: '+ done: ' + done.map(([r, n]) => `${r} ${n}`).join(', '), dim: true }])
 
   L.push(rule('Usage', cols))
-  const barW = Math.max(4, cols - 22)
+  // Capped so a full-width dock keeps the numbers next to the bar; too narrow for 4 cells, the bar goes, not the reset time.
+  const barW = Math.min(24, cols - 22)
   for (const w of s.usage) {
     L.push([
       { t: `${w.who} ${w.win}`.padEnd(10) },
-      { t: bar(w.pct, barW), c: pctColor(w.pct) },
+      ...(barW >= 4 ? [{ t: bar(w.pct, barW), c: pctColor(w.pct) }] : []),
       { t: `${Math.round(w.pct)}%`.padStart(5), c: pctColor(w.pct), b: true },
       { t: until(w, now).padStart(7), dim: true },
     ])

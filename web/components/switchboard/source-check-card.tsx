@@ -12,12 +12,12 @@ function Why({ line }: { line: string }) {
   return i > 0 && i <= 26 ? <><b>{line.slice(0, i)}</b> {line.slice(i + 2)}</> : <>{line}</>
 }
 
-function Row({ s }: { s: Source }) {
+function Row({ s, folded }: { s: Source; folded?: boolean }) {
   const { host, path } = siteOf(s.url), tone = bandTone(s.band)
   return (
     <li>
       {/* Open when the band says to look closer; a Reliable source stays folded. */}
-      <details className="sc-src" data-tone={tone.color} open={tone.look || undefined}>
+      <details className="sc-src" data-tone={tone.color} open={(!folded && tone.look) || undefined}>
         <summary>
           <span className="sc-site" title={s.url}><strong>{host}</strong>{path && <span>{path}</span>}</span>
           <span className="sc-chip">{s.band}</span>
@@ -49,13 +49,17 @@ function OpenReport({ report, send }: { report: string; send: (m: HubCommand) =>
 }
 
 /** One source-check run: the question, a tally, then a row per source with its band, score and strongest reasons. */
-export function SourceCheckCard({ run, send, now = Date.now() }: { run: SourceRun; send: (m: HubCommand) => void; now?: number }) {
+/** compact: the sources fold behind one line, for lists like Live's Results. */
+export function SourceCheckCard({ run, send, now = Date.now(), compact }: { run: SourceRun; send: (m: HubCommand) => void; now?: number; compact?: boolean }) {
+  const rows = <ul className="sc-rows" aria-label="Sources">{run.sources.map(s => <Row key={s.url} s={s} folded={compact} />)}</ul>
   return (
     <section className="cp-card sc-run" aria-label={`Source check: ${run.question}`} style={panel}>
       <h3 style={caps}><span>{run.done ? 'Checked' : 'Checking'}</span><span style={{ color: run.done ? 'var(--hub-ash)' : 'var(--hub-blue)' }}>{run.done ? `${ago(run.at, now)} ago` : 'Running'}</span></h3>
       <strong className="sc-q">{run.question}</strong>
       <span className="sc-sum">{summaryLine(run.sources)}</span>
-      <ul className="sc-rows" aria-label="Sources">{run.sources.map(s => <Row key={s.url} s={s} />)}</ul>
+      {compact && run.sources.length
+        ? <details className="sc-more"><summary>Show {run.sources.length} {run.sources.length === 1 ? 'source' : 'sources'}</summary>{rows}</details>
+        : rows}
       {run.report && <div className="sc-acts"><OpenReport report={run.report} send={send} /></div>}
     </section>
   )

@@ -6,7 +6,7 @@ dialog.cv::backdrop { background: rgba(0, 0, 0, 0.45); animation: cv-fade 220ms 
 @media (max-width: 760px) { dialog.cv { width: 100vw; border-left: 0; box-shadow: none; } }
 /* Screen tab, full size: the dialog grows to the terminal (100 columns at 12px is ~722px) up to the window less 64px; wider terminals scroll in their box */
 @media (min-width: 761px) {
-  dialog.cv:has(.cv-scr) { width: fit-content; min-width: 600px; max-width: calc(100vw - 64px); }
+  dialog.cv:has(.cv-xt) { width: fit-content; min-width: 600px; max-width: calc(100vw - 64px); }
   dialog.cv:has(.cv-scr[data-fit]) { width: min(780px, 100vw); min-width: 0; }
 }
 
@@ -154,6 +154,17 @@ dialog.cv::backdrop { background: rgba(0, 0, 0, 0.45); animation: cv-fade 220ms 
 .cv-scr-h small[data-s='gone'] .cv-scr-dot { background: var(--hub-red); }
 .cv-scr-h .hub-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; }
 .cv-ro { padding: 0; line-height: 1.5; }
+.cv-scr-h small { margin-right: auto; }
+.cv-seg { flex: none; display: flex; padding: 2px; border-radius: 8px; background: var(--hub-canvas); box-shadow: inset 0 0 0 1px var(--hub-hair); }
+.cv-seg button { all: unset; cursor: pointer; padding: 5px 10px; border-radius: 6px; font: 500 12px/1 var(--hub-sans); color: var(--hub-mute); }
+.cv-seg button[aria-pressed='true'] { background: var(--hub-card); color: var(--hub-ink); box-shadow: 0 0 0 1px var(--hub-hair); }
+.cv-seg button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .cv-seg button:hover { color: var(--hub-ink); } }
+@media (pointer: coarse) { .cv-seg button { min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; padding: 0 14px; } }
+/* Text: the same screen wrapped to the pane at a reading size, so nothing scrolls sideways. */
+.cv-txt { margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--hub-canvas); box-shadow: inset 0 0 0 1px var(--hub-hair); color: var(--hub-ink); font: 400 13.5px/1.6 var(--hub-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cv-txt:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+.cv-scr[data-fit] .cv-txt { border-radius: 0; box-shadow: none; padding: 10px 16px; }
 
 .cv-xt { overflow-x: auto; overscroll-behavior-x: contain; background: var(--hub-canvas); box-shadow: inset 0 0 0 1px var(--hub-hair); border-radius: 8px; padding: 6px; }
 .cv-xt:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }

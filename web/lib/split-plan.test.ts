@@ -27,6 +27,17 @@ test('looksMulti: a later sentence opening with a joiner', () => {
   assert.equal(looksMulti('Fix the login redirect. Another thing: the footer overlaps on phones.'), true)
 })
 
+test('looksMulti: inline numbered asks, a joiner on a new line or after a comma, second and third', () => {
+  assert.equal(looksMulti('Switchboard to-do, in this order: 1. Release the agent drawer. 2. Fix worktrees.'), true)
+  assert.equal(looksMulti('Fix the header spacing\nAlso the to-do list keeps finished items'), true)
+  assert.equal(looksMulti('Lets do research on switchboard, also did you add the stage view'), true)
+  assert.equal(looksMulti('Couple of issues the to-do tracks finished items. Second is that the folder is still called agent flow.'), true)
+  assert.equal(looksMulti('Bump it to 2. Then ship it.'), false)
+  assert.equal(looksMulti('Refactor the parser, and then run the tests.'), false)
+  assert.equal(looksMulti('Make the list scroll, plus keep the header fixed.'), false)
+  assert.equal(looksMulti('Fix the login redirect. Third-party auth breaks on Safari.'), false)
+})
+
 test('newGroupId is g- and base36 time', () => {
   assert.equal(newGroupId(1_800_000_000_000), `g-${(1_800_000_000_000).toString(36)}`)
   assert.match(newGroupId(), /^g-[0-9a-z]+$/)

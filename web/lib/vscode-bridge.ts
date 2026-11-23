@@ -7,6 +7,7 @@
  */
 
 export type { AgentEvent, SessionInfo, ConnectionStatus } from './bridge-types'
+import { demoResearchBody } from './hub-demo'
 import type { AgentEvent, SessionInfo, ConnectionStatus } from './bridge-types'
 import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub-types'
 import { sendSlices } from './attach'
@@ -32,6 +33,12 @@ export type HubCommand =
   | { type: 'hub-mirofish-report'; simId: string }
   | { type: 'hub-live-dismiss'; kind: 'mirofish' | 'crowd'; id: string }
   | { type: 'hub-research-dismiss'; sessionId: string }
+  | { type: 'hub-research-open'; sessionId: string }
+  /** Reads a saved research run; research-read comes back with the same reqId. */
+  | { type: 'hub-research-read'; reqId: string; id: string }
+  /** Marks a saved research run seen, or moves it to the trash. */
+  | { type: 'hub-research-seen'; id: string }
+  | { type: 'hub-research-delete'; id: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
@@ -50,6 +57,7 @@ export type HubCommand =
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
+  | { type: 'hub-tool-precedence'; name: string; value: 'always' | 'auto' | 'never' }
   | { type: 'hub-indefinite'; sessionId: string; on: boolean }
   | { type: 'hub-star'; sessionId: string; ai: AiId; on: boolean }
   | { type: 'hub-resume'; sessionId: string; ai: AiId }
@@ -177,6 +185,7 @@ class VSCodeBridge {
   private shownListeners: Array<() => void> = []
   private levelListeners: Array<(level: number) => void> = []
   private uploads = new Map<string, (m: UploadAck) => void>()
+  private researchReads = new Map<string, (m: { body?: string; problem?: string }) => void>()
   private graphs = new Map<string, (m: { graph?: MemoryGraph; problem?: string }) => void>()
   private runLists = new Map<string, (m: { runs?: RunDetail[]; problem?: string }) => void>()
   private flowMaps = new Map<string, (m: { map?: FlowMap; problem?: string }) => void>()
@@ -267,6 +276,9 @@ class VSCodeBridge {
       case 'upload-progress':
       case 'upload-done':
         this.uploads.get(data.id)?.(data)
+        break
+      case 'research-read':
+        this.researchReads.get(data.reqId)?.(data)
         break
       case 'graph':
         this.graphs.get(data.id)?.(data)
@@ -372,6 +384,20 @@ class VSCodeBridge {
     })
   }
 
+  /** A saved research run's markdown. Outside the editor, the demo's bodies. */
+  researchRead(id: string): Promise<string> {
+    const reqId = Math.random().toString(36).slice(2)
+    if (!this.isVSCode) {
+      // The browser app's hub answers with the markdown; with no hub (the demo) the bundled bodies.
+      const fallback = demoResearchBody(id) ?? 'Not a saved research run'
+      return fetch('/hub/command', { method: 'POST', headers: { 'X-Switchboard': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'hub-research-read', reqId, id }), signal: AbortSignal.timeout(20_000) })
+        .then(r => (r.ok ? r.text() : fallback), () => fallback)
+    }
+    const result = this.request(this.researchReads, reqId, 20_000, () => 'The editor did not answer', m => m.body ?? m.problem ?? 'no body')
+    this.postToExtension({ type: 'hub-research-read', reqId, id })
+    return result
+  }
+
   /** The Memory view's graph from the extension, or why not. */
   graph(): Promise<MemoryGraph | string> {
     const id = Math.random().toString(36).slice(2)
@@ -386,10 +412,10 @@ class VSCodeBridge {
     if (!this.isVSCode) {
       // Browser and phone: the hub answers in the reply.
       const ok = (a: unknown) => (Array.isArray(a) && a.length && a.every(x => typeof x === 'string') ? (a as string[]) : [text])
-      return fetch('/hub/split', { method: 'POST', headers: { 'X-Switchboard': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ path, text }), signal: AbortSignal.timeout(15_000) })
+      return fetch('/hub/split', { method: 'POST', headers: { 'X-Switchboard': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ path, text }), signal: AbortSignal.timeout(25_000) })
         .then(r => (r.ok ? r.json() : null)).then(j => ok(j?.asks), () => [text])
     }
-    const result = this.request(this.splits, reqId, 15_000, () => [text], asks => Array.isArray(asks) && asks.length ? asks : [text])
+    const result = this.request(this.splits, reqId, 25_000, () => [text], asks => Array.isArray(asks) && asks.length ? asks : [text])
     this.sendHub({ type: 'hub-split', reqId, path, text })
     return result
   }
@@ -410,8 +436,8 @@ class VSCodeBridge {
     return result
   }
 
-  /** A chat's outputs, a transcript page or one screenshot, for the chat view. */
-  chat(sessionId: string, what: 'outputs' | 'transcript' | 'shot', ask: ChatAsk = {}): Promise<ChatAnswer> {
+  /** A chat's outputs, a transcript page, one screenshot or its terminal screen, for the chat view. */
+  chat(sessionId: string, what: 'outputs' | 'transcript' | 'shot' | 'screen', ask: ChatAsk = {}): Promise<ChatAnswer> {
     const id = Math.random().toString(36).slice(2)
     const result = this.request<ChatAnswer, ChatAnswer>(this.chatReads, id, 30_000, () => ({ problem: 'The editor did not answer' }), m => m)
     this.postToExtension({ type: 'chat-get', id, sessionId, what, ...ask })

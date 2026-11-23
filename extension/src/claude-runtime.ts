@@ -16,7 +16,6 @@
 import * as vscode from 'vscode'
 import * as os from 'os'
 import * as path from 'path'
-import * as fs from 'fs'
 import { HookServer } from './hook-server'
 import { SessionWatcher } from './session-watcher'
 import { VisualizerPanel } from './webview-provider'
@@ -31,7 +30,7 @@ import {
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
 import { archiveRow, readArchive, recordArchive } from './hub/chains'
-import { dailySummary, fillBoxes, notify } from './hub/notify'
+import { dailySummary, fillBoxes, notify, notifyResearchDone } from './hub/notify'
 import { onSwitchboard, pendingReload, readBuild, RECHECK_MS } from './hub/self-update'
 import { idle, watchActivity } from './hub/idle'
 import { keepQuestions } from './hub/questions'
@@ -42,12 +41,27 @@ import { chatEnded, chatFinished, chatMissed, chatResumed } from './hub/todo'
 import { queueAar } from './hub/learn'
 import { stopChatServers } from './hub/reap'
 import type { ChatProgress, ChatState } from './hub/types'
-import { wireWatcherToPanel } from './session-runtime'
+import { saveResearch, wireWatcherToPanel } from './session-runtime'
 import { smartHook } from './hub/smart-tools'
 import { researchHook } from './hub/research-window'
+import { ResearchCapture, captureSaved, type Captured } from './hub/research-capture'
+import { LIBRARY, listResearch } from './hub/research-library'
+import { redact } from './hub/brain'
 import type { AgentRuntime } from './session-runtime'
 
 const log = createLogger('ClaudeRuntime')
+const researchCapture = new ResearchCapture()
+
+/** A finished research run from the hooks: saved once across windows, then listed and noticed. */
+function keepResearch(c: Captured): void {
+  try {
+    const chat = hub.get().chats.find(x => x.sessionId === c.sessionId)?.name ?? 'chat'
+    const { item, created } = captureSaved(c, { root: LIBRARY, projects: hub.get().projects.map(p => p.path), chat, scrub: redact })
+    if (!created || !item) return
+    hub.set({ research: listResearch(LIBRARY) })
+    notifyResearchDone(item.question)
+  } catch (err) { log.warn('Research save failed:', err) }
+}
 
 /** Events the session watcher already owns end-to-end via the transcript parser.
  *  Letting hooks re-emit these would create duplicate nodes with divergent names
@@ -125,6 +139,9 @@ export async function startClaudeRuntime(
       if (!mirror) smartHook(hub, payload).catch(err => log.warn('Smart toggle failed:', err))
       if (!mirror) smartSwitch(payload).catch(err => log.warn('Smart switch failed:', err))
       if (!mirror) researchHook(payload)
+      // Every window folds the hooks, mirror or not, so each sees the prompt and the Stop; the claim keeps the save to one window.
+      const done = researchCapture.hook(payload)
+      if (done) keepResearch(done)
       // Every window, mirror or not: each fills the Source Control boxes of the repos it has open.
       fillBoxes(hub.get().progress.find(p => p.sessionId === payload.session_id))
       if (!change) return
@@ -138,8 +155,8 @@ export async function startClaudeRuntime(
     hookServer.onEvent((event) => {
       if (event.sessionId && hub.isHeadless(event.sessionId)) return
       const panels = VisualizerPanel.ready()
-      if (panels.length === 0) return
-      const panel = { sendEvent: (e: AgentEvent) => { for (const p of panels) p.sendEvent(e) } }
+      // Research is saved from the same events the panels get, open or not.
+      const panel = { sendEvent: (e: AgentEvent) => { saveResearch(e); for (const p of panels) p.sendEvent(e) } }
 
       const eventSessionId = event.sessionId
       const watcherHandlesThis = eventSessionId
@@ -217,7 +234,7 @@ async function withCoverage(change: { from?: ChatState; to: ChatProgress }): Pro
 let refreshedFor: string | undefined
 
 /** A newer Switchboard installed, or in a window on the Switchboard checkout any rebuild of it: reload the window once it is idle
- * (idle.ts), else look again next tick. Terminal chats and unsaved files outlive a reload. Once per version (or build) per window,
+ * (idle.ts), else look again next tick. Terminal chats outlive a reload only if it takes under a minute, so a mid-turn chat holds it. Once per version (or build) per window,
  * so a copy that will not load cannot loop. */
 function reloadIfUpdated(context: vscode.ExtensionContext, running: { version: string; build?: string }): void {
   const roots = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)

@@ -4,7 +4,7 @@ import type { ChatRow, TerminalRow, WindowColor } from './types'
 
 export const ANSI: Record<WindowColor, string> = {
   violet: 'terminal.ansiMagenta', amber: 'terminal.ansiYellow', teal: 'terminal.ansiCyan',
-  rose: 'terminal.ansiRed', lime: 'terminal.ansiGreen', cobalt: 'terminal.ansiBlue',
+  rose: 'terminal.ansiRed', lime: 'terminal.ansiGreen', cobalt: 'terminal.ansiBlue', slate: 'terminal.ansiWhite',
 }
 
 type Term = { name: string; exitStatus?: unknown; dispose(): void }

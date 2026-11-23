@@ -1,0 +1,13 @@
+.wt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.wt-mark { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px; font-size: 12px; line-height: 1.4; color: var(--hub-ash); }
+.wt-note { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.4; color: var(--hub-ash); }
+.wt { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--hub-hair); border-radius: 10px; background: var(--hub-elev); }
+.wt .wt-note { flex: 1 1 200px; }
+.wt-name { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--hub-ink); }
+.wt-name code { font: 500 12px/1 var(--hub-mono); color: var(--hub-body); }
+.wt-ask { flex: 1 1 100%; display: grid; gap: 8px; padding: 10px; border-radius: 8px; border: 1px solid var(--hub-hair-strong); background: var(--hub-elev); color: var(--hub-ink); font-size: 13px; }
+.wt .wt-ask { background: var(--hub-canvas); }
+.wt-ask p { margin: 0; line-height: 1.45; }
+.wt-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Narrow: name and button on one row so Approve stays near the top; the note is still read via aria-describedby. */
+@media (max-width: 480px) { .wt { padding: 8px 10px; } .wt .wt-note.plain { display: none; } }

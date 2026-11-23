@@ -2,7 +2,7 @@
 // Row pieces of the to-do panel: an item and a shipped one.
 import { useId, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode } from 'react'
 import type { ChatRow, TickedItem, TodoItem, TodoWhy } from '@/lib/hub-types'
-import { aiPath } from '@/lib/todo'
+import { aiPath, rowCues, type Cue } from '@/lib/todo'
 import { isLong, shippedOf, shortSha, titleOf } from '@/lib/todo-view'
 import { waitText, type Row } from '@/lib/todo-layout'
 import { ago } from '@/lib/look'
@@ -65,9 +65,28 @@ type RowProps = {
   drag?: { grip: ReactNode; moves?: ReactNode; li: HTMLAttributes<HTMLLIElement> & { 'data-top'?: string } }
 }
 
+/** Cues on a row: a waits-on link jumps to the prerequisite row, a running or from chat opens that chat when it is live. */
+function Cues({ cues, ops }: { cues: Cue[]; ops: Ops }) {
+  const go = (c: Cue) => {
+    if (c.k !== 'waits') return ops.jump(c.to!)
+    const el = document.querySelector<HTMLElement>(`[data-item="${CSS.escape(c.to!)}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    el?.querySelector<HTMLElement>('.tdx-title')?.focus({ preventScroll: true })
+  }
+  return <span className="tdx-cues">
+    {cues.map((c, i) => {
+      const link = c.to && (c.k === 'waits' || ops.live(c.to))
+      return <span key={`${c.k}${i}`} className="tdx-cue" data-k={c.k}>
+        {link ? <button type="button" className="tdx-cue-go" onClick={() => go(c)}>{c.text}</button> : c.text}
+      </span>
+    })}
+  </span>
+}
+
 export function ItemRow({ folder, row, ops, project, next, keys, targets = [], onTop, drag }: RowProps) {
   const { t, status, wait } = row
   const uid = useId(), isOpen = ops.open.includes(t.id), busy = ops.busy.has(t.id), editing = ops.editing?.id === t.id
+  const cues = rowCues(t, ops.todos[folder] ?? { todo: [] }, ops.chats)
   const [snoozing, setSnoozing] = useState(false)
   const title = titleOf(t), wt = wait && waitText(wait, day), src = fromText(t, folder, ops.chats)
   const chat = status === 'running' ? ops.chats.find(c => c.sessionId === t.chat) : undefined
@@ -121,7 +140,7 @@ export function ItemRow({ folder, row, ops, project, next, keys, targets = [], o
     </form>
   </li>
 
-  return <li className="tdx-row" data-status={status} data-wait={wait?.why} data-next={next || undefined} data-open={isOpen || undefined}
+  return <li className="tdx-row" data-status={status} data-wait={wait?.why} data-item={t.id} data-proj={baseName(folder)} data-next={next || undefined} data-open={isOpen || undefined}
     aria-busy={busy || undefined} tabIndex={keys ? 0 : undefined} data-decide={keys ? t.id : undefined} onKeyDown={keys ? key : undefined} {...drag?.li}>
     {drag?.grip}
     {lead}
@@ -134,6 +153,7 @@ export function ItemRow({ folder, row, ops, project, next, keys, targets = [], o
         <button type="button" className="tdx-title" aria-expanded={isOpen} aria-controls={`${uid}-more`} title={t.text}
           onClick={() => ops.toggle(t.id)} onDoubleClick={() => ops.edit(folder, t)}><span>{title}</span><Chevron /></button>
       </div>
+      {cues.length > 0 && <Cues cues={cues} ops={ops} />}
       {meta && <span className="tdx-meta">{busy ? 'Starting...' : meta}</span>}
       {isOpen && <div id={`${uid}-more`} className="tdx-more">
         {title !== t.text && <p className="tdx-full">{t.text}</p>}

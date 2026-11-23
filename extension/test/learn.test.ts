@@ -11,8 +11,10 @@ import { execFileSync } from 'child_process'
 import type { Runner } from '../src/hub/learn'
 import { aarWanted, applyRun, betterOrNot, consolidate, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, proposalCount, proposeRun, stageMemory, syncMemory, tooBig, usageOk } from '../src/hub/learn'
 
-const row = (id: string, side: string, pass: boolean[]) => ({ id, side, pass })
-const won = { verdict: { baseline: 0.9, candidate: 1, regressed: [] }, judged: [row('a', 'baseline', [true, false]), row('a', 'candidate', [true, true]), row('b', 'baseline', [true]), row('b', 'candidate', [true])] }
+const row = (id: string, side: string, pass: boolean[], items?: number) => ({ id, side, pass, items })
+const yes = (n: number) => new Array<boolean>(n).fill(true)
+// b ran 10 times on 3 items, so the candidate clears 30 approved results
+const won = { verdict: { baseline: 0.9, candidate: 1, regressed: [] }, judged: [row('a', 'baseline', [true, false]), row('a', 'candidate', [true, true]), row('b', 'baseline', yes(30), 3), row('b', 'candidate', yes(30), 3)] }
 
 describe('schedule', () => {
   it('runs twice a week', () => {
@@ -60,6 +62,19 @@ describe('better or not', () => {
     assert.match(betterOrNot(won, 'x', 'y').why, /changed since/)
     assert.match(betterOrNot(won, 'x', undefined).why, /not found/)
     assert.equal(betterOrNot({}, 'x', 'x').apply, false)
+  })
+
+  it('needs 30 approved results before a new version counts', () => {
+    const few = { ...won, judged: [row('a', 'baseline', [true, false]), row('a', 'candidate', [true, true]), row('b', 'baseline', yes(27), 3), row('b', 'candidate', yes(27), 3)] }
+    assert.match(betterOrNot(few, 'x', 'x').why, /29 approved results, need 30/)
+  })
+
+  it('compares repeated runs by passes per item, not by slot', () => {
+    // item 1 passed once on each side, in different runs: not a regression
+    const moved = { ...won, judged: [...won.judged, row('c', 'baseline', [true, false, false, true], 2), row('c', 'candidate', [true, true, true, false], 2)] }
+    assert.equal(betterOrNot(moved, 'x', 'x').apply, true)
+    const fewer = { ...won, judged: [...won.judged, row('c', 'baseline', [true, true, true, true], 2), row('c', 'candidate', [true, true, false, true], 2)] }
+    assert.match(betterOrNot(fewer, 'x', 'x').why, /regressed on c/)
   })
 
   it('writes the source, keeps the old file next to the run, and says how to undo', () => {

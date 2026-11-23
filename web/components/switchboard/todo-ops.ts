@@ -124,6 +124,6 @@ export function useTodoOps({ todos, chats, archive = [], windows, send }: { todo
   const setPilot = (folder: string, c: { on?: boolean; paused?: boolean }) => send({ type: 'hub-todo-pilot', path: folder, ...c })
   const move = (folder: string, ids: string[]) => send({ type: 'hub-todo-move', path: folder, ids })
 
-  return { chats, archive, windows, said, say, open, toggle, editing, setEditing, edit, save, busy, hidden, toast, undoable, undoAll, live, run, approve, accept, decline, finish, snooze, wake, isSnoozed, snoozedCount: Object.keys(snoozes).length, restore, add, jump, setPilot, move, send }
+  return { todos, chats, archive, windows, said, say, open, toggle, editing, setEditing, edit, save, busy, hidden, toast, undoable, undoAll, live, run, approve, accept, decline, finish, snooze, wake, isSnoozed, snoozedCount: Object.keys(snoozes).length, restore, add, jump, setPilot, move, send }
 }
 export type Ops = ReturnType<typeof useTodoOps>

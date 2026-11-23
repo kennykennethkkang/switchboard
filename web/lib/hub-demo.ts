@@ -104,6 +104,108 @@ const demoSmart = (now: number): SmartState => {
     ],
   }
 }
+type DemoResearch = NonNullable<HubState['research']>[number]
+
+const DEMO_RESEARCH_BODY: Record<string, string> = {
+  r1: `## Answer
+Use **sqlite-vec** on top of the official SQLite WASM build [1][2]. It runs inside the extension host with no native module, so the VSIX stays one package for every platform [3].
+
+**Confidence:** High
+
+## Key findings
+- sqlite-vec's WASM build answers a 384 dimension top 10 query over 50k rows in 12 to 18 ms on an M2 [2].
+- LanceDB and Chroma both pull native binaries; the VSIX would need a build per platform [4][5].
+- hnswlib-wasm is faster on huge sets but keeps the index in memory and has no persistence story [6].
+- Orama is pure JS and fine under 10k notes, but its vector search slows past that [7].
+- One SQLite file keeps notes, links and vectors together, so the memory graph and recall read the same store [1].
+
+## What to do
+1. Add the WASM SQLite build and sqlite-vec as a loadable extension.
+2. Embed notes in a background job; store vectors next to the note rows.
+3. Keep the current keyword recall as a fallback when the index is cold.
+
+## Sources
+- [1] sqlite-vec docs https://alexgarcia.xyz/sqlite-vec/
+- [2] sqlite-vec WASM benchmarks https://github.com/asg017/sqlite-vec/blob/main/benchmarks/README.md
+- [3] VS Code platform specific extensions https://code.visualstudio.com/api/working-with-extensions/publishing-extension
+- [4] LanceDB Node install https://lancedb.github.io/lancedb/basic/
+- [5] Chroma JS client https://docs.trychroma.com/docs/overview/getting-started
+- [6] hnswlib-wasm https://github.com/ShravanSunder/hnswlib-wasm
+- [7] Orama vector search https://docs.orama.com/open-source/usage/search/vector-search
+- [8] SQLite WASM https://sqlite.org/wasm/doc/trunk/index.md
+- [9] Extension host limits https://code.visualstudio.com/api/advanced-topics/extension-host
+`,
+  r2: `## Answer
+Both engines ship same-origin cross-document View Transitions through the **@view-transition** rule [1][2]. The gaps left are small but real for Armasu's page transitions.
+
+**Confidence:** Medium
+
+## Key findings
+- Safari ignores **view-transition-class** on groups nested inside another named group [3].
+- Types set in the pageswap event are dropped in Safari; Chrome applies them [4].
+- Chrome caps the capture at the viewport; Safari captures the full element, so tall cards can jank [5].
+- Both honor prefers-reduced-motion only if the CSS says so; neither turns transitions off by itself [6].
+
+## What to do
+1. Keep the opacity fallback for Safari on nested groups.
+2. Set transition types from CSS media queries, not pageswap, until Safari catches up.
+
+## Sources
+- [1] MDN @view-transition https://developer.mozilla.org/en-US/docs/Web/CSS/@view-transition
+- [2] WebKit features in Safari 18.2 https://webkit.org/blog/16301/webkit-features-in-safari-18-2/
+- [3] WebKit bug 283511 https://bugs.webkit.org/show_bug.cgi?id=283511
+- [4] Chrome cross-document transitions https://developer.chrome.com/docs/web-platform/view-transitions/cross-document
+- [5] Can I use view transitions https://caniuse.com/view-transitions
+- [6] CSS View Transitions Level 2 https://www.w3.org/TR/css-view-transitions-2/
+- [7] Jake Archibald notes https://jakearchibald.com/2024/view-transitions-handling-aspect-ratio-changes/
+`,
+  r3: `## Answer
+Pace by **tokens per minute** with a token bucket sized from the window, and stop new work at 85% of the window used [1][2].
+
+**Confidence:** Medium
+
+## Key findings
+- Counting workers fails because one deep researcher can burn ten times a quick qa pass [3].
+- A bucket refilled at window size divided by 300 minutes smoothed bursts in every published harness [2][4].
+- Exponential backoff alone still caused retry storms when six workers hit the limit together [5].
+- Jittered backoff plus a shared bucket cut 429s to near zero in the tests read [5][6].
+
+## Sources
+- [1] Anthropic rate limits https://docs.anthropic.com/en/api/rate-limits
+- [2] Token bucket explained https://en.wikipedia.org/wiki/Token_bucket
+- [3] Multi-agent research system https://www.anthropic.com/engineering/multi-agent-research-system
+- [4] OpenAI rate limit guide https://platform.openai.com/docs/guides/rate-limits
+- [5] AWS backoff and jitter https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+- [6] Google SRE handling overload https://sre.google/sre-book/handling-overload/
+`,
+}
+
+/** Saved research runs for the demo; their markdown comes from demoResearchBody. */
+export function demoResearch(now = Date.now()): DemoResearch[] {
+  const MIN = 60_000, DAY = 86_400_000
+  const t0 = now
+  return [
+  {
+    id: 'r1', question: 'Which local vector store fits a VS Code extension that cannot ship native modules?', project: 'Switchboard',
+    chat: 'Memory recall speedup', sessionId: 'demo-research-1', at: t0 - 4 * MIN, sources: 9, seen: false,
+    summary: 'Use sqlite-vec through the WASM build of SQLite. It loads in the extension host with no native binary, handles 50k notes under 20 ms per query, and keeps the memory graph in one file.',
+  },
+  {
+    id: 'r2', question: 'Where do Safari and Chrome still differ on cross-document View Transitions?', project: 'Armasu',
+    chat: 'Page transitions pass', sessionId: 'demo-research-2', at: t0 - 26 * 60 * MIN, sources: 7, seen: true,
+    summary: 'Both ship same-origin cross-document transitions now. Safari still drops view-transition-class on nested groups and ignores types set from pageswap, so keep the fallback fade for Safari.',
+  },
+  {
+    id: 'r3', question: 'How should an agent fan-out be paced under a rolling 5 hour usage window?',
+    chat: 'Research space', sessionId: 'demo-research-3', at: t0 - 3 * DAY, sources: 11, seen: true,
+    summary: 'Cap live workers by tokens per minute, not by count. A token bucket refilled from the window size, with a hard stop at 85% used, kept every tested setup inside the window with no 429 storms.',
+  },
+]
+}
+
+/** The saved markdown for a demo research run, or undefined. */
+export const demoResearchBody = (id: string): string | undefined => DEMO_RESEARCH_BODY[id]
+
 export const demoHub = (now = Date.now()): HubState => {
   const h = { ...demoStations(withPlans(baseHub(now), now), now), smart: demoSmart(now) } as HubState
   if (typeof location === 'undefined' || !new URLSearchParams(location.search).get('demo')?.split(',').includes('stalled')) return h
@@ -168,6 +270,7 @@ function baseHub(now: number): HubState {
       { pid: 1, sessionId: 'd-work', ai: 'codex', takes: true, name: 'Fix login redirect v4', chain: 'Fix login redirect', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [], elapsedMs: 95 * 60e3, costUsd: 3.4, budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' }, checkBack: { everyMin: 30, count: 3 } },
       { pid: 2, sessionId: 'd-done', takes: true, name: 'Hub AIs and Starred', cwd: '/Users/k/GitHub/switchboard', link: '', live: true, why: [] },
       { pid: 3, sessionId: 'd-ask', takes: true, name: 'Outfit picker copy', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
+      { pid: 9, sessionId: 'd-tree2', takes: true, name: 'Cookie banner (worktree)', cwd: '/Users/k/GitHub/Armasu/.claude/worktrees/cookie-banner', link: '', live: true, why: [] },
       { pid: 8, sessionId: 'd-tree', takes: true, name: 'Fix login (worktree)', cwd: '/Users/k/GitHub/Armasu/.claude/worktrees/fix-login', link: '', live: true, why: [] },
       { pid: 7, sessionId: 'd-close', takes: true, name: 'Search filters', cwd: '/Users/k/GitHub/Armasu', link: '', live: true, why: [] },
       // Started from one split message; d-wrap also waits on d-almost (links).
@@ -249,6 +352,7 @@ function baseHub(now: number): HubState {
     ],
     firstRun: { github: true, claude: true, project: true, chat: false, approved: false },
     researchOffers: [{ sessionId: 'd-ask', score: 0.82, reason: 'Picker copy leans on claims about what shoppers prefer; a research run can check them', at: now - 3 * 60e3 }],
+    research: demoResearch(now),
     sourceChecks: demoSourceChecks(now),
     // The hung test run that started this check: a subagent's pnpm test, two hours on one core.
     stuck: [
@@ -323,6 +427,8 @@ function baseHub(now: number): HubState {
           questions: [{ header: 'Finish', question: 'Approve this chat as finished?', options: ['Approve', 'Send back'] }] } },
       { sessionId: 'd-idle', cwd: '/Users/k/GitHub/claude-mods', state: 'idle', startedAt: now - 90 * 60e3, at: now - 30 * 60e3,
         roles: [], tasks: [{ id: '1', subject: 'Drop old presets', status: 'pending' }] },
+      { sessionId: 'd-tree2', cwd: '/Users/k/GitHub/Armasu/.claude/worktrees/cookie-banner', state: 'done', startedAt: now - 50 * 60e3, at: now - 8 * 60e3, finishedAt: now - 8 * 60e3,
+        roles: [], tasks: [{ id: '1', subject: 'Shorten the cookie banner copy', status: 'completed' }], commit: 'Shorter cookie banner copy' },
       { sessionId: 'd-tree', cwd: '/Users/k/GitHub/Armasu/.claude/worktrees/fix-login', state: 'working', startedAt: now - 20 * 60e3, at: now - 10e3,
         roles: [], tasks: [{ id: '1', subject: 'Fix the login redirect on its own branch', status: 'in_progress' }],
         compacted: { at: now - 6 * 60e3, trigger: 'auto' }, denied: { at: now - 3 * 60e3, tool: 'Bash', target: 'rm -rf node_modules', reason: 'outside the task' },
@@ -373,7 +479,7 @@ function baseHub(now: number): HubState {
     ],
     tailscale: true,
     awake: false,
-    tools: { flagged: DEMO_FLAGGED, pick: null, chats: { 'd-work': { plugins: { 'superpowers@superpowers-dev': true, 'aws-core@claude-plugins-official': false, 'stitch-design@google-labs-code-stitch-skills': false }, skills: { 'claude-x-jev': false, phone: false }, assets: { 'docs/design/raycast-DESIGN.md': true, ...Object.fromEntries(['airbnb', 'apple', 'linear', 'notion', 'raycast', 'stripe', 'vercel'].map(b => [`/Users/demo/.claude/switchboard/design-md/${b}/DESIGN.md`, false])) } } } },
+    tools: { flagged: DEMO_FLAGGED, pick: null, precedence: { 'claude-x-jev': 'always', 'aws-core@claude-plugins-official': 'never' }, smart: { 'd-tree': { why: { 'claude-x-jev': 'Jev: needed (0.91)', phone: 'Jev: not needed (0.08)', 'aws-core@claude-plugins-official': 'Jev: not needed (0.12)', 'stitch-design@google-labs-code-stitch-skills': 'design words in the prompt' }, on: {}, refused: [], library: [], pending: false, at: now - 15 * 60e3 } }, chats: { 'd-work': { plugins: { 'superpowers@superpowers-dev': true, 'aws-core@claude-plugins-official': false, 'stitch-design@google-labs-code-stitch-skills': false }, skills: { 'claude-x-jev': false, phone: false }, assets: { 'docs/design/raycast-DESIGN.md': true, ...Object.fromEntries(['airbnb', 'apple', 'linear', 'notion', 'raycast', 'stripe', 'vercel'].map(b => [`/Users/demo/.claude/switchboard/design-md/${b}/DESIGN.md`, false])) } } } },
     installed: [
       { kind: 'mod', name: 'usage-meter@kenneth-mods', enabled: true }, { kind: 'mod', name: 'repo-rules@kenneth-mods', enabled: true }, { kind: 'mod', name: 'paid-guard@kenneth-mods', enabled: true },
       { kind: 'plugin', name: 'superpowers@superpowers-dev', enabled: true, skills: ['brainstorming', 'test-driven-development', 'writing-plans'], description: 'Planning, test-first coding and review habits for every chat.' }, { kind: 'plugin', name: 'aws-core@claude-plugins-official', enabled: true, description: 'AWS docs, CLI help and account checks.' }, { kind: 'plugin', name: 'stitch-design@google-labs-code-stitch-skills', enabled: false },
@@ -516,7 +622,7 @@ const demoRepo = (h: HubState, sessionId: string): RepoView => {
     stashes: 0, github: `https://github.com/kennykennethkkang/${cwd.split('/').pop()}`, at: Date.now(),
     ...(sessionId === 'd-work' ? demoMerge(Date.now()) : {}),
     ...(sessionId === 'd-done' ? demoLanes(Date.now()) : {}),
-    ...(sessionId === 'd-tree' ? { worktree: true, branch: 'worktree-fix-login', upstream: undefined, branches: ['worktree-fix-login', 'main'], sync: { kind: 'publish' as const, label: 'Publish branch' } } : {}),
+    ...(sessionId === 'd-tree' ? { worktree: true, worktrees: 1, branch: 'worktree-fix-login', upstream: undefined, branches: ['worktree-fix-login', 'main'], sync: { kind: 'publish' as const, label: 'Publish branch' } } : {}),
   }
 }
 
@@ -615,6 +721,7 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     }
     case 'hub-pick-tools': return h.tools ? { ...h, tools: { ...h.tools, pick: { goal: c.text, folder: c.path, profile: demoPick(h, c.text) } } } : h
     case 'hub-chat-tools': return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.tools } } } : h
+    case 'hub-tool-precedence': { if (!h.tools) return h; const p = { ...h.tools.precedence }; if (c.value === 'auto') delete p[c.name]; else p[c.name] = c.value; return { ...h, tools: { ...h.tools, precedence: p } } }
     case 'hub-indefinite': {
       const cur = h.tools?.chats[c.sessionId] ?? { plugins: {}, skills: {} }
       const { indefinite: _, ...rest } = cur
@@ -697,6 +804,8 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     }
     case 'hub-coder-view': return { ...h, controls: { ...h.controls, switchboard: { ...h.controls.switchboard, coderView: c.on } } }
     case 'hub-research-dismiss': return { ...h, researchOffers: h.researchOffers?.filter(o => o.sessionId !== c.sessionId) }
+    case 'hub-research-seen': return { ...h, research: h.research?.map(r => (r.id === c.id ? { ...r, seen: true } : r)) }
+    case 'hub-research-delete': return { ...h, research: h.research?.filter(r => r.id !== c.id) }
     case 'hub-first-run': return h.firstRun ? { ...h, firstRun: { ...h.firstRun, dismissed: c.dismissed || undefined } } : h
     case 'hub-advanced': return { ...h, controls: { ...h.controls, switchboard: { ...h.controls.switchboard, advancedMode: { ...h.controls.switchboard.advancedMode, [c.path]: c.on } } } }
     case 'hub-stage': return { ...h, stages: { ...h.stages, [c.path]: (h.stages?.[c.path] ?? []).map(r => r.run !== c.run ? r : { ...r, stages: r.stages.map(st => {

@@ -1,5 +1,5 @@
 /** Approve: a done chat waits for Kenneth's OK before it closes and moves to History. */
-import type { ArchivedChat, ChatProgress, DoneCheck } from './hub-types'
+import type { ChatProgress, DoneCheck } from './hub-types'
 
 /** The done-check verdict beside the button; undefined when the mod wrote none. */
 export const checkLine = (c?: DoneCheck) => !c ? undefined : c.verified ? 'Verified' : `Unverified${c.missing?.length ? `: ${c.missing.join(', ')}` : ''}`

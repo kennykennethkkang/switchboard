@@ -308,13 +308,18 @@ export function waitBand(s: HubState, self: string, fromTodo: boolean, now: numb
     const file = l.auto ? s.live.find(x => ids.includes(x.sessionId))?.file : undefined
     parts.push(file ? `${file.split('/').pop()} in ${names}` : names)
   }
-  // No band unless this chat itself waits; then the hub's wording of the held queue wins.
-  if (!parts.length) return undefined
-  const hold = fromTodo && key ? s.todos?.[key]?.plan?.hold : undefined
+  const hold = fromTodo && key && parts.length ? s.todos?.[key]?.plan?.hold : undefined
   if (hold?.kind === 'waiting' && typeof hold.text === 'string' && hold.text) return cut(hold.text)
-  const line =`Waiting on ${parts.join(', ')} to finish${fromTodo ? ', next to-do starts after' : ''}`
-  return cut(line)
+  // The Left lines this chat hands to To-do, one clause after the wait.
+  const mine = s.progress.find(p => p.sessionId === self)
+  const left = mine?.report?.left.length ?? 0
+  const lines: string[] = []
+  if (parts.length) lines.push(`Waiting on ${parts.join(', ')} to finish${fromTodo ? ', then this to-do runs' : ''}`)
+  if (left) lines.push(mine?.state === 'done' ? `Sent ${plural(left, 'line')} to To-do` : `Sends ${plural(left, 'line')} to To-do when it finishes`)
+  return lines.length ? cut(lines.join(' · ')) : undefined
 }
+
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
 export const register: Register = on => {
   let fromTodo = false

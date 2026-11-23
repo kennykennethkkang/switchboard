@@ -63,3 +63,13 @@ test('ropesBusy: only an awake rope keeps the board drawing', () => {
   assert.equal(ropesBusy(r, 1.2, []), true)
   assert.equal(ropesBusy([], 2, ['a']), false)
 })
+
+test('arrivals: desks of new courtyards only, none on the first court', async () => {
+  const { arrivals } = await import('./board-fx')
+  const a = { nodes: [{ id: 'yard:a', kind: 'courtyard' }, { id: 'd1', kind: 'desk', parent: 'yard:a' }] }
+  const b = { nodes: [...a.nodes, { id: 'yard:b', kind: 'courtyard' }, { id: 'd2', kind: 'desk', parent: 'yard:b' }, { id: 'd3', kind: 'desk', parent: 'yard:b' }] }
+  assert.deepEqual(arrivals(a, b), ['d2', 'd3'])
+  assert.deepEqual(arrivals(b, b), [])
+  assert.deepEqual(arrivals(undefined, b), [])
+  assert.deepEqual(arrivals({ nodes: [] }, b), [])
+})

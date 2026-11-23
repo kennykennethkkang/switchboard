@@ -37,20 +37,28 @@ export function usageOk(u: { windows: Array<{ kind?: string; percentUsed: number
   return u.windows.every(w => w.kind?.startsWith('codex_') || w.percentUsed < cap || resetMs(w.resetsAt) <= now)
 }
 
-type Results = { target?: unknown; judged?: Array<{ id: string; side: string; pass: boolean[] }>; verdict?: { baseline?: number; candidate?: number; regressed?: string[] } }
+type Judged = { id: string; side: string; pass: boolean[]; items?: number }
+type Results = { target?: unknown; judged?: Judged[]; verdict?: { baseline?: number; candidate?: number; regressed?: string[] } }
 const pc = (x: number) => `${Math.round(x * 100)}%`
+/** Same floor as self-improve.mjs MIN_APPROVED: a new version needs 30 passed checklist items. */
+export const MIN_APPROVED = 30
+/** Passes per checklist item; pass holds repeated runs back to back, items long each. */
+const perItem = (j: Judged) => { const n = j.items || j.pass.length, c = new Array<number>(n).fill(0); j.pass.forEach((p, i) => { if (p) c[i % n]++ }); return c }
 
-/** Applied only when the candidate's held-out pass rate is higher, no judged item it passed on baseline fails, and the source still matches baseline. */
+/** Applied only when the candidate's held-out pass rate is higher, no judged item passed fewer times than on baseline, it has 30 approved results, and the source still matches baseline. */
 export function betterOrNot(r: Results, baseline: string, source: string | undefined): { apply: boolean; why: string } {
   const no = (why: string) => ({ apply: false, why })
   const v = r.verdict
   if (typeof v?.baseline !== 'number' || typeof v.candidate !== 'number') return no('no verdict')
   if (!(v.candidate > v.baseline)) return no(`not better: ${pc(v.baseline)} -> ${pc(v.candidate)}`)
-  const side = (s: string) => new Map((r.judged ?? []).filter(j => j.side === s).map(j => [j.id, j.pass]))
+  const side = (s: string) => new Map((r.judged ?? []).filter(j => j.side === s).map(j => [j.id, j]))
   const b = side('baseline'), c = side('candidate')
   if (!b.size || [...b.keys()].some(id => !c.has(id))) return no('candidate runs incomplete')
-  const lost = [...new Set([...(v.regressed ?? []), ...[...b].filter(([id, p]) => p.some((x, i) => x && !c.get(id)?.[i])).map(([id]) => id)])]
+  const fewer = (id: string, j: Judged) => { const k = perItem(c.get(id)!); return perItem(j).some((n, i) => n > (k[i] ?? 0)) }
+  const lost = [...new Set([...(v.regressed ?? []), ...[...b].filter(([id, j]) => fewer(id, j)).map(([id]) => id)])]
   if (lost.length) return no(`regressed on ${lost.join(', ')}`)
+  const approved = [...c.values()].reduce((n, j) => n + j.pass.filter(Boolean).length, 0)
+  if (approved < MIN_APPROVED) return no(`${approved} approved results, need ${MIN_APPROVED}`)
   if (source === undefined) return no('target not found in claude-mods')
   if (source !== baseline) return no('target changed since the run')
   return { apply: true, why: `pass rate ${pc(v.baseline)} -> ${pc(v.candidate)}` }

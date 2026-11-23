@@ -226,7 +226,7 @@
   /* An accent for extra roles on the chat map (jev); never a state color. */
   --hub-violet: #a98bff;
   /* VS Code window colors, by palette key (extension/src/hub/colors.ts). */
-  --hub-w-violet: #a08bff; --hub-w-amber: #f2b24c; --hub-w-teal: #4fd1c9; --hub-w-rose: #ff7ab3; --hub-w-lime: #9bd65a; --hub-w-cobalt: #7ea2ff;
+  --hub-w-violet: #a08bff; --hub-w-amber: #f2b24c; --hub-w-teal: #4fd1c9; --hub-w-rose: #ff7ab3; --hub-w-lime: #9bd65a; --hub-w-cobalt: #7ea2ff; --hub-w-slate: #9aa4b5;
   --hub-blue-soft: rgba(87, 193, 255, 0.15);
   --hub-red-soft: rgba(255, 97, 97, 0.15);
   --hub-green-soft: rgba(89, 212, 153, 0.15);
@@ -257,7 +257,7 @@ body.vscode-light, body.vscode-high-contrast-light {
   --hub-teal: #08717e;
   --hub-yellow: #8a5900;
   --hub-violet: #6a4cd0;
-  --hub-w-violet: #6a4cd0; --hub-w-amber: #b26b00; --hub-w-teal: #0b8a87; --hub-w-rose: #b8306f; --hub-w-lime: #4a7d12; --hub-w-cobalt: #2f5fd0;
+  --hub-w-violet: #6a4cd0; --hub-w-amber: #b26b00; --hub-w-teal: #0b8a87; --hub-w-rose: #b8306f; --hub-w-lime: #4a7d12; --hub-w-cobalt: #2f5fd0; --hub-w-slate: #5b6474;
   --hub-blue-soft: rgba(9, 102, 176, 0.11);
   --hub-red-soft: rgba(184, 37, 47, 0.11);
   --hub-green-soft: rgba(11, 117, 72, 0.11);
@@ -286,7 +286,7 @@ body.vscode-light, body.vscode-high-contrast-light {
     --hub-teal: #08717e;
     --hub-yellow: #8a5900;
     --hub-violet: #6a4cd0;
-    --hub-w-violet: #6a4cd0; --hub-w-amber: #b26b00; --hub-w-teal: #0b8a87; --hub-w-rose: #b8306f; --hub-w-lime: #4a7d12; --hub-w-cobalt: #2f5fd0;
+    --hub-w-violet: #6a4cd0; --hub-w-amber: #b26b00; --hub-w-teal: #0b8a87; --hub-w-rose: #b8306f; --hub-w-lime: #4a7d12; --hub-w-cobalt: #2f5fd0; --hub-w-slate: #5b6474;
     --hub-blue-soft: rgba(9, 102, 176, 0.11);
     --hub-red-soft: rgba(184, 37, 47, 0.11);
     --hub-green-soft: rgba(11, 117, 72, 0.11);

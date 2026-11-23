@@ -5,8 +5,10 @@ import type { ChatProgress, ChatRow, IndefiniteBudget } from './types'
 
 /** The line that ends Run indefinitely; the usage-meter mod's IND_DONE for Claude chats. */
 export const INDEFINITE_DONE = /^Run indefinitely: done\s*$/m
+/** UI rounds: a Safe and an Explore version, crowd-ab and MiroFish pick; the mod's IND_DESIGN. */
+export const DESIGN_ROUND = 'If the round changes UI or UX, build two versions on localhost behind a toggle: Safe (proven patterns from the project and the design library) and Explore (a bolder take from ~/.claude/switchboard/design-md/SOURCES.md); have a qa agent that built neither run crowd-ab and a MiroFish sim on both, keep the winner, log both results in .switchboard/design-rounds.md, and start the next UI round from the winner with a fresh Safe and Explore pair.'
 /** The next-round prompt, as the usage-meter mod's IND_ROUND sends it to a Claude chat. */
-export const INDEFINITE_ROUND = 'Run indefinitely is on. Do another round: audit the project for bugs, errors, user problems and hard-to-use parts; fix them; add components that would help this project; run the checks; dispatch role subagents as needed. Decide everything yourself and note decisions. Never commit. When nothing is left you can improve, end with the line `Run indefinitely: done`.'
+export const INDEFINITE_ROUND = `Run indefinitely is on. Do another round: audit the project for bugs, errors, user problems and hard-to-use parts; fix them; add components that would help this project; run the checks; dispatch role subagents as needed. ${DESIGN_ROUND} Decide everything yourself and note decisions. Never commit. When nothing is left you can improve, end with the line \`Run indefinitely: done\`.`
 
 type Turn = { on: number | undefined; answer?: string; aborted?: boolean; held?: boolean }
 
@@ -50,7 +52,7 @@ export const usageLine = (onAt: number, now: number, usd: number | undefined) =>
   `used ${typeof usd === 'number' ? `$${usd.toFixed(2)} ` : ''}over ${Math.round((Math.max(0, now - onAt) / 3_600_000) * 10) / 10}h`
 
 /** The round for a chat with a /goal file, as the usage-meter mod's goalRound. */
-export const goalRound = (file: string) => `Run indefinitely is on with a goal in ${file}. Do another round toward it: build or fix what is still missing, test every function it names against how it should work, run its check and the project checks, dispatch role subagents as needed. Decide everything yourself and note decisions in the goal file. Never commit. When every point in the goal works with no issues and its check passes, end with the line \`Run indefinitely: done\`.`
+export const goalRound = (file: string) => `Run indefinitely is on with a goal in ${file}. Do another round toward it: build or fix what is still missing, test every function it names against how it should work, run its check and the project checks, dispatch role subagents as needed. ${DESIGN_ROUND} Decide everything yourself and note decisions in the goal file. Never commit. When every point in the goal works with no issues and its check passes, end with the line \`Run indefinitely: done\`.`
 
 /** The round prompt (the goal's when it has one), with a failed gate's output after it. */
 export const roundText = (gate: string | undefined, failedOut: string, goalFile?: string) => {

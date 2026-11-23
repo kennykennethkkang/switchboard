@@ -34,10 +34,12 @@
 .mm-ln { flex: none; }
 
 .mm-panel { position: absolute; z-index: 5; top: 12px; right: 12px; bottom: 12px; width: calc(400px - 24px); overflow-y: auto; overscroll-behavior: contain; border-radius: 14px; border: 1px solid var(--hub-hair); background: var(--hub-surface); box-shadow: var(--hub-shadow-pop); }
-.mm-panel .nb-read { padding: 16px 20px 32px; }
+/* the panel scrolls, not the article, so the sticky close has a scroller to stick in */
+.mm-panel .nb-read { padding: 16px 20px 32px; overflow: visible; }
 .mm-panel .nb-read h1 { font-size: 22px; }
 .mm-panel .nb-lead { font-size: 15px; }
-.mm-close { float: right; margin: -4px -8px 0 8px; }
+/* sticky so a long note can still be closed after scrolling */
+.mm-close { float: right; position: sticky; top: 8px; z-index: 1; margin: -4px -8px 0 8px; background: var(--hub-surface); box-shadow: 0 0 0 1px var(--hub-hair); }
 @media (prefers-reduced-motion: no-preference) { .mm-panel { animation: mm-in 200ms var(--hub-ease-out); } }
 @keyframes mm-in { from { opacity: 0; transform: translateX(12px); } }
 

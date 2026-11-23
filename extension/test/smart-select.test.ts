@@ -8,7 +8,8 @@ import { questionAsk } from '../src/hub/progress'
 import { buildSmart, computeStats, logDrafts, logSmart, questionBucket, smartRun, readSmartRows, smartPick, taskLabel, verdictOf, type SmartRow, type Stats } from '../src/hub/smart-select'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sb-smart-'))
-const pick = (o: Partial<SmartRow> = {}): SmartRow => ({ t: 'pick', at: 1, session: 's1', cwd: '/x/p', kind: 'model', task: 'fix', pick: 'sonnet', why: 'routine', key: 'model:1', ...o } as SmartRow)
+type PickRow = Extract<SmartRow, { t: 'pick' }>
+const pick = (o: Partial<PickRow> = {}): PickRow => ({ t: 'pick', at: 1, session: 's1', cwd: '/x/p', kind: 'model', task: 'fix', pick: 'sonnet', why: 'routine', key: 'model:1', ...o } as PickRow)
 const fin = (final: string, o: Partial<SmartRow> = {}): SmartRow => ({ t: 'final', at: 2, session: 's1', kind: 'model', key: 'model:1', final, ...o } as SmartRow)
 const done = { approvedAt: 5 }
 

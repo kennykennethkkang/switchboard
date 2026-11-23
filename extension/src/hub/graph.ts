@@ -247,11 +247,13 @@ function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<str
 export function recall(graph: MemoryGraph, query: string, hops = 2, near?: string, scope?: 'research'): string {
   const low = (x: string) => x.normalize('NFC').toLowerCase()
   const q = low(query.trim())
-  const terms = q.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  const words = (x: string) => low(x).split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  const terms = words(q)
   const byId = new Map(graph.nodes.map(n => [n.id, n]))
-  // Plain substring scoring, no stemming; fine for a few hundred notes.
-  const score = (n: GraphNode) => terms.reduce((s, t) => s + (low(n.label).includes(t) ? 3 : 0)
-    + (n.aliases?.some(a => low(a).includes(t)) ? 2 : 0) + (n.description && low(n.description).includes(t) ? 1 : 0), 0)
+  // Substring scoring, no stemming; 1-2 letter terms ("a", "in", "qa") only as whole words, or they hit nearly every note.
+  const has = (x: string, t: string) => t.length > 2 ? low(x).includes(t) : words(x).includes(t)
+  const score = (n: GraphNode) => terms.reduce((s, t) => s + (has(n.label, t) ? 3 : 0)
+    + (n.aliases?.some(a => has(a, t)) ? 2 : 0) + (n.description && has(n.description, t) ? 1 : 0), 0)
     + (low(n.label) === q ? 5 : 0)
   const inScope = (id: string) => scope !== 'research' || id.startsWith(`memory:${slugOf(RESEARCH_ROOT)}/`)
   const home = new Set(near ? graph.edges.filter(e => e.kind === 'in' && e.target === near).map(e => e.source) : [])

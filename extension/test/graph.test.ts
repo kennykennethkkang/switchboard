@@ -470,6 +470,18 @@ describe('the knowledge graph', () => {
     assert.ok(recall(g(), 'graph', 1).split('\n\n')[0].split('\n').filter(l => !l.startsWith('  ')).length <= 3)
   })
 
+  it('scores 1-2 letter query words as whole words only', () => {
+    // "in", "do" and "a" sit inside the merged note's aliases; they must not outrank the note the long words name.
+    const b = buildGraph(state(), [
+      note('merged', 'aliases: [indigo, domain, alpha, pinda, admin]\n'),
+      note('zsh-glob', 'description: grep include glob fails under zsh\n'),
+    ], [])
+    assert.match(recall(b, 'how do I grep in a glob'), /^zsh-glob:/)
+    assert.equal(recall(b, 'do a in'), 'Nothing in memory matches "do a in".')
+    // A short word still counts when it stands alone.
+    assert.match(recall(buildGraph(state(), [note('qa-runs', 'description: qa in webkit\n')], []), 'qa'), /^qa-runs:/)
+  })
+
   it('stays redacted and near 1500 characters on a big graph', () => {
     const many = Array.from({ length: 80 }, (_, i) => note(`n${i}`, `related: [${Array.from({ length: 10 }, (_, j) => `n${(i + j + 1) % 80}`).join(', ')}]\n`, `body sk-abcdefghijklmnopqrstuvwxyz ${i}`))
     const r = recall(buildGraph(state(), many, []), 'n1')
