@@ -4,10 +4,14 @@
   {
    "id": "55a17f3a",
    "text": "Trim CLAUDE.md and MEMORY.md (35k characters load in every chat and subagent, about 11k tokens). Baseline and method: vault wiki/token-efficiency.md. From Token Efficiency Analysis. Suggested, for later.",
-   "at": 1795475443168,
+   "at": 1795475445337,
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
-   "short": "Trim CLAUDE.md and MEMORY.md (35k characters load in..."
+   "short": "Trim CLAUDE.md and MEMORY.md (35k characters load in...",
+   "chat": "539d32a0-0660-472c-870b-eefa6ad112d8",
+   "host": "62903adf5e340f87",
+   "run": 130,
+   "auto": true
   },
   {
    "id": "e5ee68d1",
@@ -517,7 +521,7 @@
   "661d20ea": 1795428786896,
   "a2aa4796": 1795428786896
  },
- "seq": 129,
+ "seq": 130,
  "ticked": [
   {
    "id": "a2aa4796",
@@ -635,5 +639,6 @@
    "why": "missed",
    "short": "Adjust ship area to not need to have chat running to..."
   }
- ]
+ ],
+ "streak": 130
 }
