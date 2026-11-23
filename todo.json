@@ -4,14 +4,13 @@
   {
    "id": "8f8dfb3a",
    "text": "Release the Screen tab update (VS Code panel Screen tab, Terminal/Text toggle, screen reader text) after Merge back of terminal-view-switchboard-integration-8184: bump past main, package, install, open a chat's Screen tab in the VS Code panel to confirm it shows",
-   "at": 1795399822457,
+   "at": 1795399944545,
    "from": "a2641d21-038e-47f3-85b6-12b5258aba93",
    "name": "Terminal View Switchboard Integration",
    "short": "Release the Screen tab update (VS Code panel Screen tab,...",
-   "chat": "5b724cda-e06d-4e17-9f11-21bb4be7eab1",
-   "host": "62903adf5e340f87",
    "run": 98,
-   "auto": true
+   "auto": true,
+   "stopped": true
   },
   {
    "id": "e00a421e",
