@@ -16,11 +16,11 @@
    "id": "c6f0dbb5",
    "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
    "at": 1795404131964,
+   "chat": "082694b8-c7f6-49bf-89ef-650811afd552",
+   "host": "62903adf5e340f87",
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:",
-   "chat": "082694b8-c7f6-49bf-89ef-650811afd552",
-   "host": "62903adf5e340f87",
    "run": 102,
    "auto": true
   },
@@ -64,6 +64,14 @@
    "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
    "name": "To-do 99: Release research tab fixes",
    "short": "Fix: a project chat's deep-research report never reaches..."
+  },
+  {
+   "id": "e4bcd541",
+   "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
+   "at": 1795404381168,
+   "from": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
+   "name": "To-do 101: Fix worktree sweep grace",
+   "short": "Fix: extension `pnpm run lint:test` fails with 9 TS..."
   }
  ],
  "removed": {
