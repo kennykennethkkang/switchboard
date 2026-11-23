@@ -15,10 +15,14 @@
   {
    "id": "e4bcd541",
    "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
-   "at": 1795404381168,
+   "at": 1795407282752,
    "from": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
    "name": "To-do 101: Fix worktree sweep grace",
-   "short": "Fix: extension `pnpm run lint:test` fails with 9 TS..."
+   "short": "Fix: extension `pnpm run lint:test` fails with 9 TS...",
+   "chat": "8faac00a-608b-4cb6-83e7-e2d682503421",
+   "host": "62903adf5e340f87",
+   "run": 108,
+   "auto": true
   },
   {
    "id": "84a32676",
@@ -505,19 +509,19 @@
   "9afdac3c": 1795406440914,
   "d1c39247": 1795407280219
  },
- "seq": 107,
+ "seq": 108,
  "streak": 93,
  "ticked": [
   {
    "id": "d1c39247",
    "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
+   "at": 1795407280219,
+   "by": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
    "name": "To-do 99: Release research tab fixes",
    "short": "Fix: a project chat's deep-research report never reaches...",
    "run": 107,
-   "auto": true,
-   "at": 1795407280219,
-   "by": "62718e5b-4064-4fa8-aeee-e55a95000abf"
+   "auto": true
   },
   {
    "id": "9afdac3c",
