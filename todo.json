@@ -4,23 +4,23 @@
   {
    "id": "8f8dfb3a",
    "text": "Release the Screen tab update (VS Code panel Screen tab, Terminal/Text toggle, screen reader text) after Merge back of terminal-view-switchboard-integration-8184: bump past main, package, install, open a chat's Screen tab in the VS Code panel to confirm it shows",
-   "at": 1795399944545,
+   "at": 1795422105530,
    "from": "a2641d21-038e-47f3-85b6-12b5258aba93",
    "name": "Terminal View Switchboard Integration",
    "short": "Release the Screen tab update (VS Code panel Screen tab,...",
-   "run": 98,
-   "auto": true,
-   "stopped": true
+   "run": 126,
+   "chat": "258e6fae-7d70-45c3-aca7-8e8895096063",
+   "host": "62903adf5e340f87"
   },
   {
    "id": "007e1c30",
    "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
    "at": 1795422090856,
+   "chat": "a947970f-927c-4229-89de-b99ea63b25a1",
+   "host": "62903adf5e340f87",
    "from": "4dbff639-7423-4945-b974-a552abeef793",
    "name": "To-do 121: Compact Switchboard MEMORY md",
    "short": "Memory recall scoring:",
-   "chat": "a947970f-927c-4229-89de-b99ea63b25a1",
-   "host": "62903adf5e340f87",
    "run": 125,
    "auto": true
   },
@@ -526,7 +526,7 @@
   "a89feef4": 1795422029237,
   "06ebaaa6": 1795422084700
  },
- "seq": 125,
+ "seq": 126,
  "streak": 93,
  "ticked": [
   {
