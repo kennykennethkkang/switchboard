@@ -16,11 +16,11 @@
    "id": "07da17e7",
    "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
    "at": 1795412759607,
+   "chat": "64b45b22-552a-462b-9f4b-f58113821c30",
+   "host": "62903adf5e340f87",
    "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "name": "To-do 107: Fix research report memory save",
    "short": "Live check of the 0.21.138 research save fix (from chat...",
-   "chat": "64b45b22-552a-462b-9f4b-f58113821c30",
-   "host": "62903adf5e340f87",
    "run": 110,
    "auto": true
   },
@@ -31,6 +31,13 @@
    "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "name": "To-do 107: Fix research report memory save",
    "short": "Save deep-research reports to project memory from the..."
+  },
+  {
+   "id": "72ae2a0f",
+   "text": "Memory: bring Switchboard MEMORY.md under 200 lines (now 208; lines 201+ never load). The cut includes release-todo-unmerged-worktree (line 203), the note for \"release X after Merge back\" to-dos; chat f460e4eb missed it and retried node --test and pnpm run package. Run the memory-fix skill (merge related index lines, keep each under ~200 chars), then memory-gold.mjs --base to check no recall hit is lost. From Learn AAR of f460e4eb.",
+   "at": 1795413010143,
+   "from": "10d41c97-aef1-407f-8d5a-fda5f69fd1f4",
+   "short": "Memory: bring Switchboard MEMORY.md under 200 lines (now..."
   }
  ],
  "removed": {
