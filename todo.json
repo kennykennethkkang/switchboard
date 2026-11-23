@@ -15,10 +15,14 @@
   {
    "id": "99dca330",
    "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
-   "at": 1795400745018,
+   "at": 1795405827349,
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
-   "short": "Agents map at 390 px:"
+   "short": "Agents map at 390 px:",
+   "chat": "aa5e9732-7f88-491c-8db6-402c08a70273",
+   "host": "62903adf5e340f87",
+   "run": 104,
+   "auto": true
   },
   {
    "id": "3b565ab3-ok",
@@ -534,19 +538,19 @@
   "c6f0dbb5": 1795405524734,
   "ec112d09": 1795405818077
  },
- "seq": 103,
+ "seq": 104,
  "streak": 93,
  "ticked": [
   {
    "id": "ec112d09",
    "text": "Lantern Sea map theme: smooth drawings for the tea garden and armory places (route through placeArt hook in board.tsx bake, art/lantern.ts placeArtSmooth). From chat Realistic Map Agents Theme",
+   "at": 1795405818077,
+   "by": "21b97d4e-206a-4027-b724-491cc33fe877",
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:",
    "run": 103,
-   "auto": true,
-   "at": 1795405818077,
-   "by": "21b97d4e-206a-4027-b724-491cc33fe877"
+   "auto": true
   },
   {
    "id": "c6f0dbb5",
