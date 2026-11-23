@@ -11,6 +11,14 @@
    "run": 98,
    "auto": true,
    "stopped": true
+  },
+  {
+   "id": "07da17e7",
+   "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
+   "at": 1795412749018,
+   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
+   "name": "To-do 107: Fix research report memory save",
+   "short": "Live check of the 0.21.138 research save fix (from chat..."
   }
  ],
  "removed": {
@@ -497,13 +505,13 @@
   {
    "id": "84a32676",
    "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
+   "at": 1795407656678,
+   "by": "64d45c6b-0052-44ab-be13-0778c109415c",
    "from": "082694b8-c7f6-49bf-89ef-650811afd552",
    "name": "To-do 102: Bake Lantern Sea islands sharp",
    "short": "Fix: web/lib/court-map.test.ts perf budget fails on its...",
    "run": 109,
-   "auto": true,
-   "at": 1795407656678,
-   "by": "64d45c6b-0052-44ab-be13-0778c109415c"
+   "auto": true
   },
   {
    "id": "e4bcd541",
