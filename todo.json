@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "99dca330",
-   "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
-   "at": 1795405827349,
-   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
-   "name": "Realistic Map Agents Theme",
-   "short": "Agents map at 390 px:",
-   "chat": "aa5e9732-7f88-491c-8db6-402c08a70273",
-   "host": "62903adf5e340f87",
-   "run": 104,
-   "auto": true
-  },
-  {
    "id": "3b565ab3-ok",
    "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
    "at": 1795403233104,
@@ -536,11 +524,23 @@
   "e00a421e": 1795403793425,
   "1f7454e5": 1795403847442,
   "c6f0dbb5": 1795405524734,
-  "ec112d09": 1795405818077
+  "ec112d09": 1795405818077,
+  "99dca330": 1795406146003
  },
  "seq": 104,
  "streak": 93,
  "ticked": [
+  {
+   "id": "99dca330",
+   "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
+   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
+   "name": "Realistic Map Agents Theme",
+   "short": "Agents map at 390 px:",
+   "run": 104,
+   "auto": true,
+   "at": 1795406146003,
+   "by": "aa5e9732-7f88-491c-8db6-402c08a70273"
+  },
   {
    "id": "ec112d09",
    "text": "Lantern Sea map theme: smooth drawings for the tea garden and armory places (route through placeArt hook in board.tsx bake, art/lantern.ts placeArtSmooth). From chat Realistic Map Agents Theme",
@@ -638,15 +638,6 @@
    "short": "Fix: installing a Switchboard release reloads every...",
    "run": 94,
    "auto": true
-  },
-  {
-   "id": "58fbd139",
-   "text": "At 12:56 another chat installed Switchboard 0.21.124 and every VS Code window reloaded, which ended you mid-work. Check git status in your folder, then pick up exactly where you stopped and finish",
-   "at": 1795395506637,
-   "by": "45f4fefa-fd03-47d5-85ed-b20adfcd7425",
-   "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
-   "why": "missed",
-   "short": "At 12:56 another chat installed Switchboard 0.21.124 and..."
   }
  ]
 }
