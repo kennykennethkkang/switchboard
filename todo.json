@@ -45,6 +45,14 @@
    "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
    "name": "To-do 111: Extension research memory save",
    "short": "Live check of 0.21.139 research save (from chat 5e0538ab):"
+  },
+  {
+   "id": "d26897e3",
+   "text": "Research library (chat \"Review research tab implementation\"): ~/.claude/switchboard/research/.claims/ gets one file per saved run and is never cleaned up. Prune claim files older than about 30 days in extension/src/hub/research-library.ts, keeping claims for runs still in the library or in .trash, and add a test.",
+   "at": 1795419070318,
+   "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
+   "name": "Review research tab implementation",
+   "short": "Research library (chat \"Review research tab..."
   }
  ],
  "removed": {
