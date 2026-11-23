@@ -60,6 +60,14 @@
    "from": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
    "name": "To-do 101: Fix worktree sweep grace",
    "short": "Fix: extension `pnpm run lint:test` fails with 9 TS..."
+  },
+  {
+   "id": "84a32676",
+   "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
+   "at": 1795405525742,
+   "from": "082694b8-c7f6-49bf-89ef-650811afd552",
+   "name": "To-do 102: Bake Lantern Sea islands sharp",
+   "short": "Fix: web/lib/court-map.test.ts perf budget fails on its..."
   }
  ],
  "removed": {
@@ -539,13 +547,13 @@
   {
    "id": "c6f0dbb5",
    "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
+   "at": 1795405524734,
+   "by": "082694b8-c7f6-49bf-89ef-650811afd552",
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:",
    "run": 102,
-   "auto": true,
-   "at": 1795405524734,
-   "by": "082694b8-c7f6-49bf-89ef-650811afd552"
+   "auto": true
   },
   {
    "id": "58032070",
