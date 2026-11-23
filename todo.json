@@ -15,10 +15,14 @@
   {
    "id": "58032070",
    "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
-   "at": 1795397447783,
+   "at": 1795403861583,
    "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
    "name": "To-do 94: Fix Switchboard reload killing chats",
-   "short": "Fix: a chat killed by a window reload looks ended, so..."
+   "short": "Fix: a chat killed by a window reload looks ended, so...",
+   "chat": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
+   "host": "62903adf5e340f87",
+   "run": 101,
+   "auto": true
   },
   {
    "id": "c6f0dbb5",
@@ -539,7 +543,7 @@
   "e00a421e": 1795403793425,
   "1f7454e5": 1795403847442
  },
- "seq": 100,
+ "seq": 101,
  "streak": 93,
  "ticked": [
   {
