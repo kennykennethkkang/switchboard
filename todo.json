@@ -15,10 +15,14 @@
   {
    "id": "1f7454e5",
    "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
-   "at": 1795396322662,
+   "at": 1795403802170,
    "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
    "name": "Redesign Site Pages Ship",
-   "short": "Kit fix (aar, Redesign Site Pages Ship):"
+   "short": "Kit fix (aar, Redesign Site Pages Ship):",
+   "chat": "4efe3163-4ce7-43e7-8a93-7c3ab16abddc",
+   "host": "62903adf5e340f87",
+   "run": 100,
+   "auto": true
   },
   {
    "id": "58032070",
@@ -538,19 +542,19 @@
   "3b565ab3": 1795403233104,
   "e00a421e": 1795403793425
  },
- "seq": 99,
+ "seq": 100,
  "streak": 93,
  "ticked": [
   {
    "id": "e00a421e",
    "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
+   "at": 1795403793425,
+   "by": "0a0be0be-aa65-4b39-9deb-df52de218adc",
    "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
    "name": "Research tab seems to be",
    "short": "Release the research tab fixes (worktree...",
    "run": 99,
-   "auto": true,
-   "at": 1795403793425,
-   "by": "0a0be0be-aa65-4b39-9deb-df52de218adc"
+   "auto": true
   },
   {
    "id": "d1835d63",
