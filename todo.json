@@ -13,17 +13,6 @@
    "stopped": true
   },
   {
-   "id": "9feadeed",
-   "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
-   "at": 1795418833016,
-   "chat": "1d6a74b3-290d-41fe-b8d6-15fb01350d64",
-   "host": "62903adf5e340f87",
-   "from": "8db3461e-3619-42d8-a08a-f74267017535",
-   "short": "Add two held-out rules tasks for worktree Bash to...",
-   "run": 115,
-   "auto": true
-  },
-  {
    "id": "69a53497",
    "text": "Memory consolidation: 10 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-23-f3dcd803.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
    "at": 1795418939060,
@@ -519,11 +508,22 @@
   "ae106774": 1795414776403,
   "72ae2a0f": 1795415155063,
   "2669df6d": 1795418439396,
-  "91eb2700": 1795418828291
+  "91eb2700": 1795418828291,
+  "9feadeed": 1795418985789
  },
  "seq": 115,
  "streak": 93,
  "ticked": [
+  {
+   "id": "9feadeed",
+   "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
+   "from": "8db3461e-3619-42d8-a08a-f74267017535",
+   "short": "Add two held-out rules tasks for worktree Bash to...",
+   "run": 115,
+   "auto": true,
+   "at": 1795418985789,
+   "by": "1d6a74b3-290d-41fe-b8d6-15fb01350d64"
+  },
   {
    "id": "91eb2700",
    "text": "repo-rules fails closed on transient errors (improve-system 2026-11-22): \"repo-rules: the guard failed, so the command was held\" hit 5 sessions in Switchboard worktrees on 11-22/23, on plain commands (cd ../../../web && cat lib/skins/README.md; git status --short | wc -l) and two Write/Edit calls. bashRule returns undefined on that command in 180 ms when run alone, so the throw comes from roots()/report()/engine timeout under load, not the rule. In claude-mods/repo-rules/hooks/register.ts line 146 (held) and the .catch on the Bash, Edit and Write handlers: find what threw (log the error into the deny text), fix it, and add a test that a throwing roots() on a clean command does not hold it.",
@@ -619,18 +619,6 @@
    "name": "Fix VS Code terminal usage",
    "short": "Release the side pane dock fix (worktree...",
    "run": 106,
-   "auto": true
-  },
-  {
-   "id": "3b565ab3-ok",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795406228107,
-   "by": "8c51ef92-fb74-4d57-ac90-98af8e04260b",
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57...",
-   "run": 105,
    "auto": true
   }
  ]
