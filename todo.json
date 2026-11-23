@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "07da17e7",
-   "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
-   "at": 1795412759607,
-   "chat": "64b45b22-552a-462b-9f4b-f58113821c30",
-   "host": "62903adf5e340f87",
-   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
-   "name": "To-do 107: Fix research report memory save",
-   "short": "Live check of the 0.21.138 research save fix (from chat...",
-   "run": 110,
-   "auto": true
-  },
-  {
    "id": "ae106774",
    "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
    "at": 1795412753916,
@@ -524,11 +512,23 @@
   "9afdac3c": 1795406440914,
   "d1c39247": 1795407280219,
   "e4bcd541": 1795407319411,
-  "84a32676": 1795407656678
+  "84a32676": 1795407656678,
+  "07da17e7": 1795413235700
  },
  "seq": 110,
  "streak": 93,
  "ticked": [
+  {
+   "id": "07da17e7",
+   "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
+   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
+   "name": "To-do 107: Fix research report memory save",
+   "short": "Live check of the 0.21.138 research save fix (from chat...",
+   "run": 110,
+   "auto": true,
+   "at": 1795413235700,
+   "by": "64b45b22-552a-462b-9f4b-f58113821c30"
+  },
   {
    "id": "84a32676",
    "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
@@ -627,17 +627,6 @@
    "name": "To-do 94: Fix Switchboard reload killing chats",
    "short": "Fix: a chat killed by a window reload looks ended, so...",
    "run": 101,
-   "auto": true
-  },
-  {
-   "id": "1f7454e5",
-   "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
-   "at": 1795403847442,
-   "by": "4efe3163-4ce7-43e7-8a93-7c3ab16abddc",
-   "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
-   "name": "Redesign Site Pages Ship",
-   "short": "Kit fix (aar, Redesign Site Pages Ship):",
-   "run": 100,
    "auto": true
   }
  ]
