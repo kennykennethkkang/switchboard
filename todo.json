@@ -37,6 +37,14 @@
    "from": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
    "name": "To-do 114: Fix repo-rules fail-open transient errors",
    "short": "bash-approve and paid-guard fail closed on clean calls..."
+  },
+  {
+   "id": "76653e53",
+   "text": "Live check of 0.21.139 research save (from chat 5e0538ab): once the window runs 0.21.139, start a project chat with /deep-research while no Switchboard view is open in that window (see memory research-live-test: hub-new-chat POST via node script), then confirm a research-*.md note and its MEMORY.md line appear in that project's ~/.claude/projects/<slug>/memory. The extension now saves via saveResearch in extension/src/session-runtime.ts.",
+   "at": 1795419065997,
+   "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
+   "name": "To-do 111: Extension research memory save",
+   "short": "Live check of 0.21.139 research save (from chat 5e0538ab):"
   }
  ],
  "removed": {
