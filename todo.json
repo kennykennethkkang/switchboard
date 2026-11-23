@@ -5,11 +5,11 @@
    "id": "661d20ea",
    "text": "Release Switchboard after Merge back of the inspiration-sites worktree chat: ships design-md/SOURCES.md (library stamp local-3) and DESIGN_ROUND in extension/src/hub/indefinite.ts. Worktree was at 0.21.113 vs main's uncommitted 0.21.149, so it could not release itself.",
    "at": 1795427111255,
+   "chat": "8d22c18f-469d-45d5-80f1-65ab3110aed2",
+   "host": "62903adf5e340f87",
    "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
    "name": "Instagram Reel Switchboard UI Integration",
    "short": "Release Switchboard after Merge back of the...",
-   "chat": "8d22c18f-469d-45d5-80f1-65ab3110aed2",
-   "host": "62903adf5e340f87",
    "run": 129,
    "auto": true
   }
@@ -512,6 +512,7 @@
   "62583c2e": 1795424761406
  },
  "seq": 129,
+ "streak": 129,
  "ticked": [
   {
    "id": "62583c2e",
@@ -621,5 +622,15 @@
    "auto": true
   }
  ],
- "streak": 129
+ "suggested": [
+  {
+   "id": "a2aa4796",
+   "text": "Implement this video https://www.instagram.com/reel/Df--4CtAgrf/?knvt=NTc4MTIwNjQ2YQ== and make sure that all of these are inside of switchboard or it is programmed to search through all of those",
+   "at": 1795428684564,
+   "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
+   "name": "Instagram Reel Switchboard UI Integration",
+   "why": "missed",
+   "short": "Implement this video https://www.instagram.com/reel/Df--4..."
+  }
+ ]
 }
