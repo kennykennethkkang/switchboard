@@ -15,10 +15,14 @@
   {
    "id": "9afdac3c",
    "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
-   "at": 1795403764215,
+   "at": 1795406232725,
    "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
    "name": "Fix VS Code terminal usage",
-   "short": "Release the side pane dock fix (worktree..."
+   "short": "Release the side pane dock fix (worktree...",
+   "chat": "f460e4eb-61be-4f53-9aec-51d0aecb1351",
+   "host": "62903adf5e340f87",
+   "run": 106,
+   "auto": true
   },
   {
    "id": "d1c39247",
@@ -519,20 +523,20 @@
   "99dca330": 1795406146003,
   "3b565ab3-ok": 1795406228107
  },
- "seq": 105,
+ "seq": 106,
  "streak": 93,
  "ticked": [
   {
    "id": "3b565ab3-ok",
    "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795406228107,
+   "by": "8c51ef92-fb74-4d57-ac90-98af8e04260b",
    "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
    "name": "To-do 93: Fix to-do auto-tick and release",
    "why": "missed",
    "short": "You were cut off by a Switchboard window reload at 12:57...",
    "run": 105,
-   "auto": true,
-   "at": 1795406228107,
-   "by": "8c51ef92-fb74-4d57-ac90-98af8e04260b"
+   "auto": true
   },
   {
    "id": "99dca330",
