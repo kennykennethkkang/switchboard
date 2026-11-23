@@ -1,19 +1,6 @@
 {
  "version": 1,
- "todo": [
-  {
-   "id": "661d20ea",
-   "text": "Release Switchboard after Merge back of the inspiration-sites worktree chat: ships design-md/SOURCES.md (library stamp local-3) and DESIGN_ROUND in extension/src/hub/indefinite.ts. Worktree was at 0.21.113 vs main's uncommitted 0.21.149, so it could not release itself.",
-   "at": 1795427111255,
-   "chat": "8d22c18f-469d-45d5-80f1-65ab3110aed2",
-   "host": "62903adf5e340f87",
-   "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
-   "name": "Instagram Reel Switchboard UI Integration",
-   "short": "Release Switchboard after Merge back of the...",
-   "run": 129,
-   "auto": true
-  }
- ],
+ "todo": [],
  "removed": {
   "17474366": 1794509875435,
   "58032070": 1795404119789,
@@ -509,11 +496,32 @@
   "8f8dfb3a": 1795422167085,
   "007e1c30": 1795422359124,
   "ea70f92c": 1795422422896,
-  "62583c2e": 1795424761406
+  "62583c2e": 1795424761406,
+  "661d20ea": 1795428786896,
+  "a2aa4796": 1795428786896
  },
  "seq": 129,
- "streak": 129,
  "ticked": [
+  {
+   "id": "a2aa4796",
+   "text": "Implement this video https://www.instagram.com/reel/Df--4CtAgrf/?knvt=NTc4MTIwNjQ2YQ== and make sure that all of these are inside of switchboard or it is programmed to search through all of those",
+   "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
+   "name": "Instagram Reel Switchboard UI Integration",
+   "why": "missed",
+   "short": "Implement this video https://www.instagram.com/reel/Df--4...",
+   "at": 1795428786896
+  },
+  {
+   "id": "661d20ea",
+   "text": "Release Switchboard after Merge back of the inspiration-sites worktree chat: ships design-md/SOURCES.md (library stamp local-3) and DESIGN_ROUND in extension/src/hub/indefinite.ts. Worktree was at 0.21.113 vs main's uncommitted 0.21.149, so it could not release itself.",
+   "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
+   "name": "Instagram Reel Switchboard UI Integration",
+   "short": "Release Switchboard after Merge back of the...",
+   "run": 129,
+   "auto": true,
+   "at": 1795428786896,
+   "by": "8d22c18f-469d-45d5-80f1-65ab3110aed2"
+  },
   {
    "id": "62583c2e",
    "text": "Merge back: treat renamed files and non-ASCII (git-quoted) file names that main already holds identically as already merged, instead of a clash. sameInMain in extension/src/hub/git.ts skips headers where a/ != b/ and quoted paths; parse git's quoted headers and rename pairs, keep the lstat+mode+readlink compare, add tests in extension/test/merge-back.test.ts (qa probe repro S3/S4). From chat \"Worktree merge fix and chat\".",
@@ -598,39 +606,6 @@
    "short": "Compact Switchboard MEMORY.md from 194 lines to under...",
    "run": 121,
    "auto": true
-  },
-  {
-   "id": "d26897e3",
-   "text": "Research library (chat \"Review research tab implementation\"): ~/.claude/switchboard/research/.claims/ gets one file per saved run and is never cleaned up. Prune claim files older than about 30 days in extension/src/hub/research-library.ts, keeping claims for runs still in the library or in .trash, and add a test.",
-   "at": 1795420796487,
-   "by": "8083026f-ddf5-4ff9-8a06-ce7cd93cc97c",
-   "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
-   "name": "Review research tab implementation",
-   "short": "Research library (chat \"Review research tab...",
-   "run": 120,
-   "auto": true
-  },
-  {
-   "id": "76653e53",
-   "text": "Live check of 0.21.139 research save (from chat 5e0538ab): once the window runs 0.21.139, start a project chat with /deep-research while no Switchboard view is open in that window (see memory research-live-test: hub-new-chat POST via node script), then confirm a research-*.md note and its MEMORY.md line appear in that project's ~/.claude/projects/<slug>/memory. The extension now saves via saveResearch in extension/src/session-runtime.ts.",
-   "at": 1795420713842,
-   "by": "8fe28baf-8726-40bd-ab75-be3d94e1ffba",
-   "from": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
-   "name": "To-do 111: Extension research memory save",
-   "short": "Live check of 0.21.139 research save (from chat 5e0538ab):",
-   "run": 119,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "a2aa4796",
-   "text": "Implement this video https://www.instagram.com/reel/Df--4CtAgrf/?knvt=NTc4MTIwNjQ2YQ== and make sure that all of these are inside of switchboard or it is programmed to search through all of those",
-   "at": 1795428684564,
-   "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
-   "name": "Instagram Reel Switchboard UI Integration",
-   "why": "missed",
-   "short": "Implement this video https://www.instagram.com/reel/Df--4..."
   }
  ]
 }
