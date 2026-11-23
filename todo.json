@@ -4,10 +4,14 @@
   {
    "id": "62583c2e",
    "text": "Merge back: treat renamed files and non-ASCII (git-quoted) file names that main already holds identically as already merged, instead of a clash. sameInMain in extension/src/hub/git.ts skips headers where a/ != b/ and quoted paths; parse git's quoted headers and rename pairs, keep the lstat+mode+readlink compare, add tests in extension/test/merge-back.test.ts (qa probe repro S3/S4). From chat \"Worktree merge fix and chat\".",
-   "at": 1795424640612,
+   "at": 1795424646086,
    "from": "bdd8fc14-2d9f-4691-aaa3-d9484caf47e9",
    "name": "Worktree merge fix and chat",
-   "short": "Merge back: treat renamed files and non-ASCII..."
+   "short": "Merge back: treat renamed files and non-ASCII...",
+   "chat": "41a66f79-b65a-4723-912e-37a06492bb09",
+   "host": "62903adf5e340f87",
+   "run": 128,
+   "auto": true
   }
  ],
  "removed": {
@@ -506,7 +510,7 @@
   "007e1c30": 1795422359124,
   "ea70f92c": 1795422422896
  },
- "seq": 127,
+ "seq": 128,
  "ticked": [
   {
    "id": "ea70f92c",
@@ -615,5 +619,6 @@
    "run": 118,
    "auto": true
   }
- ]
+ ],
+ "streak": 128
 }
