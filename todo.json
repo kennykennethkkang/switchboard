@@ -72,6 +72,14 @@
    "name": "To-do 93: Fix to-do auto-tick and release",
    "why": "missed",
    "short": "You were cut off by a Switchboard window reload at 12:57..."
+  },
+  {
+   "id": "9afdac3c",
+   "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
+   "at": 1795403764215,
+   "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
+   "name": "Fix VS Code terminal usage",
+   "short": "Release the side pane dock fix (worktree..."
   }
  ],
  "removed": {
