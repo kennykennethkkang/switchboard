@@ -15,10 +15,14 @@
   {
    "id": "c6f0dbb5",
    "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
-   "at": 1795400743387,
+   "at": 1795404131964,
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
-   "short": "Lantern Sea map theme:"
+   "short": "Lantern Sea map theme:",
+   "chat": "082694b8-c7f6-49bf-89ef-650811afd552",
+   "host": "62903adf5e340f87",
+   "run": 102,
+   "auto": true
   },
   {
    "id": "ec112d09",
@@ -532,19 +536,19 @@
   "e00a421e": 1795403793425,
   "1f7454e5": 1795403847442
  },
- "seq": 101,
+ "seq": 102,
  "streak": 93,
  "ticked": [
   {
    "id": "58032070",
    "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
+   "at": 1795404119789,
+   "by": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
    "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
    "name": "To-do 94: Fix Switchboard reload killing chats",
    "short": "Fix: a chat killed by a window reload looks ended, so...",
    "run": 101,
-   "auto": true,
-   "at": 1795404119789,
-   "by": "a4199f2e-7c5d-4131-ad2a-1043bb555260"
+   "auto": true
   },
   {
    "id": "1f7454e5",
