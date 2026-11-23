@@ -60,6 +60,14 @@
    "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
    "name": "Fix VS Code terminal usage",
    "short": "Release the side pane dock fix (worktree..."
+  },
+  {
+   "id": "d1c39247",
+   "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
+   "at": 1795403855773,
+   "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
+   "name": "To-do 99: Release research tab fixes",
+   "short": "Fix: a project chat's deep-research report never reaches..."
   }
  ],
  "removed": {
@@ -537,13 +545,13 @@
   {
    "id": "1f7454e5",
    "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
+   "at": 1795403847442,
+   "by": "4efe3163-4ce7-43e7-8a93-7c3ab16abddc",
    "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
    "name": "Redesign Site Pages Ship",
    "short": "Kit fix (aar, Redesign Site Pages Ship):",
    "run": 100,
-   "auto": true,
-   "at": 1795403847442,
-   "by": "4efe3163-4ce7-43e7-8a93-7c3ab16abddc"
+   "auto": true
   },
   {
    "id": "e00a421e",
