@@ -15,10 +15,14 @@
   {
    "id": "007e1c30",
    "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
-   "at": 1795421259148,
+   "at": 1795422090856,
    "from": "4dbff639-7423-4945-b974-a552abeef793",
    "name": "To-do 121: Compact Switchboard MEMORY md",
-   "short": "Memory recall scoring:"
+   "short": "Memory recall scoring:",
+   "chat": "a947970f-927c-4229-89de-b99ea63b25a1",
+   "host": "62903adf5e340f87",
+   "run": 125,
+   "auto": true
   },
   {
    "id": "ea70f92c",
@@ -522,19 +526,19 @@
   "a89feef4": 1795422029237,
   "06ebaaa6": 1795422084700
  },
- "seq": 124,
+ "seq": 125,
  "streak": 93,
  "ticked": [
   {
    "id": "06ebaaa6",
    "text": "Four orphan worktrees with uncommitted files and no chat (from chat \"Fix idle chats\"): .claude/worktrees/also-issue-with-approve-page-c0d8 (1 file), fix-terminal-usage-bar-7fee (2), https-www-instagram-com-reel-1be3 (3), research-panel-vs-code-tab-dc4f (2). For each: diff against main, fold what main lacks per the merge-back memory note (git apply --check first), or discard if already in main; then git worktree remove and delete the branch.",
+   "at": 1795422084700,
+   "by": "7e7539c8-61da-4c2f-b5b6-fe1ffa9886ed",
    "from": "44e05433-8196-4e67-8fea-5fead283cfee",
    "name": "Fix idle chats",
    "short": "Four orphan worktrees with uncommitted files and no chat...",
    "run": 124,
-   "auto": true,
-   "at": 1795422084700,
-   "by": "7e7539c8-61da-4c2f-b5b6-fe1ffa9886ed"
+   "auto": true
   },
   {
    "id": "a89feef4",
