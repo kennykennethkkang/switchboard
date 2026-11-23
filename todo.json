@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "ec112d09",
-   "text": "Lantern Sea map theme: smooth drawings for the tea garden and armory places (route through placeArt hook in board.tsx bake, art/lantern.ts placeArtSmooth). From chat Realistic Map Agents Theme",
-   "at": 1795405527273,
-   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
-   "name": "Realistic Map Agents Theme",
-   "short": "Lantern Sea map theme:",
-   "chat": "21b97d4e-206a-4027-b724-491cc33fe877",
-   "host": "62903adf5e340f87",
-   "run": 103,
-   "auto": true
-  },
-  {
    "id": "99dca330",
    "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
    "at": 1795400745018,
@@ -543,11 +531,23 @@
   "3b565ab3": 1795403233104,
   "e00a421e": 1795403793425,
   "1f7454e5": 1795403847442,
-  "c6f0dbb5": 1795405524734
+  "c6f0dbb5": 1795405524734,
+  "ec112d09": 1795405818077
  },
  "seq": 103,
  "streak": 93,
  "ticked": [
+  {
+   "id": "ec112d09",
+   "text": "Lantern Sea map theme: smooth drawings for the tea garden and armory places (route through placeArt hook in board.tsx bake, art/lantern.ts placeArtSmooth). From chat Realistic Map Agents Theme",
+   "from": "75abf021-4713-4b21-8632-4387eb6242b8",
+   "name": "Realistic Map Agents Theme",
+   "short": "Lantern Sea map theme:",
+   "run": 103,
+   "auto": true,
+   "at": 1795405818077,
+   "by": "21b97d4e-206a-4027-b724-491cc33fe877"
+  },
   {
    "id": "c6f0dbb5",
    "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
@@ -643,18 +643,6 @@
    "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
    "why": "missed",
    "short": "At 12:56 another chat installed Switchboard 0.21.124 and..."
-  },
-  {
-   "id": "f5f5c66d",
-   "text": "Release the to-do auto-tick fix (worktree fix-completed-todo-items-3228: missed asks tick with their chat's Release item, run prompts never become missed asks, shipped check reads extension/CHANGELOG.md and remembers seen commits across reloads) after Merge back: bump past main, CHANGELOG line, package, install",
-   "at": 1795384971163,
-   "by": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "from": "67006108-625e-4578-9713-1e8ecc1b66ac",
-   "name": "Fix completed todo items",
-   "short": "Release the to-do auto-tick fix (worktree...",
-   "run": 93,
-   "auto": true,
-   "stopped": true
   }
  ]
 }
