@@ -16,13 +16,20 @@
    "id": "2669df6d",
    "text": "Fix: a finished chat keeps progress state 'working', which holds midTurn() true and blocks the window's idle update reload forever. Seen 2026-11-22: Zellizard-Tracker chat aefdf1b5 (turn ended 19:05, Stop + turn_duration in transcript) shows state working (at 20:55, ended map a2e071e2d91c69b92), so that window stayed on 0.21.136 past the 0.21.138 install. Likely a late subagent hook after Stop flipping state back to working (extension/src/hub/progress.ts, hub-service.ts midTurn line ~722).",
    "at": 1795415161238,
+   "chat": "fd3496fc-ffd0-418c-b951-07bc798606e9",
+   "host": "62903adf5e340f87",
    "from": "64b45b22-552a-462b-9f4b-f58113821c30",
    "name": "To-do 110: Live check 0 21 138",
    "short": "Fix: a finished chat keeps progress state 'working',...",
-   "chat": "fd3496fc-ffd0-418c-b951-07bc798606e9",
-   "host": "62903adf5e340f87",
    "run": 113,
    "auto": true
+  },
+  {
+   "id": "91eb2700",
+   "text": "repo-rules fails closed on transient errors (improve-system 2026-11-22): \"repo-rules: the guard failed, so the command was held\" hit 5 sessions in Switchboard worktrees on 11-22/23, on plain commands (cd ../../../web && cat lib/skins/README.md; git status --short | wc -l) and two Write/Edit calls. bashRule returns undefined on that command in 180 ms when run alone, so the throw comes from roots()/report()/engine timeout under load, not the rule. In claude-mods/repo-rules/hooks/register.ts line 146 (held) and the .catch on the Bash, Edit and Write handlers: find what threw (log the error into the deny text), fix it, and add a test that a throwing roots() on a clean command does not hold it.",
+   "at": 1795417012219,
+   "from": "8db3461e-3619-42d8-a08a-f74267017535",
+   "short": "repo-rules fails closed on transient errors..."
   }
  ],
  "removed": {
