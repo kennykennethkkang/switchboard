@@ -15,10 +15,14 @@
   {
    "id": "ae106774",
    "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
-   "at": 1795412753916,
+   "at": 1795413239832,
    "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "name": "To-do 107: Fix research report memory save",
-   "short": "Save deep-research reports to project memory from the..."
+   "short": "Save deep-research reports to project memory from the...",
+   "chat": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
+   "host": "62903adf5e340f87",
+   "run": 111,
+   "auto": true
   },
   {
    "id": "72ae2a0f",
@@ -515,19 +519,19 @@
   "84a32676": 1795407656678,
   "07da17e7": 1795413235700
  },
- "seq": 110,
+ "seq": 111,
  "streak": 93,
  "ticked": [
   {
    "id": "07da17e7",
    "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
+   "at": 1795413235700,
+   "by": "64b45b22-552a-462b-9f4b-f58113821c30",
    "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "name": "To-do 107: Fix research report memory save",
    "short": "Live check of the 0.21.138 research save fix (from chat...",
    "run": 110,
-   "auto": true,
-   "at": 1795413235700,
-   "by": "64b45b22-552a-462b-9f4b-f58113821c30"
+   "auto": true
   },
   {
    "id": "84a32676",
