@@ -2,17 +2,6 @@
  "version": 1,
  "todo": [
   {
-   "id": "8f8dfb3a",
-   "text": "Release the Screen tab update (VS Code panel Screen tab, Terminal/Text toggle, screen reader text) after Merge back of terminal-view-switchboard-integration-8184: bump past main, package, install, open a chat's Screen tab in the VS Code panel to confirm it shows",
-   "at": 1795422105530,
-   "from": "a2641d21-038e-47f3-85b6-12b5258aba93",
-   "name": "Terminal View Switchboard Integration",
-   "short": "Release the Screen tab update (VS Code panel Screen tab,...",
-   "run": 126,
-   "chat": "258e6fae-7d70-45c3-aca7-8e8895096063",
-   "host": "62903adf5e340f87"
-  },
-  {
    "id": "007e1c30",
    "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
    "at": 1795422090856,
@@ -524,11 +513,22 @@
   "a261e4a4": 1795421259385,
   "75675ae5": 1795421983030,
   "a89feef4": 1795422029237,
-  "06ebaaa6": 1795422084700
+  "06ebaaa6": 1795422084700,
+  "8f8dfb3a": 1795422167085
  },
  "seq": 126,
  "streak": 93,
  "ticked": [
+  {
+   "id": "8f8dfb3a",
+   "text": "Release the Screen tab update (VS Code panel Screen tab, Terminal/Text toggle, screen reader text) after Merge back of terminal-view-switchboard-integration-8184: bump past main, package, install, open a chat's Screen tab in the VS Code panel to confirm it shows",
+   "from": "a2641d21-038e-47f3-85b6-12b5258aba93",
+   "name": "Terminal View Switchboard Integration",
+   "short": "Release the Screen tab update (VS Code panel Screen tab,...",
+   "run": 126,
+   "at": 1795422167085,
+   "by": "258e6fae-7d70-45c3-aca7-8e8895096063"
+  },
   {
    "id": "06ebaaa6",
    "text": "Four orphan worktrees with uncommitted files and no chat (from chat \"Fix idle chats\"): .claude/worktrees/also-issue-with-approve-page-c0d8 (1 file), fix-terminal-usage-bar-7fee (2), https-www-instagram-com-reel-1be3 (3), research-panel-vs-code-tab-dc4f (2). For each: diff against main, fold what main lacks per the merge-back memory note (git apply --check first), or discard if already in main; then git worktree remove and delete the branch.",
@@ -622,16 +622,6 @@
    "by": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
    "short": "Memory consolidation:",
    "run": 116,
-   "auto": true
-  },
-  {
-   "id": "9feadeed",
-   "text": "Add two held-out rules tasks for worktree Bash to claude-mods/kit/skills/self-improve/evals/tasks.json (improve-system 2026-11-22): worktree chats still had about 70 compound Bash refusals this week (Armasu 46, Switchboard 21, Zellizard 3; \"This session is isolated in the worktree...\"). The kit/rules.md line from run 2026-11-19T18-27-18-831Z cannot win until a held-out task runs in a worktree. Tasks from real chats: (1) a worktree chat must read ../../../web/lib/skins/README.md and grep the web folder; checklist: one plain command per Bash call, no ; && $( ) or heredoc, relative paths. (2) a worktree chat must run a 3-step check; checklist: writes a script with Write and runs sh <file>. Separate change Kenneth reviews; then rerun self-improve on rules.md with the worktree line.",
-   "at": 1795418985789,
-   "by": "1d6a74b3-290d-41fe-b8d6-15fb01350d64",
-   "from": "8db3461e-3619-42d8-a08a-f74267017535",
-   "short": "Add two held-out rules tasks for worktree Bash to...",
-   "run": 115,
    "auto": true
   }
  ]
