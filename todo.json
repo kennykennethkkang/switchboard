@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "9afdac3c",
-   "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
-   "at": 1795406232725,
-   "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
-   "name": "Fix VS Code terminal usage",
-   "short": "Release the side pane dock fix (worktree...",
-   "chat": "f460e4eb-61be-4f53-9aec-51d0aecb1351",
-   "host": "62903adf5e340f87",
-   "run": 106,
-   "auto": true
-  },
-  {
    "id": "d1c39247",
    "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
    "at": 1795403855773,
@@ -521,11 +509,23 @@
   "c6f0dbb5": 1795405524734,
   "ec112d09": 1795405818077,
   "99dca330": 1795406146003,
-  "3b565ab3-ok": 1795406228107
+  "3b565ab3-ok": 1795406228107,
+  "9afdac3c": 1795406440914
  },
  "seq": 106,
  "streak": 93,
  "ticked": [
+  {
+   "id": "9afdac3c",
+   "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
+   "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
+   "name": "Fix VS Code terminal usage",
+   "short": "Release the side pane dock fix (worktree...",
+   "run": 106,
+   "auto": true,
+   "at": 1795406440914,
+   "by": "f460e4eb-61be-4f53-9aec-51d0aecb1351"
+  },
   {
    "id": "3b565ab3-ok",
    "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
@@ -623,17 +623,6 @@
    "from": "cc143ce5-75a5-4e99-9210-5c3b167dc523",
    "short": "Proposed kit rule edit (aar 2026-11-22, Switchboard...",
    "run": 96,
-   "auto": true
-  },
-  {
-   "id": "6f818296",
-   "text": "Local first-draft routing: a local Ollama model (Gemma 12B, 128k context) writes first drafts and scaffolds before Claude; the author of reel instagram.com/reel/DfsG079gJ62 (ChiefGyk3D) says it cut his Claude usage about 40%. Reference: github.com/ChiefGyk3D/department-of-internal-arguments packs/local-llm-routing/PACK.md (Apache-2.0: \"local output is a draft: verify it against the source\", echo and compare identifiers, quote then answer, output only what was asked). Ollama is not installed yet. Credit the repo in README Credits.",
-   "at": 1795399587509,
-   "by": "5bc0e4df-2a29-4ec3-957f-355fe7f53caf",
-   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
-   "name": "Instagram reel rule implementation",
-   "short": "Local first-draft routing:",
-   "run": 95,
    "auto": true
   }
  ]
