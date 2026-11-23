@@ -8,6 +8,14 @@
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "Trim CLAUDE.md and MEMORY.md (35k characters load in..."
+  },
+  {
+   "id": "e5ee68d1",
+   "text": "Decide whether the Artifact tool stays on in main chats (about 11k tokens each, about 13 uses in 14 days; enableArtifact false turns it off). From Token Efficiency Analysis. Suggested, for later.",
+   "at": 1795475444260,
+   "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
+   "name": "Token Efficiency Analysis",
+   "short": "Decide whether the Artifact tool stays on in main chats..."
   }
  ],
  "removed": {
