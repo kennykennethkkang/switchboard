@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "e00a421e",
-   "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
-   "at": 1795399944755,
-   "chat": "0a0be0be-aa65-4b39-9deb-df52de218adc",
-   "host": "62903adf5e340f87",
-   "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
-   "name": "Research tab seems to be",
-   "short": "Release the research tab fixes (worktree...",
-   "run": 99,
-   "auto": true
-  },
-  {
    "id": "1f7454e5",
    "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
    "at": 1795396322662,
@@ -547,11 +535,23 @@
   "6f818296": 1795399587509,
   "352ab00b": 1795399653788,
   "d1835d63": 1795399811700,
-  "3b565ab3": 1795403233104
+  "3b565ab3": 1795403233104,
+  "e00a421e": 1795403793425
  },
  "seq": 99,
  "streak": 93,
  "ticked": [
+  {
+   "id": "e00a421e",
+   "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
+   "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
+   "name": "Research tab seems to be",
+   "short": "Release the research tab fixes (worktree...",
+   "run": 99,
+   "auto": true,
+   "at": 1795403793425,
+   "by": "0a0be0be-aa65-4b39-9deb-df52de218adc"
+  },
   {
    "id": "d1835d63",
    "text": "Release the self-improve 30 approved results floor after Merge back of worktree instagram-reel-rule-implementation-e264 (learn.ts betterOrNot + extension/kit/skills/self-improve generic copy); claude-mods source already edited.",
@@ -646,17 +646,6 @@
    "name": "Auto merge all worktrees",
    "short": "Release Merge all worktrees:",
    "run": 91,
-   "auto": true
-  },
-  {
-   "id": "a8cd1ef4",
-   "text": "Release the Research tracker change after worktree switchboard-research-tracker-fix-3756 merges back: bump, CHANGELOG, package, install (usage-meter 0.6.6 kit copy included)",
-   "at": 1795340613624,
-   "by": "7b7c8c76-3130-43e9-8ba0-603e04bcfc4a",
-   "from": "90d5ab72-ced9-4d50-8dfc-f9da3c3defc6",
-   "name": "Switchboard Research Tracker Fix",
-   "short": "Release the Research tracker change after worktree...",
-   "run": 90,
    "auto": true
   }
  ]
