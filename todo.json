@@ -19,6 +19,14 @@
    "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
    "name": "To-do 107: Fix research report memory save",
    "short": "Live check of the 0.21.138 research save fix (from chat..."
+  },
+  {
+   "id": "ae106774",
+   "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
+   "at": 1795412753916,
+   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
+   "name": "To-do 107: Fix research report memory save",
+   "short": "Save deep-research reports to project memory from the..."
   }
  ],
  "removed": {
