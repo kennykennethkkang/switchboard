@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "ae106774",
-   "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
-   "at": 1795413239832,
-   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
-   "name": "To-do 107: Fix research report memory save",
-   "short": "Save deep-research reports to project memory from the...",
-   "chat": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6",
-   "host": "62903adf5e340f87",
-   "run": 111,
-   "auto": true
-  },
-  {
    "id": "72ae2a0f",
    "text": "Memory: bring Switchboard MEMORY.md under 200 lines (now 208; lines 201+ never load). The cut includes release-todo-unmerged-worktree (line 203), the note for \"release X after Merge back\" to-dos; chat f460e4eb missed it and retried node --test and pnpm run package. Run the memory-fix skill (merge related index lines, keep each under ~200 chars), then memory-gold.mjs --base to check no recall hit is lost. From Learn AAR of f460e4eb.",
    "at": 1795413010143,
@@ -517,11 +505,23 @@
   "d1c39247": 1795407280219,
   "e4bcd541": 1795407319411,
   "84a32676": 1795407656678,
-  "07da17e7": 1795413235700
+  "07da17e7": 1795413235700,
+  "ae106774": 1795414776403
  },
  "seq": 111,
  "streak": 93,
  "ticked": [
+  {
+   "id": "ae106774",
+   "text": "Save deep-research reports to project memory from the extension, not a webview (from chat 62718e5b): today web/lib/research-store.ts onResearchDone sends hub-research-save, so a window with no Switchboard view open saves nothing. Fold events through web/lib/research.ts reduceResearch in the extension and call saveResearchMemory (extension/src/hub/research.ts) there, without saving twice",
+   "from": "62718e5b-4064-4fa8-aeee-e55a95000abf",
+   "name": "To-do 107: Fix research report memory save",
+   "short": "Save deep-research reports to project memory from the...",
+   "run": 111,
+   "auto": true,
+   "at": 1795414776403,
+   "by": "5e0538ab-ab8d-4e29-8d02-c70cf3fa4df6"
+  },
   {
    "id": "07da17e7",
    "text": "Live check of the 0.21.138 research save fix (from chat 62718e5b): once the Zellizard-Tracker window is on 0.21.138, start a /deep-research chat there using the memory research-live-test recipe (script idea: POST hub-new-chat to /hub/command) and confirm a ~/.claude/projects/-Users-kennykennethkkang-Documents-GitHub-Zellizard-Tracker/memory/research-*.md note plus a project-research.md line in its MEMORY.md",
@@ -620,17 +620,6 @@
    "name": "Realistic Map Agents Theme",
    "short": "Lantern Sea map theme:",
    "run": 102,
-   "auto": true
-  },
-  {
-   "id": "58032070",
-   "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
-   "at": 1795404119789,
-   "by": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
-   "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
-   "name": "To-do 94: Fix Switchboard reload killing chats",
-   "short": "Fix: a chat killed by a window reload looks ended, so...",
-   "run": 101,
    "auto": true
   }
  ]
