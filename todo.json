@@ -16,9 +16,9 @@
    "id": "69a53497",
    "text": "Memory consolidation: 10 proposed rewrites or merges in /Users/kennykennethkkang/.claude/switchboard/consolidate/2026-11-23-f3dcd803.md. Review, then apply the ones you want with the memory-fix skill (gold check before and after).",
    "at": 1795418990164,
-   "short": "Memory consolidation:",
    "chat": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
    "host": "62903adf5e340f87",
+   "short": "Memory consolidation:",
    "run": 116,
    "auto": true
   },
@@ -29,6 +29,14 @@
    "from": "2a263860-d82d-4848-88ee-4d39cbfe5a13",
    "name": "Review research tab implementation",
    "short": "Release the Research library (chat \"Review research tab..."
+  },
+  {
+   "id": "dbcec580",
+   "text": "bash-approve and paid-guard fail closed on clean calls (from chat 42b516db, repo-rules fix): claude-mods/bash-approve/hooks/register.ts:138 and paid-guard/hooks/register.ts:229 use `.catch(($, e, next) => next.called ? next(e) : { deny })`, so any $ failure (env read, worker end, timeout) holds a clean call. Do as repo-rules 0.2.6 did: run the pure check before any $ call, have the .catch re-run only the pure check (deny on a hit, next(e) otherwise), put next.error.kind and message in the deny, add a test with a beneath-hook that denies the $ call on a clean call, bump each plugin.json and update via kenneth-mods. See memory guard-catch-rejudge.",
+   "at": 1795419038003,
+   "from": "42b516db-7c35-4a6e-a34b-d1d2b38989d6",
+   "name": "To-do 114: Fix repo-rules fail-open transient errors",
+   "short": "bash-approve and paid-guard fail closed on clean calls..."
   }
  ],
  "removed": {
