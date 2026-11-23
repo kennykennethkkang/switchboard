@@ -15,11 +15,15 @@
   {
    "id": "3b565ab3-ok",
    "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795403233104,
+   "at": 1795406157604,
    "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
    "name": "To-do 93: Fix to-do auto-tick and release",
    "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
+   "short": "You were cut off by a Switchboard window reload at 12:57...",
+   "chat": "8c51ef92-fb74-4d57-ac90-98af8e04260b",
+   "host": "62903adf5e340f87",
+   "run": 105,
+   "auto": true
   },
   {
    "id": "9afdac3c",
@@ -527,19 +531,19 @@
   "ec112d09": 1795405818077,
   "99dca330": 1795406146003
  },
- "seq": 104,
+ "seq": 105,
  "streak": 93,
  "ticked": [
   {
    "id": "99dca330",
    "text": "Agents map at 390 px: labels overlap and an open side panel (.bp) covers the tool belt; fix layout on the phone view. From chat Realistic Map Agents Theme",
+   "at": 1795406146003,
+   "by": "aa5e9732-7f88-491c-8db6-402c08a70273",
    "from": "75abf021-4713-4b21-8632-4387eb6242b8",
    "name": "Realistic Map Agents Theme",
    "short": "Agents map at 390 px:",
    "run": 104,
-   "auto": true,
-   "at": 1795406146003,
-   "by": "aa5e9732-7f88-491c-8db6-402c08a70273"
+   "auto": true
   },
   {
    "id": "ec112d09",
