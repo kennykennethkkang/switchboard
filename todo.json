@@ -15,10 +15,14 @@
   {
    "id": "84a32676",
    "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
-   "at": 1795405525742,
+   "at": 1795407327774,
    "from": "082694b8-c7f6-49bf-89ef-650811afd552",
    "name": "To-do 102: Bake Lantern Sea islands sharp",
-   "short": "Fix: web/lib/court-map.test.ts perf budget fails on its..."
+   "short": "Fix: web/lib/court-map.test.ts perf budget fails on its...",
+   "chat": "64d45c6b-0052-44ab-be13-0778c109415c",
+   "host": "62903adf5e340f87",
+   "run": 109,
+   "auto": true
   }
  ],
  "removed": {
@@ -498,19 +502,19 @@
   "d1c39247": 1795407280219,
   "e4bcd541": 1795407319411
  },
- "seq": 108,
+ "seq": 109,
  "streak": 93,
  "ticked": [
   {
    "id": "e4bcd541",
    "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
+   "at": 1795407319411,
+   "by": "8faac00a-608b-4cb6-83e7-e2d682503421",
    "from": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
    "name": "To-do 101: Fix worktree sweep grace",
    "short": "Fix: extension `pnpm run lint:test` fails with 9 TS...",
    "run": 108,
-   "auto": true,
-   "at": 1795407319411,
-   "by": "8faac00a-608b-4cb6-83e7-e2d682503421"
+   "auto": true
   },
   {
    "id": "d1c39247",
