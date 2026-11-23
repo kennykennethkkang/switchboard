@@ -15,10 +15,14 @@
   {
    "id": "d1c39247",
    "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
-   "at": 1795403855773,
+   "at": 1795406442741,
    "from": "0a0be0be-aa65-4b39-9deb-df52de218adc",
    "name": "To-do 99: Release research tab fixes",
-   "short": "Fix: a project chat's deep-research report never reaches..."
+   "short": "Fix: a project chat's deep-research report never reaches...",
+   "chat": "62718e5b-4064-4fa8-aeee-e55a95000abf",
+   "host": "62903adf5e340f87",
+   "run": 107,
+   "auto": true
   },
   {
    "id": "e4bcd541",
@@ -512,19 +516,19 @@
   "3b565ab3-ok": 1795406228107,
   "9afdac3c": 1795406440914
  },
- "seq": 106,
+ "seq": 107,
  "streak": 93,
  "ticked": [
   {
    "id": "9afdac3c",
    "text": "Release the side pane dock fix (worktree fix-vs-code-terminal-usage-8d03: chat terminals get CLAUDE_CODE_NO_FLICKER=1 when Controls > tui is fullscreen, extension/src/hub/controls.ts tuiEnv + actions.ts chatEnv) after Merge back: bump, package, install.",
+   "at": 1795406440914,
+   "by": "f460e4eb-61be-4f53-9aec-51d0aecb1351",
    "from": "768bcedb-3af4-44c0-b8b2-66c8a9b90a62",
    "name": "Fix VS Code terminal usage",
    "short": "Release the side pane dock fix (worktree...",
    "run": 106,
-   "auto": true,
-   "at": 1795406440914,
-   "by": "f460e4eb-61be-4f53-9aec-51d0aecb1351"
+   "auto": true
   },
   {
    "id": "3b565ab3-ok",
