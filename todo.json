@@ -38,6 +38,14 @@
    "at": 1795413010143,
    "from": "10d41c97-aef1-407f-8d5a-fda5f69fd1f4",
    "short": "Memory: bring Switchboard MEMORY.md under 200 lines (now..."
+  },
+  {
+   "id": "2669df6d",
+   "text": "Fix: a finished chat keeps progress state 'working', which holds midTurn() true and blocks the window's idle update reload forever. Seen 2026-11-22: Zellizard-Tracker chat aefdf1b5 (turn ended 19:05, Stop + turn_duration in transcript) shows state working (at 20:55, ended map a2e071e2d91c69b92), so that window stayed on 0.21.136 past the 0.21.138 install. Likely a late subagent hook after Stop flipping state back to working (extension/src/hub/progress.ts, hub-service.ts midTurn line ~722).",
+   "at": 1795413113846,
+   "from": "64b45b22-552a-462b-9f4b-f58113821c30",
+   "name": "To-do 110: Live check 0 21 138",
+   "short": "Fix: a finished chat keeps progress state 'working',..."
   }
  ],
  "removed": {
