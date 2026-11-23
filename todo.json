@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "58032070",
-   "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
-   "at": 1795403861583,
-   "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
-   "name": "To-do 94: Fix Switchboard reload killing chats",
-   "short": "Fix: a chat killed by a window reload looks ended, so...",
-   "chat": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
-   "host": "62903adf5e340f87",
-   "run": 101,
-   "auto": true
-  },
-  {
    "id": "c6f0dbb5",
    "text": "Lantern Sea map theme: bake islands at higher res so they stay sharp at max zoom (art/lantern.ts res, board.tsx bake cap). From chat Realistic Map Agents Theme",
    "at": 1795400743387,
@@ -76,6 +64,7 @@
  ],
  "removed": {
   "17474366": 1794509875435,
+  "58032070": 1795404119789,
   "60191406": 1793870136284,
   "88264666": 1793822810406,
   "4323189c": 1793339057827,
@@ -547,6 +536,17 @@
  "streak": 93,
  "ticked": [
   {
+   "id": "58032070",
+   "text": "Fix: a chat killed by a window reload looks ended, so the worktree sweep (extension/src/hub/hub-panel-codex.ts ~line 53, endedWorktrees fast path + cleanWorktree) removes its fresh worktree at once and resuming it fails with \"folder is gone\". On 2026-11-22 the 0.21.124 reload deleted the abyss worktree while its chat was busy (recreated at bd2ec53). A chat that ended without SessionEnd (killed) should wait the 10 idle minutes, or longer, before its worktree goes. Left by chat \"To-do 94: Fix Switchboard reload killing chats\" (the mid-turn reload hold shipped in 0.21.127).",
+   "from": "c61ff256-a63a-4c77-8df8-0286f20f6184",
+   "name": "To-do 94: Fix Switchboard reload killing chats",
+   "short": "Fix: a chat killed by a window reload looks ended, so...",
+   "run": 101,
+   "auto": true,
+   "at": 1795404119789,
+   "by": "a4199f2e-7c5d-4131-ad2a-1043bb555260"
+  },
+  {
    "id": "1f7454e5",
    "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
    "at": 1795403847442,
@@ -641,17 +641,6 @@
    "name": "Fix maps memory item styling",
    "why": "missed",
    "short": "Inside of maps memory component still looks a bit weird..."
-  },
-  {
-   "id": "20c5030c",
-   "text": "Proposed kit edit (aar, map art kits 2026-11-22): in claude-mods/kit/agents/qa.md and designer.md, under the Report section add: \"If a hook makes you reply again after your Report, repeat the full Report in that reply; the lead only sees your last message.\" Reason: two qa reports arrived as \"my report stands\" stubs and needed a resend.",
-   "at": 1795354222399,
-   "by": "99e25226-6618-4e32-bfe7-6ca1ddba4906",
-   "from": "f79b2d95-3119-4cad-842a-013fbf1bbcee",
-   "name": "Redesign map agents page",
-   "short": "Proposed kit edit (aar, map art kits 2026-11-22):",
-   "run": 92,
-   "auto": true
   }
  ]
 }
