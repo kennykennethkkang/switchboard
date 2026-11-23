@@ -13,18 +13,6 @@
    "stopped": true
   },
   {
-   "id": "e4bcd541",
-   "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
-   "at": 1795407282752,
-   "from": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
-   "name": "To-do 101: Fix worktree sweep grace",
-   "short": "Fix: extension `pnpm run lint:test` fails with 9 TS...",
-   "chat": "8faac00a-608b-4cb6-83e7-e2d682503421",
-   "host": "62903adf5e340f87",
-   "run": 108,
-   "auto": true
-  },
-  {
    "id": "84a32676",
    "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
    "at": 1795405525742,
@@ -507,11 +495,23 @@
   "99dca330": 1795406146003,
   "3b565ab3-ok": 1795406228107,
   "9afdac3c": 1795406440914,
-  "d1c39247": 1795407280219
+  "d1c39247": 1795407280219,
+  "e4bcd541": 1795407319411
  },
  "seq": 108,
  "streak": 93,
  "ticked": [
+  {
+   "id": "e4bcd541",
+   "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
+   "from": "a4199f2e-7c5d-4131-ad2a-1043bb555260",
+   "name": "To-do 101: Fix worktree sweep grace",
+   "short": "Fix: extension `pnpm run lint:test` fails with 9 TS...",
+   "run": 108,
+   "auto": true,
+   "at": 1795407319411,
+   "by": "8faac00a-608b-4cb6-83e7-e2d682503421"
+  },
   {
    "id": "d1c39247",
    "text": "Fix: a project chat's deep-research report never reaches its project memory (found live by \"Release research tab fixes 0.21.131\"). Zellizard-Tracker chat aefdf1b5 answered with an Answer line on 0.21.131, but no ~/.claude/projects/<slug>/memory/research-*.md was written. The save is sent by a webview (web/lib/research-store.ts onResearchDone, then hub-research-save in hub-panel.ts); find why it did not fire (webview not getting that chat's events, or isRealResearch/looksLikeAnswer refusing a run whose web calls ran in subagents) and fix it, ideally saving from the extension. Recipe: memory research-live-test.",
@@ -610,17 +610,6 @@
    "name": "Research tab seems to be",
    "short": "Release the research tab fixes (worktree...",
    "run": 99,
-   "auto": true
-  },
-  {
-   "id": "d1835d63",
-   "text": "Release the self-improve 30 approved results floor after Merge back of worktree instagram-reel-rule-implementation-e264 (learn.ts betterOrNot + extension/kit/skills/self-improve generic copy); claude-mods source already edited.",
-   "at": 1795399811700,
-   "by": "607d4398-b654-458a-80bc-000828b75a05",
-   "from": "76dcb0a9-9302-4049-9e7a-db8617486654",
-   "name": "Instagram reel rule implementation",
-   "short": "Release the self-improve 30 approved results floor after...",
-   "run": 97,
    "auto": true
   }
  ]
