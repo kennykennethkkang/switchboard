@@ -16,11 +16,11 @@
    "id": "a261e4a4",
    "text": "Compact Switchboard MEMORY.md from 194 lines to under 140 by merging overlapping notes (memory-fix skill, gold check before and after, one link per line). From chat ad4c10a7 (memory consolidation apply).",
    "at": 1795420805958,
+   "chat": "4dbff639-7423-4945-b974-a552abeef793",
+   "host": "62903adf5e340f87",
    "from": "ad4c10a7-bbd6-44ef-aa8d-69dfb51b70ae",
    "name": "To-do 116: Consolidate memory proposals review",
    "short": "Compact Switchboard MEMORY.md from 194 lines to under...",
-   "chat": "4dbff639-7423-4945-b974-a552abeef793",
-   "host": "62903adf5e340f87",
    "run": 121,
    "auto": true
   },
@@ -45,6 +45,14 @@
    "from": "44e05433-8196-4e67-8fea-5fead283cfee",
    "name": "Fix idle chats",
    "short": "Four orphan worktrees with uncommitted files and no chat..."
+  },
+  {
+   "id": "007e1c30",
+   "text": "Memory recall scoring: graph.ts recall() scores 1-2 letter query words (\"a\", \"i\", \"in\", \"do\") as substrings of names, aliases and descriptions, so merged notes with many aliases outrank specific ones. Score whole words or skip short stopwords, keep gold 32/32 (memory-gold.mjs). From chat 4dbff639 (memory compaction).",
+   "at": 1795421259148,
+   "from": "4dbff639-7423-4945-b974-a552abeef793",
+   "name": "To-do 121: Compact Switchboard MEMORY md",
+   "short": "Memory recall scoring:"
   }
  ],
  "removed": {
