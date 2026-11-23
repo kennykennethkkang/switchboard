@@ -11,18 +11,6 @@
    "run": 98,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "84a32676",
-   "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
-   "at": 1795407327774,
-   "from": "082694b8-c7f6-49bf-89ef-650811afd552",
-   "name": "To-do 102: Bake Lantern Sea islands sharp",
-   "short": "Fix: web/lib/court-map.test.ts perf budget fails on its...",
-   "chat": "64d45c6b-0052-44ab-be13-0778c109415c",
-   "host": "62903adf5e340f87",
-   "run": 109,
-   "auto": true
   }
  ],
  "removed": {
@@ -500,11 +488,23 @@
   "3b565ab3-ok": 1795406228107,
   "9afdac3c": 1795406440914,
   "d1c39247": 1795407280219,
-  "e4bcd541": 1795407319411
+  "e4bcd541": 1795407319411,
+  "84a32676": 1795407656678
  },
  "seq": 109,
  "streak": 93,
  "ticked": [
+  {
+   "id": "84a32676",
+   "text": "Fix: web/lib/court-map.test.ts perf budget fails on its own (full buildCourt 283ms at 400 wide vs 60ms budget, line 610); profile buildCourt in the uncommitted court-map.ts work. Found by chat Lantern Sea sharp zoom (082694b8)",
+   "from": "082694b8-c7f6-49bf-89ef-650811afd552",
+   "name": "To-do 102: Bake Lantern Sea islands sharp",
+   "short": "Fix: web/lib/court-map.test.ts perf budget fails on its...",
+   "run": 109,
+   "auto": true,
+   "at": 1795407656678,
+   "by": "64d45c6b-0052-44ab-be13-0778c109415c"
+  },
   {
    "id": "e4bcd541",
    "text": "Fix: extension `pnpm run lint:test` fails with 9 TS errors in extension/test/smart-select.test.ts (SmartRow union now has t:\"final\" rows without task/pick/why, from uncommitted extension/src/hub/smart-tools.ts work; line 25 passes SmartRow where a pick row is expected). Runtime tests pass. Left by chat \"To-do 101: Fix worktree sweep grace\".",
@@ -603,17 +603,6 @@
    "name": "Redesign Site Pages Ship",
    "short": "Kit fix (aar, Redesign Site Pages Ship):",
    "run": 100,
-   "auto": true
-  },
-  {
-   "id": "e00a421e",
-   "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
-   "at": 1795403793425,
-   "by": "0a0be0be-aa65-4b39-9deb-df52de218adc",
-   "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
-   "name": "Research tab seems to be",
-   "short": "Release the research tab fixes (worktree...",
-   "run": 99,
    "auto": true
   }
  ]
