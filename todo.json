@@ -1,6 +1,15 @@
 {
  "version": 1,
- "todo": [],
+ "todo": [
+  {
+   "id": "55a17f3a",
+   "text": "Trim CLAUDE.md and MEMORY.md (35k characters load in every chat and subagent, about 11k tokens). Baseline and method: vault wiki/token-efficiency.md. From Token Efficiency Analysis. Suggested, for later.",
+   "at": 1795475443168,
+   "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
+   "name": "Token Efficiency Analysis",
+   "short": "Trim CLAUDE.md and MEMORY.md (35k characters load in..."
+  }
+ ],
  "removed": {
   "17474366": 1794509875435,
   "58032070": 1795404119789,
