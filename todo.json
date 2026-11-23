@@ -15,10 +15,14 @@
   {
    "id": "e00a421e",
    "text": "Release the research tab fixes (worktree research-tab-seems-to-be-1f51) after Merge back: bump, package, install, then start one Research-switch chat and one project chat with deep-research and check each panel fills and the project note lands in memory",
-   "at": 1795388416835,
+   "at": 1795399944755,
    "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
    "name": "Research tab seems to be",
-   "short": "Release the research tab fixes (worktree..."
+   "short": "Release the research tab fixes (worktree...",
+   "chat": "0a0be0be-aa65-4b39-9deb-df52de218adc",
+   "host": "62903adf5e340f87",
+   "run": 99,
+   "auto": true
   },
   {
    "id": "1f7454e5",
@@ -503,7 +507,7 @@
   "352ab00b": 1795399653788,
   "d1835d63": 1795399811700
  },
- "seq": 98,
+ "seq": 99,
  "streak": 93,
  "ticked": [
   {
