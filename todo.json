@@ -51,6 +51,14 @@
    "from": "82fa1ded-7782-425f-a9c2-fdca3ab5ca79",
    "name": "Research tab seems to be",
    "short": "Release the research tab fixes (worktree..."
+  },
+  {
+   "id": "1f7454e5",
+   "text": "Kit fix (aar, Redesign Site Pages Ship): in claude-mods/kit/skills/crowd-ab/SKILL.md, under Inputs > screenshot, add the line \"Every option's screenshot shows the same picked item, tab and data; if they differ, recapture before writing descriptions.\" Why: Ship A and B were shot with different chats picked and the panel voted on the white Push button that came from the data.",
+   "at": 1795396322662,
+   "from": "348b7387-c9cb-46aa-a029-5217f9b05601",
+   "name": "Redesign Site Pages Ship",
+   "short": "Kit fix (aar, Redesign Site Pages Ship):"
   }
  ],
  "removed": {
@@ -517,26 +525,15 @@
  },
  "seq": 94,
  "streak": 93,
- "suggested": [
-  {
-   "id": "3b565ab3",
-   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
-   "at": 1795389688962,
-   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
-   "name": "To-do 93: Fix to-do auto-tick and release",
-   "why": "missed",
-   "short": "You were cut off by a Switchboard window reload at 12:57..."
-  }
- ],
  "ticked": [
   {
    "id": "58fbd139",
    "text": "At 12:56 another chat installed Switchboard 0.21.124 and every VS Code window reloaded, which ended you mid-work. Check git status in your folder, then pick up exactly where you stopped and finish",
+   "at": 1795395506637,
+   "by": "45f4fefa-fd03-47d5-85ed-b20adfcd7425",
    "from": "9e16ce97-ced0-453e-abd1-9d950f293ff7",
    "why": "missed",
-   "short": "At 12:56 another chat installed Switchboard 0.21.124 and...",
-   "at": 1795395506637,
-   "by": "45f4fefa-fd03-47d5-85ed-b20adfcd7425"
+   "short": "At 12:56 another chat installed Switchboard 0.21.124 and..."
   },
   {
    "id": "f5f5c66d",
@@ -637,6 +634,17 @@
    "short": "Release the Research-as-a-tab change after worktree...",
    "run": 87,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "3b565ab3",
+   "text": "You were cut off by a Switchboard window reload at 12:57 (the 0.21.124 install). Pick up where you left off: check any subagents or background jobs you had running, then continue the task.",
+   "at": 1795389688962,
+   "from": "4a34b74a-98df-4788-9b7a-638069d9f78f",
+   "name": "To-do 93: Fix to-do auto-tick and release",
+   "why": "missed",
+   "short": "You were cut off by a Switchboard window reload at 12:57..."
   }
  ]
 }
