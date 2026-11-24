@@ -5,11 +5,11 @@
    "id": "e5ee68d1",
    "text": "Decide whether the Artifact tool stays on in main chats (about 11k tokens each, about 13 uses in 14 days; enableArtifact false turns it off). From Token Efficiency Analysis. Suggested, for later.",
    "at": 1795476255602,
+   "chat": "6b07ca9f-6912-43b0-9936-f4a81df554a6",
+   "host": "62903adf5e340f87",
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "Decide whether the Artifact tool stays on in main chats...",
-   "chat": "6b07ca9f-6912-43b0-9936-f4a81df554a6",
-   "host": "62903adf5e340f87",
    "run": 131,
    "auto": true
   },
@@ -20,6 +20,13 @@
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "On or after 2026-11-30, compare a week of token use with..."
+  },
+  {
+   "id": "3aef530c",
+   "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: claude-mods/kit/rules.md line 69 (Left question). Replace `\"To-do later\" (leave them in the Suggested tray)` with `\"To-do later\" (call nothing: Switchboard puts the standup's Left lines in the Suggested tray; todo_add here starts a chat on them)`. Why: on 2026-11-23 the lead called todo_add after \"To-do later\" at 98% of the weekly limit, and 539d32a0 started in the same minute.",
+   "at": 1795539803892,
+   "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
+   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before..."
   }
  ],
  "removed": {
