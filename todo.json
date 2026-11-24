@@ -30,6 +30,13 @@
    "at": 1795556912240,
    "from": "2e4fc716-2e46-48d8-8b33-a9e1ecba1c37",
    "short": "AAR fix plan (chat 8d72faf7), propose to Kenneth before..."
+  },
+  {
+   "id": "b56d08b1",
+   "text": "AAR fix plan (Learn review of chat 6b07ca9f), propose to Kenneth before editing: claude-mods/kit/rules.md line 69, replace `\"Finish here\" (do them now, rerun the checks, update the standup, ask again)` with `\"Finish here\" (do them now, rerun the checks, add what they taught to the aar's memory note and vault entry, reprint the standup, ask again)`. Why: in 8d72faf7 and 6b07ca9f the work done after \"Finish here\" reached no AAR, because the aar runs before the Left question.",
+   "at": 1795557041118,
+   "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
+   "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to..."
   }
  ],
  "removed": {
