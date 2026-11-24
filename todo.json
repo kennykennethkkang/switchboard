@@ -16,12 +16,20 @@
    "id": "b56d08b1",
    "text": "AAR fix plan (Learn review of chat 6b07ca9f), propose to Kenneth before editing: claude-mods/kit/rules.md line 69, replace `\"Finish here\" (do them now, rerun the checks, update the standup, ask again)` with `\"Finish here\" (do them now, rerun the checks, add what they taught to the aar's memory note and vault entry, reprint the standup, ask again)`. Why: in 8d72faf7 and 6b07ca9f the work done after \"Finish here\" reached no AAR, because the aar runs before the Left question.",
    "at": 1795558913361,
-   "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
-   "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to...",
    "chat": "1853c56d-0d73-4e6a-a373-d4c642761e76",
    "host": "62903adf5e340f87",
+   "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
+   "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to...",
    "run": 136,
    "auto": true
+  },
+  {
+   "id": "622b8053",
+   "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
+   "at": 1795560498059,
+   "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
+   "name": "Research Page Results Missing",
+   "short": "After the chat \"Research Page Results Missing\"..."
   }
  ],
  "removed": {
