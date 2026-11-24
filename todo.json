@@ -14,17 +14,6 @@
    "stopped": true
   },
   {
-   "id": "3aef530c",
-   "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: claude-mods/kit/rules.md line 69 (Left question). Replace `\"To-do later\" (leave them in the Suggested tray)` with `\"To-do later\" (call nothing: Switchboard puts the standup's Left lines in the Suggested tray; todo_add here starts a chat on them)`. Why: on 2026-11-23 the lead called todo_add after \"To-do later\" at 98% of the weekly limit, and 539d32a0 started in the same minute.",
-   "at": 1795556600007,
-   "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
-   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before...",
-   "chat": "184b14ac-0045-4d53-99ad-9f8b376c6e09",
-   "host": "62903adf5e340f87",
-   "run": 133,
-   "auto": true
-  },
-  {
    "id": "38581497",
    "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: extension/src/hub/learn.ts aar() (line 283) uses path.dirname(transcript)/memory, so a worktree chat gets an empty memory copy and its notes land in a folder no main chat loads. When next.cwd is under .claude/worktrees/, use ~/.claude/projects/<slugOf(main checkout)>/memory (cwd with the /.claude/worktrees/... part cut), with a test in extension/test/learn.test.ts. Then move left-later-no-todo-add.md and its MEMORY.md line from the memory folder of the project slug ending token-efficiency-analysis-71db into the main Switchboard memory folder.",
    "at": 1795539806036,
@@ -531,11 +520,33 @@
   "661d20ea": 1795428786896,
   "a2aa4796": 1795428786896,
   "55a17f3a": 1795476249963,
-  "e5ee68d1": 1795540647949
+  "e5ee68d1": 1795540647949,
+  "3aef530c": 1795556713856
  },
  "seq": 133,
  "streak": 130,
+ "suggested": [
+  {
+   "id": "5fe3f1a7",
+   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
+   "at": 1795470152648,
+   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
+   "name": "Ship area decoupling and merge",
+   "why": "missed",
+   "short": "Adjust ship area to not need to have chat running to..."
+  }
+ ],
  "ticked": [
+  {
+   "id": "3aef530c",
+   "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: claude-mods/kit/rules.md line 69 (Left question). Replace `\"To-do later\" (leave them in the Suggested tray)` with `\"To-do later\" (call nothing: Switchboard puts the standup's Left lines in the Suggested tray; todo_add here starts a chat on them)`. Why: on 2026-11-23 the lead called todo_add after \"To-do later\" at 98% of the weekly limit, and 539d32a0 started in the same minute.",
+   "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
+   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before...",
+   "run": 133,
+   "auto": true,
+   "at": 1795556713856,
+   "by": "184b14ac-0045-4d53-99ad-9f8b376c6e09"
+  },
   {
    "id": "e5ee68d1",
    "text": "Decide whether the Artifact tool stays on in main chats (about 11k tokens each, about 13 uses in 14 days; enableArtifact false turns it off). From Token Efficiency Analysis. Suggested, for later.",
@@ -631,26 +642,6 @@
    "short": "Four orphan worktrees with uncommitted files and no chat...",
    "run": 124,
    "auto": true
-  },
-  {
-   "id": "a89feef4",
-   "text": "Learned: kit/rules.md in claude-mods updated (pass rate 85% -> 90%). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/candidate.diff. Undo: cp \"/Users/kennykennethkkang/.claude/self-improve/runs/2026-11-23T06-55-35-440Z/previous.md\" \"/Users/kennykennethkkang/Documents/GitHub/claude-mods/kit/rules.md\"",
-   "at": 1795422029237,
-   "by": "2e763078-41cc-418e-9b2c-30a3d8aeff58",
-   "short": "Learned: kit/rules.md in claude-mods updated (pass rate...",
-   "run": 123,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "5fe3f1a7",
-   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
-   "at": 1795470152648,
-   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
-   "name": "Ship area decoupling and merge",
-   "why": "missed",
-   "short": "Adjust ship area to not need to have chat running to..."
   }
  ]
 }
