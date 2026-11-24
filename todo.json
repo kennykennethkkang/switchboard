@@ -4,10 +4,14 @@
   {
    "id": "4c31f78a",
    "text": "On or after 2026-11-30, compare a week of token use with the 2026-11-23 baseline in vault wiki/token-efficiency.md (cost split, starting context, caches expired during AskUserQuestion). From Token Efficiency Analysis. Suggested, for later.",
-   "at": 1795475445672,
+   "at": 1795540655412,
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
-   "short": "On or after 2026-11-30, compare a week of token use with..."
+   "short": "On or after 2026-11-30, compare a week of token use with...",
+   "chat": "8d72faf7-ff84-4926-a802-64b8f02d4ac8",
+   "host": "62903adf5e340f87",
+   "run": 132,
+   "auto": true
   },
   {
    "id": "3aef530c",
@@ -525,30 +529,19 @@
   "55a17f3a": 1795476249963,
   "e5ee68d1": 1795540647949
  },
- "seq": 131,
+ "seq": 132,
  "streak": 130,
- "suggested": [
-  {
-   "id": "5fe3f1a7",
-   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
-   "at": 1795470152648,
-   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
-   "name": "Ship area decoupling and merge",
-   "why": "missed",
-   "short": "Adjust ship area to not need to have chat running to..."
-  }
- ],
  "ticked": [
   {
    "id": "e5ee68d1",
    "text": "Decide whether the Artifact tool stays on in main chats (about 11k tokens each, about 13 uses in 14 days; enableArtifact false turns it off). From Token Efficiency Analysis. Suggested, for later.",
+   "at": 1795540647949,
+   "by": "6b07ca9f-6912-43b0-9936-f4a81df554a6",
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "Decide whether the Artifact tool stays on in main chats...",
    "run": 131,
-   "auto": true,
-   "at": 1795540647949,
-   "by": "6b07ca9f-6912-43b0-9936-f4a81df554a6"
+   "auto": true
   },
   {
    "id": "55a17f3a",
@@ -643,6 +636,17 @@
    "short": "Learned: kit/rules.md in claude-mods updated (pass rate...",
    "run": 123,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "5fe3f1a7",
+   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
+   "at": 1795470152648,
+   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
+   "name": "Ship area decoupling and merge",
+   "why": "missed",
+   "short": "Adjust ship area to not need to have chat running to..."
   }
  ]
 }
