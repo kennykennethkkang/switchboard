@@ -16,9 +16,13 @@
   {
    "id": "3aef530c",
    "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: claude-mods/kit/rules.md line 69 (Left question). Replace `\"To-do later\" (leave them in the Suggested tray)` with `\"To-do later\" (call nothing: Switchboard puts the standup's Left lines in the Suggested tray; todo_add here starts a chat on them)`. Why: on 2026-11-23 the lead called todo_add after \"To-do later\" at 98% of the weekly limit, and 539d32a0 started in the same minute.",
-   "at": 1795539803892,
+   "at": 1795556600007,
    "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
-   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before..."
+   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before...",
+   "chat": "184b14ac-0045-4d53-99ad-9f8b376c6e09",
+   "host": "62903adf5e340f87",
+   "run": 133,
+   "auto": true
   },
   {
    "id": "38581497",
@@ -529,7 +533,7 @@
   "55a17f3a": 1795476249963,
   "e5ee68d1": 1795540647949
  },
- "seq": 132,
+ "seq": 133,
  "streak": 130,
  "ticked": [
   {
