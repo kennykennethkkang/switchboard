@@ -4,14 +4,15 @@
   {
    "id": "4c31f78a",
    "text": "On or after 2026-11-30, compare a week of token use with the 2026-11-23 baseline in vault wiki/token-efficiency.md (cost split, starting context, caches expired during AskUserQuestion). From Token Efficiency Analysis. Suggested, for later.",
-   "at": 1795540655412,
+   "at": 1795548284849,
+   "chat": "8d72faf7-ff84-4926-a802-64b8f02d4ac8",
+   "host": "62903adf5e340f87",
    "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
    "name": "Token Efficiency Analysis",
    "short": "On or after 2026-11-30, compare a week of token use with...",
-   "chat": "8d72faf7-ff84-4926-a802-64b8f02d4ac8",
-   "host": "62903adf5e340f87",
    "run": 132,
-   "auto": true
+   "auto": true,
+   "notBefore": 1796080200000
   },
   {
    "id": "3aef530c",
