@@ -30,6 +30,14 @@
    "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
    "name": "Research Page Results Missing",
    "short": "After the chat \"Research Page Results Missing\"..."
+  },
+  {
+   "id": "3f4a8092",
+   "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
+   "at": 1795560504783,
+   "from": "9909bd89-f656-40fe-818a-0280ca450195",
+   "name": "Enable code mode everywhere",
+   "short": "Release Switchboard with the Code Mode fixes from chat..."
   }
  ],
  "removed": {
