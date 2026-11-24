@@ -27,6 +27,13 @@
    "at": 1795539803892,
    "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
    "short": "AAR fix plan (chat b402e70d), propose to Kenneth before..."
+  },
+  {
+   "id": "38581497",
+   "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: extension/src/hub/learn.ts aar() (line 283) uses path.dirname(transcript)/memory, so a worktree chat gets an empty memory copy and its notes land in a folder no main chat loads. When next.cwd is under .claude/worktrees/, use ~/.claude/projects/<slugOf(main checkout)>/memory (cwd with the /.claude/worktrees/... part cut), with a test in extension/test/learn.test.ts. Then move left-later-no-todo-add.md and its MEMORY.md line from the memory folder of the project slug ending token-efficiency-analysis-71db into the main Switchboard memory folder.",
+   "at": 1795539806036,
+   "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
+   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before..."
   }
  ],
  "removed": {
