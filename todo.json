@@ -15,9 +15,13 @@
   {
    "id": "b56d08b1",
    "text": "AAR fix plan (Learn review of chat 6b07ca9f), propose to Kenneth before editing: claude-mods/kit/rules.md line 69, replace `\"Finish here\" (do them now, rerun the checks, update the standup, ask again)` with `\"Finish here\" (do them now, rerun the checks, add what they taught to the aar's memory note and vault entry, reprint the standup, ask again)`. Why: in 8d72faf7 and 6b07ca9f the work done after \"Finish here\" reached no AAR, because the aar runs before the Left question.",
-   "at": 1795557041118,
+   "at": 1795558913361,
    "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
-   "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to..."
+   "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to...",
+   "chat": "1853c56d-0d73-4e6a-a373-d4c642761e76",
+   "host": "62903adf5e340f87",
+   "run": 136,
+   "auto": true
   }
  ],
  "removed": {
@@ -524,29 +528,18 @@
   "3aef530c": 1795556713856,
   "e43a7988": 1795558910929
  },
- "seq": 135,
+ "seq": 136,
  "streak": 130,
- "suggested": [
-  {
-   "id": "5fe3f1a7",
-   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
-   "at": 1795470152648,
-   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
-   "name": "Ship area decoupling and merge",
-   "why": "missed",
-   "short": "Adjust ship area to not need to have chat running to..."
-  }
- ],
  "ticked": [
   {
    "id": "e43a7988",
    "text": "AAR fix plan (chat 8d72faf7), propose to Kenneth before editing: extension/src/hub/todo.ts addTodo (line 156, every add path) never sets notBefore, so autopilot started 4c31f78a (\"On or after 2026-11-30, ...\") six days early. Add `const dateOf = (t: string) => { const m = /^(?:on or after|not before) (\\d{4})-(\\d{2})-(\\d{2})\\b/i.exec(t); return m ? new Date(+m[1], +m[2] - 1, +m[3]).getTime() : undefined }` and in addTodo put `...(more.notBefore === undefined && (dateOf(t) ?? 0) > now ? { notBefore: dateOf(t) } : {})` after `...more`. Anchored at the start, so a date elsewhere in the text holds nothing. Tests in extension/test/todo-fields.test.ts: future date set, past date not set, date mid-sentence not set, more.notBefore (0 too) kept, accepted suggestion set. Replay over git log -p refs/switchboard/todo first. Do not touch 4c31f78a, it already has its date.",
+   "at": 1795558910929,
+   "by": "1c1c1b10-c7e5-4d0c-a477-9a7fd85d322b",
    "from": "2e4fc716-2e46-48d8-8b33-a9e1ecba1c37",
    "short": "AAR fix plan (chat 8d72faf7), propose to Kenneth before...",
    "run": 135,
-   "auto": true,
-   "at": 1795558910929,
-   "by": "1c1c1b10-c7e5-4d0c-a477-9a7fd85d322b"
+   "auto": true
   },
   {
    "id": "38581497",
@@ -642,6 +635,17 @@
    "short": "Memory recall scoring:",
    "run": 125,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "5fe3f1a7",
+   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
+   "at": 1795470152648,
+   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
+   "name": "Ship area decoupling and merge",
+   "why": "missed",
+   "short": "Adjust ship area to not need to have chat running to..."
   }
  ]
 }
