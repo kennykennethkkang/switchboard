@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "3f4a8092",
-   "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
-   "at": 1795574491867,
-   "chat": "337d889e-d538-4b92-bc18-bf45247b3594",
-   "host": "62903adf5e340f87",
-   "from": "9909bd89-f656-40fe-818a-0280ca450195",
-   "name": "Enable code mode everywhere",
-   "short": "Release Switchboard with the Code Mode fixes from chat...",
-   "run": 138,
-   "auto": true
-  },
-  {
    "id": "ce433e4a",
    "text": "AAR fix plan (Learn review of chat 9909bd89), propose to Kenneth before editing: extension/src/hub/progress.ts, step(), PostToolUse branch, after the `if (stopped && p.running?.includes(stopped))` block, add: a PostToolUse of Agent (or Task) whose tool_response has status 'completed' and an agentId in p.running ends that agent the same way (drop it from running, finish its role, set ended). Why: a foreground web-fetch agent that had returned its report stayed in running, and stuck.ts typed \"has been quiet 135 min\" into an approved chat, which cost another turn. Proof: all four web-fetch quiet alerts in the transcripts (chats 069b650e, c52cfda9 twice, 9909bd89) were finished foreground agents. First establish, not yet known, why SubagentStop did not clear them (never sent for web-fetch, or the hook post lost), and check that the PostToolUse hook payload's tool_response carries status and agentId as the transcript's toolUseResult does (line 127 of 9909bd89: status completed, agentType web-fetch). A SendMessage resume of that agent must still show as running. Test in extension/test/progress.test.ts.",
    "at": 1795560785152,
@@ -586,11 +574,23 @@
   "0cbe0237": 1795574331700,
   "b56d08b1": 1795574337408,
   "53f49ae9": 1795574337683,
-  "622b8053": 1795574465481
+  "622b8053": 1795574465481,
+  "3f4a8092": 1795575316035
  },
  "seq": 138,
  "streak": 130,
  "ticked": [
+  {
+   "id": "3f4a8092",
+   "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
+   "from": "9909bd89-f656-40fe-818a-0280ca450195",
+   "name": "Enable code mode everywhere",
+   "short": "Release Switchboard with the Code Mode fixes from chat...",
+   "run": 138,
+   "auto": true,
+   "at": 1795575316035,
+   "by": "337d889e-d538-4b92-bc18-bf45247b3594"
+  },
   {
    "id": "622b8053",
    "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
@@ -682,17 +682,6 @@
    "name": "Instagram Reel Switchboard UI Integration",
    "short": "Release Switchboard after Merge back of the...",
    "run": 129,
-   "auto": true
-  },
-  {
-   "id": "62583c2e",
-   "text": "Merge back: treat renamed files and non-ASCII (git-quoted) file names that main already holds identically as already merged, instead of a clash. sameInMain in extension/src/hub/git.ts skips headers where a/ != b/ and quoted paths; parse git's quoted headers and rename pairs, keep the lstat+mode+readlink compare, add tests in extension/test/merge-back.test.ts (qa probe repro S3/S4). From chat \"Worktree merge fix and chat\".",
-   "at": 1795424761406,
-   "by": "41a66f79-b65a-4723-912e-37a06492bb09",
-   "from": "bdd8fc14-2d9f-4691-aaa3-d9484caf47e9",
-   "name": "Worktree merge fix and chat",
-   "short": "Merge back: treat renamed files and non-ASCII...",
-   "run": 128,
    "auto": true
   }
  ]
