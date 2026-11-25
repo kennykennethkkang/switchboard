@@ -15,10 +15,14 @@
   {
    "id": "5f974665",
    "text": "From To-do 154 (b4113c39): repo-rules hold refusal text misleads. claude-mods/repo-rules/hooks/register.ts line 126 says \"SendMessage it to make the change or say when it is done\", but the other chat saying done does not lift the hold (To-dos 148, 151, 154 each lost 10 to 18 min retrying). Replace it with the minutes left until the hold lapses, say a reply does not free it, wait once and run checks meanwhile. Test in repo-rules tests, bump plugin.json, sync extension/kit/mods/repo-rules on the next release.",
-   "at": 1795620065115,
+   "at": 1795635296624,
    "from": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
    "name": "To-do 154: Approve closing answer guard",
-   "short": "From To-do 154 (b4113c39):"
+   "short": "From To-do 154 (b4113c39):",
+   "chat": "f00bfa80-f7c3-4422-a592-60055eab8121",
+   "host": "62903adf5e340f87",
+   "run": 157,
+   "auto": true
   },
   {
    "id": "ccf48002",
@@ -581,18 +585,18 @@
   "65072b4b": 1795631020291,
   "56fed7e9": 1795635283083
  },
- "seq": 156,
+ "seq": 157,
  "streak": 130,
  "ticked": [
   {
    "id": "56fed7e9",
    "text": "Rule proposal for Kenneth to approve (aar Learn review of Armasu c3d8be16; nothing applied). Proof: Kenneth asked to fix risks in two chats, Armasu 8dc0119b (\"fix risks\", \"any risks to fix?\", \"can risks be fixed?\") and c3d8be16 (\"Finish what is left to do and fix risks\"), and both standups listed Risks a check could settle. Target: claude-mods/kit/rules.md, Finishing, the bullet starting \"- Left question: when Left or Risks holds\". Add a new bullet just before it, exact text: \"- Before the standup, sort every Risks line: settled now (a read-only check, a scratch test, or sending a fix made after the qa report back to the same qa agent), filed under Left, or accepted with the reason. A line a check could settle does not go in Risks.\" Note: risks-line-fixable-first in Armasu memory.",
+   "at": 1795635283083,
+   "by": "eac81b23-c67a-4875-9cc2-22cd74877286",
    "from": "8de8ea11-8c60-45fa-8a85-291a6c12b02c",
    "short": "Rule proposal for Kenneth to approve (aar Learn review...",
    "run": 156,
-   "auto": true,
-   "at": 1795635283083,
-   "by": "eac81b23-c67a-4875-9cc2-22cd74877286"
+   "auto": true
   },
   {
    "id": "65072b4b",
