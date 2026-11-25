@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "4c9dfe12",
-   "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
-   "at": 1795642818345,
-   "chat": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f",
-   "host": "62903adf5e340f87",
-   "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
-   "name": "To-do 17: Rule proposal push notification fix",
-   "short": "Send Switchboard's own web push when a Claude chat is...",
-   "run": 163,
-   "auto": true
-  },
-  {
    "id": "713fe615",
    "text": "Proposed fix from Learn (To-do 155, a2ae8789), ask Kenneth before applying: stop impeccable's Stop pass on the animation-styles demo pages. In Switchboard it asks for a triage of the same 8 findings in extension/kit/skills/animation-styles/gallery.html and reference/gallery.html in about 30 chats (957c8d1c, fed33211, f79b2d95, 7b7c8c76, fee82622 among them), often after the final message, so the standup and commit blocks are written twice; in a2ae8789 the second copy dropped lines. Both files are style demos, and impeccable's hooks.md allows ignore-file for a deliberate demo but only with Kenneth's OK. Target /Users/kennykennethkkang/Documents/GitHub/Switchboard/.impeccable/config.json, replace \"ignoreFiles\": [] with \"ignoreFiles\": [\"extension/kit/skills/animation-styles/gallery.html\", \"extension/kit/skills/animation-styles/reference/gallery.html\"] (same as running impeccable hooks ignore-file once per path). Check: the next chat that edits a web file ends with no gallery.html findings.",
    "at": 1795637905974,
@@ -617,11 +605,23 @@
   "15a7edca": 1795639128036,
   "2b88a239": 1795640442773,
   "86133a00-ok": 1795641728153,
-  "94ee2fcf-ok": 1795642804629
+  "94ee2fcf-ok": 1795642804629,
+  "4c9dfe12": 1795643596895
  },
  "seq": 163,
  "streak": 130,
  "ticked": [
+  {
+   "id": "4c9dfe12",
+   "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
+   "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
+   "name": "To-do 17: Rule proposal push notification fix",
+   "short": "Send Switchboard's own web push when a Claude chat is...",
+   "run": 163,
+   "auto": true,
+   "at": 1795643596895,
+   "by": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f"
+  },
   {
    "id": "94ee2fcf-ok",
    "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
@@ -719,14 +719,6 @@
    "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
    "name": "To-do 8: Reduce idle Claude chat CPU",
    "short": "Plan page: web/components/switchboard/todo-panel.tsx..."
-  },
-  {
-   "id": "06a3f33d",
-   "text": "Now board lanes: web/components/switchboard/memory-notebook.css (.nb-list line 17, .nb-body line 38) and now-board.css use the same class names, and the notebook rules win in the built CSS, so the lanes get an extra divider, padding, a right border and a narrow card (196 px at 1280). Give the notebook its own class names; check 360 and 1280 px, light and dark. Found by UI qa in the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
-   "at": 1795622770933,
-   "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
-   "name": "To-do 8: Reduce idle Claude chat CPU",
-   "short": "Now board lanes:"
   }
  ]
 }
