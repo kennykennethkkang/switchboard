@@ -68,6 +68,14 @@
    "from": "77dc6596-05f7-44e2-be11-a10bb6d4f1f6",
    "name": "Also one issue I am",
    "short": "From chat 77dc6596 (tab closer, worktree..."
+  },
+  {
+   "id": "b4073894",
+   "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
+   "at": 1795601209671,
+   "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
+   "name": "Research Topic Folders Expansion",
+   "short": "Fix web/lib/stations.test.ts failing after local midnight:"
   }
  ],
  "removed": {
