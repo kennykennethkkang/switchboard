@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "713fe615",
-   "text": "Proposed fix from Learn (To-do 155, a2ae8789), ask Kenneth before applying: stop impeccable's Stop pass on the animation-styles demo pages. In Switchboard it asks for a triage of the same 8 findings in extension/kit/skills/animation-styles/gallery.html and reference/gallery.html in about 30 chats (957c8d1c, fed33211, f79b2d95, 7b7c8c76, fee82622 among them), often after the final message, so the standup and commit blocks are written twice; in a2ae8789 the second copy dropped lines. Both files are style demos, and impeccable's hooks.md allows ignore-file for a deliberate demo but only with Kenneth's OK. Target /Users/kennykennethkkang/Documents/GitHub/Switchboard/.impeccable/config.json, replace \"ignoreFiles\": [] with \"ignoreFiles\": [\"extension/kit/skills/animation-styles/gallery.html\", \"extension/kit/skills/animation-styles/reference/gallery.html\"] (same as running impeccable hooks ignore-file once per path). Check: the next chat that edits a web file ends with no gallery.html findings.",
-   "at": 1795643598556,
-   "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
-   "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask...",
-   "chat": "bc373df4-fbe4-4606-b195-17a723470d8e",
-   "host": "62903adf5e340f87",
-   "run": 164,
-   "auto": true
-  },
-  {
    "id": "68ca7984",
    "text": "Make sure switchboard and claude-mods are good for transfer over to my desktop (windows device). Maybe we can setup a login system and update system where I can update the application and it will show up. Do deep research check if there is a possibility to make it an updatable app that also all other users can use and access information across different devices or set it up just for now me. Please research as much as possible. I also want to check and make sure formatting, functions, information, and material is completely setup correctly and functioning. Make sure that there are no issues with how everything harnesses together and when on another device material is the same or at least memory data that is important. Please do a full setup and look for free options before anything else.",
    "at": 1795639714476,
@@ -610,11 +599,22 @@
   "2b88a239": 1795640442773,
   "86133a00-ok": 1795641728153,
   "94ee2fcf-ok": 1795642804629,
-  "4c9dfe12": 1795643596895
+  "4c9dfe12": 1795643596895,
+  "713fe615": 1795643912920
  },
  "seq": 164,
  "streak": 130,
  "ticked": [
+  {
+   "id": "713fe615",
+   "text": "Proposed fix from Learn (To-do 155, a2ae8789), ask Kenneth before applying: stop impeccable's Stop pass on the animation-styles demo pages. In Switchboard it asks for a triage of the same 8 findings in extension/kit/skills/animation-styles/gallery.html and reference/gallery.html in about 30 chats (957c8d1c, fed33211, f79b2d95, 7b7c8c76, fee82622 among them), often after the final message, so the standup and commit blocks are written twice; in a2ae8789 the second copy dropped lines. Both files are style demos, and impeccable's hooks.md allows ignore-file for a deliberate demo but only with Kenneth's OK. Target /Users/kennykennethkkang/Documents/GitHub/Switchboard/.impeccable/config.json, replace \"ignoreFiles\": [] with \"ignoreFiles\": [\"extension/kit/skills/animation-styles/gallery.html\", \"extension/kit/skills/animation-styles/reference/gallery.html\"] (same as running impeccable hooks ignore-file once per path). Check: the next chat that edits a web file ends with no gallery.html findings.",
+   "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
+   "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask...",
+   "run": 164,
+   "auto": true,
+   "at": 1795643912920,
+   "by": "bc373df4-fbe4-4606-b195-17a723470d8e"
+  },
   {
    "id": "4c9dfe12",
    "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
@@ -714,15 +714,6 @@
    "short": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the...",
    "run": 155,
    "auto": true
-  },
-  {
-   "id": "d39fb890",
-   "text": "Plan page: web/components/switchboard/todo-panel.tsx line 120 shows the memory hold with the yellow dot because .hub-hold carries no kind; the Now board shows it red (now-board.css data-kind memory). Make them match. From the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
-   "at": 1795623446763,
-   "by": "e1e80017-c48e-479c-9a49-6def9c42cb8b",
-   "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
-   "name": "To-do 8: Reduce idle Claude chat CPU",
-   "short": "Plan page: web/components/switchboard/todo-panel.tsx..."
   }
  ]
 }
