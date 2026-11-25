@@ -15,10 +15,14 @@
   {
    "id": "15a7edca",
    "text": "Memory page, Notebook view: the top 44 px is blank, where Map view shows its Back / Agents / Code / Memory bar (web/components/switchboard/memory-kit.tsx Shell dialog \"hub mem mk nb\" sits at top 44; .mem in web/app/globals.css:622; map view is .mem.mk.mm in memory-maps.css). Repro: #map-memory in Coder view, press Notebook, 1280 px dark; same in 0.21.172, older than the mnb- rename. Likely the modal backdrop covers the bar (not proven). Found by UI qa in the Now board class names chat (claude-mods, bc20da00, To-do 13), 2026-11-25.",
-   "at": 1795623233272,
+   "at": 1795637846998,
    "from": "bc20da00-2825-4374-b668-09b95256db9f",
    "name": "To-do 13: Sync Now board class names",
-   "short": "Memory page, Notebook view:"
+   "short": "Memory page, Notebook view:",
+   "chat": "d14e538e-0e26-48da-b37d-97103fff5507",
+   "host": "62903adf5e340f87",
+   "run": 159,
+   "auto": true
   },
   {
    "id": "2b88a239",
@@ -595,19 +599,19 @@
   "94ee2fcf": 1795636028416,
   "ccf48002": 1795637841139
  },
- "seq": 158,
+ "seq": 159,
  "streak": 130,
  "ticked": [
   {
    "id": "ccf48002",
    "text": "AWS Sign in button for single sign-on profiles (from Armasu chat \"To-do 31: Armasu AWS Review Fixes\", b7fb7396): extension/src/hub/actions.ts awsLogin always spawns `aws login --profile <p>`, which the CLI refuses for a profile with sso_session (Armasu and ArmasuAdmin since 2026-11-25: \"already configured with SSO credentials\"). Run `aws sso login --profile <p>` when the profile has sso_session or sso_start_url, and in aws.ts do not count such a profile as a 12 hour session (dueHeadsUps, trackSessions use the aws login cache). ArmasuAdmin is meant to stay signed out: no notice for it. Two sign-ins: Armasu opens in Chrome Profile 4 (Kenneth-Kang), ArmasuAdmin in Profile 12 (Armasu). Details: vault armasu-deploy, Logins.",
+   "at": 1795637841139,
+   "by": "3fcf6a24-0453-414f-988f-3092d75d76ab",
    "from": "b7fb7396-2fe2-466c-9849-d276a9117194",
    "name": "To-do 31: Armasu AWS Review Fixes",
    "short": "AWS Sign in button for single sign-on profiles (from...",
    "run": 158,
-   "auto": true,
-   "at": 1795637841139,
-   "by": "3fcf6a24-0453-414f-988f-3092d75d76ab"
+   "auto": true
   },
   {
    "id": "5f974665",
