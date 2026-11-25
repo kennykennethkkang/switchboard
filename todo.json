@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "aa4e6cbd",
-   "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
-   "at": 1795618538069,
-   "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
-   "name": "To-do 146: Switchboard approval timeout AAR fix",
-   "short": "From To-do 146 (f33a9d8a), found by qa-codex:",
-   "chat": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
-   "host": "62903adf5e340f87",
-   "run": 154,
-   "auto": true
-  },
-  {
    "id": "65072b4b",
    "text": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the Mac speed chat, 2026-11-25). First search the web and the VS Code and Node docs for functions that lower usage (file watchers instead of polling, retainContextWhenHidden, document.hidden pause, WebviewView visibility, one shared daemon instead of work per window, streaming JSON, worker threads, content-visibility, list virtualization), then profile before and after with ~/.claude/switchboard/tools/prof.mjs and keep only what measures better. Read vault wiki switchboard-lag and note lag-profile-live-hosts first. Measured, 30 s CPU profiles: Armasu window on 0.21.160 6.7% of a core, 0.21.165 and .166 windows 2.5 to 3.1%; top cost everywhere is child_process spawn (execFile), then scanForActiveSessions (readdir and stat per scan), session save, webview postMessage. heapUsed (no forced GC) is 188 to 248 MB per window, sampled in 4 of the 5 windows. Look for: (1) fewer spawned ps, git and lsof calls, one per Mac shared by windows; (2) heap per window, find what is held with a heap snapshot; (3) two node hooks (switchboard/hook.js and switchboard-app/hook.js) start on every tool call of every chat, merge to one forwarder; (4) 3131 app crashed 6 times in app.log with uncaught ERR_STREAM_UNABLE_TO_PIPE at pipeline (app.js:17889), handle the closed response and check the restart cost; (5) 3 webview animations and timers must stop when hidden; VS Code renderers for the Switchboard and Armasu windows were at 57% and 41% in one sample; (6) idle chat tabs: offer to close or suspend chats idle for hours, each claude process holds 300 to 500 MB; (7) old extension folders: 50+ switchboard-0.21.x still in ~/.vscode/extensions and 279 MB of old .vsix in extension/ (list, ask before deleting). Also suggest, do not build, improvements to the program in general found during the search.",
    "at": 1795606926738,
@@ -585,11 +573,23 @@
   "e1bb6e40": 1795611455218,
   "b4073894": 1795611547144,
   "ec91fa3e": 1795611547184,
-  "adbd4f0b": 1795618536958
+  "adbd4f0b": 1795618536958,
+  "aa4e6cbd": 1795619829363
  },
  "seq": 154,
  "streak": 130,
  "ticked": [
+  {
+   "id": "aa4e6cbd",
+   "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
+   "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
+   "name": "To-do 146: Switchboard approval timeout AAR fix",
+   "short": "From To-do 146 (f33a9d8a), found by qa-codex:",
+   "run": 154,
+   "auto": true,
+   "at": 1795619829363,
+   "by": "b4113c39-d9a2-4607-800f-80fd0bac15a1"
+  },
   {
    "id": "adbd4f0b",
    "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
@@ -682,16 +682,6 @@
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
    "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:",
    "run": 147,
-   "auto": true
-  },
-  {
-   "id": "092aabd1",
-   "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
-   "at": 1795605417445,
-   "by": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
-   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
-   "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class...",
-   "run": 146,
    "auto": true
   }
  ]
