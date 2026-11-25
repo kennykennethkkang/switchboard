@@ -16,11 +16,11 @@
    "id": "4c9dfe12",
    "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
    "at": 1795642818345,
+   "chat": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f",
+   "host": "62903adf5e340f87",
    "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
    "name": "To-do 17: Rule proposal push notification fix",
    "short": "Send Switchboard's own web push when a Claude chat is...",
-   "chat": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f",
-   "host": "62903adf5e340f87",
    "run": 163,
    "auto": true
   },
@@ -43,6 +43,12 @@
    "at": 1795640275060,
    "from": "83bb74f9-ed58-4776-9df0-5f365108dcf3",
    "short": "Correct a stale memory line (Learn review of 1b9b30b2,..."
+  },
+  {
+   "id": "6f6c8b95",
+   "text": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIwNjQ2YQ== help with work tree merge and merge in general",
+   "at": 1795643174041,
+   "short": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIw..."
   }
  ],
  "removed": {
