@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "947e4be5",
-   "text": "Codex Workbench guard (from chat Device Research Action Layer): a Codex chat whose cwd is under ~/Documents/Research/Workbench can apply_patch a file outside that folder with no open change record. Claude chats are refused by checkLogged in claude-mods/repo-rules/hooks/register.ts (0.2.7). Export needsLog/inWorkbench/checkLogged where needed and call the same check for patch paths in claude-mods/kit/codex-hooks.mjs (repo-rules is loaded at line 70, patches judged near line 160), with a test; then bump, bundle and release. Facts: records in ~/.claude/switchboard/adjustments/<id>/record.json; memory note workbench-and-adjust; vault wiki workbench.",
-   "at": 1795609100736,
-   "from": "f4afaee5-6e2a-4b81-8c3b-0f03c60ccb75",
-   "name": "Device Research Action Layer",
-   "short": "Codex Workbench guard (from chat Device Research Action...",
-   "chat": "533a3641-10fd-4cc6-9ce1-616b8e4ad723",
-   "host": "62903adf5e340f87",
-   "run": 150,
-   "auto": true
-  },
-  {
    "id": "e1bb6e40",
    "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
    "at": 1795601195079,
@@ -597,11 +585,23 @@
   "0b23972c": 1795606121182,
   "eb065c41": 1795606926126,
   "eb6108b8": 1795607261751,
-  "ee17d285": 1795609087914
+  "ee17d285": 1795609087914,
+  "947e4be5": 1795609477752
  },
  "seq": 150,
  "streak": 130,
  "ticked": [
+  {
+   "id": "947e4be5",
+   "text": "Codex Workbench guard (from chat Device Research Action Layer): a Codex chat whose cwd is under ~/Documents/Research/Workbench can apply_patch a file outside that folder with no open change record. Claude chats are refused by checkLogged in claude-mods/repo-rules/hooks/register.ts (0.2.7). Export needsLog/inWorkbench/checkLogged where needed and call the same check for patch paths in claude-mods/kit/codex-hooks.mjs (repo-rules is loaded at line 70, patches judged near line 160), with a test; then bump, bundle and release. Facts: records in ~/.claude/switchboard/adjustments/<id>/record.json; memory note workbench-and-adjust; vault wiki workbench.",
+   "from": "f4afaee5-6e2a-4b81-8c3b-0f03c60ccb75",
+   "name": "Device Research Action Layer",
+   "short": "Codex Workbench guard (from chat Device Research Action...",
+   "run": 150,
+   "auto": true,
+   "at": 1795609477752,
+   "by": "533a3641-10fd-4cc6-9ce1-616b8e4ad723"
+  },
   {
    "id": "ee17d285",
    "text": "Skip missed rows for an approved chat: chatMissed in extension/src/hub/todo.ts (called from extension/src/claude-runtime.ts line 230 after Jev scores) files a chat's own asks as missed with no check that Kenneth approved it. chatApproved only clears rows that exist at Approve time, and the score lands later. Seen: 5fe3f1a7 filed 2026-11-23 21:42:32 UTC, 18 s after chat 4d95974e's Approve at 21:42:14, then autopilot ran To-do 140 on shipped work. Fix: no missed rows when the chat has an approved row in the archive (approvedFields in hub-panel.ts approveChat), clear any left, with a test for score after Approve, then release. From chat 1007fb31 (To-do 140).",
@@ -695,17 +695,6 @@
    "run": 142,
    "auto": true,
    "stopped": true
-  },
-  {
-   "id": "0cbe0237-ok",
-   "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
-   "at": 1795577138005,
-   "by": "e7317a25-729a-4761-8bbc-18c06ca7c49a",
-   "from": "30711186-f555-457a-8e47-26adbf84b6d4",
-   "why": "later",
-   "short": "Archive Lua research memory and drop MEMORY.md line",
-   "run": 141,
-   "auto": true
   }
  ]
 }
