@@ -13,19 +13,6 @@
    "auto": true
   },
   {
-   "id": "86133a00-ok",
-   "text": "Choose from the ideas in vault `switchboard-lag`: native HTTP hooks, one leader window, usage-meter polling only in the owning window, no transcript scan in the app while windows are live, a 30 fps cap on the shown map board, only the two newest builds kept at release.",
-   "at": 1795640456247,
-   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
-   "name": "To-do 155: Switchboard CPU memory optimization",
-   "why": "later",
-   "short": "Choose which switchboard-lag performance ideas to pursue",
-   "chat": "7a48b9b8-4855-420f-81cd-a28c384bee98",
-   "host": "62903adf5e340f87",
-   "run": 161,
-   "auto": true
-  },
-  {
    "id": "94ee2fcf-ok",
    "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
    "at": 1795636028416,
@@ -603,11 +590,24 @@
   "94ee2fcf": 1795636028416,
   "ccf48002": 1795637841139,
   "15a7edca": 1795639128036,
-  "2b88a239": 1795640442773
+  "2b88a239": 1795640442773,
+  "86133a00-ok": 1795641728153
  },
  "seq": 161,
  "streak": 130,
  "ticked": [
+  {
+   "id": "86133a00-ok",
+   "text": "Choose from the ideas in vault `switchboard-lag`: native HTTP hooks, one leader window, usage-meter polling only in the owning window, no transcript scan in the app while windows are live, a 30 fps cap on the shown map board, only the two newest builds kept at release.",
+   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
+   "name": "To-do 155: Switchboard CPU memory optimization",
+   "why": "later",
+   "short": "Choose which switchboard-lag performance ideas to pursue",
+   "run": 161,
+   "auto": true,
+   "at": 1795641728153,
+   "by": "7a48b9b8-4855-420f-81cd-a28c384bee98"
+  },
   {
    "id": "2b88a239",
    "text": "Codex skill copies refresh only at Set up: mirrorAllSkills (extension/kit/setup-run.mjs, refreshes unedited ~/.agents/skills copies by digest since 0.21.173) and installOwnSkills run nowhere else, so a kit skill edited and copied to ~/.claude/skills between Set ups reaches Codex late. Run both refreshes when a Switchboard window starts (one window only, off the activation path, hashing about 28 MB), refreshing copies that exist and adding none, with a test. Check To-do 155's activation and CPU work first. From chat 0d57b404 (To-do 15).",
@@ -699,17 +699,6 @@
    "name": "To-do 146: Switchboard approval timeout AAR fix",
    "short": "From To-do 146 (f33a9d8a), found by qa-codex:",
    "run": 154,
-   "auto": true
-  },
-  {
-   "id": "adbd4f0b",
-   "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
-   "at": 1795618536958,
-   "by": "957c8d1c-7c05-4bb2-9166-aedfd3543f29",
-   "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
-   "name": "To-do 146: Switchboard approval timeout AAR fix",
-   "short": "From To-do 146 (f33a9d8a):",
-   "run": 153,
    "auto": true
   }
  ]
