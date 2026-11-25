@@ -15,10 +15,14 @@
   {
    "id": "0cbe0237-ok",
    "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
-   "at": 1795574331700,
+   "at": 1795577057351,
    "from": "30711186-f555-457a-8e47-26adbf84b6d4",
    "why": "later",
-   "short": "Archive Lua research memory and drop MEMORY.md line"
+   "short": "Archive Lua research memory and drop MEMORY.md line",
+   "chat": "e7317a25-729a-4761-8bbc-18c06ca7c49a",
+   "host": "62903adf5e340f87",
+   "run": 141,
+   "auto": true
   },
   {
    "id": "53f49ae9-ok",
@@ -585,20 +589,20 @@
   "ce433e4a": 1795576818404,
   "5fe3f1a7-ok": 1795577056319
  },
- "seq": 140,
+ "seq": 141,
  "streak": 130,
  "ticked": [
   {
    "id": "5fe3f1a7-ok",
    "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
+   "at": 1795577056319,
+   "by": "1007fb31-9c75-41f3-a9e5-16094b5c84f3",
    "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
    "name": "Ship area decoupling and merge",
    "why": "missed",
    "short": "Adjust ship area to not need to have chat running to...",
    "run": 140,
-   "auto": true,
-   "at": 1795577056319,
-   "by": "1007fb31-9c75-41f3-a9e5-16094b5c84f3"
+   "auto": true
   },
   {
    "id": "ce433e4a",
