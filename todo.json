@@ -76,6 +76,13 @@
    "at": 1795576265159,
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
    "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class..."
+  },
+  {
+   "id": "8d90b02d",
+   "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
+   "at": 1795576269701,
+   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
+   "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:"
   }
  ],
  "removed": {
