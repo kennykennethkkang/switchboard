@@ -596,11 +596,15 @@
   {
    "id": "d39fb890",
    "text": "Plan page: web/components/switchboard/todo-panel.tsx line 120 shows the memory hold with the yellow dot because .hub-hold carries no kind; the Now board shows it red (now-board.css data-kind memory). Make them match. From the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
+   "at": 1795623446763,
+   "by": "e1e80017-c48e-479c-9a49-6def9c42cb8b",
    "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
    "name": "To-do 8: Reduce idle Claude chat CPU",
    "short": "Plan page: web/components/switchboard/todo-panel.tsx...",
-   "at": 1795623446763,
-   "by": "e1e80017-c48e-479c-9a49-6def9c42cb8b"
+   "shipped": {
+    "sha": "CHANGEL",
+    "subject": "Plan page: a memory hold's dot is red, as on the Now board; every other hold stays yellow"
+   }
   },
   {
    "id": "06a3f33d",
