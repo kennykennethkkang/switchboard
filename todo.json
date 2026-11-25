@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "11422331",
-   "text": "AAR fix plan (Learn review of chat 0772838d), propose to Kenneth before editing: extension/src/hub/learn.ts, learnTick. Learn runs whatever build its window has loaded, so the 0.21.155 memory-folder fix did not apply in the Switchboard window (pid 59130, up since 09:20, 0.21.155 installed 14:01). Seen in three reviews: 9909bd89, 30711186, 0772838d. Exact change: in learnTick, right after `if (!due && !queue.length) return`, add `if (updatePending()) return`, where updatePending is true when the version or build on disk is newer than the running one (the check reloadIfUpdated already makes from `running` in extension/src/claude-runtime.ts line 123; export it from self-update.ts). The queue then waits for a reloaded window. The queue lives in memory, so it must also be saved across the reload or those reviews are lost (see the comment above `queue`). Test: a tick with an update pending starts no run and keeps the queue. Part 2, by hand with a snapshot first: move the stray notes into the main Switchboard memory folder and add their MEMORY.md lines, then remove the empty folders: code-mode-hook-refusal.md and code-mode-hook-and-ask-limits.md from the clean-research-tab-content-9db3 worktree slug; the finished-agent-quiet-alert section of killed-chat-progress-row.md from the enable-code-mode-everywhere-8518 slug (merge it into the main note, which lacks it); learn-runs-in-loaded-build.md and subagent-bash-stuck-before-hooks.md from the fix-second-brain-memory-5d6d slug (the second is unproven, no index line). Correct worktree-chats (worktree-memory-by-repo, \"pre-0.21.155 leftover\") and memory-maintenance (outdated-and-unproven, \"hung on long git and grep chains\": those calls never started). Run memory-health and the gold check after.",
-   "at": 1795594432026,
-   "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
-   "short": "AAR fix plan (Learn review of chat 0772838d), propose to...",
-   "chat": "37cb5600-0a63-40ef-b3cb-e292b7f0a432",
-   "host": "62903adf5e340f87",
-   "run": 144,
-   "auto": true
-  },
-  {
    "id": "443cb8c3",
    "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
    "at": 1795575161676,
@@ -70,6 +59,7 @@
   }
  ],
  "removed": {
+  "11422331": 1795595213248,
   "17474366": 1794509875435,
   "38581497": 1795557705653,
   "58032070": 1795404119789,
@@ -590,6 +580,16 @@
  "streak": 130,
  "ticked": [
   {
+   "id": "11422331",
+   "text": "AAR fix plan (Learn review of chat 0772838d), propose to Kenneth before editing: extension/src/hub/learn.ts, learnTick. Learn runs whatever build its window has loaded, so the 0.21.155 memory-folder fix did not apply in the Switchboard window (pid 59130, up since 09:20, 0.21.155 installed 14:01). Seen in three reviews: 9909bd89, 30711186, 0772838d. Exact change: in learnTick, right after `if (!due && !queue.length) return`, add `if (updatePending()) return`, where updatePending is true when the version or build on disk is newer than the running one (the check reloadIfUpdated already makes from `running` in extension/src/claude-runtime.ts line 123; export it from self-update.ts). The queue then waits for a reloaded window. The queue lives in memory, so it must also be saved across the reload or those reviews are lost (see the comment above `queue`). Test: a tick with an update pending starts no run and keeps the queue. Part 2, by hand with a snapshot first: move the stray notes into the main Switchboard memory folder and add their MEMORY.md lines, then remove the empty folders: code-mode-hook-refusal.md and code-mode-hook-and-ask-limits.md from the clean-research-tab-content-9db3 worktree slug; the finished-agent-quiet-alert section of killed-chat-progress-row.md from the enable-code-mode-everywhere-8518 slug (merge it into the main note, which lacks it); learn-runs-in-loaded-build.md and subagent-bash-stuck-before-hooks.md from the fix-second-brain-memory-5d6d slug (the second is unproven, no index line). Correct worktree-chats (worktree-memory-by-repo, \"pre-0.21.155 leftover\") and memory-maintenance (outdated-and-unproven, \"hung on long git and grep chains\": those calls never started). Run memory-health and the gold check after.",
+   "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
+   "short": "AAR fix plan (Learn review of chat 0772838d), propose to...",
+   "run": 144,
+   "auto": true,
+   "at": 1795595213248,
+   "by": "3df5f8ab-5951-4b9c-af79-8773d84ca9b0"
+  },
+  {
    "id": "7378e218",
    "text": "AAR fix plan (Learn review of chat 30711186), propose to Kenneth before editing: in Code Mode a PreToolUse hook that passes its timeout refuses the call, and Switchboard's forwarder is installed with timeout 2, so on a loaded Mac plain calls are refused (\"[node]: the hook did not finish, so this call was not run\"). Seen 2026-11-24 in three chats: 30711186, 82f38e8d and Armasu 8dc0119b, on Poll, REPL, Write and ListAgents as well as Bash (so not the Bash-only jev guard); two logged hook.js timedOut true at 2106 and 2159 ms against timeoutMs 2000. Why past its own 1.5 s exit is inferred: that timer starts only once node has booted. Change: (1) extension/src/constants.ts line 64 to `export const HOOK_TIMEOUT_S = 10`, and replace HOOK_SAFETY_MARGIN_MS with `export const HOOK_EXIT_MS = 1500`; (2) extension/src/discovery.ts line 195 to `setTimeout(() => process.exit(0), ${HOOK_EXIT_MS});` with its import and the comment above it, so a hook still exits 1.5 s after boot; (3) scripts/setup.js lines 24, 25 and 59 the same (it installs ~/.claude/switchboard-app/hook.js); (4) addNewHookEvents in extension/src/hooks-config.ts only adds missing events, so it also has to raise the timeout on our existing entries, or current installs keep 2, and the switchboard-app entries need the same. Tests: an old entry with timeout 2 is raised and other tools' entries stay untouched; the script text still exits at 1500. Check first by timing the hook under load, and check the edit guard deny still reaches the chat.",
    "at": 1795594423279,
@@ -685,16 +685,6 @@
    "from": "2e4fc716-2e46-48d8-8b33-a9e1ecba1c37",
    "short": "AAR fix plan (chat 8d72faf7), propose to Kenneth before...",
    "run": 135,
-   "auto": true
-  },
-  {
-   "id": "38581497",
-   "text": "AAR fix plan (chat b402e70d), propose to Kenneth before editing: extension/src/hub/learn.ts aar() (line 283) uses path.dirname(transcript)/memory, so a worktree chat gets an empty memory copy and its notes land in a folder no main chat loads. When next.cwd is under .claude/worktrees/, use ~/.claude/projects/<slugOf(main checkout)>/memory (cwd with the /.claude/worktrees/... part cut), with a test in extension/test/learn.test.ts. Then move left-later-no-todo-add.md and its MEMORY.md line from the memory folder of the project slug ending token-efficiency-analysis-71db into the main Switchboard memory folder.",
-   "at": 1795557705653,
-   "by": "02203327-0864-410d-85ce-3a3050f16ad2",
-   "from": "5b68fea3-6ed2-45b4-a27a-94bb61b76583",
-   "short": "AAR fix plan (chat b402e70d), propose to Kenneth before...",
-   "run": 134,
    "auto": true
   }
  ]
