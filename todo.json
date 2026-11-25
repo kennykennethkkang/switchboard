@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "eb6108b8",
-   "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
-   "at": 1795606115050,
-   "chat": "1078abc9-4d0d-475e-90a6-9150fec03059",
-   "host": "62903adf5e340f87",
-   "from": "8dc0119b-f759-4ad2-bb27-56c4c63cc7cf",
-   "name": "To-do 27: Armasu AWS Hardening Tasks",
-   "short": "AAR fix plan for Kenneth to approve (seen in chats...",
-   "run": 148,
-   "auto": true
-  },
-  {
    "id": "ee17d285",
    "text": "Skip missed rows for an approved chat: chatMissed in extension/src/hub/todo.ts (called from extension/src/claude-runtime.ts line 230 after Jev scores) files a chat's own asks as missed with no check that Kenneth approved it. chatApproved only clears rows that exist at Approve time, and the score lands later. Seen: 5fe3f1a7 filed 2026-11-23 21:42:32 UTC, 18 s after chat 4d95974e's Approve at 21:42:14, then autopilot ran To-do 140 on shipped work. Fix: no missed rows when the chat has an approved row in the archive (approvedFields in hub-panel.ts approveChat), clear any left, with a test for score after Approve, then release. From chat 1007fb31 (To-do 140).",
    "at": 1795585082815,
@@ -611,11 +599,23 @@
   "092aabd1": 1795605417445,
   "8d90b02d": 1795606102437,
   "0b23972c": 1795606121182,
-  "eb065c41": 1795606926126
+  "eb065c41": 1795606926126,
+  "eb6108b8": 1795607261751
  },
  "seq": 148,
  "streak": 130,
  "ticked": [
+  {
+   "id": "eb6108b8",
+   "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
+   "from": "8dc0119b-f759-4ad2-bb27-56c4c63cc7cf",
+   "name": "To-do 27: Armasu AWS Hardening Tasks",
+   "short": "AAR fix plan for Kenneth to approve (seen in chats...",
+   "run": 148,
+   "auto": true,
+   "at": 1795607261751,
+   "by": "1078abc9-4d0d-475e-90a6-9150fec03059"
+  },
   {
    "id": "eb065c41",
    "text": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the Mac speed chat, 2026-11-25). First search the web and the VS Code and Node docs for functions that lower usage (file watchers instead of polling, retainContextWhenHidden, document.hidden pause, WebviewView visibility, one shared daemon instead of work per window, streaming JSON, worker threads, content-visibility, list virtualization), then profile before and after with ~/.claude/switchboard/tools/prof.mjs and keep only what measures better. Read vault wiki switchboard-lag and note lag-profile-live-hosts first. Measured, 30 s CPU profiles: Armasu window on 0.21.160 6.7% of a core, 0.21.165 and .166 windows 2.5 to 3.1%; top cost everywhere is child_process spawn (execFile), then scanForActiveSessions (readdir and stat per scan), session save, webview postMessage. Heap after GC is 188 to 248 MB per window, 5 windows. Look for: (1) fewer spawned ps, git and lsof calls, one per Mac shared by windows; (2) heap per window, find what is held with a heap snapshot; (3) two node hooks (switchboard/hook.js and switchboard-app/hook.js) start on every tool call of every chat, merge to one forwarder; (4) 3131 app crashed 6 times in app.log with uncaught ERR_STREAM_UNABLE_TO_PIPE at pipeline (app.js:17889), handle the closed response and check the restart cost; (5) 3 webview animations and timers must stop when hidden; VS Code renderers for the Switchboard and Armasu windows were at 57% and 41% in one sample; (6) idle chat tabs: offer to close or suspend chats idle for hours, each claude process holds 300 to 500 MB; (7) old extension folders: 50+ switchboard-0.21.x still in ~/.vscode/extensions and 279 MB of old .vsix in extension/ (list, ask before deleting). Also suggest, do not build, improvements to the program in general found during the search.",
@@ -709,16 +709,6 @@
    "why": "missed",
    "short": "Adjust ship area to not need to have chat running to...",
    "run": 140,
-   "auto": true
-  },
-  {
-   "id": "ce433e4a",
-   "text": "AAR fix plan (Learn review of chat 9909bd89), propose to Kenneth before editing: extension/src/hub/progress.ts, step(), PostToolUse branch, after the `if (stopped && p.running?.includes(stopped))` block, add: a PostToolUse of Agent (or Task) whose tool_response has status 'completed' and an agentId in p.running ends that agent the same way (drop it from running, finish its role, set ended). Why: a foreground web-fetch agent that had returned its report stayed in running, and stuck.ts typed \"has been quiet 135 min\" into an approved chat, which cost another turn. Proof: all four web-fetch quiet alerts in the transcripts (chats 069b650e, c52cfda9 twice, 9909bd89) were finished foreground agents. First establish, not yet known, why SubagentStop did not clear them (never sent for web-fetch, or the hook post lost), and check that the PostToolUse hook payload's tool_response carries status and agentId as the transcript's toolUseResult does (line 127 of 9909bd89: status completed, agentType web-fetch). A SendMessage resume of that agent must still show as running. Test in extension/test/progress.test.ts.",
-   "at": 1795576818404,
-   "by": "39f7e999-37b3-4bd6-a201-83d523417c98",
-   "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
-   "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
-   "run": 139,
    "auto": true
   }
  ]
