@@ -16,11 +16,11 @@
    "id": "3f4a8092",
    "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
    "at": 1795574491867,
+   "chat": "337d889e-d538-4b92-bc18-bf45247b3594",
+   "host": "62903adf5e340f87",
    "from": "9909bd89-f656-40fe-818a-0280ca450195",
    "name": "Enable code mode everywhere",
    "short": "Release Switchboard with the Code Mode fixes from chat...",
-   "chat": "337d889e-d538-4b92-bc18-bf45247b3594",
-   "host": "62903adf5e340f87",
    "run": 138,
    "auto": true
   },
@@ -63,6 +63,13 @@
    "at": 1795574363742,
    "from": "5ff03598-bc17-45cc-8611-e6ed0f36b757",
    "short": "AAR fix plan (Learn review of chat 30711186), propose to..."
+  },
+  {
+   "id": "11422331",
+   "text": "AAR fix plan (Learn review of chat 0772838d), propose to Kenneth before editing: extension/src/hub/learn.ts, learnTick. Learn runs whatever build its window has loaded, so the 0.21.155 memory-folder fix did not apply in the Switchboard window (pid 59130, up since 09:20, 0.21.155 installed 14:01). Seen in three reviews: 9909bd89, 30711186, 0772838d. Exact change: in learnTick, right after `if (!due && !queue.length) return`, add `if (updatePending()) return`, where updatePending is true when the version or build on disk is newer than the running one (the check reloadIfUpdated already makes from `running` in extension/src/claude-runtime.ts line 123; export it from self-update.ts). The queue then waits for a reloaded window. The queue lives in memory, so it must also be saved across the reload or those reviews are lost (see the comment above `queue`). Test: a tick with an update pending starts no run and keeps the queue. Part 2, by hand with a snapshot first: move the stray notes into the main Switchboard memory folder and add their MEMORY.md lines, then remove the empty folders: code-mode-hook-refusal.md and code-mode-hook-and-ask-limits.md from the clean-research-tab-content-9db3 worktree slug; the finished-agent-quiet-alert section of killed-chat-progress-row.md from the enable-code-mode-everywhere-8518 slug (merge it into the main note, which lacks it); learn-runs-in-loaded-build.md and subagent-bash-stuck-before-hooks.md from the fix-second-brain-memory-5d6d slug (the second is unproven, no index line). Correct worktree-chats (worktree-memory-by-repo, \"pre-0.21.155 leftover\") and memory-maintenance (outdated-and-unproven, \"hung on long git and grep chains\": those calls never started). Run memory-health and the gold check after.",
+   "at": 1795574884465,
+   "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
+   "short": "AAR fix plan (Learn review of chat 0772838d), propose to..."
   }
  ],
  "removed": {
