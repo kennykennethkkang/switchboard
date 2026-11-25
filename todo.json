@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "5f974665",
-   "text": "From To-do 154 (b4113c39): repo-rules hold refusal text misleads. claude-mods/repo-rules/hooks/register.ts line 126 says \"SendMessage it to make the change or say when it is done\", but the other chat saying done does not lift the hold (To-dos 148, 151, 154 each lost 10 to 18 min retrying). Replace it with the minutes left until the hold lapses, say a reply does not free it, wait once and run checks meanwhile. Test in repo-rules tests, bump plugin.json, sync extension/kit/mods/repo-rules on the next release.",
-   "at": 1795635296624,
-   "chat": "f00bfa80-f7c3-4422-a592-60055eab8121",
-   "host": "62903adf5e340f87",
-   "from": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
-   "name": "To-do 154: Approve closing answer guard",
-   "short": "From To-do 154 (b4113c39):",
-   "run": 157,
-   "auto": true
-  },
-  {
    "id": "ccf48002",
    "text": "AWS Sign in button for single sign-on profiles (from Armasu chat \"To-do 31: Armasu AWS Review Fixes\", b7fb7396): extension/src/hub/actions.ts awsLogin always spawns `aws login --profile <p>`, which the CLI refuses for a profile with sso_session (Armasu and ArmasuAdmin since 2026-11-25: \"already configured with SSO credentials\"). Run `aws sso login --profile <p>` when the profile has sso_session or sso_start_url, and in aws.ts do not count such a profile as a 12 hour session (dueHeadsUps, trackSessions use the aws login cache). ArmasuAdmin is meant to stay signed out: no notice for it. Two sign-ins: Armasu opens in Chrome Profile 4 (Kenneth-Kang), ArmasuAdmin in Profile 12 (Armasu). Details: vault armasu-deploy, Logins.",
    "at": 1795622715384,
@@ -583,11 +571,43 @@
   "06a3f33d": 1795622770933,
   "d39fb890": 1795623446763,
   "65072b4b": 1795631020291,
-  "56fed7e9": 1795635283083
+  "56fed7e9": 1795635283083,
+  "5f974665": 1795635570458
  },
  "seq": 157,
  "streak": 130,
+ "suggested": [
+  {
+   "id": "94ee2fcf",
+   "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
+   "at": 1795635319199,
+   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
+   "name": "To-do 155: Switchboard CPU memory optimization",
+   "why": "later",
+   "short": "Measure Switchboard window on 0.21.173 and under busy chats"
+  },
+  {
+   "id": "86133a00",
+   "text": "Choose from the ideas in vault `switchboard-lag`: native HTTP hooks, one leader window, usage-meter polling only in the owning window, no transcript scan in the app while windows are live, a 30 fps cap on the shown map board, only the two newest builds kept at release.",
+   "at": 1795635319199,
+   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
+   "name": "To-do 155: Switchboard CPU memory optimization",
+   "why": "later",
+   "short": "Choose which switchboard-lag performance ideas to pursue"
+  }
+ ],
  "ticked": [
+  {
+   "id": "5f974665",
+   "text": "From To-do 154 (b4113c39): repo-rules hold refusal text misleads. claude-mods/repo-rules/hooks/register.ts line 126 says \"SendMessage it to make the change or say when it is done\", but the other chat saying done does not lift the hold (To-dos 148, 151, 154 each lost 10 to 18 min retrying). Replace it with the minutes left until the hold lapses, say a reply does not free it, wait once and run checks meanwhile. Test in repo-rules tests, bump plugin.json, sync extension/kit/mods/repo-rules on the next release.",
+   "from": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
+   "name": "To-do 154: Approve closing answer guard",
+   "short": "From To-do 154 (b4113c39):",
+   "run": 157,
+   "auto": true,
+   "at": 1795635570458,
+   "by": "f00bfa80-f7c3-4422-a592-60055eab8121"
+  },
   {
    "id": "56fed7e9",
    "text": "Rule proposal for Kenneth to approve (aar Learn review of Armasu c3d8be16; nothing applied). Proof: Kenneth asked to fix risks in two chats, Armasu 8dc0119b (\"fix risks\", \"any risks to fix?\", \"can risks be fixed?\") and c3d8be16 (\"Finish what is left to do and fix risks\"), and both standups listed Risks a check could settle. Target: claude-mods/kit/rules.md, Finishing, the bullet starting \"- Left question: when Left or Risks holds\". Add a new bullet just before it, exact text: \"- Before the standup, sort every Risks line: settled now (a read-only check, a scratch test, or sending a fix made after the qa report back to the same qa agent), filed under Left, or accepted with the reason. A line a check could settle does not go in Risks.\" Note: risks-line-fixable-first in Armasu memory.",
@@ -678,37 +698,6 @@
    "short": "From chat 77dc6596 (tab closer, worktree...",
    "run": 151,
    "auto": true
-  },
-  {
-   "id": "947e4be5",
-   "text": "Codex Workbench guard (from chat Device Research Action Layer): a Codex chat whose cwd is under ~/Documents/Research/Workbench can apply_patch a file outside that folder with no open change record. Claude chats are refused by checkLogged in claude-mods/repo-rules/hooks/register.ts (0.2.7). Export needsLog/inWorkbench/checkLogged where needed and call the same check for patch paths in claude-mods/kit/codex-hooks.mjs (repo-rules is loaded at line 70, patches judged near line 160), with a test; then bump, bundle and release. Facts: records in ~/.claude/switchboard/adjustments/<id>/record.json; memory note workbench-and-adjust; vault wiki workbench.",
-   "at": 1795609477752,
-   "by": "533a3641-10fd-4cc6-9ce1-616b8e4ad723",
-   "from": "f4afaee5-6e2a-4b81-8c3b-0f03c60ccb75",
-   "name": "Device Research Action Layer",
-   "short": "Codex Workbench guard (from chat Device Research Action...",
-   "run": 150,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "94ee2fcf",
-   "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
-   "at": 1795635319199,
-   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
-   "name": "To-do 155: Switchboard CPU memory optimization",
-   "why": "later",
-   "short": "Measure Switchboard window on 0.21.173 and under busy chats"
-  },
-  {
-   "id": "86133a00",
-   "text": "Choose from the ideas in vault `switchboard-lag`: native HTTP hooks, one leader window, usage-meter polling only in the owning window, no transcript scan in the app while windows are live, a 30 fps cap on the shown map board, only the two newest builds kept at release.",
-   "at": 1795635319199,
-   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
-   "name": "To-do 155: Switchboard CPU memory optimization",
-   "why": "later",
-   "short": "Choose which switchboard-lag performance ideas to pursue"
   }
  ]
 }
