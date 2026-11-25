@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "15a7edca",
-   "text": "Memory page, Notebook view: the top 44 px is blank, where Map view shows its Back / Agents / Code / Memory bar (web/components/switchboard/memory-kit.tsx Shell dialog \"hub mem mk nb\" sits at top 44; .mem in web/app/globals.css:622; map view is .mem.mk.mm in memory-maps.css). Repro: #map-memory in Coder view, press Notebook, 1280 px dark; same in 0.21.172, older than the mnb- rename. Likely the modal backdrop covers the bar (not proven). Found by UI qa in the Now board class names chat (claude-mods, bc20da00, To-do 13), 2026-11-25.",
-   "at": 1795637846998,
-   "chat": "d14e538e-0e26-48da-b37d-97103fff5507",
-   "host": "62903adf5e340f87",
-   "from": "bc20da00-2825-4374-b668-09b95256db9f",
-   "name": "To-do 13: Sync Now board class names",
-   "short": "Memory page, Notebook view:",
-   "run": 159,
-   "auto": true
-  },
-  {
    "id": "2b88a239",
    "text": "Codex skill copies refresh only at Set up: mirrorAllSkills (extension/kit/setup-run.mjs, refreshes unedited ~/.agents/skills copies by digest since 0.21.173) and installOwnSkills run nowhere else, so a kit skill edited and copied to ~/.claude/skills between Set ups reaches Codex late. Run both refreshes when a Switchboard window starts (one window only, off the activation path, hashing about 28 MB), refreshing copies that exist and adding none, with a test. Check To-do 155's activation and CPU work first. From chat 0d57b404 (To-do 15).",
    "at": 1795624362302,
@@ -604,11 +592,23 @@
   "5f974665": 1795635570458,
   "86133a00": 1795635949717,
   "94ee2fcf": 1795636028416,
-  "ccf48002": 1795637841139
+  "ccf48002": 1795637841139,
+  "15a7edca": 1795639128036
  },
  "seq": 159,
  "streak": 130,
  "ticked": [
+  {
+   "id": "15a7edca",
+   "text": "Memory page, Notebook view: the top 44 px is blank, where Map view shows its Back / Agents / Code / Memory bar (web/components/switchboard/memory-kit.tsx Shell dialog \"hub mem mk nb\" sits at top 44; .mem in web/app/globals.css:622; map view is .mem.mk.mm in memory-maps.css). Repro: #map-memory in Coder view, press Notebook, 1280 px dark; same in 0.21.172, older than the mnb- rename. Likely the modal backdrop covers the bar (not proven). Found by UI qa in the Now board class names chat (claude-mods, bc20da00, To-do 13), 2026-11-25.",
+   "from": "bc20da00-2825-4374-b668-09b95256db9f",
+   "name": "To-do 13: Sync Now board class names",
+   "short": "Memory page, Notebook view:",
+   "run": 159,
+   "auto": true,
+   "at": 1795639128036,
+   "by": "d14e538e-0e26-48da-b37d-97103fff5507"
+  },
   {
    "id": "ccf48002",
    "text": "AWS Sign in button for single sign-on profiles (from Armasu chat \"To-do 31: Armasu AWS Review Fixes\", b7fb7396): extension/src/hub/actions.ts awsLogin always spawns `aws login --profile <p>`, which the CLI refuses for a profile with sso_session (Armasu and ArmasuAdmin since 2026-11-25: \"already configured with SSO credentials\"). Run `aws sso login --profile <p>` when the profile has sso_session or sso_start_url, and in aws.ts do not count such a profile as a 12 hour session (dueHeadsUps, trackSessions use the aws login cache). ArmasuAdmin is meant to stay signed out: no notice for it. Two sign-ins: Armasu opens in Chrome Profile 4 (Kenneth-Kang), ArmasuAdmin in Profile 12 (Armasu). Details: vault armasu-deploy, Logins.",
@@ -699,17 +699,6 @@
    "from": "26f03750-35b0-4926-8076-f11b27d5420b",
    "name": "To-do 143: Hook timeout diagnosis",
    "short": "web/lib/stations.test.ts, test \"?demo=stations shows a..."
-  },
-  {
-   "id": "b4073894",
-   "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
-   "at": 1795611547144,
-   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72",
-   "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
-   "name": "Research Topic Folders Expansion",
-   "short": "Fix web/lib/stations.test.ts failing after local midnight:",
-   "run": 152,
-   "auto": true
   }
  ]
 }
