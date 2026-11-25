@@ -15,10 +15,14 @@
   {
    "id": "ee17d285",
    "text": "Skip missed rows for an approved chat: chatMissed in extension/src/hub/todo.ts (called from extension/src/claude-runtime.ts line 230 after Jev scores) files a chat's own asks as missed with no check that Kenneth approved it. chatApproved only clears rows that exist at Approve time, and the score lands later. Seen: 5fe3f1a7 filed 2026-11-23 21:42:32 UTC, 18 s after chat 4d95974e's Approve at 21:42:14, then autopilot ran To-do 140 on shipped work. Fix: no missed rows when the chat has an approved row in the archive (approvedFields in hub-panel.ts approveChat), clear any left, with a test for score after Approve, then release. From chat 1007fb31 (To-do 140).",
-   "at": 1795585082815,
+   "at": 1795607270113,
    "from": "1007fb31-9c75-41f3-a9e5-16094b5c84f3",
    "name": "To-do 140: Ship area selection",
-   "short": "Skip missed rows for an approved chat:"
+   "short": "Skip missed rows for an approved chat:",
+   "chat": "6baf4620-a5da-4dfe-842d-ebe15861777f",
+   "host": "62903adf5e340f87",
+   "run": 149,
+   "auto": true
   },
   {
    "id": "947e4be5",
@@ -602,19 +606,19 @@
   "eb065c41": 1795606926126,
   "eb6108b8": 1795607261751
  },
- "seq": 148,
+ "seq": 149,
  "streak": 130,
  "ticked": [
   {
    "id": "eb6108b8",
    "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
+   "at": 1795607261751,
+   "by": "1078abc9-4d0d-475e-90a6-9150fec03059",
    "from": "8dc0119b-f759-4ad2-bb27-56c4c63cc7cf",
    "name": "To-do 27: Armasu AWS Hardening Tasks",
    "short": "AAR fix plan for Kenneth to approve (seen in chats...",
    "run": 148,
-   "auto": true,
-   "at": 1795607261751,
-   "by": "1078abc9-4d0d-475e-90a6-9150fec03059"
+   "auto": true
   },
   {
    "id": "eb065c41",
