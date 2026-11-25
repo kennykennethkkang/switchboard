@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "8d90b02d",
-   "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
-   "at": 1795605418709,
-   "chat": "fb0c2f7d-7b6d-47ac-ae7e-b10eb0702170",
-   "host": "62903adf5e340f87",
-   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
-   "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:",
-   "run": 147,
-   "auto": true
-  },
-  {
    "id": "eb6108b8",
    "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
    "at": 1795576648585,
@@ -615,11 +604,22 @@
   "7378e218": 1795594423279,
   "443cb8c3": 1795601235527,
   "0f779708": 1795605014653,
-  "092aabd1": 1795605417445
+  "092aabd1": 1795605417445,
+  "8d90b02d": 1795606102437
  },
  "seq": 147,
  "streak": 130,
  "ticked": [
+  {
+   "id": "8d90b02d",
+   "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
+   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
+   "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:",
+   "run": 147,
+   "auto": true,
+   "at": 1795606102437,
+   "by": "fb0c2f7d-7b6d-47ac-ae7e-b10eb0702170"
+  },
   {
    "id": "092aabd1",
    "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
@@ -715,17 +715,6 @@
    "name": "Enable code mode everywhere",
    "short": "Release Switchboard with the Code Mode fixes from chat...",
    "run": 138,
-   "auto": true
-  },
-  {
-   "id": "622b8053",
-   "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
-   "at": 1795574465481,
-   "by": "185f176d-ff4b-4719-89ed-cc532ee26d7a",
-   "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
-   "name": "Research Page Results Missing",
-   "short": "After the chat \"Research Page Results Missing\"...",
-   "run": 137,
    "auto": true
   }
  ]
