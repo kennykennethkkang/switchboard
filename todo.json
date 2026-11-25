@@ -16,10 +16,10 @@
    "id": "ce433e4a",
    "text": "AAR fix plan (Learn review of chat 9909bd89), propose to Kenneth before editing: extension/src/hub/progress.ts, step(), PostToolUse branch, after the `if (stopped && p.running?.includes(stopped))` block, add: a PostToolUse of Agent (or Task) whose tool_response has status 'completed' and an agentId in p.running ends that agent the same way (drop it from running, finish its role, set ended). Why: a foreground web-fetch agent that had returned its report stayed in running, and stuck.ts typed \"has been quiet 135 min\" into an approved chat, which cost another turn. Proof: all four web-fetch quiet alerts in the transcripts (chats 069b650e, c52cfda9 twice, 9909bd89) were finished foreground agents. First establish, not yet known, why SubagentStop did not clear them (never sent for web-fetch, or the hook post lost), and check that the PostToolUse hook payload's tool_response carries status and agentId as the transcript's toolUseResult does (line 127 of 9909bd89: status completed, agentType web-fetch). A SendMessage resume of that agent must still show as running. Test in extension/test/progress.test.ts.",
    "at": 1795575316720,
-   "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
-   "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
    "chat": "39f7e999-37b3-4bd6-a201-83d523417c98",
    "host": "62903adf5e340f87",
+   "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
+   "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
    "run": 139,
    "auto": true
   },
@@ -69,6 +69,13 @@
    "at": 1795575161676,
    "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
    "short": "AAR fix plan (approve before applying), from Learn..."
+  },
+  {
+   "id": "092aabd1",
+   "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
+   "at": 1795576265159,
+   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
+   "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class..."
   }
  ],
  "removed": {
