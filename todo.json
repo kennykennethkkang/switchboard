@@ -15,10 +15,14 @@
   {
    "id": "adbd4f0b",
    "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
-   "at": 1795605999620,
+   "at": 1795611561076,
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
-   "short": "From To-do 146 (f33a9d8a):"
+   "short": "From To-do 146 (f33a9d8a):",
+   "chat": "957c8d1c-7c05-4bb2-9166-aedfd3543f29",
+   "host": "62903adf5e340f87",
+   "run": 153,
+   "auto": true
   },
   {
    "id": "aa4e6cbd",
@@ -567,17 +571,17 @@
   "b4073894": 1795611547144,
   "ec91fa3e": 1795611547184
  },
- "seq": 152,
+ "seq": 153,
  "streak": 130,
  "ticked": [
   {
    "id": "ec91fa3e",
    "text": "web/lib/stations.test.ts, test \"?demo=stations shows a send-back, a Verified chat at Review and all three Done groups\": passed before midnight on 2026-11-24 and failed at 00:03, 00:15 and later on 2026-11-25 (actual third group [], expected [d-stopped]). Likely the demo chats in web/lib/hub-demo.ts use minutes-ago times that cross a day; not confirmed. Check with a fixed clock first, then fix the demo data or the test. From chat 26f03750 (hook timeout), whose change does not touch it.",
+   "at": 1795611547184,
+   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72",
    "from": "26f03750-35b0-4926-8076-f11b27d5420b",
    "name": "To-do 143: Hook timeout diagnosis",
-   "short": "web/lib/stations.test.ts, test \"?demo=stations shows a...",
-   "at": 1795611547184,
-   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72"
+   "short": "web/lib/stations.test.ts, test \"?demo=stations shows a..."
   },
   {
    "id": "b4073894",
