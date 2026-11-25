@@ -16,10 +16,10 @@
    "id": "443cb8c3",
    "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
    "at": 1795595228048,
-   "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
-   "short": "AAR fix plan (approve before applying), from Learn...",
    "chat": "d652e68d-2adc-4109-acb7-602b8ebadc5d",
    "host": "62903adf5e340f87",
+   "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
+   "short": "AAR fix plan (approve before applying), from Learn...",
    "run": 145,
    "auto": true
   },
@@ -60,6 +60,14 @@
    "from": "f4afaee5-6e2a-4b81-8c3b-0f03c60ccb75",
    "name": "Device Research Action Layer",
    "short": "Codex Workbench guard (from chat Device Research Action..."
+  },
+  {
+   "id": "e1bb6e40",
+   "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
+   "at": 1795601195079,
+   "from": "77dc6596-05f7-44e2-be11-a10bb6d4f1f6",
+   "name": "Also one issue I am",
+   "short": "From chat 77dc6596 (tab closer, worktree..."
   }
  ],
  "removed": {
