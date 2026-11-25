@@ -15,10 +15,14 @@
   {
    "id": "e1bb6e40",
    "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
-   "at": 1795601195079,
+   "at": 1795609490775,
    "from": "77dc6596-05f7-44e2-be11-a10bb6d4f1f6",
    "name": "Also one issue I am",
-   "short": "From chat 77dc6596 (tab closer, worktree..."
+   "short": "From chat 77dc6596 (tab closer, worktree...",
+   "chat": "fed33211-e2f5-4d25-b6ef-fdf0e64a24c2",
+   "host": "62903adf5e340f87",
+   "run": 151,
+   "auto": true
   },
   {
    "id": "b4073894",
@@ -588,19 +592,19 @@
   "ee17d285": 1795609087914,
   "947e4be5": 1795609477752
  },
- "seq": 150,
+ "seq": 151,
  "streak": 130,
  "ticked": [
   {
    "id": "947e4be5",
    "text": "Codex Workbench guard (from chat Device Research Action Layer): a Codex chat whose cwd is under ~/Documents/Research/Workbench can apply_patch a file outside that folder with no open change record. Claude chats are refused by checkLogged in claude-mods/repo-rules/hooks/register.ts (0.2.7). Export needsLog/inWorkbench/checkLogged where needed and call the same check for patch paths in claude-mods/kit/codex-hooks.mjs (repo-rules is loaded at line 70, patches judged near line 160), with a test; then bump, bundle and release. Facts: records in ~/.claude/switchboard/adjustments/<id>/record.json; memory note workbench-and-adjust; vault wiki workbench.",
+   "at": 1795609477752,
+   "by": "533a3641-10fd-4cc6-9ce1-616b8e4ad723",
    "from": "f4afaee5-6e2a-4b81-8c3b-0f03c60ccb75",
    "name": "Device Research Action Layer",
    "short": "Codex Workbench guard (from chat Device Research Action...",
    "run": 150,
-   "auto": true,
-   "at": 1795609477752,
-   "by": "533a3641-10fd-4cc6-9ce1-616b8e4ad723"
+   "auto": true
   },
   {
    "id": "ee17d285",
