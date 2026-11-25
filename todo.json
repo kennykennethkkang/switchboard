@@ -78,6 +78,14 @@
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
    "short": "From To-do 146 (f33a9d8a):"
+  },
+  {
+   "id": "aa4e6cbd",
+   "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
+   "at": 1795605999997,
+   "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
+   "name": "To-do 146: Switchboard approval timeout AAR fix",
+   "short": "From To-do 146 (f33a9d8a), found by qa-codex:"
   }
  ],
  "removed": {
