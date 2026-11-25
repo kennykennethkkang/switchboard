@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "092aabd1",
-   "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
-   "at": 1795601246256,
-   "chat": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
-   "host": "62903adf5e340f87",
-   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
-   "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class...",
-   "run": 146,
-   "auto": true
-  },
-  {
    "id": "8d90b02d",
    "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
    "at": 1795576269701,
@@ -597,11 +586,22 @@
   "8d02f47f": 1795594090869,
   "7378e218": 1795594423279,
   "443cb8c3": 1795601235527,
-  "0f779708": 1795605014653
+  "0f779708": 1795605014653,
+  "092aabd1": 1795605417445
  },
  "seq": 146,
  "streak": 130,
  "ticked": [
+  {
+   "id": "092aabd1",
+   "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
+   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
+   "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class...",
+   "run": 146,
+   "auto": true,
+   "at": 1795605417445,
+   "by": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e"
+  },
   {
    "id": "443cb8c3",
    "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
@@ -699,17 +699,6 @@
    "short": "After the chat \"Research Page Results Missing\"...",
    "run": 137,
    "auto": true
-  },
-  {
-   "id": "b56d08b1",
-   "text": "AAR fix plan (Learn review of chat 6b07ca9f), propose to Kenneth before editing: claude-mods/kit/rules.md line 69, replace `\"Finish here\" (do them now, rerun the checks, update the standup, ask again)` with `\"Finish here\" (do them now, rerun the checks, add what they taught to the aar's memory note and vault entry, reprint the standup, ask again)`. Why: in 8d72faf7 and 6b07ca9f the work done after \"Finish here\" reached no AAR, because the aar runs before the Left question.",
-   "at": 1795574337408,
-   "by": "1853c56d-0d73-4e6a-a373-d4c642761e76",
-   "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
-   "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to...",
-   "run": 136,
-   "auto": true
   }
- ],
- "cleared": 1
+ ]
 }
