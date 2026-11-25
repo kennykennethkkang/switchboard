@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "0cbe0237-ok",
-   "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
-   "at": 1795577057351,
-   "from": "30711186-f555-457a-8e47-26adbf84b6d4",
-   "why": "later",
-   "short": "Archive Lua research memory and drop MEMORY.md line",
-   "chat": "e7317a25-729a-4761-8bbc-18c06ca7c49a",
-   "host": "62903adf5e340f87",
-   "run": 141,
-   "auto": true
-  },
-  {
    "id": "53f49ae9-ok",
    "text": "Fix second brain watch this video make sure that my second brain (memory) has these implementations and fixes and check it is functioning optimally",
    "at": 1795574337683,
@@ -587,11 +575,23 @@
   "622b8053": 1795574465481,
   "3f4a8092": 1795575316035,
   "ce433e4a": 1795576818404,
-  "5fe3f1a7-ok": 1795577056319
+  "5fe3f1a7-ok": 1795577056319,
+  "0cbe0237-ok": 1795577138005
  },
  "seq": 141,
  "streak": 130,
  "ticked": [
+  {
+   "id": "0cbe0237-ok",
+   "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
+   "from": "30711186-f555-457a-8e47-26adbf84b6d4",
+   "why": "later",
+   "short": "Archive Lua research memory and drop MEMORY.md line",
+   "run": 141,
+   "auto": true,
+   "at": 1795577138005,
+   "by": "e7317a25-729a-4761-8bbc-18c06ca7c49a"
+  },
   {
    "id": "5fe3f1a7-ok",
    "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
@@ -685,17 +685,6 @@
    "name": "Token Efficiency Analysis",
    "short": "Decide whether the Artifact tool stays on in main chats...",
    "run": 131,
-   "auto": true
-  },
-  {
-   "id": "55a17f3a",
-   "text": "Trim CLAUDE.md and MEMORY.md (35k characters load in every chat and subagent, about 11k tokens). Baseline and method: vault wiki/token-efficiency.md. From Token Efficiency Analysis. Suggested, for later.",
-   "at": 1795476249963,
-   "by": "539d32a0-0660-472c-870b-eefa6ad112d8",
-   "from": "b402e70d-9a29-43c7-b8bd-5095e167d7d6",
-   "name": "Token Efficiency Analysis",
-   "short": "Trim CLAUDE.md and MEMORY.md (35k characters load in...",
-   "run": 130,
    "auto": true
   }
  ]
