@@ -15,10 +15,14 @@
   {
    "id": "aa4e6cbd",
    "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
-   "at": 1795605999997,
+   "at": 1795618538069,
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
-   "short": "From To-do 146 (f33a9d8a), found by qa-codex:"
+   "short": "From To-do 146 (f33a9d8a), found by qa-codex:",
+   "chat": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
+   "host": "62903adf5e340f87",
+   "run": 154,
+   "auto": true
   },
   {
    "id": "65072b4b",
@@ -583,19 +587,19 @@
   "ec91fa3e": 1795611547184,
   "adbd4f0b": 1795618536958
  },
- "seq": 153,
+ "seq": 154,
  "streak": 130,
  "ticked": [
   {
    "id": "adbd4f0b",
    "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
+   "at": 1795618536958,
+   "by": "957c8d1c-7c05-4bb2-9166-aedfd3543f29",
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
    "short": "From To-do 146 (f33a9d8a):",
    "run": 153,
-   "auto": true,
-   "at": 1795618536958,
-   "by": "957c8d1c-7c05-4bb2-9166-aedfd3543f29"
+   "auto": true
   },
   {
    "id": "ec91fa3e",
