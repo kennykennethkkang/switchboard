@@ -54,6 +54,14 @@
    "from": "b7fb7396-2fe2-466c-9849-d276a9117194",
    "name": "To-do 31: Armasu AWS Review Fixes",
    "short": "AWS Sign in button for single sign-on profiles (from..."
+  },
+  {
+   "id": "15a7edca",
+   "text": "Memory page, Notebook view: the top 44 px is blank, where Map view shows its Back / Agents / Code / Memory bar (web/components/switchboard/memory-kit.tsx Shell dialog \"hub mem mk nb\" sits at top 44; .mem in web/app/globals.css:622; map view is .mem.mk.mm in memory-maps.css). Repro: #map-memory in Coder view, press Notebook, 1280 px dark; same in 0.21.172, older than the mnb- rename. Likely the modal backdrop covers the bar (not proven). Found by UI qa in the Now board class names chat (claude-mods, bc20da00, To-do 13), 2026-11-25.",
+   "at": 1795623233272,
+   "from": "bc20da00-2825-4374-b668-09b95256db9f",
+   "name": "To-do 13: Sync Now board class names",
+   "short": "Memory page, Notebook view:"
   }
  ],
  "removed": {
@@ -595,14 +603,10 @@
   {
    "id": "06a3f33d",
    "text": "Now board lanes: web/components/switchboard/memory-notebook.css (.nb-list line 17, .nb-body line 38) and now-board.css use the same class names, and the notebook rules win in the built CSS, so the lanes get an extra divider, padding, a right border and a narrow card (196 px at 1280). Give the notebook its own class names; check 360 and 1280 px, light and dark. Found by UI qa in the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
+   "at": 1795622770933,
    "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
    "name": "To-do 8: Reduce idle Claude chat CPU",
-   "short": "Now board lanes:",
-   "at": 1795622770933,
-   "shipped": {
-    "sha": "CHANGEL",
-    "subject": "Less CPU: an unchanged repo costs one git call instead of about 23 each time the changes panel refreshes, and every window shares one ps, lsof, pgrep, sysctl and tailscale read"
-   }
+   "short": "Now board lanes:"
   },
   {
    "id": "aa4e6cbd",
