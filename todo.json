@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "b4073894",
-   "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
-   "at": 1795611456056,
-   "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
-   "name": "Research Topic Folders Expansion",
-   "short": "Fix web/lib/stations.test.ts failing after local midnight:",
-   "chat": "a307b452-bb89-4761-8f13-a9c87a15dd72",
-   "host": "62903adf5e340f87",
-   "run": 152,
-   "auto": true
-  },
-  {
    "id": "ec91fa3e",
    "text": "web/lib/stations.test.ts, test \"?demo=stations shows a send-back, a Verified chat at Review and all three Done groups\": passed before midnight on 2026-11-24 and failed at 00:03, 00:15 and later on 2026-11-25 (actual third group [], expected [d-stopped]). Likely the demo chats in web/lib/hub-demo.ts use minutes-ago times that cross a day; not confirmed. Check with a fixed clock first, then fix the demo data or the test. From chat 26f03750 (hook timeout), whose change does not touch it.",
    "at": 1795601213892,
@@ -583,11 +571,23 @@
   "eb6108b8": 1795607261751,
   "ee17d285": 1795609087914,
   "947e4be5": 1795609477752,
-  "e1bb6e40": 1795611455218
+  "e1bb6e40": 1795611455218,
+  "b4073894": 1795611547144
  },
  "seq": 152,
  "streak": 130,
  "ticked": [
+  {
+   "id": "b4073894",
+   "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
+   "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
+   "name": "Research Topic Folders Expansion",
+   "short": "Fix web/lib/stations.test.ts failing after local midnight:",
+   "run": 152,
+   "auto": true,
+   "at": 1795611547144,
+   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72"
+  },
   {
    "id": "e1bb6e40",
    "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
@@ -679,16 +679,6 @@
    "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
    "short": "AAR fix plan (Learn review of chat 0772838d), propose to...",
    "run": 144,
-   "auto": true
-  },
-  {
-   "id": "7378e218",
-   "text": "AAR fix plan (Learn review of chat 30711186), propose to Kenneth before editing: in Code Mode a PreToolUse hook that passes its timeout refuses the call, and Switchboard's forwarder is installed with timeout 2, so on a loaded Mac plain calls are refused (\"[node]: the hook did not finish, so this call was not run\"). Seen 2026-11-24 in three chats: 30711186, 82f38e8d and Armasu 8dc0119b, on Poll, REPL, Write and ListAgents as well as Bash (so not the Bash-only jev guard); two logged hook.js timedOut true at 2106 and 2159 ms against timeoutMs 2000. Why past its own 1.5 s exit is inferred: that timer starts only once node has booted. Change: (1) extension/src/constants.ts line 64 to `export const HOOK_TIMEOUT_S = 10`, and replace HOOK_SAFETY_MARGIN_MS with `export const HOOK_EXIT_MS = 1500`; (2) extension/src/discovery.ts line 195 to `setTimeout(() => process.exit(0), ${HOOK_EXIT_MS});` with its import and the comment above it, so a hook still exits 1.5 s after boot; (3) scripts/setup.js lines 24, 25 and 59 the same (it installs ~/.claude/switchboard-app/hook.js); (4) addNewHookEvents in extension/src/hooks-config.ts only adds missing events, so it also has to raise the timeout on our existing entries, or current installs keep 2, and the switchboard-app entries need the same. Tests: an old entry with timeout 2 is raised and other tools' entries stay untouched; the script text still exits at 1500. Check first by timing the hook under load, and check the edit guard deny still reaches the chat.",
-   "at": 1795594423279,
-   "by": "26f03750-35b0-4926-8076-f11b27d5420b",
-   "from": "5ff03598-bc17-45cc-8611-e6ed0f36b757",
-   "short": "AAR fix plan (Learn review of chat 30711186), propose to...",
-   "run": 143,
    "auto": true
   }
  ]
