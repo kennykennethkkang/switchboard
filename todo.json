@@ -15,9 +15,13 @@
   {
    "id": "8d90b02d",
    "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
-   "at": 1795576269701,
+   "at": 1795605418709,
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
-   "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:"
+   "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:",
+   "chat": "fb0c2f7d-7b6d-47ac-ae7e-b10eb0702170",
+   "host": "62903adf5e340f87",
+   "run": 147,
+   "auto": true
   },
   {
    "id": "eb6108b8",
@@ -589,18 +593,18 @@
   "0f779708": 1795605014653,
   "092aabd1": 1795605417445
  },
- "seq": 146,
+ "seq": 147,
  "streak": 130,
  "ticked": [
   {
    "id": "092aabd1",
    "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
+   "at": 1795605417445,
+   "by": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
    "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class...",
    "run": 146,
-   "auto": true,
-   "at": 1795605417445,
-   "by": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e"
+   "auto": true
   },
   {
    "id": "443cb8c3",
