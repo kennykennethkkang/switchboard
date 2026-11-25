@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "ce433e4a",
-   "text": "AAR fix plan (Learn review of chat 9909bd89), propose to Kenneth before editing: extension/src/hub/progress.ts, step(), PostToolUse branch, after the `if (stopped && p.running?.includes(stopped))` block, add: a PostToolUse of Agent (or Task) whose tool_response has status 'completed' and an agentId in p.running ends that agent the same way (drop it from running, finish its role, set ended). Why: a foreground web-fetch agent that had returned its report stayed in running, and stuck.ts typed \"has been quiet 135 min\" into an approved chat, which cost another turn. Proof: all four web-fetch quiet alerts in the transcripts (chats 069b650e, c52cfda9 twice, 9909bd89) were finished foreground agents. First establish, not yet known, why SubagentStop did not clear them (never sent for web-fetch, or the hook post lost), and check that the PostToolUse hook payload's tool_response carries status and agentId as the transcript's toolUseResult does (line 127 of 9909bd89: status completed, agentType web-fetch). A SendMessage resume of that agent must still show as running. Test in extension/test/progress.test.ts.",
-   "at": 1795575316720,
-   "chat": "39f7e999-37b3-4bd6-a201-83d523417c98",
-   "host": "62903adf5e340f87",
-   "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
-   "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
-   "run": 139,
-   "auto": true
-  },
-  {
    "id": "5fe3f1a7-ok",
    "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
    "at": 1795574329011,
@@ -601,11 +590,22 @@
   "b56d08b1": 1795574337408,
   "53f49ae9": 1795574337683,
   "622b8053": 1795574465481,
-  "3f4a8092": 1795575316035
+  "3f4a8092": 1795575316035,
+  "ce433e4a": 1795576818404
  },
  "seq": 139,
  "streak": 130,
  "ticked": [
+  {
+   "id": "ce433e4a",
+   "text": "AAR fix plan (Learn review of chat 9909bd89), propose to Kenneth before editing: extension/src/hub/progress.ts, step(), PostToolUse branch, after the `if (stopped && p.running?.includes(stopped))` block, add: a PostToolUse of Agent (or Task) whose tool_response has status 'completed' and an agentId in p.running ends that agent the same way (drop it from running, finish its role, set ended). Why: a foreground web-fetch agent that had returned its report stayed in running, and stuck.ts typed \"has been quiet 135 min\" into an approved chat, which cost another turn. Proof: all four web-fetch quiet alerts in the transcripts (chats 069b650e, c52cfda9 twice, 9909bd89) were finished foreground agents. First establish, not yet known, why SubagentStop did not clear them (never sent for web-fetch, or the hook post lost), and check that the PostToolUse hook payload's tool_response carries status and agentId as the transcript's toolUseResult does (line 127 of 9909bd89: status completed, agentType web-fetch). A SendMessage resume of that agent must still show as running. Test in extension/test/progress.test.ts.",
+   "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
+   "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
+   "run": 139,
+   "auto": true,
+   "at": 1795576818404,
+   "by": "39f7e999-37b3-4bd6-a201-83d523417c98"
+  },
   {
    "id": "3f4a8092",
    "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
@@ -698,17 +698,6 @@
    "name": "Instagram Reel Switchboard UI Integration",
    "why": "missed",
    "short": "Implement this video https://www.instagram.com/reel/Df--4..."
-  },
-  {
-   "id": "661d20ea",
-   "text": "Release Switchboard after Merge back of the inspiration-sites worktree chat: ships design-md/SOURCES.md (library stamp local-3) and DESIGN_ROUND in extension/src/hub/indefinite.ts. Worktree was at 0.21.113 vs main's uncommitted 0.21.149, so it could not release itself.",
-   "at": 1795428786896,
-   "by": "8d22c18f-469d-45d5-80f1-65ab3110aed2",
-   "from": "ae33c4a9-d9c6-4d6f-b3e8-d3505317f9ea",
-   "name": "Instagram Reel Switchboard UI Integration",
-   "short": "Release Switchboard after Merge back of the...",
-   "run": 129,
-   "auto": true
   }
  ]
 }
