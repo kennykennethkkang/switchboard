@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "e1bb6e40",
-   "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
-   "at": 1795609490775,
-   "from": "77dc6596-05f7-44e2-be11-a10bb6d4f1f6",
-   "name": "Also one issue I am",
-   "short": "From chat 77dc6596 (tab closer, worktree...",
-   "chat": "fed33211-e2f5-4d25-b6ef-fdf0e64a24c2",
-   "host": "62903adf5e340f87",
-   "run": 151,
-   "auto": true
-  },
-  {
    "id": "b4073894",
    "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
    "at": 1795601209671,
@@ -590,11 +578,23 @@
   "eb065c41": 1795606926126,
   "eb6108b8": 1795607261751,
   "ee17d285": 1795609087914,
-  "947e4be5": 1795609477752
+  "947e4be5": 1795609477752,
+  "e1bb6e40": 1795611455218
  },
  "seq": 151,
  "streak": 130,
  "ticked": [
+  {
+   "id": "e1bb6e40",
+   "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
+   "from": "77dc6596-05f7-44e2-be11-a10bb6d4f1f6",
+   "name": "Also one issue I am",
+   "short": "From chat 77dc6596 (tab closer, worktree...",
+   "run": 151,
+   "auto": true,
+   "at": 1795611455218,
+   "by": "fed33211-e2f5-4d25-b6ef-fdf0e64a24c2"
+  },
   {
    "id": "947e4be5",
    "text": "Codex Workbench guard (from chat Device Research Action Layer): a Codex chat whose cwd is under ~/Documents/Research/Workbench can apply_patch a file outside that folder with no open change record. Claude chats are refused by checkLogged in claude-mods/repo-rules/hooks/register.ts (0.2.7). Export needsLog/inWorkbench/checkLogged where needed and call the same check for patch paths in claude-mods/kit/codex-hooks.mjs (repo-rules is loaded at line 70, patches judged near line 160), with a test; then bump, bundle and release. Facts: records in ~/.claude/switchboard/adjustments/<id>/record.json; memory note workbench-and-adjust; vault wiki workbench.",
@@ -686,19 +686,6 @@
    "short": "AAR fix plan (Learn review of chat 30711186), propose to...",
    "run": 143,
    "auto": true
-  },
-  {
-   "id": "53f49ae9-ok",
-   "text": "Fix second brain watch this video make sure that my second brain (memory) has these implementations and fixes and check it is functioning optimally",
-   "at": 1795594041875,
-   "by": "3df5f8ab-5951-4b9c-af79-8773d84ca9b0",
-   "from": "0772838d-b350-49d4-b500-be3b6d28c2ad",
-   "name": "Fix Second Brain Memory",
-   "why": "missed",
-   "short": "Fix second brain watch this video make sure that my...",
-   "run": 142,
-   "auto": true,
-   "stopped": true
   }
  ]
 }
