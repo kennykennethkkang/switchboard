@@ -15,11 +15,15 @@
   {
    "id": "86133a00-ok",
    "text": "Choose from the ideas in vault `switchboard-lag`: native HTTP hooks, one leader window, usage-meter polling only in the owning window, no transcript scan in the app while windows are live, a 30 fps cap on the shown map board, only the two newest builds kept at release.",
-   "at": 1795635949717,
+   "at": 1795640456247,
    "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
    "name": "To-do 155: Switchboard CPU memory optimization",
    "why": "later",
-   "short": "Choose which switchboard-lag performance ideas to pursue"
+   "short": "Choose which switchboard-lag performance ideas to pursue",
+   "chat": "7a48b9b8-4855-420f-81cd-a28c384bee98",
+   "host": "62903adf5e340f87",
+   "run": 161,
+   "auto": true
   },
   {
    "id": "94ee2fcf-ok",
@@ -601,19 +605,19 @@
   "15a7edca": 1795639128036,
   "2b88a239": 1795640442773
  },
- "seq": 160,
+ "seq": 161,
  "streak": 130,
  "ticked": [
   {
    "id": "2b88a239",
    "text": "Codex skill copies refresh only at Set up: mirrorAllSkills (extension/kit/setup-run.mjs, refreshes unedited ~/.agents/skills copies by digest since 0.21.173) and installOwnSkills run nowhere else, so a kit skill edited and copied to ~/.claude/skills between Set ups reaches Codex late. Run both refreshes when a Switchboard window starts (one window only, off the activation path, hashing about 28 MB), refreshing copies that exist and adding none, with a test. Check To-do 155's activation and CPU work first. From chat 0d57b404 (To-do 15).",
+   "at": 1795640442773,
+   "by": "bc1f3bd4-4ff4-4484-9fa1-4a99ebc48677",
    "from": "0d57b404-8507-4ed9-9daf-2b6ee76856e4",
    "name": "To-do 15: Sync Codex skill copies",
    "short": "Codex skill copies refresh only at Set up:",
    "run": 160,
-   "auto": true,
-   "at": 1795640442773,
-   "by": "bc1f3bd4-4ff4-4484-9fa1-4a99ebc48677"
+   "auto": true
   },
   {
    "id": "15a7edca",
