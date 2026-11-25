@@ -15,10 +15,14 @@
   {
    "id": "3f4a8092",
    "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
-   "at": 1795560504783,
+   "at": 1795574491867,
    "from": "9909bd89-f656-40fe-818a-0280ca450195",
    "name": "Enable code mode everywhere",
-   "short": "Release Switchboard with the Code Mode fixes from chat..."
+   "short": "Release Switchboard with the Code Mode fixes from chat...",
+   "chat": "337d889e-d538-4b92-bc18-bf45247b3594",
+   "host": "62903adf5e340f87",
+   "run": 138,
+   "auto": true
   },
   {
    "id": "ce433e4a",
@@ -570,19 +574,19 @@
   "53f49ae9": 1795574337683,
   "622b8053": 1795574465481
  },
- "seq": 137,
+ "seq": 138,
  "streak": 130,
  "ticked": [
   {
    "id": "622b8053",
    "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
+   "at": 1795574465481,
+   "by": "185f176d-ff4b-4719-89ed-cc532ee26d7a",
    "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
    "name": "Research Page Results Missing",
    "short": "After the chat \"Research Page Results Missing\"...",
    "run": 137,
-   "auto": true,
-   "at": 1795574465481,
-   "by": "185f176d-ff4b-4719-89ed-cc532ee26d7a"
+   "auto": true
   },
   {
    "id": "b56d08b1",
