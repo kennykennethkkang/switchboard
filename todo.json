@@ -51,6 +51,15 @@
    "from": "30711186-f555-457a-8e47-26adbf84b6d4",
    "why": "later",
    "short": "Archive Lua research memory and drop MEMORY.md line"
+  },
+  {
+   "id": "53f49ae9-ok",
+   "text": "Fix second brain watch this video make sure that my second brain (memory) has these implementations and fixes and check it is functioning optimally",
+   "at": 1795574337683,
+   "from": "0772838d-b350-49d4-b500-be3b6d28c2ad",
+   "name": "Fix Second Brain Memory",
+   "why": "missed",
+   "short": "Fix second brain watch this video make sure that my..."
   }
  ],
  "removed": {
@@ -558,31 +567,21 @@
   "e43a7988": 1795558910929,
   "5fe3f1a7": 1795574329011,
   "0cbe0237": 1795574331700,
-  "b56d08b1": 1795574337408
+  "b56d08b1": 1795574337408,
+  "53f49ae9": 1795574337683
  },
  "seq": 136,
  "streak": 130,
- "suggested": [
-  {
-   "id": "53f49ae9",
-   "text": "Fix second brain watch this video make sure that my second brain (memory) has these implementations and fixes and check it is functioning optimally",
-   "at": 1795574165388,
-   "from": "0772838d-b350-49d4-b500-be3b6d28c2ad",
-   "name": "Fix Second Brain Memory",
-   "why": "missed",
-   "short": "Fix second brain watch this video make sure that my..."
-  }
- ],
  "ticked": [
   {
    "id": "b56d08b1",
    "text": "AAR fix plan (Learn review of chat 6b07ca9f), propose to Kenneth before editing: claude-mods/kit/rules.md line 69, replace `\"Finish here\" (do them now, rerun the checks, update the standup, ask again)` with `\"Finish here\" (do them now, rerun the checks, add what they taught to the aar's memory note and vault entry, reprint the standup, ask again)`. Why: in 8d72faf7 and 6b07ca9f the work done after \"Finish here\" reached no AAR, because the aar runs before the Left question.",
+   "at": 1795574337408,
+   "by": "1853c56d-0d73-4e6a-a373-d4c642761e76",
    "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
    "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to...",
    "run": 136,
-   "auto": true,
-   "at": 1795574337408,
-   "by": "1853c56d-0d73-4e6a-a373-d4c642761e76"
+   "auto": true
   },
   {
    "id": "e43a7988",
