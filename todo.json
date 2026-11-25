@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "622b8053",
-   "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
-   "at": 1795574341951,
-   "chat": "47c17bf2-8470-4a28-9085-1afeab8e2908",
-   "host": "62903adf5e340f87",
-   "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
-   "name": "Research Page Results Missing",
-   "short": "After the chat \"Research Page Results Missing\"...",
-   "run": 137,
-   "auto": true
-  },
-  {
    "id": "3f4a8092",
    "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
    "at": 1795560504783,
@@ -579,11 +567,23 @@
   "5fe3f1a7": 1795574329011,
   "0cbe0237": 1795574331700,
   "b56d08b1": 1795574337408,
-  "53f49ae9": 1795574337683
+  "53f49ae9": 1795574337683,
+  "622b8053": 1795574465481
  },
  "seq": 137,
  "streak": 130,
  "ticked": [
+  {
+   "id": "622b8053",
+   "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
+   "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
+   "name": "Research Page Results Missing",
+   "short": "After the chat \"Research Page Results Missing\"...",
+   "run": 137,
+   "auto": true,
+   "at": 1795574465481,
+   "by": "185f176d-ff4b-4719-89ed-cc532ee26d7a"
+  },
   {
    "id": "b56d08b1",
    "text": "AAR fix plan (Learn review of chat 6b07ca9f), propose to Kenneth before editing: claude-mods/kit/rules.md line 69, replace `\"Finish here\" (do them now, rerun the checks, update the standup, ask again)` with `\"Finish here\" (do them now, rerun the checks, add what they taught to the aar's memory note and vault entry, reprint the standup, ask again)`. Why: in 8d72faf7 and 6b07ca9f the work done after \"Finish here\" reached no AAR, because the aar runs before the Left question.",
@@ -675,17 +675,6 @@
    "name": "Worktree merge fix and chat",
    "short": "Merge back: treat renamed files and non-ASCII...",
    "run": 128,
-   "auto": true
-  },
-  {
-   "id": "ea70f92c",
-   "text": "Proposed fix, claude-mods/kit/skills/self-improve/scripts/self-improve.mjs: in the agent job, write o.result to path.join(ws, 'out.md') after each run; in the judge loop, on the third bad reply write the raw j.result to path.join(run, `judge-fail-${o.t.id}-${o.side}-${o.run}.txt`) before throwing. Why: run 2026-11-23T08-15-20-377Z lost all 28 outputs to one flaky judge failure with nothing to inspect. Add a test in self-improve.test.mjs if the write is factored out. Filed by chat 16adfd89 aar.",
-   "at": 1795422422896,
-   "by": "0a309375-6829-42d1-ac2f-d71e91e78e85",
-   "from": "16adfd89-6ae1-4159-9c91-2a87e1814cbe",
-   "name": "To-do 122: Rerun self-improve on rules md",
-   "short": "Proposed fix, claude-mods/kit/skills/self-improve/scripts...",
-   "run": 127,
    "auto": true
   }
  ]
