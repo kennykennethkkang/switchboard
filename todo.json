@@ -16,9 +16,9 @@
    "id": "68ca7984",
    "text": "Make sure switchboard and claude-mods are good for transfer over to my desktop (windows device). Maybe we can setup a login system and update system where I can update the application and it will show up. Do deep research check if there is a possibility to make it an updatable app that also all other users can use and access information across different devices or set it up just for now me. Please research as much as possible. I also want to check and make sure formatting, functions, information, and material is completely setup correctly and functioning. Make sure that there are no issues with how everything harnesses together and when on another device material is the same or at least memory data that is important. Please do a full setup and look for free options before anything else.",
    "at": 1795643913663,
-   "short": "Make sure switchboard and claude-mods are good for...",
    "chat": "4da7282f-e369-4baf-8e5b-99b061a42257",
    "host": "62903adf5e340f87",
+   "short": "Make sure switchboard and claude-mods are good for...",
    "run": 165,
    "auto": true
   },
@@ -58,6 +58,13 @@
    "text": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIwNjQ2YQ== do an extensive check on the ai rules that are on switchboard and check that all rules are set and made sure",
    "at": 1795643251557,
    "short": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIw..."
+  },
+  {
+   "id": "66fc2f92",
+   "text": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK): in claude-mods/kit/rules.md, after line 34 (the Code Mode \"hasn't started\" bullet), add: \"- In Code Mode an MCP tool whose server name has a hyphen keeps it: `tools[\"mcp__usage-meter__hub_recall\"]`, never `tools.mcp__usage_meter__hub_recall` (it throws and ends the script).\" Proof: three chats threw on it (b4113c39, 47c17bf2, 5b2f2681 on 2026-11-25 threw twice on its first hub_recall). The claude-code-mode memory note already says it, but its MEMORY.md hook does not, so chats miss it.",
+   "at": 1795648278236,
+   "from": "1833026e-b67b-4f65-85d3-ad2ab1b6dad6",
+   "short": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK):"
   }
  ],
  "removed": {
