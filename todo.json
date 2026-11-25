@@ -45,6 +45,15 @@
    "at": 1795560785152,
    "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
    "short": "AAR fix plan (Learn review of chat 9909bd89), propose to..."
+  },
+  {
+   "id": "5fe3f1a7-ok",
+   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
+   "at": 1795574329011,
+   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
+   "name": "Ship area decoupling and merge",
+   "why": "missed",
+   "short": "Adjust ship area to not need to have chat running to..."
   }
  ],
  "removed": {
@@ -549,7 +558,8 @@
   "55a17f3a": 1795476249963,
   "e5ee68d1": 1795540647949,
   "3aef530c": 1795556713856,
-  "e43a7988": 1795558910929
+  "e43a7988": 1795558910929,
+  "5fe3f1a7": 1795574329011
  },
  "seq": 136,
  "streak": 130,
@@ -661,15 +671,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "5fe3f1a7",
-   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
-   "at": 1795470152648,
-   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
-   "name": "Ship area decoupling and merge",
-   "why": "missed",
-   "short": "Adjust ship area to not need to have chat running to..."
-  },
   {
    "id": "0cbe0237",
    "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
