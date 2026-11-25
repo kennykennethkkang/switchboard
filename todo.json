@@ -16,11 +16,11 @@
    "id": "2b88a239",
    "text": "Codex skill copies refresh only at Set up: mirrorAllSkills (extension/kit/setup-run.mjs, refreshes unedited ~/.agents/skills copies by digest since 0.21.173) and installOwnSkills run nowhere else, so a kit skill edited and copied to ~/.claude/skills between Set ups reaches Codex late. Run both refreshes when a Switchboard window starts (one window only, off the activation path, hashing about 28 MB), refreshing copies that exist and adding none, with a test. Check To-do 155's activation and CPU work first. From chat 0d57b404 (To-do 15).",
    "at": 1795639137220,
+   "chat": "bc1f3bd4-4ff4-4484-9fa1-4a99ebc48677",
+   "host": "62903adf5e340f87",
    "from": "0d57b404-8507-4ed9-9daf-2b6ee76856e4",
    "name": "To-do 15: Sync Codex skill copies",
    "short": "Codex skill copies refresh only at Set up:",
-   "chat": "bc1f3bd4-4ff4-4484-9fa1-4a99ebc48677",
-   "host": "62903adf5e340f87",
    "run": 160,
    "auto": true
   },
@@ -56,6 +56,12 @@
    "at": 1795637905974,
    "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
    "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask..."
+  },
+  {
+   "id": "68ca7984",
+   "text": "Make sure switchboard and claude-mods are good for transfer over to my desktop (windows device). Maybe we can setup a login system and update system where I can update the application and it will show up. Do deep research check if there is a possibility to make it an updatable app that also all other users can use and access information across different devices or set it up just for now me. Please research as much as possible. I also want to check and make sure formatting, functions, information, and material is completely setup correctly and functioning. Make sure that there are no issues with how everything harnesses together and when on another device material is the same or at least memory data that is important. Please do a full setup and look for free options before anything else.",
+   "at": 1795639714476,
+   "short": "Make sure switchboard and claude-mods are good for..."
   }
  ],
  "removed": {
