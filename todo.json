@@ -15,10 +15,14 @@
   {
    "id": "eb6108b8",
    "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
-   "at": 1795576648585,
+   "at": 1795606115050,
    "from": "8dc0119b-f759-4ad2-bb27-56c4c63cc7cf",
    "name": "To-do 27: Armasu AWS Hardening Tasks",
-   "short": "AAR fix plan for Kenneth to approve (seen in chats..."
+   "short": "AAR fix plan for Kenneth to approve (seen in chats...",
+   "chat": "1078abc9-4d0d-475e-90a6-9150fec03059",
+   "host": "62903adf5e340f87",
+   "run": 148,
+   "auto": true
   },
   {
    "id": "ee17d285",
@@ -607,18 +611,18 @@
   "092aabd1": 1795605417445,
   "8d90b02d": 1795606102437
  },
- "seq": 147,
+ "seq": 148,
  "streak": 130,
  "ticked": [
   {
    "id": "8d90b02d",
    "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
+   "at": 1795606102437,
+   "by": "fb0c2f7d-7b6d-47ac-ae7e-b10eb0702170",
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
    "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:",
    "run": 147,
-   "auto": true,
-   "at": 1795606102437,
-   "by": "fb0c2f7d-7b6d-47ac-ae7e-b10eb0702170"
+   "auto": true
   },
   {
    "id": "092aabd1",
