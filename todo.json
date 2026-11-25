@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "ee17d285",
-   "text": "Skip missed rows for an approved chat: chatMissed in extension/src/hub/todo.ts (called from extension/src/claude-runtime.ts line 230 after Jev scores) files a chat's own asks as missed with no check that Kenneth approved it. chatApproved only clears rows that exist at Approve time, and the score lands later. Seen: 5fe3f1a7 filed 2026-11-23 21:42:32 UTC, 18 s after chat 4d95974e's Approve at 21:42:14, then autopilot ran To-do 140 on shipped work. Fix: no missed rows when the chat has an approved row in the archive (approvedFields in hub-panel.ts approveChat), clear any left, with a test for score after Approve, then release. From chat 1007fb31 (To-do 140).",
-   "at": 1795607270113,
-   "from": "1007fb31-9c75-41f3-a9e5-16094b5c84f3",
-   "name": "To-do 140: Ship area selection",
-   "short": "Skip missed rows for an approved chat:",
-   "chat": "6baf4620-a5da-4dfe-842d-ebe15861777f",
-   "host": "62903adf5e340f87",
-   "run": 149,
-   "auto": true
-  },
-  {
    "id": "947e4be5",
    "text": "Codex Workbench guard (from chat Device Research Action Layer): a Codex chat whose cwd is under ~/Documents/Research/Workbench can apply_patch a file outside that folder with no open change record. Claude chats are refused by checkLogged in claude-mods/repo-rules/hooks/register.ts (0.2.7). Export needsLog/inWorkbench/checkLogged where needed and call the same check for patch paths in claude-mods/kit/codex-hooks.mjs (repo-rules is loaded at line 70, patches judged near line 160), with a test; then bump, bundle and release. Facts: records in ~/.claude/switchboard/adjustments/<id>/record.json; memory note workbench-and-adjust; vault wiki workbench.",
    "at": 1795593245946,
@@ -604,11 +592,23 @@
   "8d90b02d": 1795606102437,
   "0b23972c": 1795606121182,
   "eb065c41": 1795606926126,
-  "eb6108b8": 1795607261751
+  "eb6108b8": 1795607261751,
+  "ee17d285": 1795609087914
  },
  "seq": 149,
  "streak": 130,
  "ticked": [
+  {
+   "id": "ee17d285",
+   "text": "Skip missed rows for an approved chat: chatMissed in extension/src/hub/todo.ts (called from extension/src/claude-runtime.ts line 230 after Jev scores) files a chat's own asks as missed with no check that Kenneth approved it. chatApproved only clears rows that exist at Approve time, and the score lands later. Seen: 5fe3f1a7 filed 2026-11-23 21:42:32 UTC, 18 s after chat 4d95974e's Approve at 21:42:14, then autopilot ran To-do 140 on shipped work. Fix: no missed rows when the chat has an approved row in the archive (approvedFields in hub-panel.ts approveChat), clear any left, with a test for score after Approve, then release. From chat 1007fb31 (To-do 140).",
+   "from": "1007fb31-9c75-41f3-a9e5-16094b5c84f3",
+   "name": "To-do 140: Ship area selection",
+   "short": "Skip missed rows for an approved chat:",
+   "run": 149,
+   "auto": true,
+   "at": 1795609087914,
+   "by": "6baf4620-a5da-4dfe-842d-ebe15861777f"
+  },
   {
    "id": "eb6108b8",
    "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
@@ -701,18 +701,6 @@
    "why": "later",
    "short": "Archive Lua research memory and drop MEMORY.md line",
    "run": 141,
-   "auto": true
-  },
-  {
-   "id": "5fe3f1a7-ok",
-   "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
-   "at": 1795577056319,
-   "by": "1007fb31-9c75-41f3-a9e5-16094b5c84f3",
-   "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
-   "name": "Ship area decoupling and merge",
-   "why": "missed",
-   "short": "Adjust ship area to not need to have chat running to...",
-   "run": 140,
    "auto": true
   }
  ]
