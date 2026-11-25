@@ -42,6 +42,14 @@
    "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
    "name": "To-do 8: Reduce idle Claude chat CPU",
    "short": "Plan page: web/components/switchboard/todo-panel.tsx..."
+  },
+  {
+   "id": "5f974665",
+   "text": "From To-do 154 (b4113c39): repo-rules hold refusal text misleads. claude-mods/repo-rules/hooks/register.ts line 126 says \"SendMessage it to make the change or say when it is done\", but the other chat saying done does not lift the hold (To-dos 148, 151, 154 each lost 10 to 18 min retrying). Replace it with the minutes left until the hold lapses, say a reply does not free it, wait once and run checks meanwhile. Test in repo-rules tests, bump plugin.json, sync extension/kit/mods/repo-rules on the next release.",
+   "at": 1795620065115,
+   "from": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
+   "name": "To-do 154: Approve closing answer guard",
+   "short": "From To-do 154 (b4113c39):"
   }
  ],
  "removed": {
@@ -582,13 +590,13 @@
   {
    "id": "aa4e6cbd",
    "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
+   "at": 1795619829363,
+   "by": "b4113c39-d9a2-4607-800f-80fd0bac15a1",
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
    "short": "From To-do 146 (f33a9d8a), found by qa-codex:",
    "run": 154,
-   "auto": true,
-   "at": 1795619829363,
-   "by": "b4113c39-d9a2-4607-800f-80fd0bac15a1"
+   "auto": true
   },
   {
    "id": "adbd4f0b",
