@@ -57,6 +57,14 @@
    "name": "To-do 155: Switchboard CPU memory optimization",
    "why": "later",
    "short": "Measure Switchboard window on 0.21.173 and under busy chats"
+  },
+  {
+   "id": "4c9dfe12",
+   "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
+   "at": 1795636295033,
+   "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
+   "name": "To-do 17: Rule proposal push notification fix",
+   "short": "Send Switchboard's own web push when a Claude chat is..."
   }
  ],
  "removed": {
