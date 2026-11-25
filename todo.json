@@ -15,9 +15,13 @@
   {
    "id": "443cb8c3",
    "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
-   "at": 1795575161676,
+   "at": 1795595228048,
    "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
-   "short": "AAR fix plan (approve before applying), from Learn..."
+   "short": "AAR fix plan (approve before applying), from Learn...",
+   "chat": "d652e68d-2adc-4109-acb7-602b8ebadc5d",
+   "host": "62903adf5e340f87",
+   "run": 145,
+   "auto": true
   },
   {
    "id": "092aabd1",
@@ -576,18 +580,18 @@
   "8d02f47f": 1795594090869,
   "7378e218": 1795594423279
  },
- "seq": 144,
+ "seq": 145,
  "streak": 130,
  "ticked": [
   {
    "id": "11422331",
    "text": "AAR fix plan (Learn review of chat 0772838d), propose to Kenneth before editing: extension/src/hub/learn.ts, learnTick. Learn runs whatever build its window has loaded, so the 0.21.155 memory-folder fix did not apply in the Switchboard window (pid 59130, up since 09:20, 0.21.155 installed 14:01). Seen in three reviews: 9909bd89, 30711186, 0772838d. Exact change: in learnTick, right after `if (!due && !queue.length) return`, add `if (updatePending()) return`, where updatePending is true when the version or build on disk is newer than the running one (the check reloadIfUpdated already makes from `running` in extension/src/claude-runtime.ts line 123; export it from self-update.ts). The queue then waits for a reloaded window. The queue lives in memory, so it must also be saved across the reload or those reviews are lost (see the comment above `queue`). Test: a tick with an update pending starts no run and keeps the queue. Part 2, by hand with a snapshot first: move the stray notes into the main Switchboard memory folder and add their MEMORY.md lines, then remove the empty folders: code-mode-hook-refusal.md and code-mode-hook-and-ask-limits.md from the clean-research-tab-content-9db3 worktree slug; the finished-agent-quiet-alert section of killed-chat-progress-row.md from the enable-code-mode-everywhere-8518 slug (merge it into the main note, which lacks it); learn-runs-in-loaded-build.md and subagent-bash-stuck-before-hooks.md from the fix-second-brain-memory-5d6d slug (the second is unproven, no index line). Correct worktree-chats (worktree-memory-by-repo, \"pre-0.21.155 leftover\") and memory-maintenance (outdated-and-unproven, \"hung on long git and grep chains\": those calls never started). Run memory-health and the gold check after.",
+   "at": 1795595213248,
+   "by": "3df5f8ab-5951-4b9c-af79-8773d84ca9b0",
    "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
    "short": "AAR fix plan (Learn review of chat 0772838d), propose to...",
    "run": 144,
-   "auto": true,
-   "at": 1795595213248,
-   "by": "3df5f8ab-5951-4b9c-af79-8773d84ca9b0"
+   "auto": true
   },
   {
    "id": "7378e218",
