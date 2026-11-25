@@ -15,9 +15,13 @@
   {
    "id": "713fe615",
    "text": "Proposed fix from Learn (To-do 155, a2ae8789), ask Kenneth before applying: stop impeccable's Stop pass on the animation-styles demo pages. In Switchboard it asks for a triage of the same 8 findings in extension/kit/skills/animation-styles/gallery.html and reference/gallery.html in about 30 chats (957c8d1c, fed33211, f79b2d95, 7b7c8c76, fee82622 among them), often after the final message, so the standup and commit blocks are written twice; in a2ae8789 the second copy dropped lines. Both files are style demos, and impeccable's hooks.md allows ignore-file for a deliberate demo but only with Kenneth's OK. Target /Users/kennykennethkkang/Documents/GitHub/Switchboard/.impeccable/config.json, replace \"ignoreFiles\": [] with \"ignoreFiles\": [\"extension/kit/skills/animation-styles/gallery.html\", \"extension/kit/skills/animation-styles/reference/gallery.html\"] (same as running impeccable hooks ignore-file once per path). Check: the next chat that edits a web file ends with no gallery.html findings.",
-   "at": 1795637905974,
+   "at": 1795643598556,
    "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
-   "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask..."
+   "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask...",
+   "chat": "bc373df4-fbe4-4606-b195-17a723470d8e",
+   "host": "62903adf5e340f87",
+   "run": 164,
+   "auto": true
   },
   {
    "id": "68ca7984",
@@ -608,19 +612,19 @@
   "94ee2fcf-ok": 1795642804629,
   "4c9dfe12": 1795643596895
  },
- "seq": 163,
+ "seq": 164,
  "streak": 130,
  "ticked": [
   {
    "id": "4c9dfe12",
    "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
+   "at": 1795643596895,
+   "by": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f",
    "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
    "name": "To-do 17: Rule proposal push notification fix",
    "short": "Send Switchboard's own web push when a Claude chat is...",
    "run": 163,
-   "auto": true,
-   "at": 1795643596895,
-   "by": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f"
+   "auto": true
   },
   {
    "id": "94ee2fcf-ok",
