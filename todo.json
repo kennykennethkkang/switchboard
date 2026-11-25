@@ -76,6 +76,14 @@
    "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
    "name": "Research Topic Folders Expansion",
    "short": "Fix web/lib/stations.test.ts failing after local midnight:"
+  },
+  {
+   "id": "ec91fa3e",
+   "text": "web/lib/stations.test.ts, test \"?demo=stations shows a send-back, a Verified chat at Review and all three Done groups\": passed before midnight on 2026-11-24 and failed at 00:03, 00:15 and later on 2026-11-25 (actual third group [], expected [d-stopped]). Likely the demo chats in web/lib/hub-demo.ts use minutes-ago times that cross a day; not confirmed. Check with a fixed clock first, then fix the demo data or the test. From chat 26f03750 (hook timeout), whose change does not touch it.",
+   "at": 1795601213892,
+   "from": "26f03750-35b0-4926-8076-f11b27d5420b",
+   "name": "To-do 143: Hook timeout diagnosis",
+   "short": "web/lib/stations.test.ts, test \"?demo=stations shows a..."
   }
  ],
  "removed": {
