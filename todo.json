@@ -54,6 +54,14 @@
    "name": "Ship area decoupling and merge",
    "why": "missed",
    "short": "Adjust ship area to not need to have chat running to..."
+  },
+  {
+   "id": "0cbe0237-ok",
+   "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
+   "at": 1795574331700,
+   "from": "30711186-f555-457a-8e47-26adbf84b6d4",
+   "why": "later",
+   "short": "Archive Lua research memory and drop MEMORY.md line"
   }
  ],
  "removed": {
@@ -559,7 +567,8 @@
   "e5ee68d1": 1795540647949,
   "3aef530c": 1795556713856,
   "e43a7988": 1795558910929,
-  "5fe3f1a7": 1795574329011
+  "5fe3f1a7": 1795574329011,
+  "0cbe0237": 1795574331700
  },
  "seq": 136,
  "streak": 130,
@@ -671,14 +680,6 @@
   }
  ],
  "suggested": [
-  {
-   "id": "0cbe0237",
-   "text": "Archive `research-what-year-was-the-lua-programming-language-610cbe.md` in claude-mods memory and drop its `MEMORY.md` line.",
-   "at": 1795574158641,
-   "from": "30711186-f555-457a-8e47-26adbf84b6d4",
-   "why": "later",
-   "short": "Archive Lua research memory and drop MEMORY.md line"
-  },
   {
    "id": "53f49ae9",
    "text": "Fix second brain watch this video make sure that my second brain (memory) has these implementations and fixes and check it is functioning optimally",
