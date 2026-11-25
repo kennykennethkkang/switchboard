@@ -48,6 +48,15 @@
    "name": "To-do 155: Switchboard CPU memory optimization",
    "why": "later",
    "short": "Choose which switchboard-lag performance ideas to pursue"
+  },
+  {
+   "id": "94ee2fcf-ok",
+   "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
+   "at": 1795636028416,
+   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
+   "name": "To-do 155: Switchboard CPU memory optimization",
+   "why": "later",
+   "short": "Measure Switchboard window on 0.21.173 and under busy chats"
   }
  ],
  "removed": {
@@ -586,7 +595,8 @@
   "65072b4b": 1795631020291,
   "56fed7e9": 1795635283083,
   "5f974665": 1795635570458,
-  "86133a00": 1795635949717
+  "86133a00": 1795635949717,
+  "94ee2fcf": 1795636028416
  },
  "seq": 158,
  "streak": 130,
@@ -692,17 +702,6 @@
    "short": "From chat 77dc6596 (tab closer, worktree...",
    "run": 151,
    "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "94ee2fcf",
-   "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
-   "at": 1795635319199,
-   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
-   "name": "To-do 155: Switchboard CPU memory optimization",
-   "why": "later",
-   "short": "Measure Switchboard window on 0.21.173 and under busy chats"
   }
  ]
 }
