@@ -46,6 +46,14 @@
    "at": 1795617171106,
    "from": "8de8ea11-8c60-45fa-8a85-291a6c12b02c",
    "short": "Rule proposal for Kenneth to approve (aar Learn review..."
+  },
+  {
+   "id": "06a3f33d",
+   "text": "Now board lanes: web/components/switchboard/memory-notebook.css (.nb-list line 17, .nb-body line 38) and now-board.css use the same class names, and the notebook rules win in the built CSS, so the lanes get an extra divider, padding, a right border and a narrow card (196 px at 1280). Give the notebook its own class names; check 360 and 1280 px, light and dark. Found by UI qa in the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
+   "at": 1795617533727,
+   "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
+   "name": "To-do 8: Reduce idle Claude chat CPU",
+   "short": "Now board lanes:"
   }
  ],
  "removed": {
