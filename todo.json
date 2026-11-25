@@ -13,18 +13,6 @@
    "auto": true
   },
   {
-   "id": "adbd4f0b",
-   "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
-   "at": 1795611561076,
-   "chat": "957c8d1c-7c05-4bb2-9166-aedfd3543f29",
-   "host": "62903adf5e340f87",
-   "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
-   "name": "To-do 146: Switchboard approval timeout AAR fix",
-   "short": "From To-do 146 (f33a9d8a):",
-   "run": 153,
-   "auto": true
-  },
-  {
    "id": "aa4e6cbd",
    "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
    "at": 1795605999997,
@@ -592,11 +580,23 @@
   "947e4be5": 1795609477752,
   "e1bb6e40": 1795611455218,
   "b4073894": 1795611547144,
-  "ec91fa3e": 1795611547184
+  "ec91fa3e": 1795611547184,
+  "adbd4f0b": 1795618536958
  },
  "seq": 153,
  "streak": 130,
  "ticked": [
+  {
+   "id": "adbd4f0b",
+   "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
+   "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
+   "name": "To-do 146: Switchboard approval timeout AAR fix",
+   "short": "From To-do 146 (f33a9d8a):",
+   "run": 153,
+   "auto": true,
+   "at": 1795618536958,
+   "by": "957c8d1c-7c05-4bb2-9166-aedfd3543f29"
+  },
   {
    "id": "ec91fa3e",
    "text": "web/lib/stations.test.ts, test \"?demo=stations shows a send-back, a Verified chat at Review and all three Done groups\": passed before midnight on 2026-11-24 and failed at 00:03, 00:15 and later on 2026-11-25 (actual third group [], expected [d-stopped]). Likely the demo chats in web/lib/hub-demo.ts use minutes-ago times that cross a day; not confirmed. Check with a fixed clock first, then fix the demo data or the test. From chat 26f03750 (hook timeout), whose change does not touch it.",
@@ -688,16 +688,6 @@
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
    "short": "AAR fix plan (Learn review of chat 1c1c1b10, same class...",
    "run": 146,
-   "auto": true
-  },
-  {
-   "id": "443cb8c3",
-   "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
-   "at": 1795601235527,
-   "by": "d652e68d-2adc-4109-acb7-602b8ebadc5d",
-   "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
-   "short": "AAR fix plan (approve before applying), from Learn...",
-   "run": 145,
    "auto": true
   }
  ]
