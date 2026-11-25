@@ -70,6 +70,13 @@
    "at": 1795574884465,
    "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
    "short": "AAR fix plan (Learn review of chat 0772838d), propose to..."
+  },
+  {
+   "id": "443cb8c3",
+   "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
+   "at": 1795575161676,
+   "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
+   "short": "AAR fix plan (approve before applying), from Learn..."
   }
  ],
  "removed": {
