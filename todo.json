@@ -79,14 +79,6 @@
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
    "short": "From To-do 146 (f33a9d8a), found by qa-codex:"
-  },
-  {
-   "id": "eb065c41",
-   "text": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the Mac speed chat, 2026-11-25). First search the web and the VS Code and Node docs for functions that lower usage (file watchers instead of polling, retainContextWhenHidden, document.hidden pause, WebviewView visibility, one shared daemon instead of work per window, streaming JSON, worker threads, content-visibility, list virtualization), then profile before and after with ~/.claude/switchboard/tools/prof.mjs and keep only what measures better. Read vault wiki switchboard-lag and note lag-profile-live-hosts first. Measured, 30 s CPU profiles: Armasu window on 0.21.160 6.7% of a core, 0.21.165 and .166 windows 2.5 to 3.1%; top cost everywhere is child_process spawn (execFile), then scanForActiveSessions (readdir and stat per scan), session save, webview postMessage. Heap after GC is 188 to 248 MB per window, 5 windows. Look for: (1) fewer spawned ps, git and lsof calls, one per Mac shared by windows; (2) heap per window, find what is held with a heap snapshot; (3) two node hooks (switchboard/hook.js and switchboard-app/hook.js) start on every tool call of every chat, merge to one forwarder; (4) 3131 app crashed 6 times in app.log with uncaught ERR_STREAM_UNABLE_TO_PIPE at pipeline (app.js:17889), handle the closed response and check the restart cost; (5) 3 webview animations and timers must stop when hidden; VS Code renderers for the Switchboard and Armasu windows were at 57% and 41% in one sample; (6) idle chat tabs: offer to close or suspend chats idle for hours, each claude process holds 300 to 500 MB; (7) old extension folders: 50+ switchboard-0.21.x still in ~/.vscode/extensions and 279 MB of old .vsix in extension/ (list, ask before deleting). Also suggest, do not build, improvements to the program in general found during the search.",
-   "at": 1795606016412,
-   "from": "e41f9181-c5aa-4a26-8680-0f8d0fbf9bfb",
-   "name": "Optimize Mac performance and cleanup",
-   "short": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the..."
   }
  ],
  "removed": {
@@ -610,11 +602,21 @@
   "0f779708": 1795605014653,
   "092aabd1": 1795605417445,
   "8d90b02d": 1795606102437,
-  "0b23972c": 1795606121182
+  "0b23972c": 1795606121182,
+  "eb065c41": 1795606926126
  },
  "seq": 148,
  "streak": 130,
  "ticked": [
+  {
+   "id": "eb065c41",
+   "text": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the Mac speed chat, 2026-11-25). First search the web and the VS Code and Node docs for functions that lower usage (file watchers instead of polling, retainContextWhenHidden, document.hidden pause, WebviewView visibility, one shared daemon instead of work per window, streaming JSON, worker threads, content-visibility, list virtualization), then profile before and after with ~/.claude/switchboard/tools/prof.mjs and keep only what measures better. Read vault wiki switchboard-lag and note lag-profile-live-hosts first. Measured, 30 s CPU profiles: Armasu window on 0.21.160 6.7% of a core, 0.21.165 and .166 windows 2.5 to 3.1%; top cost everywhere is child_process spawn (execFile), then scanForActiveSessions (readdir and stat per scan), session save, webview postMessage. Heap after GC is 188 to 248 MB per window, 5 windows. Look for: (1) fewer spawned ps, git and lsof calls, one per Mac shared by windows; (2) heap per window, find what is held with a heap snapshot; (3) two node hooks (switchboard/hook.js and switchboard-app/hook.js) start on every tool call of every chat, merge to one forwarder; (4) 3131 app crashed 6 times in app.log with uncaught ERR_STREAM_UNABLE_TO_PIPE at pipeline (app.js:17889), handle the closed response and check the restart cost; (5) 3 webview animations and timers must stop when hidden; VS Code renderers for the Switchboard and Armasu windows were at 57% and 41% in one sample; (6) idle chat tabs: offer to close or suspend chats idle for hours, each claude process holds 300 to 500 MB; (7) old extension folders: 50+ switchboard-0.21.x still in ~/.vscode/extensions and 279 MB of old .vsix in extension/ (list, ask before deleting). Also suggest, do not build, improvements to the program in general found during the search.",
+   "from": "e41f9181-c5aa-4a26-8680-0f8d0fbf9bfb",
+   "name": "Optimize Mac performance and cleanup",
+   "short": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the...",
+   "at": 1795606926126,
+   "by": "e41f9181-c5aa-4a26-8680-0f8d0fbf9bfb"
+  },
   {
    "id": "8d90b02d",
    "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
@@ -710,18 +712,6 @@
    "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
    "run": 139,
    "auto": true
-  },
-  {
-   "id": "3f4a8092",
-   "text": "Release Switchboard with the Code Mode fixes from chat 9909bd89 (Enable code mode everywhere). Wait until worktree enable-code-mode-everywhere-8518 is merged into main (check: `command grep -n virtualResult extension/src/tool-summarizer.ts` in main). If a release after that already contains it (grep codeModeOn's string \"does not work in Code Mode\" in the installed dist), only add the CHANGELOG line. Otherwise bump past the newest version, CHANGELOG line covering: a waiting question stays while Code Mode runs code, results and answers of calls made by code show, Remote Control refuses while Code Mode is on, plus mods done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10. Then package, install, and check in a live Code Mode chat that an AskUserQuestion stays on the hub.",
-   "at": 1795575316035,
-   "by": "337d889e-d538-4b92-bc18-bf45247b3594",
-   "from": "9909bd89-f656-40fe-818a-0280ca450195",
-   "name": "Enable code mode everywhere",
-   "short": "Release Switchboard with the Code Mode fixes from chat...",
-   "run": 138,
-   "auto": true
   }
- ],
- "cleared": 1
+ ]
 }
