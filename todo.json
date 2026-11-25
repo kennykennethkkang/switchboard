@@ -15,11 +15,15 @@
   {
    "id": "5fe3f1a7-ok",
    "text": "Adjust ship area to not need to have chat running to ship allow user to select which one they want to ship. Also maybe add merge worktrees into the ship area so users can merge here but also allow",
-   "at": 1795574329011,
+   "at": 1795576832359,
    "from": "4d95974e-c432-495f-aad0-4d53bd5bab78",
    "name": "Ship area decoupling and merge",
    "why": "missed",
-   "short": "Adjust ship area to not need to have chat running to..."
+   "short": "Adjust ship area to not need to have chat running to...",
+   "chat": "1007fb31-9c75-41f3-a9e5-16094b5c84f3",
+   "host": "62903adf5e340f87",
+   "run": 140,
+   "auto": true
   },
   {
    "id": "0cbe0237-ok",
@@ -593,18 +597,18 @@
   "3f4a8092": 1795575316035,
   "ce433e4a": 1795576818404
  },
- "seq": 139,
+ "seq": 140,
  "streak": 130,
  "ticked": [
   {
    "id": "ce433e4a",
    "text": "AAR fix plan (Learn review of chat 9909bd89), propose to Kenneth before editing: extension/src/hub/progress.ts, step(), PostToolUse branch, after the `if (stopped && p.running?.includes(stopped))` block, add: a PostToolUse of Agent (or Task) whose tool_response has status 'completed' and an agentId in p.running ends that agent the same way (drop it from running, finish its role, set ended). Why: a foreground web-fetch agent that had returned its report stayed in running, and stuck.ts typed \"has been quiet 135 min\" into an approved chat, which cost another turn. Proof: all four web-fetch quiet alerts in the transcripts (chats 069b650e, c52cfda9 twice, 9909bd89) were finished foreground agents. First establish, not yet known, why SubagentStop did not clear them (never sent for web-fetch, or the hook post lost), and check that the PostToolUse hook payload's tool_response carries status and agentId as the transcript's toolUseResult does (line 127 of 9909bd89: status completed, agentType web-fetch). A SendMessage resume of that agent must still show as running. Test in extension/test/progress.test.ts.",
+   "at": 1795576818404,
+   "by": "39f7e999-37b3-4bd6-a201-83d523417c98",
    "from": "60f31728-2fd0-492b-a376-3f338fa0c05a",
    "short": "AAR fix plan (Learn review of chat 9909bd89), propose to...",
    "run": 139,
-   "auto": true,
-   "at": 1795576818404,
-   "by": "39f7e999-37b3-4bd6-a201-83d523417c98"
+   "auto": true
   },
   {
    "id": "3f4a8092",
