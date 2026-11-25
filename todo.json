@@ -13,14 +13,6 @@
    "auto": true
   },
   {
-   "id": "ec91fa3e",
-   "text": "web/lib/stations.test.ts, test \"?demo=stations shows a send-back, a Verified chat at Review and all three Done groups\": passed before midnight on 2026-11-24 and failed at 00:03, 00:15 and later on 2026-11-25 (actual third group [], expected [d-stopped]). Likely the demo chats in web/lib/hub-demo.ts use minutes-ago times that cross a day; not confirmed. Check with a fixed clock first, then fix the demo data or the test. From chat 26f03750 (hook timeout), whose change does not touch it.",
-   "at": 1795601213892,
-   "from": "26f03750-35b0-4926-8076-f11b27d5420b",
-   "name": "To-do 143: Hook timeout diagnosis",
-   "short": "web/lib/stations.test.ts, test \"?demo=stations shows a..."
-  },
-  {
    "id": "adbd4f0b",
    "text": "From To-do 146 (f33a9d8a): an Approve whose PostToolUse hook is lost leaves no trace (chat 1007fb31, 2026-11-25 05:41 UTC, load over 100: in neither archive.json nor approve.log). 0.21.166 takes an Approve whose PreToolUse was lost; this is the other half. Idea to check first: trueUp (extension/src/hub/true-state.ts, called from hub-service.ts trueUp) makes up missed hooks from the session file and transcript; have it also look for an answered closing question in the transcript (Code Mode calls carry repl_ ids) and pass it through hub.hook as the PostToolUse. Old answers must never re-fire after a reload. Replay it as a failing test before changing code, and propose the design to Kenneth.",
    "at": 1795605999620,
@@ -572,21 +564,31 @@
   "ee17d285": 1795609087914,
   "947e4be5": 1795609477752,
   "e1bb6e40": 1795611455218,
-  "b4073894": 1795611547144
+  "b4073894": 1795611547144,
+  "ec91fa3e": 1795611547184
  },
  "seq": 152,
  "streak": 130,
  "ticked": [
   {
+   "id": "ec91fa3e",
+   "text": "web/lib/stations.test.ts, test \"?demo=stations shows a send-back, a Verified chat at Review and all three Done groups\": passed before midnight on 2026-11-24 and failed at 00:03, 00:15 and later on 2026-11-25 (actual third group [], expected [d-stopped]). Likely the demo chats in web/lib/hub-demo.ts use minutes-ago times that cross a day; not confirmed. Check with a fixed clock first, then fix the demo data or the test. From chat 26f03750 (hook timeout), whose change does not touch it.",
+   "from": "26f03750-35b0-4926-8076-f11b27d5420b",
+   "name": "To-do 143: Hook timeout diagnosis",
+   "short": "web/lib/stations.test.ts, test \"?demo=stations shows a...",
+   "at": 1795611547184,
+   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72"
+  },
+  {
    "id": "b4073894",
    "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
+   "at": 1795611547144,
+   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72",
    "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
    "name": "Research Topic Folders Expansion",
    "short": "Fix web/lib/stations.test.ts failing after local midnight:",
    "run": 152,
-   "auto": true,
-   "at": 1795611547144,
-   "by": "a307b452-bb89-4761-8f13-a9c87a15dd72"
+   "auto": true
   },
   {
    "id": "e1bb6e40",
@@ -669,16 +671,6 @@
    "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
    "short": "AAR fix plan (approve before applying), from Learn...",
    "run": 145,
-   "auto": true
-  },
-  {
-   "id": "11422331",
-   "text": "AAR fix plan (Learn review of chat 0772838d), propose to Kenneth before editing: extension/src/hub/learn.ts, learnTick. Learn runs whatever build its window has loaded, so the 0.21.155 memory-folder fix did not apply in the Switchboard window (pid 59130, up since 09:20, 0.21.155 installed 14:01). Seen in three reviews: 9909bd89, 30711186, 0772838d. Exact change: in learnTick, right after `if (!due && !queue.length) return`, add `if (updatePending()) return`, where updatePending is true when the version or build on disk is newer than the running one (the check reloadIfUpdated already makes from `running` in extension/src/claude-runtime.ts line 123; export it from self-update.ts). The queue then waits for a reloaded window. The queue lives in memory, so it must also be saved across the reload or those reviews are lost (see the comment above `queue`). Test: a tick with an update pending starts no run and keeps the queue. Part 2, by hand with a snapshot first: move the stray notes into the main Switchboard memory folder and add their MEMORY.md lines, then remove the empty folders: code-mode-hook-refusal.md and code-mode-hook-and-ask-limits.md from the clean-research-tab-content-9db3 worktree slug; the finished-agent-quiet-alert section of killed-chat-progress-row.md from the enable-code-mode-everywhere-8518 slug (merge it into the main note, which lacks it); learn-runs-in-loaded-build.md and subagent-bash-stuck-before-hooks.md from the fix-second-brain-memory-5d6d slug (the second is unproven, no index line). Correct worktree-chats (worktree-memory-by-repo, \"pre-0.21.155 leftover\") and memory-maintenance (outdated-and-unproven, \"hung on long git and grep chains\": those calls never started). Run memory-health and the gold check after.",
-   "at": 1795595213248,
-   "by": "3df5f8ab-5951-4b9c-af79-8773d84ca9b0",
-   "from": "88c700fa-bffd-4c36-a677-bfd5d0cc6adf",
-   "short": "AAR fix plan (Learn review of chat 0772838d), propose to...",
-   "run": 144,
    "auto": true
   }
  ]
