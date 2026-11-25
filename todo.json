@@ -83,6 +83,14 @@
    "at": 1795576269701,
    "from": "503197a6-476e-4a83-8826-22dd0447ca96",
    "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:"
+  },
+  {
+   "id": "eb6108b8",
+   "text": "AAR fix plan for Kenneth to approve (seen in chats 30711186 and Armasu 8dc0119b): claude-mods/kit/rules.md, under \"Every role, subagents included\", add after the AskUserQuestion line: \"- In Code Mode a Poll line saying an AskUserQuestion has not started is an open question on screen, never a stuck hook; it closes at 2 hours, then ask again once with mcp__switchboard__ask. Only 'the hook did not finish' is a hook: retry that call alone.\"",
+   "at": 1795576648585,
+   "from": "8dc0119b-f759-4ad2-bb27-56c4c63cc7cf",
+   "name": "To-do 27: Armasu AWS Hardening Tasks",
+   "short": "AAR fix plan for Kenneth to approve (seen in chats..."
   }
  ],
  "removed": {
