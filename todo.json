@@ -54,6 +54,14 @@
    "from": "bc20da00-2825-4374-b668-09b95256db9f",
    "name": "To-do 13: Sync Now board class names",
    "short": "Memory page, Notebook view:"
+  },
+  {
+   "id": "2b88a239",
+   "text": "Codex skill copies refresh only at Set up: mirrorAllSkills (extension/kit/setup-run.mjs, refreshes unedited ~/.agents/skills copies by digest since 0.21.173) and installOwnSkills run nowhere else, so a kit skill edited and copied to ~/.claude/skills between Set ups reaches Codex late. Run both refreshes when a Switchboard window starts (one window only, off the activation path, hashing about 28 MB), refreshing copies that exist and adding none, with a test. Check To-do 155's activation and CPU work first. From chat 0d57b404 (To-do 15).",
+   "at": 1795624362302,
+   "from": "0d57b404-8507-4ed9-9daf-2b6ee76856e4",
+   "name": "To-do 15: Sync Codex skill copies",
+   "short": "Codex skill copies refresh only at Set up:"
   }
  ],
  "removed": {
@@ -600,11 +608,7 @@
    "by": "e1e80017-c48e-479c-9a49-6def9c42cb8b",
    "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
    "name": "To-do 8: Reduce idle Claude chat CPU",
-   "short": "Plan page: web/components/switchboard/todo-panel.tsx...",
-   "shipped": {
-    "sha": "CHANGEL",
-    "subject": "Plan page: a memory hold's dot is red, as on the Now board; every other hold stays yellow"
-   }
+   "short": "Plan page: web/components/switchboard/todo-panel.tsx..."
   },
   {
    "id": "06a3f33d",
