@@ -15,10 +15,14 @@
   {
    "id": "b4073894",
    "text": "Fix web/lib/stations.test.ts failing after local midnight: \"?demo=stations ... all three Done groups\" expects d-stopped, but the demo's Stopped chat falls on yesterday just after 00:00. Passes with TZ=UTC. Pin the test's clock or the demo's time. From chat Research Topic Folders Expansion (1ec1db4f).",
-   "at": 1795601209671,
+   "at": 1795611456056,
    "from": "1ec1db4f-9318-49d7-9b4e-301b933392a5",
    "name": "Research Topic Folders Expansion",
-   "short": "Fix web/lib/stations.test.ts failing after local midnight:"
+   "short": "Fix web/lib/stations.test.ts failing after local midnight:",
+   "chat": "a307b452-bb89-4761-8f13-a9c87a15dd72",
+   "host": "62903adf5e340f87",
+   "run": 152,
+   "auto": true
   },
   {
    "id": "ec91fa3e",
@@ -581,19 +585,19 @@
   "947e4be5": 1795609477752,
   "e1bb6e40": 1795611455218
  },
- "seq": 151,
+ "seq": 152,
  "streak": 130,
  "ticked": [
   {
    "id": "e1bb6e40",
    "text": "From chat 77dc6596 (tab closer, worktree also-one-issue-i-am-c452): after that worktree has merged into main (extension/src/hub/tabs.ts exists there), first change the Settings label \"Stop a chat's dev servers when it ends\" and its hint in web/components/switchboard/gear.tsx and web/lib/gear-rows.ts to mention Chrome tabs and update the README line that names it, then add a CHANGELOG entry, bump, package and install, and check live that a tab opened with $BROWSER by a chat is recorded in ~/.claude/switchboard/tabs and closes when the chat is done (low load, Chrome not in front; see memory chrome-tab-control).",
+   "at": 1795611455218,
+   "by": "fed33211-e2f5-4d25-b6ef-fdf0e64a24c2",
    "from": "77dc6596-05f7-44e2-be11-a10bb6d4f1f6",
    "name": "Also one issue I am",
    "short": "From chat 77dc6596 (tab closer, worktree...",
    "run": 151,
-   "auto": true,
-   "at": 1795611455218,
-   "by": "fed33211-e2f5-4d25-b6ef-fdf0e64a24c2"
+   "auto": true
   },
   {
    "id": "947e4be5",
