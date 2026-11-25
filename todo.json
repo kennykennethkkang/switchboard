@@ -15,10 +15,14 @@
   {
    "id": "622b8053",
    "text": "After the chat \"Research Page Results Missing\" (82f38e8d, worktree research-page-results-missing-6b95) is approved and merged into main: bump, package and install Switchboard from main. Changelog lines: \"Deep research with background researchers saves its report: a researcher that returns no longer resets the run\", \"A background agent that returns mid-turn closes its lane in the live panel\", \"A saved research report opens without its file header\". Then check 127.0.0.1:3131/#research shows the GTA 6 and Roblox report without the header text.",
-   "at": 1795560498059,
+   "at": 1795574341951,
    "from": "82f38e8d-b2a9-468f-81db-9a842bf5be64",
    "name": "Research Page Results Missing",
-   "short": "After the chat \"Research Page Results Missing\"..."
+   "short": "After the chat \"Research Page Results Missing\"...",
+   "chat": "47c17bf2-8470-4a28-9085-1afeab8e2908",
+   "host": "62903adf5e340f87",
+   "run": 137,
+   "auto": true
   },
   {
    "id": "3f4a8092",
@@ -570,7 +574,7 @@
   "b56d08b1": 1795574337408,
   "53f49ae9": 1795574337683
  },
- "seq": 136,
+ "seq": 137,
  "streak": 130,
  "ticked": [
   {
