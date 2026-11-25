@@ -86,6 +86,14 @@
    "from": "f33a9d8a-f6ca-4741-916e-c3319be7bb4e",
    "name": "To-do 146: Switchboard approval timeout AAR fix",
    "short": "From To-do 146 (f33a9d8a), found by qa-codex:"
+  },
+  {
+   "id": "eb065c41",
+   "text": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the Mac speed chat, 2026-11-25). First search the web and the VS Code and Node docs for functions that lower usage (file watchers instead of polling, retainContextWhenHidden, document.hidden pause, WebviewView visibility, one shared daemon instead of work per window, streaming JSON, worker threads, content-visibility, list virtualization), then profile before and after with ~/.claude/switchboard/tools/prof.mjs and keep only what measures better. Read vault wiki switchboard-lag and note lag-profile-live-hosts first. Measured, 30 s CPU profiles: Armasu window on 0.21.160 6.7% of a core, 0.21.165 and .166 windows 2.5 to 3.1%; top cost everywhere is child_process spawn (execFile), then scanForActiveSessions (readdir and stat per scan), session save, webview postMessage. Heap after GC is 188 to 248 MB per window, 5 windows. Look for: (1) fewer spawned ps, git and lsof calls, one per Mac shared by windows; (2) heap per window, find what is held with a heap snapshot; (3) two node hooks (switchboard/hook.js and switchboard-app/hook.js) start on every tool call of every chat, merge to one forwarder; (4) 3131 app crashed 6 times in app.log with uncaught ERR_STREAM_UNABLE_TO_PIPE at pipeline (app.js:17889), handle the closed response and check the restart cost; (5) 3 webview animations and timers must stop when hidden; VS Code renderers for the Switchboard and Armasu windows were at 57% and 41% in one sample; (6) idle chat tabs: offer to close or suspend chats idle for hours, each claude process holds 300 to 500 MB; (7) old extension folders: 50+ switchboard-0.21.x still in ~/.vscode/extensions and 279 MB of old .vsix in extension/ (list, ask before deleting). Also suggest, do not build, improvements to the program in general found during the search.",
+   "at": 1795606016412,
+   "from": "e41f9181-c5aa-4a26-8680-0f8d0fbf9bfb",
+   "name": "Optimize Mac performance and cleanup",
+   "short": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the..."
   }
  ],
  "removed": {
