@@ -15,9 +15,13 @@
   {
    "id": "56fed7e9",
    "text": "Rule proposal for Kenneth to approve (aar Learn review of Armasu c3d8be16; nothing applied). Proof: Kenneth asked to fix risks in two chats, Armasu 8dc0119b (\"fix risks\", \"any risks to fix?\", \"can risks be fixed?\") and c3d8be16 (\"Finish what is left to do and fix risks\"), and both standups listed Risks a check could settle. Target: claude-mods/kit/rules.md, Finishing, the bullet starting \"- Left question: when Left or Risks holds\". Add a new bullet just before it, exact text: \"- Before the standup, sort every Risks line: settled now (a read-only check, a scratch test, or sending a fix made after the qa report back to the same qa agent), filed under Left, or accepted with the reason. A line a check could settle does not go in Risks.\" Note: risks-line-fixable-first in Armasu memory.",
-   "at": 1795617171106,
+   "at": 1795631025138,
    "from": "8de8ea11-8c60-45fa-8a85-291a6c12b02c",
-   "short": "Rule proposal for Kenneth to approve (aar Learn review..."
+   "short": "Rule proposal for Kenneth to approve (aar Learn review...",
+   "chat": "eac81b23-c67a-4875-9cc2-22cd74877286",
+   "host": "62903adf5e340f87",
+   "run": 156,
+   "auto": true
   },
   {
    "id": "5f974665",
@@ -587,19 +591,19 @@
   "d39fb890": 1795623446763,
   "65072b4b": 1795631020291
  },
- "seq": 155,
+ "seq": 156,
  "streak": 130,
  "ticked": [
   {
    "id": "65072b4b",
    "text": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the Mac speed chat, 2026-11-25). First search the web and the VS Code and Node docs for functions that lower usage (file watchers instead of polling, retainContextWhenHidden, document.hidden pause, WebviewView visibility, one shared daemon instead of work per window, streaming JSON, worker threads, content-visibility, list virtualization), then profile before and after with ~/.claude/switchboard/tools/prof.mjs and keep only what measures better. Read vault wiki switchboard-lag and note lag-profile-live-hosts first. Measured, 30 s CPU profiles: Armasu window on 0.21.160 6.7% of a core, 0.21.165 and .166 windows 2.5 to 3.1%; top cost everywhere is child_process spawn (execFile), then scanForActiveSessions (readdir and stat per scan), session save, webview postMessage. heapUsed (no forced GC) is 188 to 248 MB per window, sampled in 4 of the 5 windows. Look for: (1) fewer spawned ps, git and lsof calls, one per Mac shared by windows; (2) heap per window, find what is held with a heap snapshot; (3) two node hooks (switchboard/hook.js and switchboard-app/hook.js) start on every tool call of every chat, merge to one forwarder; (4) 3131 app crashed 6 times in app.log with uncaught ERR_STREAM_UNABLE_TO_PIPE at pipeline (app.js:17889), handle the closed response and check the restart cost; (5) 3 webview animations and timers must stop when hidden; VS Code renderers for the Switchboard and Armasu windows were at 57% and 41% in one sample; (6) idle chat tabs: offer to close or suspend chats idle for hours, each claude process holds 300 to 500 MB; (7) old extension folders: 50+ switchboard-0.21.x still in ~/.vscode/extensions and 279 MB of old .vsix in extension/ (list, ask before deleting). Also suggest, do not build, improvements to the program in general found during the search.",
+   "at": 1795631020291,
+   "by": "a2ae8789-0d20-406f-892b-de691cc03a13",
    "from": "e41f9181-c5aa-4a26-8680-0f8d0fbf9bfb",
    "name": "Optimize Mac performance and cleanup",
    "short": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the...",
    "run": 155,
-   "auto": true,
-   "at": 1795631020291,
-   "by": "a2ae8789-0d20-406f-892b-de691cc03a13"
+   "auto": true
   },
   {
    "id": "d39fb890",
