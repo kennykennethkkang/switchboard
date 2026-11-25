@@ -16,11 +16,11 @@
    "id": "15a7edca",
    "text": "Memory page, Notebook view: the top 44 px is blank, where Map view shows its Back / Agents / Code / Memory bar (web/components/switchboard/memory-kit.tsx Shell dialog \"hub mem mk nb\" sits at top 44; .mem in web/app/globals.css:622; map view is .mem.mk.mm in memory-maps.css). Repro: #map-memory in Coder view, press Notebook, 1280 px dark; same in 0.21.172, older than the mnb- rename. Likely the modal backdrop covers the bar (not proven). Found by UI qa in the Now board class names chat (claude-mods, bc20da00, To-do 13), 2026-11-25.",
    "at": 1795637846998,
+   "chat": "d14e538e-0e26-48da-b37d-97103fff5507",
+   "host": "62903adf5e340f87",
    "from": "bc20da00-2825-4374-b668-09b95256db9f",
    "name": "To-do 13: Sync Now board class names",
    "short": "Memory page, Notebook view:",
-   "chat": "d14e538e-0e26-48da-b37d-97103fff5507",
-   "host": "62903adf5e340f87",
    "run": 159,
    "auto": true
   },
@@ -57,6 +57,13 @@
    "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
    "name": "To-do 17: Rule proposal push notification fix",
    "short": "Send Switchboard's own web push when a Claude chat is..."
+  },
+  {
+   "id": "713fe615",
+   "text": "Proposed fix from Learn (To-do 155, a2ae8789), ask Kenneth before applying: stop impeccable's Stop pass on the animation-styles demo pages. In Switchboard it asks for a triage of the same 8 findings in extension/kit/skills/animation-styles/gallery.html and reference/gallery.html in about 30 chats (957c8d1c, fed33211, f79b2d95, 7b7c8c76, fee82622 among them), often after the final message, so the standup and commit blocks are written twice; in a2ae8789 the second copy dropped lines. Both files are style demos, and impeccable's hooks.md allows ignore-file for a deliberate demo but only with Kenneth's OK. Target /Users/kennykennethkkang/Documents/GitHub/Switchboard/.impeccable/config.json, replace \"ignoreFiles\": [] with \"ignoreFiles\": [\"extension/kit/skills/animation-styles/gallery.html\", \"extension/kit/skills/animation-styles/reference/gallery.html\"] (same as running impeccable hooks ignore-file once per path). Check: the next chat that edits a web file ends with no gallery.html findings.",
+   "at": 1795637905974,
+   "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
+   "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask..."
   }
  ],
  "removed": {
