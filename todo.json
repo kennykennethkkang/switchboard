@@ -32,14 +32,6 @@
    "short": "Rule proposal for Kenneth to approve (aar Learn review..."
   },
   {
-   "id": "06a3f33d",
-   "text": "Now board lanes: web/components/switchboard/memory-notebook.css (.nb-list line 17, .nb-body line 38) and now-board.css use the same class names, and the notebook rules win in the built CSS, so the lanes get an extra divider, padding, a right border and a narrow card (196 px at 1280). Give the notebook its own class names; check 360 and 1280 px, light and dark. Found by UI qa in the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
-   "at": 1795617533727,
-   "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
-   "name": "To-do 8: Reduce idle Claude chat CPU",
-   "short": "Now board lanes:"
-  },
-  {
    "id": "d39fb890",
    "text": "Plan page: web/components/switchboard/todo-panel.tsx line 120 shows the memory hold with the yellow dot because .hub-hold carries no kind; the Now board shows it red (now-board.css data-kind memory). Make them match. From the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
    "at": 1795617534153,
@@ -594,11 +586,24 @@
   "b4073894": 1795611547144,
   "ec91fa3e": 1795611547184,
   "adbd4f0b": 1795618536958,
-  "aa4e6cbd": 1795619829363
+  "aa4e6cbd": 1795619829363,
+  "06a3f33d": 1795622770933
  },
  "seq": 155,
  "streak": 130,
  "ticked": [
+  {
+   "id": "06a3f33d",
+   "text": "Now board lanes: web/components/switchboard/memory-notebook.css (.nb-list line 17, .nb-body line 38) and now-board.css use the same class names, and the notebook rules win in the built CSS, so the lanes get an extra divider, padding, a right border and a narrow card (196 px at 1280). Give the notebook its own class names; check 360 and 1280 px, light and dark. Found by UI qa in the idle chat cost chat (claude-mods, c1140395), 2026-11-25.",
+   "from": "c1140395-58b4-4ef8-b3a5-fe779f601b68",
+   "name": "To-do 8: Reduce idle Claude chat CPU",
+   "short": "Now board lanes:",
+   "at": 1795622770933,
+   "shipped": {
+    "sha": "CHANGEL",
+    "subject": "Less CPU: an unchanged repo costs one git call instead of about 23 each time the changes panel refreshes, and every window shares one ps, lsof, pgrep, sysctl and tailscale read"
+   }
+  },
   {
    "id": "aa4e6cbd",
    "text": "From To-do 146 (f33a9d8a), found by qa-codex: a subagent's answer to the closing question can approve a chat already needs-you. extension/src/hub/hub-service.ts line 549: UserPromptSubmit, PreToolUse AskUserQuestion, then a PostToolUse Approve with agent_id fires onApproved, because approvalBlock only refuses working. Same before 0.21.166. Write the failing test in extension/test/approve.test.ts, decide whether a closing answer with agent_id should be ignored outright (closingPick callers, Send back too), then the smallest fix.",
@@ -693,16 +698,6 @@
    "from": "e41f9181-c5aa-4a26-8680-0f8d0fbf9bfb",
    "name": "Optimize Mac performance and cleanup",
    "short": "Cut Switchboard's CPU and memory on a 16 GB M2 (from the..."
-  },
-  {
-   "id": "8d90b02d",
-   "text": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10: both sent a commit block and an installed version that had gone stale during the Approve wait, 18 minutes and 4 hours), propose to Kenneth before editing: claude-mods/kit/rules.md, Finishing, the bullet starting \"The final message ends with the heading `Commit message:`\", append at its end: \" Write it after the Approve answer: when the wait was over 10 minutes, scan the finished chats' messages and the installed version again first.\" Same bullet as 443cb8c3 (short standup in the final message): apply both together and read the line again before editing.",
-   "at": 1795606102437,
-   "by": "fb0c2f7d-7b6d-47ac-ae7e-b10eb0702170",
-   "from": "503197a6-476e-4a83-8826-22dd0447ca96",
-   "short": "AAR fix plan (Learn reviews of chats 47c17bf2 and 1c1c1b10:",
-   "run": 147,
-   "auto": true
   }
  ]
 }
