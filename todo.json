@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "443cb8c3",
-   "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
-   "at": 1795595228048,
-   "chat": "d652e68d-2adc-4109-acb7-602b8ebadc5d",
-   "host": "62903adf5e340f87",
-   "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
-   "short": "AAR fix plan (approve before applying), from Learn...",
-   "run": 145,
-   "auto": true
-  },
-  {
    "id": "092aabd1",
    "text": "AAR fix plan (Learn review of chat 1c1c1b10, same class as 5ec52720), propose to Kenneth before editing: an Approve is refused as \"the chat is still working\" when the question's PreToolUse hook timed out, so the hub never saw the question (~/.claude/switchboard/approve.log, 1c1c1b10 at 1795574143642; its transcript has hook_cancelled on PreToolUse:AskUserQuestion, 2128 ms of 2000). That the lost payload left the chat `working` is read from the code, not replayed: write the failing test first. extension/src/hub/hub-service.ts line 541, replace `approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)` with `approvalBlock(was && (tapped || (typeof payload.tool_use_id === 'string' && !payload.agent_id)) ? { ...was, state: 'needs-you' } : was, now)`: the lead's own answered closing question proves it was open. Open tasks and running subagents still refuse. Test in extension/test/approve.test.ts next to line 104: UserPromptSubmit, then PostToolUse AskUserQuestion Approve with tool_use_id and no PreToolUse, expect one approved event and no log file; the line 121 test (no tool_use_id) must stay green. Related: 7378e218 (longer hook timeout) makes the miss rarer but does not close this.",
    "at": 1795576265159,
@@ -602,11 +591,22 @@
   "59dc0f56": 1795593894092,
   "53f49ae9-ok": 1795594041875,
   "8d02f47f": 1795594090869,
-  "7378e218": 1795594423279
+  "7378e218": 1795594423279,
+  "443cb8c3": 1795601235527
  },
  "seq": 145,
  "streak": 130,
  "ticked": [
+  {
+   "id": "443cb8c3",
+   "text": "AAR fix plan (approve before applying), from Learn review of 1853c56d: standups never reach Switchboard when the final message leaves them out. progress.ts Stop sets report from last_assistant_message only, and text printed right before the Approve question is stored as a one-line narration summary. Seen in 1853c56d and 10753a2c (final message only \"Approved\" plus commit blocks). In claude-mods/kit/rules.md line 72 replace \"- The final message ends with the heading `Commit message:`\" with \"- The final message repeats a short standup (Done, For you, Left, Risks), since Switchboard reads it only there, and ends with the heading `Commit message:`\". Then node kit/setup.mjs --rules-only and the rules tests.",
+   "from": "df735b7d-124c-4896-a5bd-14f89d036adf",
+   "short": "AAR fix plan (approve before applying), from Learn...",
+   "run": 145,
+   "auto": true,
+   "at": 1795601235527,
+   "by": "d652e68d-2adc-4109-acb7-602b8ebadc5d"
+  },
   {
    "id": "11422331",
    "text": "AAR fix plan (Learn review of chat 0772838d), propose to Kenneth before editing: extension/src/hub/learn.ts, learnTick. Learn runs whatever build its window has loaded, so the 0.21.155 memory-folder fix did not apply in the Switchboard window (pid 59130, up since 09:20, 0.21.155 installed 14:01). Seen in three reviews: 9909bd89, 30711186, 0772838d. Exact change: in learnTick, right after `if (!due && !queue.length) return`, add `if (updatePending()) return`, where updatePending is true when the version or build on disk is newer than the running one (the check reloadIfUpdated already makes from `running` in extension/src/claude-runtime.ts line 123; export it from self-update.ts). The queue then waits for a reloaded window. The queue lives in memory, so it must also be saved across the reload or those reviews are lost (see the comment above `queue`). Test: a tick with an update pending starts no run and keeps the queue. Part 2, by hand with a snapshot first: move the stray notes into the main Switchboard memory folder and add their MEMORY.md lines, then remove the empty folders: code-mode-hook-refusal.md and code-mode-hook-and-ask-limits.md from the clean-research-tab-content-9db3 worktree slug; the finished-agent-quiet-alert section of killed-chat-progress-row.md from the enable-code-mode-everywhere-8518 slug (merge it into the main note, which lacks it); learn-runs-in-loaded-build.md and subagent-bash-stuck-before-hooks.md from the fix-second-brain-memory-5d6d slug (the second is unproven, no index line). Correct worktree-chats (worktree-memory-by-repo, \"pre-0.21.155 leftover\") and memory-maintenance (outdated-and-unproven, \"hung on long git and grep chains\": those calls never started). Run memory-health and the gold check after.",
@@ -703,16 +703,6 @@
    "from": "291a5125-2995-4e66-801b-b06e3cf87d8e",
    "short": "AAR fix plan (Learn review of chat 6b07ca9f), propose to...",
    "run": 136,
-   "auto": true
-  },
-  {
-   "id": "e43a7988",
-   "text": "AAR fix plan (chat 8d72faf7), propose to Kenneth before editing: extension/src/hub/todo.ts addTodo (line 156, every add path) never sets notBefore, so autopilot started 4c31f78a (\"On or after 2026-11-30, ...\") six days early. Add `const dateOf = (t: string) => { const m = /^(?:on or after|not before) (\\d{4})-(\\d{2})-(\\d{2})\\b/i.exec(t); return m ? new Date(+m[1], +m[2] - 1, +m[3]).getTime() : undefined }` and in addTodo put `...(more.notBefore === undefined && (dateOf(t) ?? 0) > now ? { notBefore: dateOf(t) } : {})` after `...more`. Anchored at the start, so a date elsewhere in the text holds nothing. Tests in extension/test/todo-fields.test.ts: future date set, past date not set, date mid-sentence not set, more.notBefore (0 too) kept, accepted suggestion set. Replay over git log -p refs/switchboard/todo first. Do not touch 4c31f78a, it already has its date.",
-   "at": 1795558910929,
-   "by": "1c1c1b10-c7e5-4d0c-a477-9a7fd85d322b",
-   "from": "2e4fc716-2e46-48d8-8b33-a9e1ecba1c37",
-   "short": "AAR fix plan (chat 8d72faf7), propose to Kenneth before...",
-   "run": 135,
    "auto": true
   }
  ]
