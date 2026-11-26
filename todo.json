@@ -15,8 +15,12 @@
   {
    "id": "6f6c8b95",
    "text": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIwNjQ2YQ== help with work tree merge and merge in general",
-   "at": 1795643174041,
-   "short": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIw..."
+   "at": 1795658170973,
+   "short": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIw...",
+   "chat": "df34e174-ef84-475b-8ddb-742afcb79e97",
+   "host": "62903adf5e340f87",
+   "run": 167,
+   "auto": true
   },
   {
    "id": "a2c22dcd",
@@ -605,18 +609,18 @@
   "68ca7984": 1795658119380,
   "2bd847d7": 1795658169101
  },
- "seq": 166,
+ "seq": 167,
  "streak": 130,
  "ticked": [
   {
    "id": "2bd847d7",
    "text": "Correct a stale memory line (Learn review of 1b9b30b2, To-do 19). In the Switchboard project memory folder, codex-gotchas.md line 100 says kit/codex-hooks.mjs `claimGuard` \"only stamps claims: nothing releases them at Stop. So the lead is refused its own engineer's files until 20 min after that run's last write\". Since 2026-11-25 that is false: releaseClaims (claude-mods kit/codex-hooks.mjs:220, also in ~/.codex/switchboard-guard) drops a role run's own claims on a Stop nothing holds, when SWITCHBOARD_ROLE_RUN is set. Snapshot the file first. Replace that passage with: \"An engineer-codex or qa-codex run writes under its own Codex session id (`01a...`, a rollout name in ~/.codex/sessions/YYYY/MM/DD). Since 2026-11-25 it frees its claims when it stops (releaseClaims in kit/codex-hooks.mjs). A killed run sends no Stop and an ordinary Codex chat never releases, so those files stay held until 20 min after the last write ([[ask-peer-chat-for-held-files]]). ListAgents and SendMessage cannot reach that id.\" Keep the rest of the note, then run memory-health. Only a memory note; no code.",
+   "at": 1795658169101,
+   "by": "a19ad27e-b979-4eb0-8b29-b34226e40fdd",
    "from": "83bb74f9-ed58-4776-9df0-5f365108dcf3",
    "short": "Correct a stale memory line (Learn review of 1b9b30b2,...",
    "run": 166,
-   "auto": true,
-   "at": 1795658169101,
-   "by": "a19ad27e-b979-4eb0-8b29-b34226e40fdd"
+   "auto": true
   },
   {
    "id": "68ca7984",
