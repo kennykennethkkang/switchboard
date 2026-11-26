@@ -61,19 +61,6 @@
    "short": "Do a full UI/UX overhaul, using mirofish ab testing and..."
   },
   {
-   "id": "d4113673",
-   "text": "Release workflow: pnpm 12 install fails on every OS with ERR_PNPM_IGNORED_BUILDS (esbuild); allow esbuild builds in pnpm-workspace.yaml",
-   "at": 1795682289924,
-   "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "host": "62903adf5e340f87",
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "before": "afbea17f",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "short": "Release workflow:",
-   "run": 174,
-   "auto": true
-  },
-  {
    "id": "1b8c9eda",
    "text": "Release and CI: 3 extension tests fail on ubuntu-latest (dev.test keep awake spawns caffeinate; setup.test 21st key store and dry-run)",
    "at": 1795682290094,
@@ -641,7 +628,8 @@
   "12c0e0ed": 1795662900406,
   "b12d727a": 1795664282983,
   "66fc2f92": 1795678808996,
-  "fc1e48ca": 1795680401152
+  "fc1e48ca": 1795680401152,
+  "d4113673": 1795692986699
  },
  "order": {
   "ids": [
@@ -659,6 +647,18 @@
  "seq": 174,
  "streak": 130,
  "ticked": [
+  {
+   "id": "d4113673",
+   "text": "Release workflow: pnpm 12 install fails on every OS with ERR_PNPM_IGNORED_BUILDS (esbuild); allow esbuild builds in pnpm-workspace.yaml",
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "before": "afbea17f",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "short": "Release workflow:",
+   "run": 174,
+   "auto": true,
+   "at": 1795692986699,
+   "by": "4b248073-e953-4013-92b2-7cf1ad827e67"
+  },
   {
    "id": "fc1e48ca",
    "text": "Stuck notice for a finished Codex job (seen in 2 chats: claude-mods c1140395, Zellizard bc0f865c). A \"Subagent background job: no new output for 30 min\" notice is made while an engineer-codex job runs quietly (output goes to $d/log), then reaches the chat up to 2 h later, after the job has ended with exit 0. Fix in extension/src/hub (stuck.ts fixDue/fixText and whatever queues the note): recheck the item right before delivery, and drop it if the job id is in the transcript's ended list or its output file shows \"[exited with code\". Also check progress.ts at the lead Stop: subJobs are filtered only by age, not by the ended list, and hub-service.ts withEnded skips the transcript read when only subJobs are pending. Add a stuck.test.ts case: job ends between detect and delivery, so no note.",
@@ -741,16 +741,6 @@
    "by": "4da7282f-e369-4baf-8e5b-99b061a42257",
    "short": "Make sure switchboard and claude-mods are good for...",
    "run": 165,
-   "auto": true
-  },
-  {
-   "id": "713fe615",
-   "text": "Proposed fix from Learn (To-do 155, a2ae8789), ask Kenneth before applying: stop impeccable's Stop pass on the animation-styles demo pages. In Switchboard it asks for a triage of the same 8 findings in extension/kit/skills/animation-styles/gallery.html and reference/gallery.html in about 30 chats (957c8d1c, fed33211, f79b2d95, 7b7c8c76, fee82622 among them), often after the final message, so the standup and commit blocks are written twice; in a2ae8789 the second copy dropped lines. Both files are style demos, and impeccable's hooks.md allows ignore-file for a deliberate demo but only with Kenneth's OK. Target /Users/kennykennethkkang/Documents/GitHub/Switchboard/.impeccable/config.json, replace \"ignoreFiles\": [] with \"ignoreFiles\": [\"extension/kit/skills/animation-styles/gallery.html\", \"extension/kit/skills/animation-styles/reference/gallery.html\"] (same as running impeccable hooks ignore-file once per path). Check: the next chat that edits a web file ends with no gallery.html findings.",
-   "at": 1795643912920,
-   "by": "bc373df4-fbe4-4606-b195-17a723470d8e",
-   "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
-   "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask...",
-   "run": 164,
    "auto": true
   }
  ]
