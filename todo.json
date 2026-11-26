@@ -99,6 +99,14 @@
    "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
    "name": "To-do 175: Gbrain memory research",
    "short": "Show each note's date (modified, else mtime, day only)..."
+  },
+  {
+   "id": "d841b941",
+   "text": "Unmarked contradiction probe in the Learn run: pair notes that seed the same recall queries, judge each pair with Jev, cache by content hash, report hits in memory health (report only, memory-fix walks them). See vault wiki/graph-engineering-memory.md 'GBrain deep pass' item 2. From chat f1a7ccac.",
+   "at": 1795717088933,
+   "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
+   "name": "To-do 175: Gbrain memory research",
+   "short": "Unmarked contradiction probe in the Learn run:"
   }
  ],
  "removed": {
