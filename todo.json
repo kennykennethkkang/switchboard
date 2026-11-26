@@ -36,9 +36,9 @@
    "id": "6f525d61",
    "text": "Please make sure lint rules and information for how switchboard should run and any information related to that is properly setup, doesn't have any contradictions, and runs properly. Feel free to ask me questions if there are any issues that come up with rule contradictions or issues in general.",
    "at": 1795714977601,
-   "short": "Please make sure lint rules and information for how...",
    "chat": "e3d8159c-d4e9-4896-ba4b-014764025025",
    "host": "62903adf5e340f87",
+   "short": "Please make sure lint rules and information for how...",
    "run": 179,
    "auto": true
   },
@@ -91,6 +91,14 @@
    "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
    "name": "To-do 177: Switchboard ADE harness setup",
    "short": "Scroll Kenneth's Instagram (Chrome profile..."
+  },
+  {
+   "id": "6fcb8efa",
+   "text": "Show each note's date (modified, else mtime, day only) on hub_recall seed lines in recall() in extension/src/hub/graph.ts, and add 'when' queries to ~/.claude/memory-gold.json. GBrain's date frame gave +14 points on held-out LoCoMo. See vault wiki/graph-engineering-memory.md 'GBrain deep pass' item 1. From chat f1a7ccac.",
+   "at": 1795717088656,
+   "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
+   "name": "To-do 175: Gbrain memory research",
+   "short": "Show each note's date (modified, else mtime, day only)..."
   }
  ],
  "removed": {
