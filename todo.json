@@ -15,10 +15,14 @@
   {
    "id": "afbea17f",
    "text": "After the first push of Switchboard 0.21.179 (chat 4da7282f, Windows transfer): read the Release workflow's windows-latest test job in GitHub Actions (gh run list -R kennykennethkkang/switchboard), fix what fails on Windows, then remove continue-on-error from .github/workflows/release.yml so Windows blocks releases. Also confirm the release v0.21.179 has the VSIX and .sha256 assets.",
-   "at": 1795658610327,
+   "at": 1795680401396,
    "from": "4da7282f-e369-4baf-8e5b-99b061a42257",
    "name": "To-do 165: Switchboard Desktop Transfer Setup",
-   "short": "After the first push of Switchboard 0.21.179 (chat..."
+   "short": "After the first push of Switchboard 0.21.179 (chat...",
+   "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "host": "62903adf5e340f87",
+   "run": 174,
+   "auto": true
   },
   {
    "id": "0759d06b",
@@ -583,18 +587,18 @@
   "66fc2f92": 1795678808996,
   "fc1e48ca": 1795680401152
  },
- "seq": 173,
+ "seq": 174,
  "streak": 130,
  "ticked": [
   {
    "id": "fc1e48ca",
    "text": "Stuck notice for a finished Codex job (seen in 2 chats: claude-mods c1140395, Zellizard bc0f865c). A \"Subagent background job: no new output for 30 min\" notice is made while an engineer-codex job runs quietly (output goes to $d/log), then reaches the chat up to 2 h later, after the job has ended with exit 0. Fix in extension/src/hub (stuck.ts fixDue/fixText and whatever queues the note): recheck the item right before delivery, and drop it if the job id is in the transcript's ended list or its output file shows \"[exited with code\". Also check progress.ts at the lead Stop: subJobs are filtered only by age, not by the ended list, and hub-service.ts withEnded skips the transcript read when only subJobs are pending. Add a stuck.test.ts case: job ends between detect and delivery, so no note.",
+   "at": 1795680401152,
+   "by": "ccd17482-d612-437f-820f-bf3b9b9a371c",
    "from": "e4ab441e-3a61-45e2-99d8-83bc4dcb7202",
    "short": "Stuck notice for a finished Codex job (seen in 2 chats:",
    "run": 173,
-   "auto": true,
-   "at": 1795680401152,
-   "by": "ccd17482-d612-437f-820f-bf3b9b9a371c"
+   "auto": true
   },
   {
    "id": "66fc2f92",
