@@ -13,16 +13,6 @@
    "auto": true
   },
   {
-   "id": "12c0e0ed",
-   "text": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIwNjQ2YQ== even more enhanced memory see if this is useful or if any components are useful to implement into switchboard.",
-   "at": 1795662634529,
-   "short": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIw...",
-   "chat": "359f1afc-dd08-40d5-9c3f-bea6936418ef",
-   "host": "62903adf5e340f87",
-   "run": 170,
-   "auto": true
-  },
-  {
    "id": "b12d727a",
    "text": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIwNjQ2YQ== do an extensive check on the ai rules that are on switchboard and check that all rules are set and made sure",
    "at": 1795643251557,
@@ -601,11 +591,21 @@
   "7ececa69": 1795658727520,
   "6f6c8b95": 1795659552952,
   "a2c22dcd": 1795661566043,
-  "ffd87216": 1795662622302
+  "ffd87216": 1795662622302,
+  "12c0e0ed": 1795662900406
  },
  "seq": 170,
  "streak": 130,
  "ticked": [
+  {
+   "id": "12c0e0ed",
+   "text": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIwNjQ2YQ== even more enhanced memory see if this is useful or if any components are useful to implement into switchboard.",
+   "short": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIw...",
+   "run": 170,
+   "auto": true,
+   "at": 1795662900406,
+   "by": "359f1afc-dd08-40d5-9c3f-bea6936418ef"
+  },
   {
    "id": "ffd87216",
    "text": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIwNjQ2YQ== format Claude and important info. Watch video add what could help to the program or add to it if something exists don’t double add and check over anything that has issues.",
@@ -695,17 +695,6 @@
    "why": "later",
    "short": "Choose which switchboard-lag performance ideas to pursue",
    "run": 161,
-   "auto": true
-  },
-  {
-   "id": "2b88a239",
-   "text": "Codex skill copies refresh only at Set up: mirrorAllSkills (extension/kit/setup-run.mjs, refreshes unedited ~/.agents/skills copies by digest since 0.21.173) and installOwnSkills run nowhere else, so a kit skill edited and copied to ~/.claude/skills between Set ups reaches Codex late. Run both refreshes when a Switchboard window starts (one window only, off the activation path, hashing about 28 MB), refreshing copies that exist and adding none, with a test. Check To-do 155's activation and CPU work first. From chat 0d57b404 (To-do 15).",
-   "at": 1795640442773,
-   "by": "bc1f3bd4-4ff4-4484-9fa1-4a99ebc48677",
-   "from": "0d57b404-8507-4ed9-9daf-2b6ee76856e4",
-   "name": "To-do 15: Sync Codex skill copies",
-   "short": "Codex skill copies refresh only at Set up:",
-   "run": 160,
    "auto": true
   }
  ]
