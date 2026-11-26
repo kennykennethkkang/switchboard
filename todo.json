@@ -37,10 +37,22 @@
    "short": "Make sure the site is crash free, bug free, and has zero..."
   },
   {
+   "id": "6ed638cf",
+   "text": "Make switchboard be a harness that makes vs code go from and ide to an ade and make sure that this is correct. Please check online for more information on ade and feel free to doomscroll on my personal gmail account kennethkang0715@gmail.com on instagram. Only view videos related to code, code work, agents, agent systems, and anything related with coding including UI/UX to see if there is anything else that will be super useful in switchboard to add. Run indefinitely",
+   "at": 1795682605238,
+   "short": "Make switchboard be a harness that makes vs code go from..."
+  },
+  {
    "id": "52659460",
    "text": "Do a full UI/UX overhaul, using mirofish ab testing and all tools avaliable adjust components so they make sense to users but also have no problems when running the program. This also includes smart updating (Which should be added directly into switchboard as a button which grabs from the repo and updates. Login functionality, user can login and access saved data/information. Also make sure that there is no user issues. Image if you were a brand new user, moderate user, and senior engineer. Make the site make sense for all roles and make sure coder view is targeted towards senior engineers or people who have coding background. This check also means all the small components and minor details need to be cleaned up and adjusted. This includes rules, information, or even commands that the system should understand.",
    "at": 1795682224441,
    "short": "Do a full UI/UX overhaul, using mirofish ab testing and..."
+  },
+  {
+   "id": "569b63cb",
+   "text": "Setup information for turn, goal, timer, and proactive and set a default that just takes any information. Also allow for auto pick and smart picking on which one should be used based on chat context. Make sure that it is smart and improves itself over time and see if there is anything helpful. Information on these 4 chats should be avaliable when user hovers over it to see information. Please make sure each has their own functionalities and has its own purpose and work properly.",
+   "at": 1795682706025,
+   "short": "Setup information for turn, goal, timer, and proactive..."
   },
   {
    "id": "d4113673",
@@ -67,18 +79,6 @@
    "short": "Release and CI:",
    "run": 174,
    "auto": true
-  },
-  {
-   "id": "6ed638cf",
-   "text": "Make switchboard be a harness that makes vs code go from and ide to an ade and make sure that this is correct. Please check online for more information on ade and feel free to doomscroll on my personal gmail account kennethkang0715@gmail.com on instagram. Only view videos related to code, code work, agents, agent systems, and anything related with coding including UI/UX to see if there is anything else that will be super useful in switchboard to add. Run indefinitely",
-   "at": 1795682605238,
-   "short": "Make switchboard be a harness that makes vs code go from..."
-  },
-  {
-   "id": "569b63cb",
-   "text": "Setup information for turn, goal, timer, and proactive and set a default that just takes any information. Also allow for auto pick and smart picking on which one should be used based on chat context. Make sure that it is smart and improves itself over time and see if there is anything helpful. Information on these 4 chats should be avaliable when user hovers over it to see information. Please make sure each has their own functionalities and has its own purpose and work properly.",
-   "at": 1795682706025,
-   "short": "Setup information for turn, goal, timer, and proactive..."
   }
  ],
  "removed": {
@@ -734,5 +734,17 @@
    "run": 164,
    "auto": true
   }
- ]
+ ],
+ "order": {
+  "ids": [
+   "4c31f78a",
+   "afbea17f",
+   "0759d06b",
+   "64add4d3",
+   "6ed638cf",
+   "52659460",
+   "569b63cb"
+  ],
+  "at": 1795682715086
+ }
 }
