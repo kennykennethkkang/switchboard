@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "66fc2f92",
-   "text": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK): in claude-mods/kit/rules.md, after line 34 (the Code Mode \"hasn't started\" bullet), add: \"- In Code Mode an MCP tool whose server name has a hyphen keeps it: `tools[\"mcp__usage-meter__hub_recall\"]`, never `tools.mcp__usage_meter__hub_recall` (it throws and ends the script).\" Proof: three chats threw on it (b4113c39, 47c17bf2, 5b2f2681 on 2026-11-25 threw twice on its first hub_recall). The claude-code-mode memory note already says it, but its MEMORY.md hook does not, so chats miss it.",
-   "at": 1795664296670,
-   "from": "1833026e-b67b-4f65-85d3-ad2ab1b6dad6",
-   "short": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK):",
-   "chat": "a48c7420-1327-4e5a-ab3a-20d4c232d22a",
-   "host": "62903adf5e340f87",
-   "run": 172,
-   "auto": true
-  },
-  {
    "id": "fc1e48ca",
    "text": "Stuck notice for a finished Codex job (seen in 2 chats: claude-mods c1140395, Zellizard bc0f865c). A \"Subagent background job: no new output for 30 min\" notice is made while an engineer-codex job runs quietly (output goes to $d/log), then reaches the chat up to 2 h later, after the job has ended with exit 0. Fix in extension/src/hub (stuck.ts fixDue/fixText and whatever queues the note): recheck the item right before delivery, and drop it if the job id is in the transcript's ended list or its output file shows \"[exited with code\". Also check progress.ts at the lead Stop: subJobs are filtered only by age, not by the ended list, and hub-service.ts withEnded skips the transcript read when only subJobs are pending. Add a stuck.test.ts case: job ends between detect and delivery, so no note.",
    "at": 1795655122763,
@@ -591,11 +580,22 @@
   "a2c22dcd": 1795661566043,
   "ffd87216": 1795662622302,
   "12c0e0ed": 1795662900406,
-  "b12d727a": 1795664282983
+  "b12d727a": 1795664282983,
+  "66fc2f92": 1795678808996
  },
  "seq": 172,
  "streak": 130,
  "ticked": [
+  {
+   "id": "66fc2f92",
+   "text": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK): in claude-mods/kit/rules.md, after line 34 (the Code Mode \"hasn't started\" bullet), add: \"- In Code Mode an MCP tool whose server name has a hyphen keeps it: `tools[\"mcp__usage-meter__hub_recall\"]`, never `tools.mcp__usage_meter__hub_recall` (it throws and ends the script).\" Proof: three chats threw on it (b4113c39, 47c17bf2, 5b2f2681 on 2026-11-25 threw twice on its first hub_recall). The claude-code-mode memory note already says it, but its MEMORY.md hook does not, so chats miss it.",
+   "from": "1833026e-b67b-4f65-85d3-ad2ab1b6dad6",
+   "short": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK):",
+   "run": 172,
+   "auto": true,
+   "at": 1795678808996,
+   "by": "a48c7420-1327-4e5a-ab3a-20d4c232d22a"
+  },
   {
    "id": "b12d727a",
    "text": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIwNjQ2YQ== do an extensive check on the ai rules that are on switchboard and check that all rules are set and made sure",
@@ -679,18 +679,6 @@
    "name": "To-do 17: Rule proposal push notification fix",
    "short": "Send Switchboard's own web push when a Claude chat is...",
    "run": 163,
-   "auto": true
-  },
-  {
-   "id": "94ee2fcf-ok",
-   "text": "Measure the Switchboard window on 0.21.173, and all windows while several chats are working.",
-   "at": 1795642804629,
-   "by": "5714b5d6-a504-49bf-bd39-cfa271dda444",
-   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
-   "name": "To-do 155: Switchboard CPU memory optimization",
-   "why": "later",
-   "short": "Measure Switchboard window on 0.21.173 and under busy chats",
-   "run": 162,
    "auto": true
   }
  ]
