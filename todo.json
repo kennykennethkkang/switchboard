@@ -35,8 +35,12 @@
   {
    "id": "6ed638cf",
    "text": "Make switchboard be a harness that makes vs code go from and ide to an ade and make sure that this is correct. Please check online for more information on ade and feel free to doomscroll on my personal gmail account kennethkang0715@gmail.com on instagram. Only view videos related to code, code work, agents, agent systems, and anything related with coding including UI/UX to see if there is anything else that will be super useful in switchboard to add. Run indefinitely",
-   "at": 1795682605238,
-   "short": "Make switchboard be a harness that makes vs code go from..."
+   "at": 1795706577518,
+   "short": "Make switchboard be a harness that makes vs code go from...",
+   "chat": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "host": "62903adf5e340f87",
+   "run": 177,
+   "auto": true
   },
   {
    "id": "569b63cb",
@@ -641,7 +645,7 @@
   ],
   "at": 1795682858753
  },
- "seq": 176,
+ "seq": 177,
  "streak": 130,
  "ticked": [
   {
