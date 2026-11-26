@@ -10,11 +10,14 @@ export type CheckBackChat = { sessionId: string; status?: string; updatedAt?: nu
 export const hasOpenWork = (p: Pick<ChatProgress, 'tasks' | 'running' | 'jobs' | 'subJobs'> | undefined): boolean =>
   !!p && (p.tasks.some(t => t.status !== 'completed') || !!p.running?.length || !!p.jobs?.length || !!p.subJobs?.length)
 
-/** Session ids owed a check-back: idle for everyMin since the later of its last turn and last check-back, work open, under the cap. */
+/** The text a check-back sends: the Timer's own prompt, else the default. */
+export const checkBackText = (s: CheckBack) => s.text || CHECK_BACK_TEXT
+
+/** Session ids owed a check-back: idle for everyMin since the later of its last turn and last check-back, under the cap; the default text also needs open work. */
 export function dueCheckBacks(now: number, chats: CheckBackChat[], settings: Record<string, CheckBack | undefined>): string[] {
   return chats.flatMap(c => {
     const s = settings[c.sessionId]
-    if (!s || c.stopped || !c.takes || !c.open || c.status !== 'idle' || c.updatedAt === undefined || s.count >= CHECK_BACK_MAX) return []
+    if (!s || c.stopped || !c.takes || (!c.open && !s.text) || c.status !== 'idle' || c.updatedAt === undefined || s.count >= CHECK_BACK_MAX) return []
     return now - Math.max(c.updatedAt, s.lastAt ?? 0) >= s.everyMin * 60_000 ? [c.sessionId] : []
   })
 }

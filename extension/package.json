@@ -2,7 +2,7 @@
   "name": "switchboard",
   "displayName": "Switchboard",
   "description": "Claude Code sessions, usage, timeline and controls in one panel. Based on Agent Flow.",
-  "version": "0.21.150",
+  "version": "0.21.185",
   "publisher": "kennykennethkkang",
   "license": "Apache-2.0",
   "icon": "media/icon.png",
@@ -44,6 +44,14 @@
         "title": "Switchboard: Connect to Running Agent"
       },
       {
+        "command": "agentVisualizer.syncNow",
+        "title": "Switchboard: Sync now"
+      },
+      {
+        "command": "agentVisualizer.checkForUpdates",
+        "title": "Switchboard: Check for updates"
+      },
+      {
         "command": "agentVisualizer.configureHooks",
         "title": "Switchboard: Configure Claude Code Hooks"
       },
@@ -82,6 +90,11 @@
     "configuration": {
       "title": "Switchboard",
       "properties": {
+        "agentVisualizer.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Install new Switchboard releases from GitHub and pull claude-mods when it has no local edits. You are asked before a reload."
+        },
         "agentVisualizer.runtime": {
           "type": "string",
           "enum": [

@@ -36,7 +36,10 @@ export const HUB_RESUME = 'Usage limit reset. Continue where you stopped'
 export const RESUME_DEDUP_MS = 30 * 60_000
 // A hold that starts this soon after a tool call, prompt or turn end cut work off, even with no call denied.
 export const RECENT_MS = 10 * 60_000
-export async function noteActive($: EngineInterface) { st.activeAt = await Promise.resolve().then(() => $.clock.now()).catch(() => st.activeAt) }
+export async function noteActive($: EngineInterface) {
+  st.activeAt = await Promise.resolve().then(() => $.clock.now()).catch(() => st.activeAt)
+  st.quietTicks = 0
+}
 export async function loadHold($: EngineInterface) {
   const id = await $.session.id()
   if (held.id === id) return

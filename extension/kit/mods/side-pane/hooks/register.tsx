@@ -11,17 +11,34 @@ import { view } from './view'
 const PANE = 'side'
 const TITLE = 'Side'
 const POLL_MS = 3000
+const QUIET_TICKS = 20
 const HIDE_OPEN = new Set(['role-rows', 'smart-select', 'cache-keeper'])
 const HIDE_CLOSED = new Set(['todo-band', 'cache-keeper'])
 const NONE = new Set<string>()
 const ASK_TOOLS = new Set(['AskUserQuestion', 'mcp__switchboard__ask'])
 const ENDED = new Set(['completed', 'killed'])
 const EMPTY: Snap = { at: 0, usage: [], agents: [], done: {}, smart: {}, mods: [] }
+const SNAP_REFRESH_MS = 30_000
 
 const snap = atom({ plugin: 'side-pane', key: 'snap' } as const, EMPTY, { shape: 'snap-1' })
 const modsOpen = atom({ plugin: 'side-pane', key: 'modsOpen' } as const, false)
 const placed = atom({ plugin: 'side-pane', key: 'placed' } as const, false)
 const asks = atom({ plugin: 'side-pane', key: 'asks' } as const, [] as string[])
+let quietTicks = 0
+let lastPollStartedAt = -Infinity
+let lastHadAgents = false
+let polling = false
+
+export function needsSnapUpdate(previous: Snap, next: Snap, now: number) {
+  const before = { ...previous }, after = { ...next }
+  delete before.at
+  delete after.at
+  return JSON.stringify(before) !== JSON.stringify(after) || next.agents.length > 0 || now - previous.at >= SNAP_REFRESH_MS
+}
+
+export function panePollDue(ticks: number, hasAgents: boolean) {
+  return ticks < QUIET_TICKS || hasAgents || ticks % 10 === 0
+}
 
 const readJson = async ($: EngineInterface, path: string): Promise<any> => {
   try {
@@ -86,13 +103,14 @@ async function tail($: EngineInterface, path: string, bytes = 65536): Promise<st
   }
 }
 
-async function poll($: EngineInterface) {
+async function pollOnce($: EngineInterface, force: boolean) {
+  lastPollStartedAt = await $.clock.now()
   const panes = await $.ui.panes().catch(() => [])
   const mine = panes.find(p => p.id === PANE)
   const isPlaced = mine?.isPlaced === true
   if ((await read($, placed)) !== isPlaced) await update($, placed, () => isPlaced)
-  if (!mine) return
-  const home = (await $.env.get('HOME')) ?? ''
+  if (!mine) { lastHadAgents = false; return }
+  const home = (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? ''
   const sw = `${home}/.claude/switchboard`
   const [now, session, lim, cx, settings, picks, flag, list] = await Promise.all([
     $.clock.now(),
@@ -123,7 +141,21 @@ async function poll($: EngineInterface) {
     .map(([id]) => id.split('@')[0]!)
     .sort()
   const next: Snap = { at: now, usage: [...windows(lim, 'Claude', now), ...windows(cx, 'Codex', now)], agents, done, smart, mods }
-  await update($, snap, () => next)
+  lastHadAgents = list.some(a => ['running', 'pending', 'waiting'].includes(a.status))
+  const previous = await read($, snap)
+  if (force || needsSnapUpdate(previous, next, now)) await update($, snap, () => next)
+}
+
+async function poll($: EngineInterface, force = false) {
+  if (polling) return
+  polling = true
+  try { await pollOnce($, force) } finally { polling = false }
+}
+
+function activity($: EngineInterface) {
+  const wasQuiet = quietTicks >= QUIET_TICKS
+  quietTicks = 0
+  if (wasQuiet) void poll($).catch(() => undefined)
 }
 
 async function open($: EngineInterface) {
@@ -132,9 +164,12 @@ async function open($: EngineInterface) {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    quietTicks = 0
     await $.command.register({ name: 'side', description: 'Toggle the side pane; /side mods shows or hides the mods list' })
-    void open($).then(() => poll($))
-    $.clock.every(POLL_MS, () => void poll($).catch(() => undefined))
+    void open($).then(() => poll($, true)).catch(() => undefined)
+    $.clock.every(POLL_MS, () => {
+      if (panePollDue(++quietTicks, lastHadAgents)) void poll($).catch(() => undefined)
+    })
     return next(e)
   })
 
@@ -152,13 +187,19 @@ export const register: Register = on => {
       await update($, placed, () => false)
       return { text: 'Side pane closed.' }
     }
+    quietTicks = 0
     const got = await open($)
-    await poll($)
+    await poll($, true)
     return { text: got.isPlaced ? 'Side pane opened.' : `Side pane waits: ${got.reason}` }
   })
 
+  on('prompt.submit', async ($, e, next) => { activity($); return next(e) })
+  on('agent.spawn', async ($, e, next) => { activity($); return next(e) })
+  on('turn.complete', async ($, e, next) => { activity($); return next(e) })
+
   // A question to the person is in flight from call to answer.
   on('tool.call', async ($, e, next) => {
+    activity($)
     const tool = String(e.tool)
     if (!ASK_TOOLS.has(tool)) return next(e)
     const name = tool === 'AskUserQuestion' ? 'question' : 'Switchboard ask'
@@ -174,6 +215,8 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePromptList' }, async ($, e, next) => {
+    const now = await $.clock.now()
+    if (now - lastPollStartedAt >= POLL_MS) void poll($).catch(() => undefined)
     // Closed: smart-select's row carries the to-do and cache, so theirs hide only while it is there.
     const hide = (await read($, placed)) ? HIDE_OPEN : e.props.rows.some(r => r.plugin === 'smart-select') ? HIDE_CLOSED : NONE
     return next({ ...e, props: { ...e.props, rows: e.props.rows.filter(r => !hide.has(r.plugin)) } })

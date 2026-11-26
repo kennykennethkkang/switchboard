@@ -132,7 +132,7 @@ describe('trustFolder keys and other windows', () => {
 
   const windows = path.join(base, 'windows')
   fs.mkdirSync(windows)
-  const win = (name: string, w: object) => fs.writeFileSync(path.join(windows, `${name}.json`), JSON.stringify({ port: 1, hubToken: 't', ...w }))
+  const win = (name: string, w: object) => fs.writeFileSync(path.join(windows, `${name}-1.json`), JSON.stringify({ port: 1, hubToken: 't', ...w }))
 
   it('trusts inside another live window that says trusted; never a dead one or one that says untrusted', () => {
     win('dead', { pid: 999_999_9, workspace: repo, trusted: true })

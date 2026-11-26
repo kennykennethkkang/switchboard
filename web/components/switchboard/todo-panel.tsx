@@ -117,7 +117,7 @@ function PilotCtl({ folder, ops, todos, autoStart }: { folder: string; ops: Ops;
       {pilot.on && <button type="button" className="hub-btn sm" aria-pressed={pilot.paused} onClick={() => ops.setPilot(folder, { paused: !pilot.paused })}>{pilot.paused ? 'Resume' : 'Pause'}</button>}
     </span>
     <span id={`${uid}-h`} className="tdx-meta tdx-note">Auto-run starts the next item in this queue when nothing here is running.</span>
-    {pilot.hold && <p className="hub-hold tdx-note">{pilot.hold.text}</p>}
+    {pilot.hold && <p className="hub-hold tdx-note" data-kind={pilot.hold.kind}>{pilot.hold.text}</p>}
   </>
 }
 const pausedTag = (folder: string, ctx: Ctx) => autopilot(ctx.todos[folder] ?? { todo: [] }, ctx.autoStart, ctx.ops.live).paused && <span className="tdx-tag" data-k="paused">Paused</span>

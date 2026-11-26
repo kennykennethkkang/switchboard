@@ -21,9 +21,9 @@ export function memoryTally(g: MemoryGraph) {
   }
 }
 
-const TOOL_ORDER = ['mod', 'plugin', 'skill'] as const
+const TOOL_ORDER = ['mod', 'plugin', 'skill', 'builtin'] as const
 export const armoryList = (h: Pick<HubState, 'installed' | 'connections'>): Item[] => [
-  ...TOOL_ORDER.flatMap(k => h.installed.filter(i => i.kind === k && i.enabled).map(i => ({ name: i.name, note: k, ok: !i.held }))),
+  ...TOOL_ORDER.flatMap(k => h.installed.filter(i => i.kind === k && i.enabled).map(i => ({ name: i.name, note: k === 'builtin' ? 'built in' : k, ok: !i.held }))),
   ...h.connections.filter(c => c.kind === 'mcp').map(c => ({ name: c.name, note: c.detail ? `mcp, ${c.detail}` : 'mcp', ok: c.status === 'on' })),
 ]
 
@@ -54,9 +54,9 @@ export const studyList = (h: Pick<HubState, 'learn' | 'learnReady'>): Item[] => 
 ]
 
 export const keyList = (h: Pick<HubState, 'signIns' | 'aws'>): Item[] => [
-  // An unset key or a never-used profile is neutral (ok undefined), not a failure; previous-* profiles are expired backups of a switched login.
+  // An unset key, a never-used profile or a signed-out single sign-on one (used on demand) is neutral (ok undefined), not a failure; previous-* profiles are expired backups of a switched login.
   ...(h.signIns.keys ?? []).map(k => ({ id: k.saved ? k.name : undefined, name: k.name, note: !k.saved ? 'not set' : k.checked ? (k.checked.ok ? 'ok' : 'failed test') : 'saved', ok: k.saved ? k.checked?.ok !== false : undefined })),
-  ...h.aws.filter(p => !p.name.startsWith('previous-')).map(p => ({ name: p.label && p.label !== p.name ? `AWS ${p.label} (${p.name})` : `AWS ${p.name}`, note: p.status, ok: p.status === 'never' ? undefined : p.status === 'signed-in' })),
+  ...h.aws.filter(p => !p.name.startsWith('previous-')).map(p => ({ name: p.label && p.label !== p.name ? `AWS ${p.label} (${p.name})` : `AWS ${p.name}`, note: p.status, ok: p.status === 'signed-in' ? true : p.status === 'never' || p.sso ? undefined : false })),
 ]
 
 export const mapList = (h: Pick<HubState, 'projects'>): Item[] => h.projects.map(p => ({ name: p.name || base(p.path), note: p.kind }))

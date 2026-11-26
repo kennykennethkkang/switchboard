@@ -9,9 +9,11 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { execFileSync } from 'child_process'
-import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, junkPath, extraTodoFolders, loadLocalTodos, tickShipped, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS, holdReason , TodoStore , shortOf } from '../src/hub/todo'
+import { addTodo, afterEnd, afterFinish, backInChat, laterOnly, parseKept, clearGone, editTodo, emptyDoc, finishPrompt, hostId, mergeDocs, moveChat, ownerRepo, parseDoneIds, readDoc, readOptIn, removeItem, setOptIn, startTodo, storeFor, syncDoc, syncMode, todoFinished, todoEnded, updateDoc, withLock, TODO_REF, remoteSeen, replaceRemote, runOrder, runMessage, toolStep, mentions, restoreTicked, projectOf, finishItem, parseDoc, whyLeft, acceptSuggestion, dismissSuggestion, addMissed, approvedMissed, chatApproved, chatMissed, dropped, autoStartPlan, claimItems, claimRemote, claimTodo, prune, junkPath, extraTodoFolders, loadLocalTodos, tickShipped, optInFile, moveTodo, setPilot, runLabel, heldLabel, todoEnv, upcoming, START_GRACE_MS, holdReason , TodoStore , shortOf } from '../src/hub/todo'
 import { commandProblem, handleHub } from '../src/hub/routes'
 import { git } from '../src/hub/git'
+import { approvedFields } from '../src/hub/approve'
+import { archiveRow, recordArchive } from '../src/hub/chains'
 import { HubService, hub } from '../src/hub/hub-service'
 import type { ChatProgress, TodoDoc, TodoItem } from '../src/hub/types'
 
@@ -304,6 +306,42 @@ describe('todo suggestions', () => {
     assert.ok(out.suggested?.some(t => t.from === 's2'))
     assert.equal(out.removed[withLeft.suggested!.find(t => t.text === 'add dark mode')!.id], 8)
     assert.equal(approvedMissed(out, 's1', 9), out)
+  })
+
+  it('a score after Approve files no missed rows and clears the chat\'s old ones', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-missed-')), repo = path.join(tmp, 'repo'), archive = path.join(tmp, 'archive.json')
+    try {
+      execFileSync('git', ['init', '-q', repo])
+      const s = await storeFor(repo)
+      const p = chat({ cwd: repo, asked: ['fix the login', 'add dark mode'], covered: [0.1, 0.1] })
+      const texts = async () => (await readDoc(s)).suggested?.map(t => t.text) ?? []
+      // Archived but not approved still files.
+      recordArchive(archiveRow({ sessionId: 's1', cwd: repo }), archive)
+      await chatMissed({ ...p, asked: ['fix the login'], covered: [0.1] }, archive)
+      assert.deepEqual(await texts(), ['fix the login'])
+      recordArchive({ ...archiveRow({ sessionId: 's1', cwd: repo }), ...approvedFields('s1') }, archive)
+      await chatMissed(p, archive)
+      assert.deepEqual(await texts(), [])
+      // Another chat's approval does not hide this one's.
+      await chatMissed({ ...p, sessionId: 's2' }, archive)
+      assert.deepEqual(await texts(), ['fix the login', 'add dark mode'])
+      // A row this window never showed goes too, even when the score finds nothing missed.
+      await updateDoc(s, d => addMissed(d, { ...p, sessionId: 's3', asked: ['ship the docs'], covered: [0] }))
+      recordArchive({ ...archiveRow({ sessionId: 's3', cwd: repo }), ...approvedFields('s3') }, archive)
+      await chatMissed({ ...p, sessionId: 's3', asked: ['ship the docs'], covered: [0.9] }, archive)
+      assert.deepEqual(await texts(), ['fix the login', 'add dark mode'])
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
+  })
+
+  it('Approve clears rows this window has not loaded', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-missed-'))
+    try {
+      execFileSync('git', ['init', '-q', repo])
+      const s = await storeFor(repo)
+      await updateDoc(s, d => addMissed(d, chat({ cwd: repo, asked: ['add dark mode'], covered: [0] })))
+      await chatApproved('s1', repo)
+      assert.deepEqual((await readDoc(s)).suggested ?? [], [])
+    } finally { fs.rmSync(repo, { recursive: true, force: true }) }
   })
 
   it('leaves conversational asks out of the missed suggestions', () => {

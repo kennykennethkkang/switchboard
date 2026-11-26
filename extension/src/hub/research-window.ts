@@ -4,6 +4,7 @@
  * A plain researcher lookup in files never opens it. A project chat's research shows on its Chats page instead.
  */
 import { isResearch } from './research'
+import { stripResearchInstructions } from './research-question'
 
 type Payload = Record<string, unknown>
 
@@ -43,12 +44,12 @@ export class ResearchTrigger {
       const prompt = String(p.prompt ?? '').trim()
       if (!prompt) return undefined
       const slash = prompt.match(/^\/(?:[\w-]+:)?deep-research\b\s*([\s\S]*)$/)
-      this.asked.set(id, slash ? slash[1].trim() || prompt : prompt)
+      this.asked.set(id, slash ? stripResearchInstructions(slash[1]) || stripResearchInstructions(prompt) : stripResearchInstructions(prompt))
       starts = !!slash
     } else if (event === 'PreToolUse') {
       const input = (p.tool_input ?? {}) as Payload
       const skill = p.tool_name === 'Skill' && String(input.skill ?? '').split(':').pop() === 'deep-research'
-      if (skill && typeof input.args === 'string' && input.args.trim()) this.asked.set(id, input.args.trim())
+      if (skill && typeof input.args === 'string' && input.args.trim()) this.asked.set(id, stripResearchInstructions(input.args))
       starts = skill || (WEB.has(String(p.tool_name)) && (isResearch(p.cwd) || isResearcher(p.agent_type) || (!p.agent_type && !!this.live.get(id)?.size)))
     }
     if (!starts || !this.inScope(p.cwd)) return undefined

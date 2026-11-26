@@ -14,16 +14,16 @@ import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
 import { Credits } from './credits'
 import { Health } from './health'
-import { SpendLimits } from './spend-limits'
 import { ToolPrecedence } from './tool-precedence'
 import { PhoneAlerts, phoneAlertsShown } from './phone-alerts'
 import { ADVANCED_HINT } from './stages'
+import { ago } from '@/lib/look'
 import { advancedRows, raiseLine, raisesFor } from '@/lib/stages-ui'
 import './gear.css'
 
-export function Switch({ on, onChange, label, text }: { on: boolean; onChange: (next: boolean) => void; label: string; text?: string }) {
+export function Switch({ on, onChange, label, text, disabled }: { on: boolean; onChange: (next: boolean) => void; label: string; text?: string; disabled?: boolean }) {
   return (
-    <button type="button" role="switch" className="hub-switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}>
+    <button type="button" role="switch" className="hub-switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}>
       <span aria-hidden />{text}
     </button>
   )
@@ -59,6 +59,8 @@ const SIMPLE_ROWS = ['Your name', 'Continue at usage limit', 'Pause near the lim
 // group: advanced rows sit under their own heading; roles and tail split the Models pane.
 type Row = { label: string; control: ReactNode; hint?: string; section: Section; group?: 'advanced' | 'roles' | 'tail' }
 /** pane: the settings page a search hit lives on, shown as a small label. */
+const syncAgo = (at: number) => { const a = ago(at); return a === 'now' ? 'just now' : `${a} ago` }
+
 function Line({ row, pane }: { row: Row; pane?: string }) {
   // A switch or a pick saves at once, so the row says so for a moment.
   const [saved, setSaved] = useFlash(0, 2000)
@@ -166,7 +168,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <input key={sb.name} className="hub-select" aria-label="Your name" placeholder="Name" maxLength={40} defaultValue={sb.name} style={{ cursor: 'text' }}
         onBlur={e => { const v = e.target.value.trim(); if (v !== sb.name) own('name', v) }}
         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} /> },
-    { section: 'Chats', label: 'Hide done chats', hint: 'A done chat quiet this long leaves the list; idle chats always stay. Find still has it.',
+    { section: 'Chats', label: 'Hide done chats', hint: 'A done chat that is no longer running leaves the list once quiet this long; running and idle chats always stay. Find still has it.',
       control: <Pick label="Hide done chats" options={IDLE} value={sb.idleMinutes === null ? 'never' : String(sb.idleMinutes)} onChange={v => own('idleMinutes', v === 'never' ? null : Number(v))} /> },
     { section: 'Chats', label: 'Continue at usage limit', hint: 'Claude Code\'s own setting: a chat that hits a limit goes on by itself when it resets. Off, Switchboard sends the continue message instead. Either way the chat comes back.',
       control: <Switch label="Continue at usage limit" on={hub.keep.autoContinue} onChange={next => set('autoContinueAtUsageLimit', next)} /> },
@@ -184,9 +186,9 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Fix stuck items" on={sb.autoFix !== false} onChange={next => own('autoFix', next)} /> },
     { section: 'Chats', label: 'Learn automatically', hint: 'Twice a week, under the pause threshold, a background run reviews recent chats and tests rule and role edits; one that beats the old version on held-out cases is applied to claude-mods with an Undo note in the to-do, the rest become to-do proposals. Long chats that end get an after action review. Never commits.',
       control: <Switch label="Learn automatically" on={sb.learn !== false} onChange={next => own('learn', next)} /> },
-    { section: 'Chats', label: 'Stop a chat\'s dev servers when it ends', hint: 'When a chat ends for good, the dev servers and test browsers it started stop too. Never port 3000 or 3131, a chat waiting out a usage limit, or anything another live chat uses.',
-      control: <Switch label="Stop a chat's dev servers when it ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
-    { section: 'Chats', label: 'Merge worktrees automatically', hint: 'After 15 minutes with no new chat in a repo, every worktree without a running chat goes into the main checkout as uncommitted changes, the same as Merge all worktrees on the Git card. The repo\'s checks run after each one, and one that breaks them is undone and kept. Never commits or pushes.',
+    { section: 'Chats', label: 'Stop dev servers and close tabs when a chat ends', hint: 'When a chat ends for good, the dev servers and test browsers it started stop too. On macOS the Chrome tabs it opened close once it finishes, ends, or gets the answer that named the page; one you are looking at waits. Never port 3000 or 3131, a chat waiting out a usage limit, or anything another live chat uses.',
+      control: <Switch label="Stop dev servers and close tabs when a chat ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
+    { section: 'Chats', label: 'Merge worktrees automatically', hint: 'About 2 minutes after a worktree\'s chat ends, its work goes into the branch that repo is on, as uncommitted changes. The repo\'s checks run after each one, and one that breaks them is undone and kept. One missed by that (a reload, a failed check) is tried again after 15 minutes with no new chat. Never commits or pushes. Ship has the same switch per repo.',
       control: <Switch label="Merge worktrees automatically" on={sb.autoMerge !== false} onChange={next => own('autoMerge', next)} /> },
     { section: 'Chats', label: 'Show agent browsers', hint: 'Browsers agents drive through Playwright open in a window you can see. Off runs them headless, so nothing lands on your screen. Applies to chats started after the change.',
       control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
@@ -210,12 +212,12 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Brief for new chats" on={sb.brief} onChange={next => own('brief', next)} /> },
     { section: 'Chats', label: 'Phone mode', hint: 'Call me instead of asking in chats: questions, stuck and finished chats, and usage pauses and resumes ring your phone.',
       control: <Switch label="Phone mode" on={sb.phone === true} onChange={next => own('phone', next)} /> },
-    { section: 'Chats', label: 'Push to your phone', hint: 'Claude Code sends a push to your phone when a chat finishes.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
+    { section: 'Chats', label: 'Push to your phone', hint: 'Lets a chat push through the Claude app. Finished chats come through Phone alerts.', control: <Switch label="Push to your phone" on={c.push} onChange={next => set('agentPushNotifEnabled', next)} /> },
     ...(alerts ? [{ section: 'Chats' as const, label: 'Phone alerts', hint: alerts === 'https'
       ? 'Needs HTTPS: turn on HTTPS Certificates on the DNS page of the Tailscale admin console, then open the https link.'
       : alerts === 'hint'
       ? 'On iPhone, tap Share then Add to Home Screen, open Switchboard from there and turn this on.'
-      : 'AWS sign-in heads-ups on this device, even with the app closed.',
+      : 'Finished chats and AWS sign-in heads-ups on this device, even with the app closed.',
       control: alerts === 'switch' ? <PhoneAlerts /> : null }] : []),
     { section: 'Chats', label: 'Keep phone access in Apple Notes', hint: 'One private note, "Switchboard access", with the code and links; updated when they change. Off stops updates.',
       control: <Switch label="Keep phone access in Apple Notes" on={sb.accessNote} onChange={next => own('accessNote', next)} /> },
@@ -234,6 +236,8 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: codexGate(<Pick label="Codex chat effort" options={CODEX_EFFORTS} value={sb.codexEffort ?? 'default'} muted={!sb.codexEffort} disabled={noCodex} onChange={v => own('codexEffort', v === 'default' ? null : v)} />) },
     { section: 'Models', label: 'Smart model switch', hint: 'When a role keeps redoing the same part, its next run there gets the next model up. Debugging never counts. Off keeps each role on its own model.',
       control: <Switch label="Smart model switch" on={smart} onChange={next => own('smartModelSwitch', next)} /> },
+    { section: 'Models', label: 'Codex first', hint: 'While Codex has room and Claude has used more of its week, engineer and code review jobs go to Codex. Off leaves it to each chat.',
+      control: codexGate(<Switch label="Codex first" on={sb.codexFirst !== false} onChange={next => own('codexFirst', next)} />) },
     ...hub.installed.filter(i => i.kind === 'role').map((r): Row => {
       if (r.codex) {
         const model = r.codexModel ?? 'default'
@@ -310,6 +314,12 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
           control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-setup' })}>Set up</button> }} />
         <Line row={{ section: 'Installed', label: 'Export kit', hint: 'Roles, skills, plugins and mods as one folder you can copy to another Mac.',
           control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-kit-export' })}>Export</button> }} />
+        <Line row={{ section: 'Installed', label: 'Sync', hint: hub.sync?.on
+          ? `Signed in as ${hub.sync.login ?? 'GitHub'}, last sync ${hub.sync.last ? syncAgo(hub.sync.last) : 'never'}${hub.sync.note ? `. ${hub.sync.note}` : ''}`
+          : 'Sign in with GitHub to keep memory, the vault and settings the same on every computer.',
+          control: hub.sync?.on
+            ? <><button type="button" className="hub-btn" disabled={hub.sync.busy} onClick={() => send({ type: 'hub-sync-now' })}>{hub.sync.busy ? 'Syncing' : 'Sync now'}</button> <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-sync-off' })}>Turn off</button></>
+            : <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-sync-sign-in' })}>Sign in</button> }} />
         <Sweep hub={hub} send={send} />
         <ToolPrecedence hub={hub} send={send} />
         <h4 style={sub}>Installed</h4>
@@ -368,7 +378,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
               {!hits.length && !blocks.length && !listHits.length && <p style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>Nothing matches.</p>}
             </>
           : body(pane)}
-        {!query && pane === 'Integrations' && <SpendLimits hub={hub} send={send} />}
+        {!query && pane === 'Integrations' && !!hub.spend?.length && <p style={{ color: 'var(--hub-ash)', margin: '16px 0 0', fontSize: 13 }}>Spend limits for paid tools are on <a href="#usage" className="hub-link">Usage</a>.</p>}
         {!query && coder && pane === 'Chats' && <Health hub={hub} send={send} />}
         <details className="hub-fold-list" style={{ marginTop: 16 }}
           onToggle={e => { const d = e.currentTarget; if (d.open) requestAnimationFrame(() => d.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })) }}>

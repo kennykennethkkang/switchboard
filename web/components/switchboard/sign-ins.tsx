@@ -390,7 +390,7 @@ function Aws({ hub, send, problem }: { hub: HubState; send: Send; problem: Probl
         <button type="button" className="hub-link" onClick={() => send({ type: 'hub-aws-check' })}>Check now</button>
       </header>
       <p className="si-help">
-        From ~/.aws/config. Sign in runs aws login in the Chrome profile shown.
+        From ~/.aws/config. Sign in runs aws login, or aws sso login for single sign-on, in the Chrome profile shown.
         {hub.aws.some(p => p.root) && ' Root sign-ins end when AWS says so; an IAM user with SignInLocalDevelopmentAccess stays signed in up to 12 hours.'}
       </p>
       {current.length

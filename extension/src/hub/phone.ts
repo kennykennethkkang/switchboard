@@ -44,12 +44,25 @@ export function ring(c: Call): Promise<Placed | undefined> {
 }
 
 // phone-mode (claude-mods) denies every AskUserQuestion but the closing one and has the chat call instead.
-const chatCalls = (a: Ask | undefined) => a?.tool === 'AskUserQuestion' && !a.questions?.some(q => q.question.includes(APPROVE_QUESTION))
+const closingAsk = (a: Ask | undefined) => !!a?.questions?.some(q => q.question.includes(APPROVE_QUESTION))
+const chatCalls = (a: Ask | undefined) => a?.tool === 'AskUserQuestion' && !closingAsk(a)
 
 /** A chat turned done or needs-you (notify.ts dedupes repeats). A hub ask rings on its own through phoneAsk; a chat's own call covers its AskUserQuestion. */
 export function phoneChange(p: ChatProgress, title: string): void {
   if (p.state === 'done') void ring({ key: `done\n${p.sessionId}\n${doneText(p)}`, text: `${title} is done. ${doneText(p)}`, say: true })
   else if (p.state === 'needs-you' && p.ask?.via !== 'hub' && !chatCalls(p.ask)) void ring({ key: `need\n${p.sessionId}\n${p.question ?? ''}`, text: `${title} needs you: ${p.question ?? 'it is waiting on you'}`, say: true })
+}
+
+// Chats pushed at their closing question, and when: the Done after its Approve is not pushed again.
+const pushed = new Map<string, number>()
+
+/** The Web Push text for a chat that asked its closing question or is done; undefined when there is nothing to push. */
+export function pushText(p: ChatProgress, approvedAt?: number, now = Date.now()): string | undefined {
+  if (p.state === 'needs-you' && closingAsk(p.ask)) { pushed.set(p.sessionId, now); return 'done, waiting for your Approve' }
+  if (p.state !== 'done') return undefined
+  const at = pushed.get(p.sessionId)
+  pushed.delete(p.sessionId)
+  return at && approvedAt && approvedAt >= at ? undefined : doneText(p)
 }
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

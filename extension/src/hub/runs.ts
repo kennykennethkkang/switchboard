@@ -11,6 +11,7 @@ import { redact } from './brain'
 import { repoTop } from './projects'
 import { toolTarget } from './progress'
 import { transcriptFile } from './chat-view'
+import { insidePath } from './windows'
 
 export type RunReport = { status?: string; changed: string[]; checked: string[]; open: string[] }
 export type RunFile = { path: string; added: number; removed: number }
@@ -103,10 +104,12 @@ export function parseReport(text: string): RunReport | undefined {
 /** The deepest folder holding every one of dirs. */
 function commonDir(dirs: string[]): string {
   if (!dirs.length) return ''
-  const parts = dirs.map(d => d.split('/'))
+  const parts = dirs.map(d => d.replace(/\\/g, '/').split('/').filter(Boolean))
   let n = 0
   while (parts.every(p => n < p.length && p[n] === parts[0][n])) n++
-  return parts[0].slice(0, n).join('/')
+  const drive = /^([A-Za-z]:)[\\/]/.exec(dirs[0])?.[1]
+  const prefix = drive ? (n === 1 ? `${drive}/` : '') : /^[\\/]/.test(dirs[0]) ? '/' : ''
+  return prefix + parts[0].slice(0, n).join('/')
 }
 
 /** What a transcript has said so far; feed adds lines to it, so a growing file is read once. */
@@ -129,7 +132,8 @@ function feed(a: Acc, raw: string): Acc {
   const { usage, calls, dispatches, loops, files, cwds, pending } = a
   // Keyed by the absolute path; a relative one is taken from the folder its call ran in.
   const touch = (p: string, cwd: string, added: number, removed: number) => {
-    const abs = path.posix.resolve(cwd || '/', p)
+    const api = process.platform === 'win32' ? path.win32 : path
+    const abs = api.resolve(cwd || api.sep, p)
     const f = files.get(abs) ?? { path: abs, added: 0, removed: 0 }
     f.added += added; f.removed += removed; files.set(abs, f)
   }
@@ -218,7 +222,11 @@ function summary(a: Acc, meta: Meta, id: string, file: string, root?: string): R
   }
 }
 
-const relTo = (base: string, p: string) => (base && base !== '/' && p.startsWith(base + '/') ? p.slice(base.length + 1) : p)
+const relTo = (base: string, p: string) => {
+  if (!base || !insidePath(base, p)) return p
+  const normalized = (s: string) => s.replace(/\\/g, '/')
+  return normalized(p).slice(normalized(base).replace(/\/$/, '').length + 1)
+}
 
 const SAFE = /^[A-Za-z0-9_-]{1,80}$/
 // Parsed runs by transcript, with what was read so far. A file that grew is read from where it stopped, so a working

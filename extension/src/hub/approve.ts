@@ -142,8 +142,8 @@ export const CLOSING_DENY = 'Run the aar skill and print the standup (done, for 
 const GATE_TAIL = 4 * 1024 * 1024
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
-type Entry = { type?: string; isMeta?: boolean; isCompactSummary?: boolean; origin?: { kind?: string }; message?: { content?: unknown } }
-type Block = { type?: string; text?: string; name?: string; input?: unknown }
+type Entry = { type?: string; isMeta?: boolean; isCompactSummary?: boolean; isSidechain?: boolean; timestamp?: string; origin?: { kind?: string }; attachment?: { type?: string; origin?: { kind?: string } }; message?: { content?: unknown }; toolUseResult?: unknown }
+type Block = { type?: string; text?: string; name?: string; input?: unknown; id?: string; tool_use_id?: string }
 
 const blocks = (e: Entry): Block[] => Array.isArray(e.message?.content) ? e.message!.content as Block[] : []
 // Typed by Kenneth: not a tool result, skill body, compact summary, subagent notice or mod nudge (origin plugin).
@@ -164,13 +164,38 @@ function readTail(file: string): Entry[] {
 const aarRan = (b: Block) => b.type === 'tool_use' && ((b.name === 'Skill' && /(^|:)aar$/.test(String((b.input as { skill?: unknown })?.skill ?? '')))
   || /aar\/SKILL\.md|wiki\/aar-[\w.-]+\.md/.test(JSON.stringify(b.input ?? '')))
 
+function asksClosing(input: unknown): boolean {
+  const qs = (input as { questions?: unknown } | undefined)?.questions
+  return Array.isArray(qs) && qs.some(q => isClosing((q as { question?: unknown })?.question, Array.isArray((q as { options?: unknown })?.options) ? (q as { options: { label?: unknown }[] }).options.map(o => o?.label) : []))
+}
+
+// Typed while the turn ran: it waits as an attachment, not a user line.
+const queuedPrompt = (e: Entry) => e.attachment?.type === 'queued_command' && e.attachment.origin?.kind === 'human'
+
+/** The lead's last closing question, answered, as the PostToolUse it should have sent; undefined when it was asked again unanswered or Kenneth typed since. */
+export function closingAnswer(file: string): { id: string; at: number; payload: Record<string, unknown> } | undefined {
+  const asked = new Map<string, Block>()
+  let hit: ReturnType<typeof closingAnswer>
+  for (const e of readTail(file)) {
+    if (e.isSidechain) continue
+    if (realPrompt(e) || queuedPrompt(e)) hit = undefined
+    for (const b of blocks(e)) {
+      if (b.type === 'tool_use' && b.id && asksClosing(b.input)) { asked.set(b.id, b); hit = undefined }
+      const q = b.type === 'tool_result' && b.tool_use_id ? asked.get(b.tool_use_id) : undefined
+      if (!q?.id) continue
+      const payload = { hook_event_name: 'PostToolUse', tool_name: q.name, tool_input: q.input, tool_use_id: q.id, tool_response: e.toolUseResult }
+      if (closingPick(payload)) hit = { id: q.id, at: Date.parse(e.timestamp ?? ''), payload }
+    }
+  }
+  return hit
+}
+
 /** PreToolUse deny reason for the closing question asked before the aar and standup; undefined lets it through. */
 export function closingGate(payload: { hook_event_name?: string; tool_name?: string; tool_input?: unknown; transcript_path?: string; cwd?: string }): string | undefined {
   if (payload.hook_event_name !== 'PreToolUse' || payload.tool_name !== 'AskUserQuestion' || !payload.transcript_path) return undefined
   // Research chats end on a finding, not a change: no aar to run first.
   if (isResearch(payload.cwd)) return undefined
-  const qs = (payload.tool_input as { questions?: unknown })?.questions
-  if (!Array.isArray(qs) || !qs.some(q => isClosing((q as { question?: unknown })?.question, Array.isArray((q as { options?: unknown })?.options) ? (q as { options: { label?: unknown }[] }).options.map(o => o?.label) : []))) return undefined
+  if (!asksClosing(payload.tool_input)) return undefined
   const entries = readTail(payload.transcript_path)
   if (!entries.length) return undefined
   // ponytail: Edit/Write tool calls only; a chat that changed files only through Bash skips the gate (close-means-approved).

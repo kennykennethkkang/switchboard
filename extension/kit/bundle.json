@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "2026-11-23T08:59:39Z",
+  "rulesVersion": "2026-11-26T07:39:37Z",
   "generic": true,
   "history": {
     "Explore.md": [
@@ -24,7 +24,8 @@
       "9c1ec7a68745",
       "42e55a36e3e4",
       "546504b7a554",
-      "37608419bfda"
+      "37608419bfda",
+      "b8b6828d846f"
     ],
     "engineer.md": [
       "f067ddefd984",
@@ -40,7 +41,8 @@
       "0eb77cdcac89",
       "027b3985062c",
       "f95f2f9ab9cd",
-      "673cbf8f48f2"
+      "673cbf8f48f2",
+      "f693f51f1994"
     ],
     "growth.md": [
       "8f83534c5908",
@@ -72,7 +74,8 @@
       "bfc8543ee018",
       "7d314976e7f0",
       "404a64147c6c",
-      "c33534879293"
+      "c33534879293",
+      "c4aa7a6190a4"
     ],
     "researcher.md": [
       "ab8bfc5bda95",
@@ -86,10 +89,13 @@
       "897bfed22b43"
     ],
     "engineer-codex.md": [
-      "00fb5490c78f"
+      "00fb5490c78f",
+      "008aa73ea442",
+      "bd618ee463d6"
     ],
     "qa-codex.md": [
-      "2f2f4485255e"
+      "2f2f4485255e",
+      "acda6e3b6ced"
     ]
   }
 }

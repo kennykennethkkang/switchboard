@@ -183,6 +183,110 @@ describe('aar filter', () => {
   })
 })
 
+describe('aar memory folder', () => {
+  // Runs the real tick in a throwaway home; the fake run leaves one note in the staged copy.
+  const savedIn = (at: (repo: string, home: string) => string, sent?: string) => {
+    const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'learn-aar-')))
+    try {
+      const repo = path.join(home, 'Documents', 'GitHub', 'switchboard'), cwd = at(repo, home), slug = (p: string) => p.replace(/[^a-zA-Z0-9]/g, '-')
+      const projects = path.join(home, '.claude', 'projects'), sb = path.join(home, '.claude', 'switchboard')
+      for (const d of [path.join(repo, '.git'), path.join(repo, '..', 'claude-mods', 'kit'), path.join(projects, slug(cwd)), path.join(projects, slug(repo), 'memory'), sb]) fs.mkdirSync(d, { recursive: true })
+      fs.writeFileSync(path.join(projects, slug(repo), 'memory', 'old.md'), 'old')
+      fs.writeFileSync(path.join(projects, slug(cwd), 's1.jsonl'), Array.from({ length: 30 }, (_, i) => JSON.stringify({ type: 'assistant', message: { id: `m${i}`, content: [] } })).join('\n'))
+      fs.writeFileSync(path.join(sb, 'learn.json'), JSON.stringify({ improveAt: Date.now() }))
+      const script = path.join(home, 'c.ts')
+      fs.writeFileSync(script, `import * as fs from 'fs'\nimport * as path from 'path'\nimport { learnTick, queueAar } from ${JSON.stringify(path.resolve(__dirname, '../src/hub/learn.ts'))}
+queueAar({ sessionId: 's1', cwd: ${JSON.stringify(sent ?? cwd)} } as never)
+void learnTick(async () => {
+  const root = path.join(${JSON.stringify(home)}, '.cache', 'switchboard', 'learn'), stage = path.join(root, fs.readdirSync(root)[0], 'memory')
+  fs.writeFileSync(path.join(stage, 'new.md'), fs.readdirSync(stage).join())
+  return 0
+})\n`)
+      execFileSync(process.execPath, [...process.execArgv, script], { env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8' })
+      const note = (p: string) => { const f = path.join(projects, slug(p), 'memory', 'new.md'); return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : undefined }
+      return { main: note(repo), own: note(cwd) }
+    } finally { fs.rmSync(home, { recursive: true, force: true }) }
+  }
+  it('a worktree chat gets the main checkout\'s memory, its folder gone or not', () => {
+    assert.deepEqual(savedIn(repo => path.join(repo, '.claude', 'worktrees', 'x-71db')), { main: 'old.md', own: undefined })
+    assert.deepEqual(savedIn(repo => { const wt = path.join(repo, '.claude', 'worktrees', 'x-71db'); fs.mkdirSync(wt, { recursive: true }); fs.writeFileSync(path.join(wt, '.git'), 'gitdir: x'); return wt }), { main: 'old.md', own: undefined })
+  })
+  it('a subfolder chat gets its repo\'s memory', () => {
+    assert.deepEqual(savedIn(repo => path.join(repo, 'web')), { main: 'old.md', own: undefined })
+  })
+  it('a chat outside any repo keeps the folder its transcript is in', () => {
+    assert.deepEqual(savedIn((_, home) => path.join(home, 'notes')), { main: undefined, own: '' })
+  })
+  it('a chat with no folder on record keeps it too, whatever folder this runs in', () => {
+    assert.deepEqual(savedIn((_, home) => path.join(home, 'notes'), ''), { main: undefined, own: '' })
+  })
+  it('a chat in the repo itself still gets its memory', () => {
+    assert.deepEqual(savedIn(repo => repo), { main: 'old.md', own: 'old.md' })
+  })
+})
+
+describe('a newer build waiting for a reload', () => {
+  // Each script is one window's life, so the next one starts like a reloaded window.
+  const inHome = (learn: object, use: (w: { run: (body: string) => void; ran: () => number; queue: () => unknown; state: () => { improveAt?: number } }) => void) => {
+    const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'learn-hold-')))
+    try {
+      const repo = path.join(home, 'Documents', 'GitHub', 'switchboard'), sb = path.join(home, '.claude', 'switchboard')
+      const projects = path.join(home, '.claude', 'projects', repo.replace(/[^a-zA-Z0-9]/g, '-'))
+      for (const d of [path.join(repo, '.git'), path.join(repo, '..', 'claude-mods', 'kit'), path.join(projects, 'memory'), sb]) fs.mkdirSync(d, { recursive: true })
+      fs.writeFileSync(path.join(projects, 's1.jsonl'), Array.from({ length: 30 }, (_, i) => JSON.stringify({ type: 'assistant', message: { id: `m${i}`, content: [] } })).join('\n'))
+      fs.writeFileSync(path.join(sb, 'learn.json'), JSON.stringify(learn))
+      const script = path.join(home, 'c.ts'), marks = path.join(home, 'marks'), file = path.join(sb, 'aars-x.json'), src = (f: string) => JSON.stringify(path.resolve(__dirname, '../src/hub', f))
+      const run = (body: string) => {
+        fs.writeFileSync(script, `import * as fs from 'fs'\nimport { holdForUpdate, keepAarQueue, learnTick, queueAar } from ${src('learn.ts')}\nimport { hub } from ${src('hub-service.ts')}
+const mark = async () => { fs.appendFileSync(${JSON.stringify(marks)}, 'x'); return 0 }, todo = async () => undefined, s1 = { sessionId: 's1', cwd: ${JSON.stringify(repo)} } as never
+keepAarQueue(${JSON.stringify(file)})\n${body}\n`)
+        execFileSync(process.execPath, [...process.execArgv, script], { env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8' })
+      }
+      use({
+        run, ran: () => (fs.existsSync(marks) ? fs.readFileSync(marks, 'utf8').length : 0),
+        queue: () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined),
+        state: () => JSON.parse(fs.readFileSync(path.join(sb, 'learn.json'), 'utf8')),
+      })
+    } finally { fs.rmSync(home, { recursive: true, force: true }) }
+  }
+  it('starts no aar and keeps the queue for the reloaded window, which runs it once', () => inHome({ improveAt: Date.now() }, w => {
+    w.run('holdForUpdate(() => true); queueAar(s1); void learnTick(mark, todo)')
+    assert.equal(w.ran(), 0)
+    assert.equal((w.queue() as unknown[]).length, 1)
+    w.run('holdForUpdate(() => false); void learnTick(mark, todo)')
+    assert.equal(w.ran(), 1)
+    assert.deepEqual(w.queue(), [])
+    w.run('void learnTick(mark, todo)')
+    assert.equal(w.ran(), 1)
+  }))
+  it('starts no improve run either, and leaves it due', () => inHome({ improveAt: 1 }, w => {
+    w.run('holdForUpdate(() => true); void learnTick(mark, todo)')
+    assert.equal(w.ran(), 0)
+    assert.equal(w.state().improveAt, 1)
+    w.run('void learnTick(mark, todo)')
+    assert.ok(w.ran() > 0)
+  }))
+  it('a run that a reload cuts off is not queued again', () => inHome({ improveAt: Date.now() }, w => {
+    w.run('queueAar(s1); void learnTick(async () => { await mark(); process.exit(0) }, todo)')
+    assert.equal(w.ran(), 1)
+    assert.deepEqual(w.queue(), [])
+  }))
+  it('Learn off drops the kept queue', () => inHome({ improveAt: Date.now() }, w => {
+    w.run('queueAar(s1)')
+    const off = 'hub.set({ controls: { ...hub.get().controls, switchboard: { ...hub.get().controls.switchboard, learn: false } } }); '
+    w.run(`${off}void learnTick(mark, todo)`)
+    assert.equal(w.ran(), 0)
+    assert.deepEqual(w.queue(), [])
+  }))
+  it('a broken file, or rows without an id, start empty', () => inHome({ improveAt: Date.now() }, w => {
+    for (const kept of ['{', '{}', '[null, 1, {"sessionId": 2, "cwd": "/"}, {"cwd": "/"}]']) {
+      w.run(`fs.writeFileSync(process.env.HOME + '/.claude/switchboard/aars-x.json', ${JSON.stringify(kept)})`)
+      w.run('queueAar(s1)')
+      assert.deepEqual((w.queue() as Array<{ sessionId: string }>).map(q => q.sessionId), ['s1'])
+    }
+  }))
+})
+
 describe('headless runs', () => {
   const flag = (a: string[], f: string) => a[a.indexOf(f) + 1].split(',')
   it('never bypass permissions and carry an allow list', () => {

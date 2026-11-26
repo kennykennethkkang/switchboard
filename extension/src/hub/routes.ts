@@ -12,6 +12,7 @@
  * GET  /hub/research-offer  ?q={sessionId,score,reason}: a usage mod offers Research mode for a chat; kept in HubState.researchOffers (research.ts), the mods only have GET (token in the x-switchboard-token header or the query)
  * GET  /hub/flowmap ?cwd=: that project's Flow map (flowmap.ts), built on demand and cached (token in the x-switchboard-token header or the query)
  * GET  /hub/runs    ?session=&role=: that role's runs in that chat for the node drawer (runs.ts), redacted (token in the x-switchboard-token header or the query)
+ * GET  /hub/usage   30 days of Claude and Codex tokens and list-price cost (usage.ts), cached a minute (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/outputs     ?session=: what that chat produced (chat-view.ts), redacted (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/transcript  ?session=&before=: 50 messages ending before byte before (token in the x-switchboard-token header or the query)
  * GET  /hub/chat/shot        ?session=&path=: an image listed in that chat's outputs, under 10 MB (token in the x-switchboard-token header or the query)
@@ -19,7 +20,7 @@
  * POST /hub/chat/keys        {session, text | key}: types into that terminal, only when the Mac's Screen Typing setting is on and claude or codex has the terminal (token in the x-switchboard-token header or the query)
  * GET  /hub/voice   {voice, level, heard}: the mic while it runs, polled by the app (token in the x-switchboard-token header or the query)
  * POST /hub/voice   a phone's audio clip, under 5 MB (handleVoice): answers {text}, or the problem as plain text (token in the x-switchboard-token header or the query)
- * GET  /hub/state   the whole HubState, for the standalone web app's proxy (token in the x-switchboard-token header or the query); no thisWindow, it is no window
+ * GET  /hub/state   the whole HubState (or ?fields=chats,live), for the standalone web app's proxy (token in the x-switchboard-token header or the query); no thisWindow, it is no window
  * POST /hub/command a hub-* command, run as the panel's (token in the x-switchboard-token header or the query)
  * POST /hub/device  the standalone app passes on a device asking to sign in, or that it was answered (token in the x-switchboard-token header or the query)
  * POST /hub/question       the ask tool's question {sessionId, id, questions}; GET ?id= holds 25 s for its answer (204: ask again, 410: gone);
@@ -37,6 +38,7 @@ import type { HubService } from './hub-service'
 import type { WebviewToExtensionMessage } from '../protocol'
 import type { GitOp, SettingKey, SwitchboardKey } from './types'
 import { isAi } from './ais'
+import { isLoopPick } from './loop'
 import { isRepoAsk } from './projects'
 import { isKeyName } from './keys'
 import { CODEX_EFFORTS, CODEX_MODELS, ROLE_MODELS } from './roles'
@@ -57,6 +59,9 @@ export function researchReadReply(root: string, id: string): HubReply {
 import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './flowmap'
 import { readGroups, splitAsks } from './split'
 import { readRuns, type RunDetail } from './runs'
+import { usageHistory } from './history'
+import { stateJson } from './state-json'
+import type { UsageReport } from './usage'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs, type ChatOutputs, type ChatTranscript } from './chat-view'
 import { readScreen, typeKeys, type ScreenSnap, type Typed } from './screen'
 import { chatLabel, saveUpload, UploadRefused } from './uploads'
@@ -101,7 +106,7 @@ const SPLIT_MAX = 8000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexModel', 'codexEffort', 'autoPick', 'autoMerge']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexFirst', 'codexModel', 'codexEffort', 'autoPick', 'autoMerge']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -117,6 +122,13 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-research-read': { reqId: str, id: str },
   'hub-research-seen': { id: str },
   'hub-research-delete': { id: str },
+  'hub-research-ask': { id: str, text: v => typeof v === 'string' && v.trim().length > 0 && v.length <= 2000 },
+  'hub-research-folder': { op: oneOf('add', 'rename', 'delete'), name: str, to: opt(str) },
+  'hub-research-move': { ids: v => Array.isArray(v) && v.length <= 100 && v.every(x => typeof x === 'string'), folder: opt(str) },
+  'hub-research-organize': { op: oneOf('run', 'all', 'undo', 'auto-on', 'auto-off') },
+  'hub-adjust-apply': { report: str, keys: v => Array.isArray(v) && v.length > 0 && v.length <= 36 && v.every(x => typeof x === 'string') },
+  'hub-adjust-undo': { id: slug, force: opt(bool) },
+  'hub-adjust-skip': { report: str, key: slug },
   'hub-web': { phone: bool },
   'hub-toggle': { kind: oneOf('mod', 'plugin', 'skill'), name: str, enabled: bool },
   'hub-setting': { key: oneOf(...SETTING_KEYS), value: any(bool, num, str, oneOf(null)) },
@@ -125,7 +137,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-pause': { action: oneOf('resume', 'cancel') },
   'hub-hand-to': { sessionId: str },
   'hub-ai-login': { ai: isAi },
-  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool) },
+  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool), workbench: opt(bool), loop: opt(isLoopPick) },
   'hub-split': { reqId: str, path: str, text: v => typeof v === 'string' && v.length <= SPLIT_MAX },
   'hub-pick-tools': { text: str, path: opt(str) },
   'hub-tool-precedence': { name: str, value: oneOf('always', 'auto', 'never') },
@@ -135,10 +147,8 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-stage': { path: str, run: str, n: num, status: oneOf('done', 'redo') },
   'hub-escalation-reset': { project: str, role: str, files: paths },
   'hub-chat-tools': { sessionId: str, tools: profile },
-  'hub-indefinite': { sessionId: str, on: bool },
+  'hub-loop': { sessionId: str, loop: isLoopPick },
   'hub-budget': { sessionId: str, maxHours: opt(any(num, oneOf(null))), maxCostUsd: opt(any(num, oneOf(null))), gate: opt(any(v => typeof v === 'string' && v.length <= 500, oneOf(null))) },
-  'hub-checkback': { sessionId: str, everyMin: oneOf(10, 30, 60) },
-  'hub-checkback-clear': { sessionId: str },
   'hub-refine': { sessionId: str },
   'hub-snapshots': {},
   'hub-snapshot-restore': { id: str },
@@ -155,6 +165,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-approve': { sessionId: str },
   'hub-open-note': { sessionId: str },
   'hub-focus-chat': { sessionId: str },
+  'hub-open-chat': { sessionId: str },
   'hub-terminal': { id: num, act: oneOf('show', 'close') },
   'hub-keep': { onFull: opt(oneOf('compact', 'fresh')), freshBranch: opt(bool) },
   'hub-aws-login': { profile: str, chrome: opt(str) },
@@ -178,6 +189,9 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-key-remove': { name: isKeyName },
   'hub-env-setup': { folder: str },
   'hub-kit-export': {},
+  'hub-sync-sign-in': {},
+  'hub-sync-now': {},
+  'hub-sync-off': {},
   'hub-setup': {},
   'hub-rules-sync': {},
   'hub-role-model': { role: str, model: oneOf(...ROLE_MODELS) },
@@ -207,6 +221,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-wait-for': { from: str, to: str },
   'hub-unlink': { from: str, to: str },
   'hub-git': { sessionId: str, op: oneOf(...GIT_OPS), files: opt(paths), summary: opt(str), description: opt(str), branch: opt(str), stash: opt(bool), confirmed: opt(bool) },
+  'hub-auto-merge': { repo: str, on: bool },
   'hub-harden': { sessionId: str },
   'hub-draft-commit': { sessionId: str },
   'hub-todo-add': { path: str, text: todoText },
@@ -243,8 +258,8 @@ export const handleHubRequest = (hub: HubService, req: { method?: string; url?: 
 /** The runner's answer as a reply: a string is the reason it refused. */
 export const ranReply = (r: boolean | string): HubReply => (typeof r === 'string' ? { status: 400, body: r } : { status: r ? 204 : 400, body: '' })
 
-/** Only /hub/ask, /hub/holds, /hub/graph, /hub/recall and /hub/runs answer later; `ask`, `todo`, `graph` and `runs` are swapped in tests so none spends, writes or reads ~/.claude. */
-export function handleHub(hub: HubService, method: string | undefined, url: string | undefined, body: string, ask = askBrain, todo: (c: TodoCall & { cwd: string }) => Promise<string> = todoTool, graph: (s: ReturnType<HubService['get']>) => Promise<MemoryGraph> = readGraph, runs: (session: string, role: string) => Promise<RunDetail[]> = readRuns, chat: ChatReads = CHAT, token?: string, split: (text: string) => Promise<string[]> = t => splitAsks(t, quickAsk), cli: Spawn = runCli): HubReply | Promise<HubReply> | undefined {
+/** Only /hub/ask, /hub/holds, /hub/graph, /hub/recall, /hub/runs and /hub/usage answer later; `ask`, `todo`, `graph`, `runs` and `usage` are swapped in tests so none spends, writes or reads ~/.claude. */
+export function handleHub(hub: HubService, method: string | undefined, url: string | undefined, body: string, ask = askBrain, todo: (c: TodoCall & { cwd: string }) => Promise<string> = todoTool, graph: (s: ReturnType<HubService['get']>) => Promise<MemoryGraph> = readGraph, runs: (session: string, role: string) => Promise<RunDetail[]> = readRuns, chat: ChatReads = CHAT, token?: string, split: (text: string) => Promise<string[]> = t => splitAsks(t, quickAsk), cli: Spawn = runCli, usage: () => Promise<UsageReport> = () => usageHistory.report()): HubReply | Promise<HubReply> | undefined {
   const u = new URL(url ?? '/', 'http://127.0.0.1')
   const sent = tokenOf(u, token)
   if (u.pathname !== '/hub' && !u.pathname.startsWith('/hub/')) return undefined
@@ -331,6 +346,11 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
     return runs(session, role).then(r => ({ status: 200, body: JSON.stringify(r), contentType: 'application/json' }), err => ({ status: 400, body: (err as Error).message }))
   }
 
+  if (method === 'GET' && u.pathname === '/hub/usage') {
+    if (!hub.isToken(sent)) return { status: 403, body: '' }
+    return usage().then(r => ({ status: 200, body: JSON.stringify(r), contentType: 'application/json' }), err => ({ status: 500, body: (err as Error).message }))
+  }
+
   if (method === 'GET' && u.pathname.startsWith('/hub/chat/')) {
     if (!hub.isToken(sent)) return { status: 403, body: '' }
     const session = u.searchParams.get('session') ?? ''
@@ -384,8 +404,12 @@ export function handleHub(hub: HubService, method: string | undefined, url: stri
 
   if (method === 'GET' && u.pathname === '/hub/state') {
     if (!hub.isToken(sent)) return { status: 403, body: '' }
+    // fields=chats,live: a chat's mod asks for the few it reads, every 10 s per chat. It is no view, so it keeps no window on full reads; archive rows are just the id and approval.
+    const only = u.searchParams.get('fields')?.split(',')
+    const s = { ...hub.get(), phoneUrls: null, thisWindow: undefined, devices: undefined }
+    if (only) return { status: 200, body: stateJson({ ...s, archive: s.archive.map(a => ({ sessionId: a.sessionId, approvedAt: a.approvedAt })) }, new Set(only)), contentType: 'application/json' }
     hub.stateReadAt = Date.now()
-    return { status: 200, body: JSON.stringify({ ...hub.get(), phoneUrls: null, thisWindow: undefined, devices: undefined }), contentType: 'application/json' }
+    return { status: 200, body: stateJson(s), contentType: 'application/json' }
   }
 
   if (method === 'POST' && u.pathname === '/hub/command') {

@@ -7,11 +7,12 @@ import { downReason } from './hub-remote'
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference'
 export type Pred = 'supersedes' | 'depends-on' | 'part-of' | 'contradicts' | 'related'
-export type GraphNode = { id: string; kind: 'memory' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'; label: string; type?: MemoryType; description?: string; text?: string; missing?: string[]; aliases?: string[]; modified?: string; origin?: string; superseded?: boolean }
+export type GraphNode = { id: string; kind: 'memory' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'; label: string; type?: MemoryType; description?: string; text?: string; missing?: string[]; aliases?: string[]; modified?: string; origin?: string; superseded?: boolean; unproven?: boolean }
 export type GraphEdge = { source: string; target: string; kind: 'link' | 'in' | 'todo' | 'from' | Pred }
 /** Lint: duplicates are names or aliases two notes claim, contradictions id pairs, the rest node ids.
- * invalid: a memory note with no description or no valid type; stale: a project note not modified in 90 days. */
-export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][] }
+ * invalid: a memory note with no description or no valid type; stale: a project note not modified in 90 days;
+ * unproven: a note still `status: unproven` after 14 days. */
+export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][]; unproven: string[] }
 export type MemoryGraph = { nodes: GraphNode[]; edges: GraphEdge[]; health: GraphHealth }
 
 export type Group = 'user' | 'feedback' | 'project-memory' | 'reference' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'
@@ -115,6 +116,7 @@ export function healthParts(h: GraphHealth, nodes: GraphNode[]): { text: string;
     [h.dangling, h.dangling, 'note with broken links', 'notes with broken links'], [h.orphans, h.orphans, 'unlinked note', 'unlinked notes'], [h.duplicates, named, 'shared name', 'shared names'],
     [h.contradictions, [...new Set(h.contradictions.flat())], 'contradiction', 'contradictions'], [h.superseded, h.superseded, 'superseded note', 'superseded notes'],
     [h.loops, h.loops.flat(), 'supersede loop', 'supersede loops'], [h.invalid, h.invalid, 'invalid note', 'invalid notes'], [h.stale, h.stale, 'stale note', 'stale notes'],
+    [h.unproven, h.unproven, 'note unproven for 14 days', 'notes unproven for 14 days'],
   ]
   return rows.filter(([l]) => l.length).map(([l, ids, one, many]) => ({ text: `${l.length} ${l.length === 1 ? one : many}`, ids }))
 }
@@ -191,7 +193,7 @@ function baseDemo(): MemoryGraph {
       e('m:recall', 'm:askall', 'supersedes'), e('m:recall', 'wiki:switchboard-design.md', 'depends-on'), e('m:recall', 'm:vision', 'part-of'),
       e('m:nograph', 'm:recall', 'contradicts'), e('m:recall', 'm:style', 'related'), e('m:recall', 'chat:b', 'from'),
     ],
-    health: { dangling: ['m:vision'], orphans: ['m:who'], duplicates: [], contradictions: [['m:nograph', 'm:recall']], superseded: ['m:askall'], invalid: [], stale: [], loops: [] },
+    health: { dangling: ['m:vision'], orphans: ['m:who'], duplicates: [], contradictions: [['m:nograph', 'm:recall']], superseded: ['m:askall'], invalid: [], stale: [], loops: [], unproven: [] },
   }
 }
 

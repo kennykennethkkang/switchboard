@@ -25,6 +25,12 @@ const CLIP_MAX = 5 * 1024 * 1024
 // A tool pick or a sync with origin runs well past 5 s; the panel never times them out, so the app waits too.
 const COMMAND_MS = 120_000
 
+function pipeUpstream(r: http.IncomingMessage, res: http.ServerResponse, headers: http.OutgoingHttpHeaders): void {
+  if (res.destroyed || res.writableEnded || res.headersSent) { r.resume(); return }
+  res.writeHead(r.statusCode ?? 502, headers)
+  pipeline(r, res, err => { if (err && !res.destroyed) res.destroy() })
+}
+
 // EPERM: the process exists but belongs to someone else.
 function pidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true } catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM' }
@@ -68,7 +74,7 @@ export function commandFolder(body: string): string | undefined {
 }
 
 // The mic records the room, and a spoken reply (hub-jarvis with voice) plays in it; the rest reach keys, sign-ins, AWS, setup, links opened on the Mac, dev servers and pushes.
-const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-mirofish-open', 'hub-mirofish-report', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser', 'hub-harden'])
+const MAC_ONLY = new Set(['hub-device', 'hub-voice', 'hub-open-url', 'hub-mirofish-open', 'hub-mirofish-report', 'hub-dev-start', 'hub-setup', 'hub-rules-sync', 'hub-kit-export', 'hub-toggle', 'hub-switchboard', 'hub-browser', 'hub-harden', 'hub-auto-merge'])
 
 /** A command that only this Mac may send, never the phone. */
 export function macOnly(body: string): boolean {
@@ -257,6 +263,8 @@ button{font:600 15px/1 inherit;padding:12px;border:0;border-radius:8px;backgroun
 button.alt{background:transparent;color:var(--blue);border:1px solid var(--line)}
 </style></head><body><main>`
 
+const WINDOW_FILE = /-\d+\.json$/
+
 /** The editor a live window says it runs in (Cursor, VS Code...); an older extension writes none. */
 export function editorOf(files: Partial<Win>[], alive: (pid: number) => boolean = pidAlive): string {
   const name = files.find(f => usable(f, alive) && typeof f.editor === 'string')?.editor?.replace(/[<>&"]/g, '').trim()
@@ -265,7 +273,7 @@ export function editorOf(files: Partial<Win>[], alive: (pid: number) => boolean 
 
 // Sync: the two pages below render on a rare sign-in, so one small directory read is fine.
 const editorNow = (): string => {
-  try { return editorOf(fs.readdirSync(DIR).filter(n => n.endsWith('.json')).map(n => { try { return JSON.parse(fs.readFileSync(path.join(DIR, n), 'utf8')) } catch { return {} } })) } catch { return 'your editor' }
+  try { return editorOf(fs.readdirSync(DIR).filter(n => WINDOW_FILE.test(n)).map(n => { try { return JSON.parse(fs.readFileSync(path.join(DIR, n), 'utf8')) } catch { return {} } })) } catch { return 'your editor' }
 }
 
 /** The sign-in page for a typed address. Self-contained: the device has no cookie, so nothing else would load. */
@@ -286,11 +294,11 @@ export function waitPage(id: string, editor = editorNow()): string {
 <p><a href="/">Cancel and use the code instead</a></p></main></body></html>`
 }
 
-// Window files only: company.json and workspaces.json lack a port and token, so pickWindow drops them.
+// <workspace hash>-<pid>.json only: the folder holds much bigger files, and this runs on every request.
 export async function windows(): Promise<Partial<Win>[]> {
   const out: Partial<Win>[] = []
   for (const n of await fs.promises.readdir(DIR).catch(() => [] as string[])) {
-    if (!n.endsWith('.json') || n === 'workspaces.json') continue
+    if (!WINDOW_FILE.test(n)) continue
     const p = path.join(DIR, n)
     try { out.push({ ...JSON.parse(await fs.promises.readFile(p, 'utf8')), mtimeMs: (await fs.promises.stat(p)).mtimeMs }) } catch { /* mid-write */ }
   }
@@ -343,7 +351,7 @@ export function stateDelta(etag: string, raw: Buffer, base: string): { set: Reco
 export async function proxyHub(req: http.IncomingMessage, res: http.ServerResponse, port: number, workspace: string, lan?: Lan, list = windows): Promise<void> {
   let u: URL
   try { u = new URL(req.url ?? '/', 'http://x') } catch { res.writeHead(400).end(); return }
-  const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs' : req.method === 'GET' && u.pathname === '/hub/flowmap' ? 'flowmap'
+  const route = req.method === 'GET' && u.pathname === '/hub/state' ? 'state' : req.method === 'GET' && u.pathname === '/hub/voice' ? 'voice' : req.method === 'GET' && u.pathname === '/hub/graph' ? 'graph' : req.method === 'GET' && u.pathname === '/hub/runs' ? 'runs' : req.method === 'GET' && u.pathname === '/hub/usage' ? 'usage' : req.method === 'GET' && u.pathname === '/hub/flowmap' ? 'flowmap'
     : req.method === 'GET' && CHAT_READS.has(u.pathname) ? u.pathname.slice('/hub/'.length) : req.method === 'POST' && u.pathname === '/hub/command' ? 'command' : req.method === 'POST' && u.pathname === '/hub/chat/keys' ? 'chat/keys'
     : req.method === 'POST' && u.pathname === '/hub/upload' ? 'upload' : req.method === 'POST' && u.pathname === '/hub/voice' ? 'clip' : req.method === 'POST' && u.pathname === '/hub/split' ? 'split' : undefined
   if (!route || !allowed(req.headers, port, lan)) { res.writeHead(route ? 403 : 404).end(); return }
@@ -375,12 +383,13 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
   const query = new URLSearchParams(fields.flatMap(k => { const v = u.searchParams.get(k); return v === null ? [] : [[k, v]] })).toString()
   const up = http.request({ host: '127.0.0.1', port: win.port, method: req.method, path: `/hub/${route}${query ? `?${query}` : ''}`, headers: { 'Content-Type': 'application/json', 'X-Switchboard-Token': win.hubToken }, timeout: route === 'state' || route === 'voice' || route === 'chat/screen' ? 5000 : COMMAND_MS }, r => {
     const head = { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' }
-    if (route !== 'state' || r.statusCode !== 200) { res.writeHead(r.statusCode ?? 502, head); pipeline(r, res, err => { if (err) res.destroy() }); return }
+    if (route !== 'state' || r.statusCode !== 200) { pipeUpstream(r, res, head); return }
     // The page polls state every 2s: a 304 when nothing changed, else gzip, since a full state runs to a few hundred KB.
     const parts: Buffer[] = []
     r.on('data', (c: Buffer) => parts.push(c))
-    r.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
+    r.on('error', () => { if (!res.destroyed && !res.writableEnded && !res.headersSent) res.writeHead(502).end() })
     r.on('end', () => {
+      if (res.destroyed || res.writableEnded || res.headersSent) return
       const raw = Buffer.concat(parts)
       const etag = `"${crypto.createHash('sha1').update(raw).digest('hex')}"`
       if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-store' }).end(); return }
@@ -391,7 +400,8 @@ export async function proxyHub(req: http.IncomingMessage, res: http.ServerRespon
       res.end(gzip ? zlib.gzipSync(body) : body)
     })
   })
-  up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
+  res.once('close', () => { if (req.method === 'GET' && !res.writableEnded) up.destroy() })
+  up.on('error', () => { if (!res.destroyed && !res.writableEnded && !res.headersSent) res.writeHead(502).end() })
   up.on('timeout', () => up.destroy())
   up.end(body)
 }
@@ -408,10 +418,10 @@ async function proxyClip(req: http.IncomingMessage, res: http.ServerResponse, wo
   const win = pickWindow(await list(), workspace)
   if (!win) { res.writeHead(502).end(); return }
   const up = http.request({ host: '127.0.0.1', port: win.port, method: 'POST', path: '/hub/voice', headers: { 'Content-Type': req.headers['content-type'] ?? '', 'X-Switchboard-Token': win.hubToken }, timeout: COMMAND_MS }, r => {
-    res.writeHead(r.statusCode ?? 502, { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' })
-    pipeline(r, res, err => { if (err) res.destroy() })
+    pipeUpstream(r, res, { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' })
   })
-  up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
+  res.once('close', () => { if (!res.writableEnded) up.destroy() })
+  up.on('error', () => { if (!res.destroyed && !res.writableEnded && !res.headersSent) res.writeHead(502).end() })
   up.on('timeout', () => up.destroy())
   up.end(Buffer.concat(parts))
 }
@@ -436,10 +446,10 @@ async function proxyUpload(req: http.IncomingMessage, res: http.ServerResponse, 
   // Only the three fields go on, so a token the page put in the query never reaches the window.
   const q = new URLSearchParams({ cwd, name: u.searchParams.get('name') ?? '', session: u.searchParams.get('session') ?? '' })
   const up = http.request({ host: '127.0.0.1', port: win.port, method: 'POST', path: `/hub/upload?${q}`, headers: { 'Content-Type': 'application/octet-stream', 'X-Switchboard-Token': win.hubToken }, timeout: COMMAND_MS }, r => {
-    res.writeHead(r.statusCode ?? 502, { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' })
-    pipeline(r, res, err => { if (err) res.destroy() })
+    pipeUpstream(r, res, { 'Content-Type': r.headers['content-type'] ?? 'text/plain', 'Cache-Control': 'no-store' })
   })
-  up.on('error', () => { if (!res.headersSent) res.writeHead(502).end() })
+  res.once('close', () => { if (!res.writableEnded) up.destroy() })
+  up.on('error', () => { if (!res.destroyed && !res.writableEnded && !res.headersSent) res.writeHead(502).end() })
   up.on('timeout', () => up.destroy())
   let size = 0
   req.on('data', (c: Buffer) => {

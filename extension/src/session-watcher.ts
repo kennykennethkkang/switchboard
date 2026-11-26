@@ -40,6 +40,8 @@ export type { WatchedSession, SubagentState } from './protocol'
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects')
 /** Ended sessions kept listed for panels opened later */
 const MAX_ENDED = 50
+// Quiet sessions' subagent folders are looked at every this many scans
+const DEEP_SCAN_EVERY = 10
 
 type EndedSession = { info: SessionInfo; model: string | null; fileSize: number; mtime: number }
 
@@ -55,6 +57,10 @@ export class SessionWatcher implements AgentSessionWatcher {
   /** Sessions dropped on inactivity, oldest first; re-attached only once their newest mtime moves */
   private ended = new Map<string, EndedSession>()
   private scanInterval: NodeJS.Timeout | null = null
+  private scans = 0
+  private scanned = false
+  private pendingFiles = new Set<string>()
+  private dirNames: { names: string[] } | null = null
 
   private readonly _onEvent = new vscode.EventEmitter<AgentEvent>()
   private readonly _onSessionDetected = new vscode.EventEmitter<string>()
@@ -175,7 +181,7 @@ export class SessionWatcher implements AgentSessionWatcher {
       log.info('Starting: no workspace, scanning all projects')
     }
 
-    this.scanForActiveSessions()
+    this.scanForActiveSessions(true, true)
 
     // Watch project directories for instant new-file detection.
     // Watch both the exact workspace dir and the parent CLAUDE_DIR (to detect
@@ -184,7 +190,7 @@ export class SessionWatcher implements AgentSessionWatcher {
 
     // Re-scan periodically as fallback (1s instead of 3s for faster detection)
     this.scanInterval = setInterval(() => {
-      this.scanForActiveSessions()
+      this.scanForActiveSessions(++this.scans % DEEP_SCAN_EVERY === 0, true)
     }, SCAN_INTERVAL_MS)
   }
 
@@ -201,13 +207,14 @@ export class SessionWatcher implements AgentSessionWatcher {
     if (this.workspacePath && fs.existsSync(CLAUDE_DIR)) {
       try {
         this.dirWatcher = fs.watch(CLAUDE_DIR, (_eventType, filename) => {
-          if (!filename) return
+          this.dirNames = null
+          if (!filename) { this.scanForActiveSessions(true); return }
           // A new project dir appeared; check if it's a subdirectory of our workspace
           const dirPath = path.join(CLAUDE_DIR, filename)
           try {
             if (fs.statSync(dirPath).isDirectory() && this.isContainedProject(filename)) {
               this.watchDirForJsonl(dirPath)
-              this.scanForActiveSessions()
+              this.scanForActiveSessions(true)
             }
           } catch { /* stat may fail for transient files */ }
         })
@@ -215,6 +222,7 @@ export class SessionWatcher implements AgentSessionWatcher {
           log.debug('CLAUDE_DIR watch error:', err)
           this.dirWatcher?.close()
           this.dirWatcher = null
+          this.dirNames = null
         })
       } catch (err) { log.debug('CLAUDE_DIR watch failed:', err) }
     }
@@ -226,12 +234,13 @@ export class SessionWatcher implements AgentSessionWatcher {
     if (!fs.existsSync(projectDir)) return
     try {
       const watcher = fs.watch(projectDir, (_eventType, filename) => {
-        if (filename && filename.endsWith('.jsonl')) {
-          const sessionId = path.basename(filename, '.jsonl')
-          if (!this.sessions.has(sessionId)) {
-            this.scanForActiveSessions()
-          }
-        }
+        if (!filename) { this.scanForActiveSessions(true); return }
+        if (!String(filename).endsWith('.jsonl')) return
+        const name = String(filename)
+        const sessionId = path.basename(name, '.jsonl')
+        if (this.sessions.has(sessionId)) return
+        this.pendingFiles.add(path.join(projectDir, name))
+        this.scanForActiveSessions()
       })
       watcher.on('error', err => {
         log.debug('Dir watch error:', projectDir, err)
@@ -315,12 +324,20 @@ export class SessionWatcher implements AgentSessionWatcher {
     return null
   }
 
-  private scanForActiveSessions(): void {
-    if (!fs.existsSync(CLAUDE_DIR)) {
-      return
+  /** Project dirs whose name starts with the workspace's, read again when the root watcher sees a change, on a deep scan, or every scan without a watcher. */
+  private projectDirNames(): string[] {
+    if (!this.dirNames) {
+      const prefix = foldPathCase(this.workspacePath ?? '') + '-'
+      this.dirNames = { names: fs.readdirSync(CLAUDE_DIR, { withFileTypes: true }).filter(d => d.isDirectory() && foldPathCase(d.name).startsWith(prefix)).map(d => d.name) }
     }
+    return this.dirNames.names
+  }
+
+  private scanForActiveSessions(forceDeep = false, scanSubagents = false): void {
+    if (!fs.existsSync(CLAUDE_DIR)) return
 
     try {
+      if (forceDeep || !this.dirWatcher) this.dirNames = null
       const dirsToScan: string[] = []
       if (this.workspacePath) {
         // Always include the exact workspace project dir
@@ -333,12 +350,10 @@ export class SessionWatcher implements AgentSessionWatcher {
         // from a subfolder like project/extension/src). Uses containment check
         // to avoid matching unrelated projects with a similar path prefix.
         try {
-          const allDirs = fs.readdirSync(CLAUDE_DIR, { withFileTypes: true })
-          for (const dir of allDirs) {
-            if (!dir.isDirectory()) continue
-            const fullPath = path.join(CLAUDE_DIR, dir.name)
+          for (const name of this.projectDirNames()) {
+            const fullPath = path.join(CLAUDE_DIR, name)
             if (fullPath === projectDir) continue // already added
-            if (this.isContainedProject(dir.name)) {
+            if (this.isContainedProject(name)) {
               dirsToScan.push(fullPath)
             }
           }
@@ -352,42 +367,47 @@ export class SessionWatcher implements AgentSessionWatcher {
         }
       }
 
+      const newProjectDir = dirsToScan.some(dir => !this.dirWatchers.has(dir))
+      for (const dir of dirsToScan) this.watchDirForJsonl(dir)
+      const watcherMissing = newProjectDir || dirsToScan.some(dir => !this.dirWatchers.has(dir))
+      const deep = forceDeep || !this.scanned || watcherMissing
+      this.scanned = true
+      const candidates = deep
+        ? dirsToScan.flatMap(dir => { try { return fs.readdirSync(dir).filter(file => file.endsWith('.jsonl')).map(file => path.join(dir, file)) } catch { return [] } })
+        : [...this.pendingFiles]
+      this.pendingFiles.clear()
       const activeFiles: { sessionId: string; filePath: string; mtime: number }[] = []
 
-      for (const projectPath of dirsToScan) {
+      for (const filePath of candidates) {
         try {
-          const files = fs.readdirSync(projectPath)
-          for (const file of files) {
-            if (!file.endsWith('.jsonl')) { continue }
-            const filePath = path.join(projectPath, file)
-            const stat = fs.statSync(filePath)
-            let newestMtime = stat.mtimeMs
+          const file = path.basename(filePath)
+          const stat = fs.statSync(filePath)
+          let newestMtime = stat.mtimeMs
+          const sessionId = path.basename(file, '.jsonl')
+          // Ended on inactivity: skip until it is written again
+          const endedAt = this.ended.get(sessionId)?.mtime
+          const active = () => !(endedAt !== undefined && newestMtime <= endedAt) && (Date.now() - newestMtime) / 1000 <= ACTIVE_SESSION_AGE_S
 
-            // Also check subagent files; a session's main JSONL may be stale
-            // while subagents are still actively writing.
-            const sessionId = path.basename(file, '.jsonl')
-            const subagentsDir = path.join(projectPath, sessionId, 'subagents')
-            try {
-              if (fs.existsSync(subagentsDir)) {
-                for (const subFile of fs.readdirSync(subagentsDir)) {
-                  if (!subFile.endsWith('.jsonl')) continue
-                  const subStat = fs.statSync(path.join(subagentsDir, subFile))
-                  if (subStat.mtimeMs > newestMtime) newestMtime = subStat.mtimeMs
-                }
+          // Also check subagent files; a session's main JSONL may be stale
+          // while subagents are still actively writing. Old sessions are most
+          // of the folder, so theirs are looked at every few scans.
+          const subagentsDir = path.join(path.dirname(filePath), sessionId, 'subagents')
+          try {
+            if (deep && !active() && fs.existsSync(subagentsDir)) {
+              for (const subFile of fs.readdirSync(subagentsDir)) {
+                if (!subFile.endsWith('.jsonl')) continue
+                const subStat = fs.statSync(path.join(subagentsDir, subFile))
+                if (subStat.mtimeMs > newestMtime) newestMtime = subStat.mtimeMs
               }
-            } catch { /* expected if subagents dir doesn't exist yet */ }
-
-            const ageSeconds = (Date.now() - newestMtime) / 1000
-            // Ended on inactivity: skip until it is written again
-            const endedAt = this.ended.get(sessionId)?.mtime
-            if (endedAt !== undefined && newestMtime <= endedAt) continue
-            if (ageSeconds <= ACTIVE_SESSION_AGE_S) {
-              activeFiles.push({
-                sessionId,
-                filePath,
-                mtime: newestMtime,
-              })
             }
+          } catch { /* expected if subagents dir doesn't exist yet */ }
+
+          if (active()) {
+            activeFiles.push({
+              sessionId,
+              filePath,
+              mtime: newestMtime,
+            })
           }
         } catch (err) {
           log.debug('Failed to scan project dir:', err)
@@ -399,11 +419,9 @@ export class SessionWatcher implements AgentSessionWatcher {
         if (!this.sessions.has(af.sessionId)) {
           log.info(`Active session found: ${af.filePath}`)
           this.watchSession(af.sessionId, af.filePath)
-        } else {
-          // Already watching; scan for subagents
-          scanSubagentsDir(this.selfDelegate, this.parser, af.sessionId)
         }
       }
+      if (scanSubagents) for (const sessionId of this.sessions.keys()) scanSubagentsDir(this.selfDelegate, this.parser, sessionId)
     } catch (err) {
       log.error('Scan error:', err)
     }
@@ -652,6 +670,7 @@ export class SessionWatcher implements AgentSessionWatcher {
     this.dirWatcher = null
     for (const w of this.dirWatchers.values()) w.close()
     this.dirWatchers.clear()
+    this.pendingFiles.clear()
     for (const session of this.sessions.values()) this.closeSession(session)
     this.sessions.clear()
     if (this.scanInterval) {

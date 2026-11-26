@@ -12,6 +12,7 @@ import { readRuns } from './runs'
 import type { ChatProgress, Report } from './types'
 import { codexTranscriptLine } from '../codex-rollout-parser'
 import { codexRolloutFile } from '../codex-session-watcher'
+import { virtualResult } from '../tool-summarizer'
 
 const CHUNK = 256 * 1024
 const FINAL_MAX = 20_000
@@ -193,7 +194,7 @@ function line(acc: Acc, raw: string, home: string) {
   }
   for (const b of blocks(content)) {
     if (b.type !== 'tool_result' || typeof b.tool_use_id !== 'string') continue
-    const id = b.tool_use_id, t = acc.tools.get(id), out = texts(b.content)
+    const id = b.tool_use_id, t = acc.tools.get(id), out = texts(b.content) || virtualResult(id, e.toolUseResult)
     shotsIn(acc, out, home)
     if (!t) continue
     if (t.cmd && isTestCommand(t.cmd)) {
@@ -298,6 +299,9 @@ function codexMessagesOf(raw: string): ChatMessage[] {
   return codexTranscriptLine(raw).map(m => ({ role: m.role, text: clean(m.text, m.role === 'tool' ? RESULT_MAX : MESSAGE_MAX) }))
 }
 
+/** Code Mode's own steps, a dispatch or a Poll; the calls inside the code have rows of their own. */
+const codeModeStep = (r: unknown) => obj(r) && (r.asyncDispatched === true || 'remainingWakeCount' in r)
+
 function messagesOf(raw: string): ChatMessage[] {
   if (raw === SKIPPED) return [{ role: 'tool', text: 'A line over 16 MB was skipped' }]
   let e: Obj
@@ -314,8 +318,8 @@ function messagesOf(raw: string): ChatMessage[] {
   }
   for (const b of blocks(content)) {
     if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) out.push({ role: e.type === 'user' ? 'you' : 'claude', text: clean(b.text, MESSAGE_MAX) })
-    else if (b.type === 'tool_use' && typeof b.name === 'string') out.push({ role: 'tool', text: redact([b.name, toolTarget(b.name, safeInput(obj(b.input) ? b.input : {}))].filter(Boolean).join(' ')) })
-    else if (b.type === 'tool_result') out.push({ role: 'tool', text: `${b.is_error === true ? 'error' : 'result'}: ${firstLine(texts(b.content))}` })
+    else if (b.type === 'tool_use' && typeof b.name === 'string' && b.name !== 'Poll') out.push({ role: 'tool', text: redact([b.name, toolTarget(b.name, safeInput(obj(b.input) ? b.input : {}))].filter(Boolean).join(' ')) })
+    else if (b.type === 'tool_result' && !codeModeStep(e.toolUseResult)) out.push({ role: 'tool', text: `${b.is_error === true ? 'error' : 'result'}: ${firstLine(texts(b.content) || virtualResult(String(b.tool_use_id), e.toolUseResult))}` })
   }
   return out
 }

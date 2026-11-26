@@ -1,5 +1,5 @@
 /**
- * Smart toggle: each prompt (and each subagent start) picks the plugins, skills and design library entries
+ * Smart toggle: each prompt (and each subagent start) picks the plugins, skills, MCP servers, built-in tools and design library entries
  * the task needs by cheap keyword and role rules, turns them on in the chat's profile and turns off only
  * the ones it turned on before. The why per pick is kept in <session>.smart.json beside the profile.
  * --settings is read once at start (the docs' hot reload covers user, project, local and managed files only),
@@ -16,7 +16,7 @@ import type { HubService } from './hub-service'
 import { ALWAYS, FLAGGED, GATED, PROFILES, toolInventory, cleanProfile, defaultProfile, readProfiles, saveProfile } from './tools'
 import { LIBRARY } from './local'
 
-export type Pick = { name: string; kind: 'plugin' | 'skill' | 'asset'; rule: string; held?: boolean }
+export type Pick = { name: string; kind: 'plugin' | 'skill' | 'asset' | 'builtin' | 'mcp'; rule: string; held?: boolean }
 
 export const DESIGN_SKILLS = [
   'impeccable', 'frontend-design', 'emil-design-eng', 'apple-design', 'animate', 'animate-expo', 'animation-vocabulary',
@@ -33,13 +33,20 @@ const RULES: Array<[RegExp, string, string[]]> = [
   [/\b(seo|marketing|copywriting|ad copy|ad creative|pricing page|cold email|email sequence|launch post|conversion rate|growth (hacking|marketing|loops?)|competitor (analysis|profiling|research)|onboarding emails?)\b/i, 'marketing words', ['marketing-skills']],
   [/\b(pricing strategy|pitch deck|fundrais(e|ing)|go-to-market|gtm plan|mvp scope|validate (the|my|an?) idea|investor update|unit economics|user personas?)\b/i, 'founder words', ['founder']],
   [/\b(playwright|e2e|end-to-end)\b/i, 'browser test words', ['e2e-testing', 'playwright']],
+  [/\b(scrapling|scrap(?:e|ing)|crawl(?:er|ing)?|anti-bot)\b/i, 'scraping words', ['mcp:scrapling']],
   [/\b(charts?|graphs?|plots?|dataviz)\b/i, 'chart words', ['dataviz']],
   [/\bjev\b/i, 'Jev words', ['claude-x-jev']],
   [/\bauth0\b/i, 'Auth0 words', ['auth0']],
+  [/\b(artifact tool|claude artifacts?|publish\w* (it |this |that )?(as )?an? artifact)\b|claude\.ai\/(code\/)?artifact\//i, 'Artifact words', ['Artifact']],
+  [/\b(ultracode|multi-agent workflow|(use|run|as|with) a workflow|fan out (the )?agents|orchestrate\b.{0,40}\bsubagents)\b/i, 'workflow words', ['Workflow']],
+  [/(^|\s)\/loop\b/i, '/loop', ['ScheduleWakeup']],
+  [/(^|\s)\/(code-review|review)\b/i, '/code-review', ['ReportFindings']],
+  [/(^|\s)\/feedback\b|\bfeedback (about|on|for|to) (claude code|anthropic)\b/i, 'feedback words', ['SendFeedback']],
+  [/\b(an?|the|full|new) (google |claude )?doc(ument)?\b/i, 'document words', ['mcp:claude.ai Claude Docs', 'mcp:claude.ai Google Drive']],
 ]
 const short = (n: string) => n.split('@')[0]
-const usable = (inv: Installed[]) => inv.filter(i => (i.kind === 'plugin' || (i.kind === 'skill' && i.enabled)) && !FLAGGED.includes(i.name))
-const asPick = (i: Installed, rule: string): Pick => ({ name: i.name, kind: i.kind as 'plugin' | 'skill', rule, ...(i.held ? { held: true } : {}) })
+const usable = (inv: Installed[]) => inv.filter(i => (i.kind === 'plugin' || i.kind === 'builtin' || i.kind === 'mcp' || (i.kind === 'skill' && i.enabled)) && !FLAGGED.includes(i.name))
+const asPick = (i: Installed, rule: string): Pick => ({ name: i.name, kind: i.kind as Pick['kind'], rule, ...(i.held ? { held: true } : {}) })
 
 /** Every installed design skill and stitch plugin; pixelfx only for pixel work. */
 export function designSet(inv: Installed[], pixel: boolean, rule = 'design'): Pick[] {
@@ -73,17 +80,30 @@ export function pickTools(text: string, role: string | undefined, inv: Installed
     if (!re.test(text)) continue
     for (const i of usable(inv).filter(i => names.includes(short(i.name)))) if (!out.has(i.name)) out.set(i.name, asPick(i, rule))
   }
+  // A server the message names.
+  const low = text.toLowerCase()
+  for (const i of inv.filter(i => i.kind === 'mcp')) {
+    const server = i.name.replace(/^mcp:(claude\.ai )?/, '').toLowerCase()
+    if (!out.has(i.name) && new RegExp(`(^|[^\\w-])${server.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`).test(low)) out.set(i.name, asPick(i, 'named in the message'))
+  }
   return [...out.values()]
+}
+
+// A copy of a profile, and the map in it each kind of tool sits in.
+function edit(p: ChatProfile) {
+  const out = { ...p, plugins: { ...p.plugins }, skills: { ...p.skills }, ...(p.assets ? { assets: { ...p.assets } } : {}), ...(p.extras ? { extras: { ...p.extras } } : {}) }
+  const of = (kind: Installed['kind']): Record<string, boolean> | undefined => kind === 'plugin' ? out.plugins : kind === 'skill' ? out.skills : kind === 'asset' ? out.assets : kind === 'builtin' || kind === 'mcp' ? out.extras : undefined
+  return { out, of }
 }
 
 /** A new chat's profile with what its first message or goal picks turned on, so a gated bundle is there from the start. */
 export function withGoal(p: ChatProfile, text: string, inv: Installed[]): ChatProfile {
-  const plugins = { ...p.plugins }, skills = { ...p.skills }
+  const { out, of } = edit(p)
   for (const k of pickTools(text, undefined, inv)) {
-    const m = k.kind === 'plugin' ? plugins : k.kind === 'skill' ? skills : undefined
+    const m = k.kind === 'asset' ? undefined : of(k.kind)
     if (m && k.name in m && !k.held) m[k.name] = true
   }
-  return { ...p, plugins, skills }
+  return out
 }
 
 export type Precedence = 'always' | 'auto' | 'never'
@@ -109,6 +129,8 @@ export function setPrecedence(name: string, value: Precedence, file = PRECEDENCE
 export type JevAsk = (task: string, items: Array<{ name: string; about: string }>) => Promise<Record<string, number> | undefined>
 // Below this a tool is off; unsure counts as needed.
 const NOT_NEEDED = 0.3
+// A built-in tool needs this much to go on: 12.7k tokens for Artifact, against one headless call (about 24 cents to publish, measured) when a chat needs it after all.
+const SURELY = 0.7
 const JEV_MS = 3000
 const PRESET = { name: 'switchboard-tools', model: 'typesafe/jev-1.13', description: 'Which plugins and skills help with the first message of a chat', state_fields: ['task'], display_fields: [], thresholds: {}, rules: [] }
 // The 32k-token context holds about this many one-line questions.
@@ -138,8 +160,8 @@ const viaJev: JevAsk = async (task, items) => {
 }
 
 /**
- * A new chat's profile from its first message: Jev says per plugin and enabled skill whether the task needs it, and a confident no
- * turns it off. The regex picks, ALWAYS plugins and precedence "always" stay on; "never" is off. Jev down or slow: the regex-only
+ * A new chat's profile from its first message: Jev says per plugin, enabled skill, MCP server and built-in tool whether the task needs it.
+ * A confident no turns one off; a built-in tool is off unless Jev is confident it is needed. The regex picks, ALWAYS plugins and precedence "always" stay on; "never" is off. Jev down or slow: the regex-only
  * start (withGoal). No message: all on. why: Jev's line per candidate, else the regex rule.
  */
 export async function jevStart(start: ChatProfile, text: string, inv: Installed[], prec: Record<string, 'always' | 'never'>, ask: JevAsk = viaJev): Promise<{ profile: ChatProfile; why: Record<string, string> }> {
@@ -149,24 +171,25 @@ export async function jevStart(start: ChatProfile, text: string, inv: Installed[
   for (const k of regex) why[k.name] = k.rule
   const fixed = new Set(regex.map(k => k.name))
   const out = (p: ChatProfile) => {
-    const plugins = { ...p.plugins }, skills = { ...p.skills }
-    for (const [n, v] of Object.entries(prec)) for (const m of [plugins, skills]) if (n in m) m[n] = v === 'always'
-    return { profile: { ...p, plugins, skills }, why }
+    const { out: q } = edit(p)
+    for (const [n, v] of Object.entries(prec)) for (const m of [q.plugins, q.skills, q.extras ?? {}]) if (n in m) m[n] = v === 'always'
+    return { profile: q, why }
   }
   if (!text.trim()) return out(base)
   const cand = usable(inv).filter(i => i.kind !== 'asset' && !i.held && !fixed.has(i.name) && !prec[i.name] && !(i.kind === 'plugin' && (ALWAYS.includes(short(i.name)) || Object.hasOwn(GATED, short(i.name)))))
   let got: Record<string, number> | undefined
   try { got = cand.length ? await ask(text, cand.map(i => ({ name: i.name, about: (i.description ?? '').replace(/\s+/g, ' ').slice(0, 200) }))) : undefined } catch { got = undefined }
   if (!got) return out(base)
-  const plugins = { ...base.plugins }, skills = { ...base.skills }
+  const { out: next, of } = edit(base)
   for (const i of cand) {
-    const p = got[i.name]
-    if (p === undefined) continue
-    const no = p < NOT_NEEDED
-    why[i.name] = `Jev: ${no ? 'not needed' : 'needed'} (${p.toFixed(2)})`
-    if (no) (i.kind === 'plugin' ? plugins : skills)[i.name] = false
+    const p = got[i.name], m = of(i.kind)
+    if (p === undefined || !m) continue
+    const no = p < NOT_NEEDED, surely = i.kind === 'builtin' || i.name === 'mcp:scrapling', unsure = surely && !no && p < SURELY
+    why[i.name] = unsure ? `Jev: ${Math.round(p * 100)}% likely to be needed, goes on at ${SURELY * 100}%` : `Jev: ${no ? 'not needed' : 'needed'} (${p.toFixed(2)})`
+    if (no || unsure) m[i.name] = false
+    else if (surely) m[i.name] = true
   }
-  return out({ ...base, plugins, skills })
+  return out(next)
 }
 
 /**
@@ -175,8 +198,7 @@ export async function jevStart(start: ChatProfile, text: string, inv: Installed[
  */
 export function applyPicks(p: ChatProfile, inv: Installed[], picks: Pick[], prev: SmartRecord | undefined, now = Date.now(), merge = false): { profile: ChatProfile; record: SmartRecord; changed: boolean } {
   const keep = merge || !picks.length
-  const plugins = { ...p.plugins }, skills = { ...p.skills }, assets = { ...(p.assets ?? {}) }
-  const of = (k: Pick['kind']) => (k === 'plugin' ? plugins : k === 'skill' ? skills : assets)
+  const { out: profile, of } = edit({ ...p, assets: p.assets ?? {}, extras: p.extras ?? {} })
   const on: Record<string, string> = keep ? { ...prev?.on } : {}
   // Jev's start lines outlive a prompt's own picks.
   const why: Record<string, string> = keep ? { ...prev?.why } : Object.fromEntries(Object.entries(prev?.why ?? {}).filter(([, v]) => v.startsWith('Jev:')))
@@ -187,18 +209,18 @@ export function applyPicks(p: ChatProfile, inv: Installed[], picks: Pick[], prev
     why[k.name] = k.rule
     if (k.held || inv.some(i => i.name === k.name && i.held)) { refused.add(k.name); continue }
     if (k.kind === 'asset') library.add(k.name)
-    const m = of(k.kind)
+    const m = of(k.kind)!
     if (prev?.on[k.name]) on[k.name] = k.rule
     if (m[k.name] !== true) { m[k.name] = true; on[k.name] = k.rule; changed = true }
   }
   if (!keep) {
     for (const name of Object.keys(prev?.on ?? {})) {
       if (name in on) continue
-      const m = [plugins, skills, assets].find(x => x[name] === true)
+      const m = [profile.plugins, profile.skills, profile.assets!, profile.extras!].find(x => x[name] === true)
       if (m) { m[name] = false; changed = true }
     }
   }
-  const profile = { plugins, skills, ...(Object.keys(assets).length ? { assets } : {}) }
+  for (const k of ['assets', 'extras'] as const) if (!Object.keys(profile[k] ?? {}).length) delete profile[k]
   return { profile, changed, record: { why, on, refused: [...refused], library: [...library], pending: changed || !!prev?.pending, at: now } }
 }
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // Runs a Switchboard setup plan (JSON steps from src/hub/setup.ts) on any OS.
 //   node setup-run.mjs plan.json [--dry-run]
+//   node setup-run.mjs --refresh          (skill copies already there, brought up to date at a window start)
 //   node setup-run.mjs --headers <name>   (the 21st headersHelper: prints {"<name>": key} from the OS store)
 // The 21st key comes from API_KEY_21ST in the env only, goes to the OS store by stdin or env, and is never printed.
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir, userInfo } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const SERVICE = 'switchboard-21st'
@@ -93,24 +95,84 @@ function gitClone(repo, dir) {
 // Imported when needed: the --headers copy in ~/.claude/switchboard has no sweep.mjs beside it.
 const sweep = () => import('./sweep.mjs')
 
-/** Codex reads ~/.agents/skills: a skill on in ~/.claude/skills (not held in skills-archive) is copied there when missing. One already there stays. */
-export function mirrorSkill(n, home = homedir()) {
+// What was copied last, by skill: a copy still matching its digest has no edits of its own. mirrorSkill's by name, installOwnSkills' by root/name.
+const MIRRORED = '~/.claude/switchboard/codex-skills.json'
+const OWN = '~/.claude/switchboard/own-skills.json'
+const recorded = (map, home) => { try { return JSON.parse(readFileSync(expand(map, home), 'utf8')) ?? {} } catch { return {} } }
+function record(map, n, digest, home) {
+  const file = expand(map, home)
+  mkdirSync(dirname(file), { recursive: true })
+  // Renamed into place, so a Set up and a refresh at once never read half a file.
+  const tmp = `${file}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify({ ...recorded(map, home), [n]: digest }, null, 1) + '\n')
+  renameSync(tmp, file)
+}
+
+// Left by running a skill or opening its folder, so no edit.
+const JUNK = new Set(['__pycache__', '.DS_Store'])
+
+/** One hash over a folder's paths (empty folders too) and bytes, links followed. copy: a link inside counts as an edit, since a copy is made without any. */
+function digestOf(dir, copy = false) {
+  const h = createHash('sha256')
+  const walk = rel => {
+    for (const f of readdirSync(join(dir, rel)).sort()) {
+      if (JUNK.has(f)) continue
+      const r = rel ? `${rel}/${f}` : f
+      if (copy && lstatSync(join(dir, r)).isSymbolicLink()) h.update(`${r}@\0`)
+      if (statSync(join(dir, r)).isDirectory()) { h.update(`${r}/\0`); walk(r); continue }
+      const body = readFileSync(join(dir, r))
+      h.update(`${r}\0${body.length}\0`).update(body)
+    }
+  }
+  walk('')
+  return h.digest('hex')
+}
+
+/** Copies from over to by way of a hidden sibling, so a failed copy leaves the old one. */
+function replaceDir(from, to, opts) {
+  const tmp = join(dirname(to), `.${basename(to)}.sb-new-${process.pid}`), old = join(dirname(to), `.${basename(to)}.sb-old-${process.pid}`)
+  try {
+    mkdirSync(dirname(to), { recursive: true })
+    rmSync(tmp, { recursive: true, force: true })
+    cpSync(from, tmp, { recursive: true, ...opts })
+    const had = existsSync(to)
+    if (had) renameSync(to, old)
+    // There already: another run's copy won, and it stays.
+    try { renameSync(tmp, to) } catch (e) { if (had && !existsSync(to)) renameSync(old, to); throw e }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+    if (existsSync(to)) rmSync(old, { recursive: true, force: true })
+  }
+}
+
+/** Codex reads ~/.agents/skills: a skill on in ~/.claude/skills (not held in skills-archive) is copied there when missing, and again when it changed
+ * and the copy is as this left it (or was the same before). An edited copy, a link and a GENERIC one (installOwnSkills refreshes those) stay. existing: a missing one is not added. True when it copied. */
+export function mirrorSkill(n, home = homedir(), log = () => {}, existing = false) {
   const from = join(home, '.claude', 'skills', n), to = join(home, '.agents', 'skills', n)
   const codexHome = process.env.CODEX_HOME || join(home, '.codex')
-  if (!existsSync(join(from, 'SKILL.md')) || lstatSync(to, { throwIfNoEntry: false }) || lstatSync(join(codexHome, 'skills', n), { throwIfNoEntry: false })) return false
-  mkdirSync(dirname(to), { recursive: true })
-  // dereference: a claude-mods link lands as a copy.
-  cpSync(from, to, { recursive: true, dereference: true })
+  if (!existsSync(join(from, 'SKILL.md')) || lstatSync(join(codexHome, 'skills', n), { throwIfNoEntry: false })) return false
+  const st = lstatSync(to, { throwIfNoEntry: false })
+  if (!st && existing) return false
+  try {
+    if (st) {
+      if (!st.isDirectory() || isOurs(to)) return false
+      const had = digestOf(to, true), last = recorded(MIRRORED, home)[n]
+      if (had === digestOf(from)) { if (last !== had) record(MIRRORED, n, had, home); return false }
+      if (last !== had) return false
+    }
+    // dereference: a claude-mods link lands as a copy.
+    replaceDir(from, to, { dereference: true, filter: f => !JUNK.has(basename(f)) })
+    record(MIRRORED, n, digestOf(to), home)
+  } catch (e) { log(`${n}: could not copy for Codex (${e.message}), ${existsSync(to) ? 'the copy there stays' : 'not added'}.`); return false }
+  log(`${st ? 'Updated' : 'Added'} skill ${n} for Codex`)
   return true
 }
 
-/** Every folder in ~/.claude/skills with a SKILL.md, mirrored for Codex by the same rules; the names added. Plugin skills live under plugins/, so they never show here. */
-export function mirrorAllSkills(home = homedir(), log = () => {}) {
+/** Every folder in ~/.claude/skills with a SKILL.md, mirrored for Codex by the same rules; the names added or updated. Plugin skills live under plugins/, so they never show here. */
+export function mirrorAllSkills(home = homedir(), log = () => {}, existing = false) {
   const root = join(home, '.claude', 'skills')
   if (!existsSync(root)) return []
-  const added = readdirSync(root).filter(n => !n.startsWith('.') && mirrorSkill(n, home))
-  for (const n of added) log(`Added skill ${n} for Codex`)
-  return added
+  return readdirSync(root).filter(n => !n.startsWith('.') && mirrorSkill(n, home, log, existing))
 }
 
 /** Clones the repo shallow and sweeps each named skill (by its SKILL.md name, under k.path, default skills) before copying it into ~/.claude/skills.
@@ -150,43 +212,55 @@ export async function installSkills(k, { home = homedir(), clone = gitClone, log
         else log(`Added skill ${n}${r.state === 'unscanned' ? ` (not swept: ${r.reason})` : ''}`)
       }
     }
-    for (const n of k.names) if (mirrorSkill(n, home)) { out.codex.push(n); log(`Added skill ${n} for Codex`) }
+    for (const n of k.names) if (mirrorSkill(n, home, log)) out.codex.push(n)
     return out
   } finally { rmSync(tmp, { recursive: true, force: true }) }
 }
 
 // esbuild.js ends each bundled SKILL.md with it: a copy carrying it came from Switchboard.
 const GENERIC = '<!-- switchboard generic copy -->'
-const files = dir => readdirSync(dir, { recursive: true }).map(String).filter(f => lstatSync(join(dir, f)).isFile()).sort()
-const same = (a, b) => { const fa = files(a), fb = files(b); return fa.join('\n') === fb.join('\n') && fa.every(f => readFileSync(join(a, f)).equals(readFileSync(join(b, f)))) }
+const isOurs = dir => existsSync(join(dir, 'SKILL.md')) && readFileSync(join(dir, 'SKILL.md'), 'utf8').includes(GENERIC)
 
 const plainName = n => typeof n === 'string' && n !== '' && n !== '.' && n !== '..' && !/[\\/]/.test(n)
 
 /** Copies Switchboard's own skills from the bundle into ~/<root> (~/.claude/skills, or ~/.agents/skills for Codex): a missing one is added, a copy of ours that differs is replaced.
+ * existing (a window start, which nobody clicked): none is added, and one edited since it was copied stays.
  * A symlink (a claude-mods clone) and a copy without GENERIC (the user's own) are never touched. Each goes to a hidden sibling first,
  * so a failed copy leaves the old one; failed lists those, and the rest still run. */
-export function installOwnSkills(k, { home = homedir(), log = console.log, root = join('.claude', 'skills') } = {}) {
+export function installOwnSkills(k, { home = homedir(), log = console.log, root = join('.claude', 'skills'), existing = false } = {}) {
   const out = { added: [], refreshed: [], kept: [], linked: [], failed: [] }
   for (const n of k.names) {
     if (!plainName(n)) { out.failed.push(n); log(`${JSON.stringify(n)}: not a plain folder name, skipped.`); continue }
-    const from = join(k.from, n), to = join(home, root, n), tmp = join(home, root, `.${n}.sb-new-${process.pid}`)
+    const from = join(k.from, n), to = join(home, root, n)
     try {
       if (!existsSync(join(from, 'SKILL.md'))) { log(`${n}: not in this build, skipped.`); continue }
       const st = lstatSync(to, { throwIfNoEntry: false })
       if (st?.isSymbolicLink()) { out.linked.push(n); continue }
-      if (st && (!(existsSync(join(to, 'SKILL.md')) && readFileSync(join(to, 'SKILL.md'), 'utf8').includes(GENERIC)) || same(from, to))) { out.kept.push(n); continue }
-      mkdirSync(dirname(to), { recursive: true })
-      rmSync(tmp, { recursive: true, force: true })
-      cpSync(from, tmp, { recursive: true })
-      rmSync(to, { recursive: true, force: true })
-      renameSync(tmp, to)
+      if (st ? !isOurs(to) : existing) { out.kept.push(n); continue }
+      const key = join(root, n)
+      if (st) {
+        const had = digestOf(to, true), last = recorded(OWN, home)[key]
+        if (had === digestOf(from)) { if (last !== had) record(OWN, key, had, home); out.kept.push(n); continue }
+        if (existing && last !== had) { out.kept.push(n); continue }
+      }
+      replaceDir(from, to)
+      record(OWN, key, digestOf(to), home)
       if (st) { out.refreshed.push(n); log(`Updated skill ${n}`) } else { out.added.push(n); log(`Added skill ${n}`) }
     } catch (e) {
-      rmSync(tmp, { recursive: true, force: true })
       out.failed.push(n); log(`${n}: could not copy (${e.message}), ${existsSync(to) ? 'the old copy stays' : 'not added'}.`)
     }
   }
   return out
+}
+
+// Claude's and Codex's, in the order mirrorAllSkills wants them.
+const OWN_ROOTS = [join('.claude', 'skills'), join('.agents', 'skills')]
+
+/** A window start: what Set up copied, brought up to date. Only copies that exist and nobody edited; nothing is added. */
+export function refreshSkills(kit = dirname(fileURLToPath(import.meta.url)), home = homedir(), log = console.log) {
+  const names = JSON.parse(readFileSync(join(kit, 'setup.json'), 'utf8')).own ?? []
+  for (const root of OWN_ROOTS) installOwnSkills({ from: join(kit, 'skills'), names }, { home, log, root, existing: true })
+  mirrorAllSkills(home, log, true)
 }
 
 /** After a kit plugin install: swept and badged, left on (setup.json is the curated list). Our own mods are not swept. */
@@ -227,7 +301,7 @@ async function main(planFile, dry) {
     }
     if (s.own) {
       console.log(`> copy ${s.own.names.join(' ')} from ${expand(s.own.from)} to ~/.claude/skills and ~/.agents/skills, where missing or an older copy of ours`)
-      if (!dry && [installOwnSkills(s.own), installOwnSkills(s.own, { root: join('.agents', 'skills') })].some(r => r.failed.length)) failed.push(s.label)
+      if (!dry && OWN_ROOTS.map(root => installOwnSkills(s.own, { root })).some(r => r.failed.length)) failed.push(s.label)
       continue
     }
     if (s.copy) {
@@ -259,5 +333,6 @@ function headers(name) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv[2] === '--headers') headers(process.argv[3])
+  else if (process.argv[2] === '--refresh') refreshSkills()
   else main(process.argv[2], process.argv.includes('--dry-run')).catch(err => { console.log(`Set up stopped: ${err.message}`); process.exit(1) })
 }

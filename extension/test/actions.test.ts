@@ -3,20 +3,21 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 
 describe('AWS login process', () => {
-  it('keeps spawn errors and calls done once when error is followed by close', () => {
+  it('keeps spawn errors, calls done once, and signs a single sign-on profile in with aws sso login', async () => {
     const Module = require('module') as { _load: (...args: any[]) => any }
     const original = Module._load
     const child = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })
-    const errors: string[] = []
+    const errors: string[] = [], calls: string[][] = [], saved: object[] = [], warned: string[] = []
     const aws = {
+      ssoProfile: (p: string) => p === 'corp', readSessions: () => ({}), writeSessions: (s: object) => saved.push(Object.keys(s)), refreshIdentity: async () => {},
       validProfileName: () => true, readPrefs: () => ({ chrome: {} }), chromeChoice: () => ({ dir: '', gone: [] }),
       writePrefs() {}, awsBinary: () => 'aws', writeOpenChrome: () => undefined, loginError: () => undefined,
       rowText: (rows: Record<string, string>, key: string, message?: string) => { if (message) errors.push(message); return { ...rows, [key]: message } },
     }
-    const vscode = { window: { showWarningMessage() {} } }
+    const vscode = { window: { showWarningMessage: (t: string) => warned.push(t), showInformationMessage() {} } }
     Module._load = function (request, ...args) {
       if (request === 'vscode') return vscode
-      if (request === 'child_process') return { ...original.call(this, request, ...args), spawn: () => child }
+      if (request === 'child_process') return { ...original.call(this, request, ...args), spawn: (_b: string, args: string[]) => { calls.push(args); return child } }
       if (request === './aws') return aws
       if (request === './hub-service') return { hub: { get: () => ({ signIns: { chrome: [], errors: {}, notes: {} } }), set() {} } }
       return original.call(this, request, ...args)
@@ -29,6 +30,16 @@ describe('AWS login process', () => {
       child.emit('close', 1)
       assert.equal(done, 1)
       assert.deepEqual(errors, ['aws login could not start: spawn denied'])
+      assert.deepEqual(calls, [['login', '--profile', 'work']])
+      const login = async (p: string, code: number) => { child.removeAllListeners(); await new Promise<void>(end => { awsLogin(p, undefined, end); child.emit('close', code) }) }
+      await login('corp', 0)
+      await login('work', 0)
+      assert.deepEqual(calls.slice(1), [['sso', 'login', '--profile', 'corp'], ['login', '--profile', 'work']])
+      // Only aws login starts a 12 hour session.
+      assert.deepEqual(saved, [['work']])
+      await login('corp', 1)
+      assert.equal(errors.at(-1), 'aws sso login exited with code 1.')
+      assert.match(warned.at(-1)!, /^aws sso login --profile corp did not finish/)
     } finally {
       Module._load = original
     }

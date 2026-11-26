@@ -127,3 +127,4 @@
 /* The first Up next row: why the next item waits. A dot and its words. */
 .nb-hold { display: inline-flex; align-items: center; gap: 6px; font: 400 12.5px/1.45 var(--hub-sans); color: var(--hub-body); }
 .nb-hold::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--hub-yellow); }
+.nb-hold[data-kind='memory']::before { background: var(--hub-red); }

@@ -23,6 +23,29 @@ describe('ResearchCapture', () => {
     assert.deepEqual(done, { sessionId: sid, question: 'Which solid electrolyte wins?', answer: REPORT, cwd: '/p/cell-lab' })
   })
 
+  it('keeps the Ask more id while capturing only its question', () => {
+    const c = new ResearchCapture(), id = 'cell-lab/2026-11-24-q.md'
+    c.hook({ session_id: 'more', hook_event_name: 'UserPromptSubmit', prompt: `/deep-research New angle\n[adds to research: ${id}]\nRead saved report first.` })
+    const done = c.hook({ session_id: 'more', hook_event_name: 'Stop', last_assistant_message: REPORT })
+    assert.equal(done?.question, 'New angle')
+    assert.equal(done?.addsTo, id)
+  })
+
+  it('keeps later research turns attached to the Ask more report until SessionEnd', () => {
+    const c = new ResearchCapture(), id = 'cell-lab/2026-11-24-q.md'
+    c.hook({ session_id: 'more-session', hook_event_name: 'UserPromptSubmit', prompt: `/deep-research New angle\n[adds to research: ${id}]` })
+    const first = c.hook({ session_id: 'more-session', hook_event_name: 'Stop', last_assistant_message: REPORT })
+    assert.equal(first?.addsTo, id)
+    c.hook({ session_id: 'more-session', hook_event_name: 'UserPromptSubmit', prompt: 'Now check one more source' })
+    c.hook({ session_id: 'more-session', hook_event_name: 'PreToolUse', tool_name: 'Skill', tool_input: { skill: 'deep-research', args: 'Now check one more source' } })
+    const second = c.hook({ session_id: 'more-session', hook_event_name: 'Stop', last_assistant_message: REPORT })
+    assert.equal(second?.addsTo, id)
+    c.hook({ session_id: 'more-session', hook_event_name: 'SessionEnd' })
+    c.hook({ session_id: 'more-session', hook_event_name: 'UserPromptSubmit', prompt: 'A new research question' })
+    c.hook({ session_id: 'more-session', hook_event_name: 'PreToolUse', tool_name: 'Skill', tool_input: { skill: 'deep-research', args: 'A new research question' } })
+    assert.equal(c.hook({ session_id: 'more-session', hook_event_name: 'Stop', last_assistant_message: REPORT })?.addsTo, undefined)
+  })
+
   it('reads the report from the transcript when the payload has no last message', () => {
     const file = path.join(dir('tx'), 'session.jsonl')
     fs.writeFileSync(file, [
@@ -81,6 +104,39 @@ describe('turns and titles', () => {
 
   it('reads no transcript that is not a regular file', () => {
     assert.equal(transcriptReply(os.tmpdir()), '')
+  })
+})
+
+describe('background researchers', () => {
+  const note = '<task-notification>\n<task-id>a1</task-id>\n<status>completed</status>\n<result>rows</result>\n</task-notification>'
+  it('keeps the run when a finished researcher starts the turn that reports', () => {
+    const c = new ResearchCapture()
+    c.hook({ session_id: 'B', hook_event_name: 'UserPromptSubmit', prompt: 'can a mod shop make money' })
+    c.hook({ session_id: 'B', hook_event_name: 'PreToolUse', tool_name: 'Skill', tool_input: { skill: 'deep-research', args: 'Mod shop money' } })
+    c.hook({ session_id: 'B', hook_event_name: 'SubagentStart', agent_type: 'researcher', agent_id: 'a1' })
+    assert.equal(c.hook({ session_id: 'B', hook_event_name: 'Stop', last_assistant_message: 'Four researchers are out.' }), undefined)
+    c.hook({ session_id: 'B', hook_event_name: 'UserPromptSubmit', prompt: note })
+    assert.equal(c.hook({ session_id: 'B', hook_event_name: 'Stop', last_assistant_message: 'Two are still out.' }), undefined)
+    c.hook({ session_id: 'B', hook_event_name: 'UserPromptSubmit', prompt: `<system-reminder>\nx\n</system-reminder>\n${note}` })
+    assert.equal(c.hook({ session_id: 'B', hook_event_name: 'Stop', last_assistant_message: REPORT })?.question, 'Mod shop money')
+  })
+
+  it('keeps the run over a usage limit resume, but a to-do run starts clean', () => {
+    const c = new ResearchCapture()
+    const start = () => c.hook({ session_id: 'L', hook_event_name: 'UserPromptSubmit', prompt: '/deep-research best sqlite orm' })
+    start()
+    c.hook({ session_id: 'L', hook_event_name: 'UserPromptSubmit', prompt: 'Usage limit reset. Continue where you stopped.' })
+    assert.equal(c.hook({ session_id: 'L', hook_event_name: 'Stop', last_assistant_message: REPORT })?.question, 'best sqlite orm')
+    start()
+    c.hook({ session_id: 'L', hook_event_name: 'UserPromptSubmit', prompt: 'Switchboard to-do, in this order:\n1. Fix the login' })
+    assert.equal(c.hook({ session_id: 'L', hook_event_name: 'Stop', last_assistant_message: '## Findings\nFixed.' }), undefined)
+  })
+
+  it('never makes a run out of a notification in a coding chat', () => {
+    const c = new ResearchCapture()
+    c.hook({ session_id: 'N', hook_event_name: 'UserPromptSubmit', prompt: 'fix the login bug' })
+    c.hook({ session_id: 'N', hook_event_name: 'UserPromptSubmit', prompt: note })
+    assert.equal(c.hook({ session_id: 'N', hook_event_name: 'Stop', last_assistant_message: REPORT }), undefined)
   })
 })
 
@@ -151,6 +207,15 @@ describe('captureSaved', () => {
     const second = captureSaved(done, { root, projects: [], chat: 'c', now: Date.now() })
     assert.equal(first.created, true)
     assert.equal(second.created, false)
+    assert.equal(listResearch(root).length, 1)
+  })
+
+  it('saves an Ask more result as a new report when its target is gone', () => {
+    const root = dir('lib')
+    const done = { sessionId: 'lost', question: 'New angle', answer: REPORT, addsTo: 'general/missing.md' }
+    const { item, created } = captureSaved(done, { root, projects: [], chat: 'c', now: Date.now() })
+    assert.equal(created, true)
+    assert.equal(item?.question, 'New angle')
     assert.equal(listResearch(root).length, 1)
   })
 })

@@ -9,12 +9,15 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { recentSessionDirs } from '../codex-session-watcher'
+import { isCodexRoleRun } from '../codex-rollout-parser'
 import { readChains, withChains } from './chains'
 import { codexArgs, newChatCommand, noteTo, shellQuote, type Shell } from './projects'
 import { readChats } from './sessions'
+import { isTempDir } from './temp'
 import { resumeSettingsArg } from './tools'
 import type { AiId, AiStatus, ChatRow } from './types'
 import { createLogger } from '../logger'
+import { cliCall } from './windows'
 
 const log = createLogger('Ais')
 
@@ -25,14 +28,16 @@ export const codexPaste = (text: string) => (/[\x00-\x08\x0b-\x1f\x7f]/.test(tex
 
 /** A `ps` command line that is Codex itself: the binary, or node running its npm launcher. Never a shell, whatever its arguments say. */
 export const isCodexCommand = (cmd: string) => {
-  const [first = '', second = ''] = cmd.trim().split(/\s+/).map(w => w.split('/').pop() ?? '')
+  const [first = '', second = ''] = cmd.trim().split(/\s+/).map(w => w.split(/[\\/]/).pop() ?? '')
   return /^codex(\.js)?$/.test(first) || (first === 'node' && /^codex(\.js)?$/.test(second))
 }
 
 // Text typed before Codex's screen is up can be lost.
 const CODEX_BOOT_MS = 3_000
 type CodexTerm = { processId: Thenable<number | undefined>; exitStatus: unknown }
-const psCommand = (pid: number) => new Promise<string>(done => execFile('ps', ['-o', 'command=', '-p', String(pid)], (err, out) => done(err ? '' : String(out))))
+const psCommand = (pid: number) => new Promise<string>(done => process.platform === 'win32'
+  ? execFile('powershell.exe', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`], { windowsHide: true }, (err, out) => done(err ? '' : String(out)))
+  : execFile('ps', ['-o', 'command=', '-p', String(pid)], (err, out) => done(err ? '' : String(out))))
 
 /** Why a message must not be typed into this Codex terminal now; undefined when the terminal's own process is a running Codex. */
 export async function codexReady(o: { terminal: CodexTerm | undefined; live: boolean; startedAt: number; now: number }, readCommand: (pid: number) => Promise<string> = psCommand): Promise<string | undefined> {
@@ -45,7 +50,9 @@ export async function codexReady(o: { terminal: CodexTerm | undefined; live: boo
   return undefined
 }
 
-const psParent = (pid: number) => new Promise<number>(done => execFile('ps', ['-o', 'ppid=', '-p', String(pid)], (err, out) => done(err ? 0 : Number(String(out).trim()) || 0)))
+const psParent = (pid: number) => new Promise<number>(done => process.platform === 'win32'
+  ? execFile('powershell.exe', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").ParentProcessId`], { windowsHide: true }, (err, out) => done(err ? 0 : Number(String(out).trim()) || 0))
+  : execFile('ps', ['-o', 'ppid=', '-p', String(pid)], (err, out) => done(err ? 0 : Number(String(out).trim()) || 0)))
 const pidAlive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }
 type ClosableTerm = { processId: Thenable<number | undefined>; dispose(): void }
 
@@ -111,7 +118,7 @@ const loginState = (ai: AiId, args: string[]) => {
   const was = loginSeen.get(ai)
   if (was && Date.now() - was.at < PATH_MS) return was.on
   const on = cliPath(ai).then(bin => bin ? new Promise<boolean | undefined>(done =>
-    execFile(bin, args, { timeout: 5000 }, (_e, out, err) => done(signedIn(ai, `${out}${err}`)))) : undefined)
+    { const c = cliCall(bin, args); execFile(c.cmd, c.args, { windowsVerbatimArguments: c.windowsVerbatimArguments, timeout: 5000 }, (_e, out, err) => done(signedIn(ai, `${out}${err}`))) }) : undefined)
   loginSeen.set(ai, { at: Date.now(), on })
   return on
 }
@@ -127,7 +134,7 @@ const onPath = (cli: string) => {
   return on
 }
 
-type Line = { type?: string; payload?: { id?: string; cwd?: string; type?: string; message?: string; role?: string; content?: { text?: string }[]; info?: { last_token_usage?: { input_tokens?: number }; model_context_window?: number } } }
+type Line = { type?: string; payload?: { id?: string; cwd?: string; type?: string; message?: string; last_agent_message?: string; role?: string; content?: { text?: string }[]; info?: { last_token_usage?: { input_tokens?: number }; model_context_window?: number } } }
 const parse = (line: string): Line | undefined => { try { return JSON.parse(line) } catch { return undefined } }
 const HANDOFFS = path.join(os.homedir(), '.claude', 'handoffs')
 const CONTINUE = /Continue from (.+?\.md): read it first/
@@ -187,6 +194,7 @@ function readHandoff(p: string): string | undefined {
  * message the name (a handoff's note names it by its To: line), the last token count the fill.
  */
 export function codexRow(lines: string[], mtime: number, now = Date.now(), read = readHandoff, titles?: Map<string, string>, own?: Map<string, string>): ChatRow | undefined {
+  if (isCodexRoleRun(lines)) return undefined
   let id: string | undefined, cwd = '', first: string | undefined, responded: string | undefined, fill: number | undefined, status: string | undefined
   for (const line of lines) {
     const r = parse(line)
@@ -216,9 +224,10 @@ export function codexRow(lines: string[], mtime: number, now = Date.now(), read 
 /**
  * Codex rows to archive: no longer live and no running terminal for them, and either their Switchboard
  * terminal exited or the rollout has been silent past CODEX_GONE_MS. A quiet chat whose terminal runs stays.
+ * Temp-folder chats never: the hub drops them from its archive, so they would be archived again every tick.
  */
 export const endedCodex = (chats: ChatRow[], tied: (id: string) => boolean, exited: ReadonlySet<string>, now = Date.now()) =>
-  chats.filter(c => c.ai === 'codex' && !c.live && !tied(c.sessionId) && (exited.has(c.sessionId) || now - (c.updatedAt ?? now) > CODEX_GONE_MS))
+  chats.filter(c => c.ai === 'codex' && !c.live && !isTempDir(c.cwd) && !tied(c.sessionId) && (exited.has(c.sessionId) || now - (c.updatedAt ?? now) > CODEX_GONE_MS))
 
 /** How a Codex chat's last turn ended: its last answer and whether it was interrupted. */
 export function lastCodexTurn(lines: string[]): { answer?: string; aborted: boolean } {
@@ -250,9 +259,38 @@ const readLines = new Map<string, { mtime: number; lines: string[] }>()
 export async function rolloutLines(file: string, mtime?: number): Promise<string[]> {
   const hit = readLines.get(file)
   if (mtime !== undefined && hit?.mtime === mtime) return hit.lines
-  const lines = await readRollout(file)
+  const lines = compactRollout(await readRollout(file))
   if (mtime !== undefined) readLines.set(file, { mtime, lines })
   return lines
+}
+
+function compactRollout(lines: string[]): string[] {
+  const keep = new Map<number, string>()
+  let firstMeta = true, lastMeta = -1, firstEventPrompt = true, firstResponsePrompt = true
+  let lastStatus = -1, lastToken = -1, lastAgent = -1, lastPrompt = -1, lastRole = -1, lastAnswerEnd = -1
+  for (let i = 0; i < lines.length; i++) {
+    const r = parse(lines[i])
+    const p = r?.payload
+    if (r?.type === 'session_meta') { if (firstMeta) keep.set(i, lines[i]); firstMeta = false; lastMeta = i }
+    if (r?.type === 'event_msg') {
+      if (p?.type === 'user_message' && p.message) {
+        if (firstEventPrompt) { keep.set(i, lines[i]); firstEventPrompt = false }
+        lastPrompt = i
+        const text = String(p.message)
+        if (lastRole < 0 && /^\s*You are (?:the engineer|qa)\./.test(text)) lastRole = i
+      }
+      if (TURN_END.has(p?.type ?? '') || p?.type === 'task_started') lastStatus = i
+      if (p?.type === 'agent_message' && p.message) lastAgent = i
+      if (TURN_END.has(p?.type ?? '') && p?.last_agent_message) lastAnswerEnd = i
+      if (p?.type === 'token_count' && typeof p.info?.last_token_usage?.input_tokens === 'number' && typeof p.info?.model_context_window === 'number' && p.info.model_context_window > 0) lastToken = i
+    }
+    if (r?.type === 'response_item' && p?.type === 'message' && p.role === 'user' && firstResponsePrompt) {
+      const text = (p.content ?? []).map(c => c.text ?? '').join('\n')
+      if (text.trim() && !INJECTED.test(text)) { keep.set(i, lines[i]); firstResponsePrompt = false; if (lastRole < 0 && /^\s*You are (?:the engineer|qa)\./.test(text)) lastRole = i }
+    }
+  }
+  for (const i of [lastMeta, lastStatus, lastToken, lastAgent, lastPrompt, lastRole, lastAnswerEnd]) if (i >= 0) keep.set(i, lines[i])
+  return keep.size ? [...keep].sort((a, b) => a[0] - b[0]).map(([, line]) => Buffer.from(line).toString()) : lines.map(line => Buffer.from(line).toString())
 }
 
 async function readRollout(file: string): Promise<string[]> {

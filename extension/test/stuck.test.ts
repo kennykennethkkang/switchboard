@@ -244,6 +244,8 @@ test('dueFix: only owned chats, shown (not dismissed) items, once each', async (
   const { HubService } = await import('../src/hub/hub-service')
   const h = new HubService()
   h.hook({ session_id: 's', hook_event_name: 'SessionStart', cwd: '/r' }, T0)
+  // The lead's turn is over, so a note can go now.
+  h.set({ progress: h.get().progress.map(p => ({ ...p, waiting: true })) }, T0)
   const old = (id: string, sessionId = 's') => ({ id, kind: 'agent' as const, sessionId, what: 'qa subagent: no tool call', since: T0 - 30 * MIN })
   h.setStuck([old('agent:s:a'), old('agent:s:b'), old('agent:x:c', 'x')], T0)
   h.snooze('agent:s:b', T0)
@@ -302,6 +304,52 @@ test('dueFix: no auto-fix for a chat held by the usage pause or a limit retry', 
   assert.deepEqual(h.dueFix(T0), { fix: [], paused: [] })
   h.set({ pause: undefined }, T0)
   assert.deepEqual(h.dueFix(T0 + MIN).fix.map(i => i.id), ['job:p:j'])
+})
+
+test('dueFix: a quiet job note waits for the lead turn to end, so a job that ends first sends none', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  h.hook({ session_id: 's', hook_event_name: 'SessionStart', cwd: '/r' }, T0)
+  const sub = { id: 'j1', task: 'b1', agent: 'a1', command: 'codex exec - > "$d/log"', startedAt: T0 - 40 * MIN }
+  const sample = (now: number, finished: string[] = []) => h.setStuck(detect(input({ progress: [prog({ subJobs: [sub] })], procs: [], outAt: new Map([['j1', T0 - 40 * MIN]]), finished: new Set(finished) }), newWatch(), now), now)
+  sample(T0)
+  assert.deepEqual(h.get().stuck?.map(i => i.id), ['job:s:j1'])
+  // Mid-turn: Claude Code holds the note until the turn ends, by which time the job may be over.
+  assert.deepEqual(h.dueFix(T0).fix, [])
+  // The job ends, then the turn: the sample at turn end has no item, so no note.
+  h.set({ progress: h.get().progress.map(p => ({ ...p, waiting: true })) }, T0 + MIN)
+  sample(T0 + MIN, ['j1'])
+  assert.deepEqual(h.dueFix(T0 + MIN).fix, [])
+  // Still running when the turn ends: the note goes then.
+  sample(T0 + 2 * MIN)
+  assert.deepEqual(h.dueFix(T0 + 2 * MIN).fix.map(i => i.id), ['job:s:j1'])
+})
+
+test('dueFix: a quiet subagent note waits for the turn end too, so one that finished first sends none', async () => {
+  const { HubService } = await import('../src/hub/hub-service')
+  const h = new HubService()
+  h.hook({ session_id: 's', hook_event_name: 'SessionStart', cwd: '/r' }, T0)
+  const quiet = prog({ running: ['a1'], roles: [{ id: 'a1', role: 'qa', state: 'active', startedAt: T0 - 30 * MIN, at: T0 - 25 * MIN }] })
+  h.setStuck(detect(input({ progress: [quiet], procs: [] }), newWatch(), T0), T0)
+  assert.deepEqual(h.get().stuck?.map(i => i.id), ['agent:s:a1'])
+  assert.deepEqual(h.dueFix(T0).fix, [])
+  // The subagent finished, then the turn ended: the sample then has no item.
+  h.set({ progress: h.get().progress.map(p => ({ ...p, waiting: true })) }, T0 + MIN)
+  h.setStuck(detect(input({ progress: [prog({ waiting: true })], procs: [] }), newWatch(), T0 + MIN), T0 + MIN)
+  assert.deepEqual(h.dueFix(T0 + MIN).fix, [])
+})
+
+test('exited: a background shell output file that ends on its exit line', async () => {
+  const fs = await import('fs'), os = await import('os'), path = await import('path')
+  const { exited } = await import('../src/hub/stuck-sampler')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-'))
+  const at = (name: string, text: string) => { const f = path.join(dir, name); fs.writeFileSync(f, text); return f }
+  assert.equal(exited(at('a.output', 'codex exit 0\nReport\n[exited with code 0]\n')), true)
+  assert.equal(exited(at('b.output', 'x'.repeat(5000) + '\n[exited with code 137]')), true)
+  assert.equal(exited(at('c.output', 'still going\n')), false)
+  assert.equal(exited(at('d.output', '[exited with code 0]\nmore output\n')), false)
+  assert.equal(exited(path.join(dir, 'none.output')), false)
+  fs.rmSync(dir, { recursive: true, force: true })
 })
 
 const hit = (id: string, sessionId: string) => ({ id, kind: 'job' as const, sessionId, what: 'x', since: T0 })

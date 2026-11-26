@@ -29,7 +29,7 @@ For deep, each subagent brief carries: its sub-question, the source rules below,
 1. **Recall.** `hub_recall` on the topic and read `~/Documents/vault/wiki/<slug>.md` if it exists. Start from what is known; only research what is missing or stale.
 2. **Clarify.** Ask (AskUserQuestion, or `mcp__switchboard__ask` as a subagent) only when an ambiguity would change the research: which entity, which region, which time. Otherwise pick the likely reading and state it.
 3. **Brief.** Write 3 to 5 lines: the question, what a good answer contains, scope, time window. Then split it into sub-questions. For multi-hop, order the hops: each one names the entity the next one needs.
-4. **Breadth.** One or two searches per sub-question to map the ground. WebSearch `extended` for niche, recent or multi-step queries, `standard` otherwise. For live chatter use `last30days`; for pages behind a wall or heavy JS use `scrapling` or `agent-reach`; library docs go through context7.
+4. **Breadth.** One or two searches per sub-question to map the ground. WebSearch `extended` for niche, recent or multi-step queries, `standard` otherwise. For live chatter use `last30days`; for pages with heavy JS, or a Reddit post, use `scrapling` (`mcp__scrapling__browser_fetch_once`); library docs go through context7.
 5. **Depth.** Open the best sources and read the relevant part. A search summary is a lead, not a source: never cite one. A page that fails to open goes on the Not checked list by name.
 6. **Triage each source.** Primary (the paper, the filing, the official doc, the dataset) beats secondary (news, encyclopedias) beats tertiary (blogs, forums, AI summaries). Note the date. Two sources that copy one origin count as one.
 7. **Ledger.** Write each claim as a row (below) as you find it.
@@ -63,6 +63,10 @@ Short sections. Each claim ends with its citation: [1], [2].
 ## Conflicts and gaps
 What disagreed, what could not be found, what is older than the user may want.
 
+## Actions
+- [dev] **Cache zsh completions**: add the compinit cache check to ~/.zshrc. Undo: restore ~/.zshrc. [3]
+- [mac ask] **Update macOS**: install 26.5 from System Settings. Undo: none, the update cannot be rolled back. [5]
+
 ## Not checked
 - Not read: sources found but not opened, and why.
 - Could not open: each URL that failed, with the error (empty page, 403, paywall).
@@ -72,6 +76,8 @@ Write "Nothing" under a line that has no entries; never drop the section.
 ## Sources
 [1] Title, publisher, date. URL
 ```
+
+**Actions** are changes worth making because of the findings, so the reader can press Apply in Switchboard. One line each, most useful first, 12 at most, in the form above: `[area]`, bold title, exactly what changes, `Undo:`. Areas: mac (settings and apps on this device), dev (Homebrew, shell, editor, local models), kit (Claude, Codex and Switchboard skills, mods and settings), other (other repos, phone, router, home devices), project (the project this chat runs in). Add `ask` when it cannot be undone: deleted data, sign-ins, purchases, OS updates. When an action touches this device, run the adjust skill's `facts` and read the current value first, so nothing is suggested that is already done or does not fit it. Suggest only what the findings support and cite it; leave the section out when nothing is worth changing. A report applies nothing itself.
 
 Quick level can drop to Answer, Confidence, Checked, Not checked and Sources. No tables in the report: the Research panel renders headings, bullets and paragraphs only.
 

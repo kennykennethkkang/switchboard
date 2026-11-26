@@ -8,11 +8,14 @@ import * as http from 'http'
 import * as os from 'os'
 import * as path from 'path'
 import { run } from './local'
+import { invalidateSharedRun, sharedRun } from './shared-run'
 import { tailscaleBin } from './lan'
 import { projectName } from './projects'
 import type { ScreenSnap } from './screen'
 import type { OwnedStuck } from './stuck'
 import type { DevProject, Server } from './types'
+import { insidePath, samePath } from './windows'
+import { processAlive } from './process-alive'
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
 const SHIFT = 10000
@@ -40,7 +43,7 @@ export function servedPorts(json: string): Set<number> {
 }
 
 export type Win = { pid: number; port: number; hubToken: string; workspace: string; /** VS Code trusts its workspace; an older window writes none. */ trusted?: boolean }
-const inside = (dir: string, folder: string) => folder === dir || folder.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep)
+const inside = (dir: string, folder: string) => insidePath(dir, folder) || samePath(dir, folder)
 
 /** The window whose workspace is or holds the folder (the deepest one); undefined when that is this window or none holds it. */
 export function devHome(wins: Win[], folder: string, self: number): Win | undefined {
@@ -50,7 +53,7 @@ export function devHome(wins: Win[], folder: string, self: number): Win | undefi
 
 /** No window is or holds the folder, so a chat for it needs its own window. Not the folder a move is closing. */
 export function needsWindow(wins: Win[], folder: string, moving = readMoving()): boolean {
-  return !!folder && path.resolve(folder) !== moving && !wins.some(w => inside(w.workspace, folder))
+  return !!folder && (!moving || !samePath(folder, moving)) && !wins.some(w => inside(w.workspace, folder))
 }
 
 // close-for-move.ts's flag: that folder's window was closed on purpose.
@@ -96,11 +99,12 @@ export function readFocused(dir = DIR): string | undefined {
 export function readWindows(dir = DIR): Win[] {
   const out: Win[] = []
   for (const n of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
-    if (!n.endsWith('.json') || n === 'workspaces.json') continue
+    // <workspace hash>-<pid>.json; this folder holds much bigger files too.
+    if (!/-\d+\.json$/.test(n)) continue
     try {
       const w = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'))
       if (typeof w.port !== 'number' || typeof w.pid !== 'number' || typeof w.hubToken !== 'string' || typeof w.workspace !== 'string') continue
-      process.kill(w.pid, 0)
+      if (!processAlive(w.pid)) continue
       out.push(w)
     } catch { /* mid-write or a closed window */ }
   }
@@ -204,7 +208,7 @@ export async function sendHome(folder: string, command: { type: string }, self =
   // A window on a parent folder (all of ~/Documents/GitHub) would take it first, so only the folder's own window counts then.
   const until = Date.now() + waitMs
   for (;;) {
-    const wins = readWindows(dir).filter(w => !waitMs || path.resolve(w.workspace) === path.resolve(folder))
+    const wins = readWindows(dir).filter(w => !waitMs || samePath(w.workspace, folder))
     const home = devHome(wins, folder, self)
     if (home && await postCommand(home, command)) return true
     if (!home && wins.some(w => inside(w.workspace, folder))) return false
@@ -218,15 +222,18 @@ export async function tailnet(): Promise<Tailnet | null> {
   const bin = tailscaleBin()
   if (!bin) return null
   try {
-    const s = JSON.parse(await run(bin, ['status', '--json']))
+    const s = JSON.parse(await sharedRun(bin, ['status', '--json'], { ttlMs: 60_000, timeoutMs: 5000 }))
     if (s.BackendState !== 'Running' || !s.Self?.DNSName) return null
-    return { dns: s.Self.DNSName, https: (s.CertDomains ?? []).length > 0, served: servedPorts(await run(bin, ['serve', 'status', '--json'])) }
+    return { dns: s.Self.DNSName, https: (s.CertDomains ?? []).length > 0, served: servedPorts(await sharedRun(bin, ['serve', 'status', '--json'], { ttlMs: 60_000, timeoutMs: 5000 })) }
   } catch { return null }
 }
 
 export async function serve(port: number, https: boolean, on: boolean): Promise<void> {
   const bin = tailscaleBin()
-  if (bin) await run(bin, on ? serveArgs(port, https) : offArgs(port, https), 15000)
+  if (bin) {
+    await run(bin, on ? serveArgs(port, https) : offArgs(port, https), 15000)
+    invalidateSharedRun(bin, ['serve', 'status', '--json'])
+  }
 }
 
 // Keep awake: one caffeinate for every window, found through its pid file.

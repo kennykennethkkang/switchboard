@@ -9,7 +9,7 @@ import {
 } from './discovery'
 import {
   readSettingsFile, writeJsonAtomic,
-  mergeSwitchboardHooks, hasSwitchboardHook, migrateLegacyHttpHooks, missingHookEvents, removeSwitchboardHooks, HOOK_EVENTS, CODEX_HOOK_EVENTS,
+  mergeSwitchboardHooks, hasSwitchboardHook, migrateLegacyHttpHooks, missingHookEvents, raiseHookTimeouts, removeAppHooks, removeSwitchboardHooks, HOOK_EVENTS, CODEX_HOOK_EVENTS,
 } from './hook-entries'
 import { createLogger } from './logger'
 
@@ -59,6 +59,7 @@ function hasSwitchboardHooks(settingsPath: string): boolean {
 
 export async function configureClaudeHooks(): Promise<void> {
   ensureHookScript()
+  removeAppHookEntries()
 
   const hookCommand = getHookCommand()
   const hookEntry = { hooks: [{ type: 'command', command: hookCommand, timeout: HOOK_TIMEOUT_S }] }
@@ -83,9 +84,10 @@ export async function configureClaudeHooks(): Promise<void> {
 
 // ─── Migration ────────────────────────────────────────────────────────────────
 
-/** Replace legacy Agent Flow HTTP hooks with command hooks. Called once on activation.
+/** Replace legacy Agent Flow HTTP hooks with command hooks, and raise our older entries' timeout. Called once on activation.
  *  Caller must call ensureHookScript() first. */
 export function migrateHttpHooks(): void {
+  removeAppHookEntries()
   const pathsToCheck: string[] = [GLOBAL_SETTINGS_PATH]
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
   if (workspaceFolder) {
@@ -101,9 +103,11 @@ export function migrateHttpHooks(): void {
       continue
     }
     try {
-      if (!migrateLegacyHttpHooks(result.settings, hookCommand, HOOK_TIMEOUT_S)) { continue }
+      const migrated = migrateLegacyHttpHooks(result.settings, hookCommand, HOOK_TIMEOUT_S)
+      const raised = raiseHookTimeouts(result.settings, HOOK_TIMEOUT_S)
+      if (!migrated && !raised) { continue }
       writeJsonAtomic(settingsPath, result.settings)
-      log.info(`Migrated HTTP hooks → command hooks in ${settingsPath}`)
+      log.info(`Updated hooks in ${settingsPath}: HTTP migrated ${migrated}, timeout raised ${raised}`)
       // Ensure migrated project-level hooks are tracked in the manifest
       if (workspaceFolder && settingsPath.includes(workspaceFolder)) {
         addWorkspaceToManifest(workspaceFolder)
@@ -126,6 +130,8 @@ export function isDisable1MContext(): boolean {
 // ─── Prompt ───────────────────────────────────────────────────────────────────
 
 export async function promptHookSetupIfNeeded(_context: vscode.ExtensionContext): Promise<void> {
+  ensureHookScript()
+  removeAppHookEntries()
   configureCodexHooks()
   if (hooksAlreadyConfigured()) { addNewHookEvents(); return }
   await configureClaudeHooks()
@@ -134,6 +140,7 @@ export async function promptHookSetupIfNeeded(_context: vscode.ExtensionContext)
 /** Our entries in ~/.codex/hooks.json, so Codex chats drive the hub's status too; on false, takes them out.
  *  Skipped with no Codex home or a hooks.json we cannot parse; the user's own entries stay. */
 export function configureCodexHooks(on = true): void {
+  if (on) { ensureHookScript(); removeAppHookEntries() }
   const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
   if (!fs.existsSync(home)) { return }
   const file = path.join(home, 'hooks.json')
@@ -141,11 +148,26 @@ export function configureCodexHooks(on = true): void {
   if (!result.ok) { log.warn(`Not adding Codex hooks, could not parse ${file}:`, result.error); return }
   const entry = { hooks: [{ type: 'command', command: getHookCommand(), timeout: HOOK_TIMEOUT_S }] }
   try {
-    if (on) writeJsonAtomic(file, mergeSwitchboardHooks(result.settings, entry, CODEX_HOOK_EVENTS))
+    if (on) {
+      removeAppHooks(result.settings)
+      writeJsonAtomic(file, mergeSwitchboardHooks(result.settings, entry, CODEX_HOOK_EVENTS))
+    }
     else if (hasSwitchboardHook(result.settings)) writeJsonAtomic(file, removeSwitchboardHooks(result.settings))
   } catch (err) {
     log.error(`Failed to write ${file}:`, err)
   }
+}
+
+function removeAppHooksFromFile(settingsPath: string): void {
+  const result = readSettingsFile(settingsPath)
+  if (!result.ok || !removeAppHooks(result.settings)) { return }
+  try { writeJsonAtomic(settingsPath, result.settings) } catch (err) { log.error(`Failed to remove app hooks from ${settingsPath}:`, err) }
+}
+
+function removeAppHookEntries(): void {
+  removeAppHooksFromFile(GLOBAL_SETTINGS_PATH)
+  const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
+  if (fs.existsSync(home)) { removeAppHooksFromFile(path.join(home, 'hooks.json')) }
 }
 
 /** An install from before an event joined HOOK_EVENTS gets our entry for it; every other entry stays as it is. */

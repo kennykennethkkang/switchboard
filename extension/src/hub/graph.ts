@@ -13,12 +13,12 @@ import type { HubState } from './types'
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference'
 export type Pred = 'supersedes' | 'depends-on' | 'part-of' | 'contradicts' | 'related'
-export type GraphNode = { id: string; kind: 'memory' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'; label: string; type?: MemoryType; description?: string; text?: string; missing?: string[]; aliases?: string[]; modified?: string; origin?: string; superseded?: boolean }
+export type GraphNode = { id: string; kind: 'memory' | 'wiki' | 'raw' | 'project' | 'chat' | 'todo' | 'rule'; label: string; type?: MemoryType; description?: string; text?: string; missing?: string[]; aliases?: string[]; modified?: string; origin?: string; superseded?: boolean; unproven?: boolean }
 export type GraphEdge = { source: string; target: string; kind: 'link' | 'in' | 'todo' | 'from' | Pred }
 /** Lint: duplicates are names or aliases two notes claim, contradictions id pairs, the rest node ids.
  * invalid: a memory note with no description or no valid type; stale: a project note not modified in 90 days;
- * loops: groups of live notes whose supersedes edges run in a circle. */
-export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][] }
+ * loops: groups of live notes whose supersedes edges run in a circle; unproven: a note still `status: unproven` after 14 days. */
+export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][]; unproven: string[] }
 export type MemoryGraph = { nodes: GraphNode[]; edges: GraphEdge[]; health: GraphHealth }
 /** mtime: when modified is not in the frontmatter, stale goes by it. archived: from memory/archive/, a superseded note kept as history. */
 export type MemoryFile = { dir: string; file: string; text: string; mtime?: number; archived?: boolean }
@@ -40,6 +40,7 @@ export const PREDS: Pred[] = ['supersedes', 'depends-on', 'part-of', 'contradict
 const KNOWS = new Set<GraphEdge['kind']>(['link', ...PREDS])
 const RECALL_MAX = 1500
 const STALE_MS = 90 * 86_400_000
+const UNPROVEN_MS = 14 * 86_400_000
 const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
 /** The folder name Claude Code gives a project under ~/.claude/projects. */
 export const slugOf = (p: string) => p.replace(/[^A-Za-z0-9]/g, '-')
@@ -96,7 +97,7 @@ export function parseMemory(file: string, text: string) {
     return items.map(x => x.replace(/^[\s["']+|[\s\]"']+$/g, '').replace(/[|#].*$/, '').trim()).filter(Boolean)
   }
   const rel = Object.fromEntries(PREDS.map(p => [p, list(p)])) as Record<Pred, string[]>
-  return { name: key('name') || file.replace(/\.md$/, ''), description: key('description'), type: type && TYPES.includes(type) ? type : 'reference' as MemoryType, typed: !!type && TYPES.includes(type), body, links, aliases: list('aliases'), rel, origin: key('originSessionId'), modified: key('modified') }
+  return { name: key('name') || file.replace(/\.md$/, ''), description: key('description'), type: type && TYPES.includes(type) ? type : 'reference' as MemoryType, typed: !!type && TYPES.includes(type), body, links, aliases: list('aliases'), rel, origin: key('originSessionId'), modified: key('modified'), unproven: key('status')?.toLowerCase() === 'unproven' }
 }
 
 const knownOf = (state: HubState) => [...new Set([...state.projects.map(p => norm(p.path)), ...Object.keys(state.todos ?? {}).map(norm)])]
@@ -144,10 +145,11 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
   })
   const fields = (m: ReturnType<typeof parseMemory>) => ({
     description: m.description && short(m.description, DESC_MAX), text: cut(m.body),
-    ...(m.aliases.length && { aliases: m.aliases.map(redact) }), ...(m.modified && { modified: short(m.modified, 40) }), ...(m.origin && { origin: short(m.origin, 80) }),
+    ...(m.aliases.length && { aliases: m.aliases.map(redact) }), ...(m.modified && { modified: short(m.modified, 40) }), ...(m.origin && { origin: short(m.origin, 80) }), ...(m.unproven && { unproven: true }),
   })
   for (const { f, m, id } of parsed) {
     add({ id, kind: 'memory', label: redact(m.name), type: m.type, ...fields(m) })
+    bodies.set(nodes.get(id)!, redact(m.body))
     const home = bySlug.get(f.dir.toLowerCase())
     const pid = home ? projectFor(home) : add({ id: `project:dir:${f.dir}`, kind: 'project', label: decodeProjectDir(f.dir) })
     edges.push({ source: id, target: pid, kind: 'in' })
@@ -162,6 +164,7 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
     if (!byName.has(low)) byName.set(low, id)
     claim(m, id, 'vault')
     add({ id, kind: f.kind, label: redact(m.name), ...fields(m) })
+    bodies.set(nodes.get(id)!, redact(m.body))
     return { f: undefined, m, id }
   })
   const all = [...parsed, ...notes]
@@ -208,9 +211,11 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
   }
   const live = parsed.filter(p => !p.f.archived)
   const invalid = live.filter(({ m }) => !m.description || !m.typed).map(p => p.id)
-  const stale = live.filter(({ f, m }) => m.type === 'project' && now - (m.modified ? Date.parse(m.modified) : f.mtime ?? NaN) > STALE_MS).map(p => p.id)
+  const age = ({ f, m }: typeof live[number]) => now - (m.modified ? Date.parse(m.modified) : f.mtime ?? NaN)
+  const stale = live.filter(p => p.m.type === 'project' && age(p) > STALE_MS).map(p => p.id)
+  const unproven = live.filter(p => p.m.unproven && age(p) > UNPROVEN_MS).map(p => p.id)
   const once = [...new Map(edges.map(e => [`${e.source}\n${e.kind}\n${e.target}`, e])).values()]
-  return { nodes: [...nodes.values()], edges: once, health: { ...lint(nodes, once, claims, archived), invalid, stale } }
+  return { nodes: [...nodes.values()], edges: once, health: { ...lint(nodes, once, claims, archived), invalid, stale, unproven } }
 }
 
 /** Groups of notes that supersede each other in a circle, ids sorted, groups by first id. */
@@ -224,7 +229,7 @@ function loops(edges: GraphEdge[], archived: Set<string>): string[][] {
   return out.sort((a, b) => a[0].localeCompare(b[0]))
 }
 
-function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<string, Set<string>>, archived: Set<string>): Omit<GraphHealth, 'invalid' | 'stale'> {
+function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<string, Set<string>>, archived: Set<string>): Omit<GraphHealth, 'invalid' | 'stale' | 'unproven'> {
   const linked = new Set(edges.filter(e => KNOWS.has(e.kind)).flatMap(e => [e.source, e.target]))
   // A pair once, whichever side says it.
   const pairs = new Map<string, [string, string]>()
@@ -241,20 +246,41 @@ function lint(nodes: Map<string, GraphNode>, edges: GraphEdge[], claims: Map<str
   }
 }
 
-/** What memory knows about query, for a chat's hub_recall: the best 3 notes by name, alias or description, then what links to
- * them within hops, superseded notes left out unless asked for by name. near: the chat's project id, first on a tied score.
+const words = (x: string) => x.normalize('NFC').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+// Words every question has; they say nothing about which note is meant.
+const STOP = new Set('a an and are as at be by can do does for from has have how i in into is it its my not of on or so that the then this to was what when where which while who why will with you your'.split(' '))
+// Plurals and -ing forms: the longer starts with the shorter; short words only whole ("mod" is not "model").
+const kin = (t: string, w: string) => Math.min(t.length, w.length) > 3 && Math.abs(t.length - w.length) < 5 && (w.startsWith(t) || t.startsWith(w))
+// A node's whole text, redacted: node.text stops at TEXT_MAX, and a merged note's later sections must be found too.
+const bodies = new WeakMap<GraphNode, string>()
+/** How well the words hold t: 1 whole, 0.6 as a kin form, 0 not. */
+const holds = (ws: Set<string>, t: string) => (ws.has(t) ? 1 : [...ws].some(w => kin(t, w)) ? 0.6 : 0)
+type Indexed = { n: GraphNode; fields: [Set<string>, number][] }
+const indexes = new WeakMap<MemoryGraph, Indexed[]>()
+/** Every note's words by field with the field's weight, once per graph. */
+function indexOf(graph: MemoryGraph): Indexed[] {
+  const got = indexes.get(graph) ?? graph.nodes.filter(n => n.kind === 'memory' || n.kind === 'wiki' || n.kind === 'raw').map((n): Indexed => {
+    const body = new Set(words(bodies.get(n) ?? n.text ?? ''))
+    // A long note holds most words, so a hit in its text says less.
+    return { n, fields: [[new Set(words(n.label)), 4], [new Set(words(n.aliases?.join(' ') ?? '')), 3], [new Set(words(n.description ?? '')), 2], [body, 1 / (0.5 + body.size / 800)]] }
+  })
+  indexes.set(graph, got)
+  return got
+}
+
+/** What memory knows about query, for a chat's hub_recall: the best 3 notes by name, alias, description or text, a rare word counting
+ * more than a common one, then what links to them within hops. Superseded notes are left out unless asked for by name, unproven ones
+ * rank lower and say so. near: the chat's project id, first on a tied score.
  * scope research: only the notes in the research folder's memory. Plain text, redacted, about 1500 characters. */
 export function recall(graph: MemoryGraph, query: string, hops = 2, near?: string, scope?: 'research'): string {
   const low = (x: string) => x.normalize('NFC').toLowerCase()
   const q = low(query.trim())
-  const words = (x: string) => low(x).split(/[^\p{L}\p{N}]+/u).filter(Boolean)
-  const terms = words(q)
+  const terms = [...new Set(words(q))].filter(t => !STOP.has(t))
   const byId = new Map(graph.nodes.map(n => [n.id, n]))
-  // Substring scoring, no stemming; 1-2 letter terms ("a", "in", "qa") only as whole words, or they hit nearly every note.
-  const has = (x: string, t: string) => t.length > 2 ? low(x).includes(t) : words(x).includes(t)
-  const score = (n: GraphNode) => terms.reduce((s, t) => s + (has(n.label, t) ? 3 : 0)
-    + (n.aliases?.some(a => has(a, t)) ? 2 : 0) + (n.description && has(n.description, t) ? 1 : 0), 0)
-    + (low(n.label) === q ? 5 : 0)
+  const index = indexOf(graph)
+  const hits = new Map(index.map(({ n, fields }) => [n, terms.map(t => Math.max(0, ...fields.map(([ws, w]) => w * holds(ws, t))))]))
+  const rarity = terms.map((_, i) => { const df = [...hits.values()].filter(h => h[i]).length; return Math.sqrt(Math.log(1 + (index.length - df + 0.5) / (df + 0.5))) })
+  const score = (n: GraphNode) => (hits.get(n) ?? []).reduce((s, w, i) => s + w * rarity[i], low(n.label) === q ? 1000 : 0) * (n.unproven ? 0.7 : 1)
   const inScope = (id: string) => scope !== 'research' || id.startsWith(`memory:${slugOf(RESEARCH_ROOT)}/`)
   const home = new Set(near ? graph.edges.filter(e => e.kind === 'in' && e.target === near).map(e => e.source) : [])
   // A superseded note only when asked for by name or alias.
@@ -283,9 +309,15 @@ export function recall(graph: MemoryGraph, query: string, hops = 2, near?: strin
     }
     front = next
   }
+  const old = new Set(graph.health.stale)
+  const mark = (n: GraphNode) => [n.superseded && 'superseded', n.unproven && 'unproven, check it first', old.has(n.id) && 'not updated in 90 days'].filter(Boolean).join(', ')
   const head = seeds.map(n => {
-    const body = (n.text ?? '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3).join(' ').slice(0, 240)
-    return `${n.label}${n.superseded ? ' (superseded)' : ''}: ${n.description ?? labelKind(n)}${body ? `\n  ${body}` : ''}`
+    // The three lines that say most about the query: a merged note's section may sit far down.
+    const ls = (bodies.get(n) ?? n.text ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+    const worth = ls.map(l => { const ws = new Set(words(l)); return terms.reduce((s, t, i) => s + holds(ws, t) * rarity[i], 0) })
+    const at = worth.indexOf(Math.max(...worth))
+    const body = ls.slice(Math.max(0, at), at + 3).join(' ').slice(0, 240)
+    return `${n.label}${mark(n) && ` (${mark(n)})`}: ${n.description ?? labelKind(n)}${body ? `\n  ${body}` : ''}`
   }).join('\n')
   let out = redact(head).slice(0, RECALL_MAX)
   const rel = [...lines].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).map(([l]) => redact(l))

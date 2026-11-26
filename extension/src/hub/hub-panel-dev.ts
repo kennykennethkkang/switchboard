@@ -15,7 +15,7 @@ export function devPanel(refresh: () => void) {
 
   /** Dev rows for every device, Keep awake, and serve entries whose server has stopped turned off. */
   async function refreshDev(servers: Awaited<ReturnType<typeof listServers>>): Promise<void> {
-    for (const [name, s] of served) if (!servers.some(x => x.port === s.port)) { served.delete(name); await serve(s.port, s.https, false) }
+    for (const [name, s] of served) if (!servers.some(x => x.port === s.port) && !(await listServers(true)).some(x => x.port === s.port)) { served.delete(name); await serve(s.port, s.https, false) }
     const [ts, awake] = await Promise.all([tailnet(), awakePid()])
     hub.set({ dev: devRows(devFolders(), readDev, servers, ts), tailscale: !!ts, awake: !!awake })
   }
@@ -28,7 +28,7 @@ export function devPanel(refresh: () => void) {
     const look = async () => {
       const terminal = vscode.window.terminals.find(t => t.name === name && t.exitStatus === undefined)
       if (!terminal || Date.now() > until) return
-      const port = devRows([row.folder], () => row, await listServers(), null)[0]?.port
+      const port = devRows([row.folder], () => row, await listServers(true), null)[0]?.port
       if (!port) return void setTimeout(look, 2000)
       const ts = await tailnet()
       if (ts) { await serve(port, ts.https, true); served.set(name, { port, https: ts.https }) }
@@ -41,12 +41,13 @@ export function devPanel(refresh: () => void) {
   const devRequest = (folder: string) => knownDev(hub.get().dev, folder) ?? knownDev(devRows(devFolders(), readDev, [], null), folder)
 
   async function stopServer(pid: number): Promise<void> {
-    const server = hub.get().servers.find(s => s.pid === pid)
+    const server = (await listServers(true)).find(s => s.pid === pid)
     if (!server) return
     const pick = await vscode.window.showWarningMessage(`Stop ${server.command} on :${server.port}${server.folder ? ` (${server.folder})` : ''}?`, { modal: true }, 'Stop it')
     if (pick !== 'Stop it') return
     try { process.kill(pid) } catch (err) { void vscode.window.showWarningMessage(`Could not stop it (${(err as Error).message}).`) }
-    setTimeout(refresh, 800)
+    // A fresh list first, or the shared one still names it.
+    setTimeout(() => { void listServers(true).finally(refresh) }, 800)
   }
   /** Its share of the hub messages; undefined for any other type. */
   function handle(m: WebviewToExtensionMessage): HubReply | undefined {
@@ -67,7 +68,7 @@ export function devPanel(refresh: () => void) {
         for (const w of readWindows()) if (w.pid !== process.pid) void postWindow(w, { kind: 'dev-stop', folder: row.folder })
         // A server started by hand has no terminal anywhere: once the terminals had their chance, stop it by pid (the Mac asks first).
         setTimeout(async () => {
-          const port = devRows([row.folder], () => row, await listServers(), null)[0]?.port
+          const port = devRows([row.folder], () => row, await listServers(true), null)[0]?.port
           const pid = hub.get().servers.find(s => s.port === port)?.pid
           if (pid) void stopServer(pid)
           else refresh()

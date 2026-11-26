@@ -28,5 +28,5 @@ test('isMap: the three map modes only', () => {
 })
 
 test('pageTitle: the header word for each page', () => {
-  assert.deepEqual(PAGES.map(pageTitle), ['Now', 'Chats', 'Plan', 'Live', 'Ship', 'Map', 'Map', 'Map', 'Settings', 'Research'])
+  assert.deepEqual(PAGES.map(pageTitle), ['Now', 'Chats', 'Plan', 'Live', 'Ship', 'Map', 'Map', 'Map', 'Settings', 'Research', 'Workbench', 'Usage'])
 })

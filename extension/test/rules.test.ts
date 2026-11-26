@@ -245,8 +245,9 @@ describe('codex tool map', () => {
   it('rides on the Codex copy only and counts as current', () => {
     const codex = rulesFile(RULES, V, CODEX_MAP)
     assert.ok(codex.endsWith(CODEX_MAP) && codex.includes('mcp__switchboard__ask'))
-    assert.match(CODEX_MAP, /Phone push[^\n]*skip/)
     assert.match(CODEX_MAP, /request_user_input[^\n]*fallback only[^\n]*title and options/)
+    assert.match(CODEX_MAP, /ListAgents[^\n]*claude agents --json[^\n]*chats_check/)
+    assert.match(CODEX_MAP, /SendMessage[^\n]*ask the user[^\n]*mcp__switchboard__ask/)
     assert.ok(!rulesFile(RULES, V).includes('Codex tool map'))
     assert.equal(decideRules(codex, RULES, V, false, [], CODEX_MAP).action, 'skip')
     assert.equal(decideRules(rulesFile(RULES, V), RULES, '2026-11-01T00:00:00Z', false, [], CODEX_MAP).action, 'write')

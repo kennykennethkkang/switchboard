@@ -34,13 +34,14 @@ it('skips a view already sent the same state, but not one that was hidden for it
   const a: string[] = []
   const b: string[] = []
   let bShown = false
+  const send = (m: string, k: string) => posters.sendState({ k }, () => m, () => m)
   posters.add(m => a.push(m))
   posters.add(m => b.push(m), () => bShown)
-  posters.send('s1', 'k1')
-  posters.send('s1 again', 'k1')
+  send('s1', 'k1')
+  send('s1 again', 'k1')
   bShown = true
-  posters.send('s1 shown', 'k1')
-  posters.send('s2', 'k2')
+  send('s1 shown', 'k1')
+  send('s2', 'k2')
   assert.deepEqual(a, ['s1', 's2'])
   assert.deepEqual(b, ['s1 shown', 's2'])
 })

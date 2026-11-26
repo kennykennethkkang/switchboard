@@ -14,7 +14,7 @@ import { armoryList, gardenList, keyList, mapList, memoryTally, studyList, todoL
 export type CourtState = Shown
 /** x, y: top left corner in world px; the council's center sits on 0,0.
  * Yards: group is the split id its chat was started from (siblings share it, Court.ties joins them); waitsOn names the chats it waits on, for a "Waiting on X" line. The wait rope itself comes from board-fx ropesOf. */
-export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Done with this many requests Jev found not covered (look.ts almostDone). */ missed?: number; /** Problems a place flags (memory health, missing keys). */ warn?: number; /** A desk's role raised to this model (stages-ui raiseLine says why). */ model?: string; raise?: string; group?: string; /** Run indefinitely limits and check-back, one quiet line (budget-ui limitTag). */ limits?: string; waitsOn?: string[] }
+export type CourtNode = { id: string; kind: 'council' | 'pavilion' | 'window' | 'courtyard' | 'realm' | 'desk' | Place; x: number; y: number; w: number; h: number; label: string; ai?: string; chatId?: string; role?: string; state?: CourtState; task?: string; since?: number; runs?: number; shipped?: number; ask?: string; parent?: string; window?: string; color?: WindowColor; here?: boolean; /** The AI the chat's last version ran on, when it was another one. */ from?: string; /** A realm's second line: the AI and chat it stems from. */ sub?: string; /** A ring place's roster. */ list?: Item[]; /** Done with this many requests Jev found not covered (look.ts almostDone). */ missed?: number; /** Problems a place flags (memory health, missing keys). */ warn?: number; /** A desk's role raised to this model (stages-ui raiseLine says why). */ model?: string; raise?: string; group?: string; /** The goal loop, its limits and the timer, one quiet line (budget-ui limitTag). */ limits?: string; waitsOn?: string[] }
 /** Ring places after the AIs, in ring order. */
 export const PLACES = ['garden', 'armory', 'library', 'notice', 'tower', 'study', 'treasury', 'maps', 'uploads'] as const
 export type Place = typeof PLACES[number]
@@ -123,6 +123,11 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
       const running = checks.find(r => !r.done)
       Object.assign(n, { runs: checks.length, shipped: checks.filter(r => r.done).length, task: running ? `Source check: ${running.question}` : undefined })
     }
+    // And the Workbench: a change being made now, else how many reports suggest.
+    if (ai === 'research' && h.adjust && !n.task) {
+      const open = h.adjust.changes.find(c => c.status === 'open'), waiting = h.adjust.suggestions.reduce((t, s) => t + s.actions.filter(x => x.state === 'new').length, 0)
+      n.task = open ? `Changing: ${open.title}` : waiting ? `${waiting} suggested change${waiting === 1 ? '' : 's'}` : undefined
+    }
     pav.set(ai, n); homes.set(`ai:${ai}`, { n, a: at(i) }); nodes.push(n); link(council, n)
   })
   const busy = new Set(live.flatMap(c => progress.get(c.sessionId)?.roles.filter(r => r.state === 'active').map(r => r.role) ?? []))
@@ -200,7 +205,7 @@ export function buildCourt(h: HubState, stage?: { w: number; h: number }, mem?: 
     const leadTask = (run && stageView(run.run.stages).line) || tasks.find(t => t.status === 'in_progress' && (!t.role || t.role === 'lead'))?.subject
     const group = c.group, on = (h.links ?? []).filter(l => l.from === c.sessionId).flatMap(l => l.to)
     const waitsOn = on.length ? on.map(id => h.chats.find(x => x.sessionId === id)?.name ?? id.slice(0, 8)) : undefined
-    Object.assign(yard, { id: `yard:${c.sessionId}`, kind: 'courtyard', label: c.name ?? c.project ?? 'chat', ai, chatId: c.sessionId, state, task: leadTask, since: p?.startedAt, ask, parent: hub.id, from, missed, group, waitsOn, limits: limitTag(c) || undefined })
+    Object.assign(yard, { id: `yard:${c.sessionId}`, kind: 'courtyard', label: c.name ?? c.project ?? 'chat', ai, chatId: c.sessionId, state, task: leadTask, since: p?.startedAt, ask, parent: hub.id, from, missed, group, waitsOn, limits: [h.tools?.chats[c.sessionId]?.indefinite ? 'goal' : '', limitTag(c)].filter(Boolean).join(' · ') || undefined })
     nodes.push(yard); link(hub, yard); yardsOf.set(key, [...yardsOf.get(key) ?? [], yard])
 
     // Docked off the yard's rim, stacked top down, the stack centered on the yard.

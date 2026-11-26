@@ -9,36 +9,40 @@ import { loadKept, saveKept, setOneWindow, tabTargets, TAB_COMMANDS, type TabKep
 import * as path from 'path'
 import { cwdFromTranscript, hub } from './hub-service'
 import { editor, shortEditor } from '../editor'
-import { HistoryScanner } from './history'
+import { usageHistory } from './history'
 import { readSpend, setSpend } from './spend'
-import { applyPatch, controlPatch, readControls } from './controls'
-import type { ChatRow, DeviceAsk, JarvisReply, RepoView, SwitchboardKey, WindowColor } from './types'
+import { applyPatch, codeModeOn, controlPatch, readControls } from './controls'
+import type { ChatRow, DeviceAsk, GitOp, JarvisReply, RepoView, SwitchboardKey, WindowColor } from './types'
 import { SHADES, titleBar, titleBarColors, windowColors } from './colors'
 import { FLAGGED, PROFILES, cleanName, readProfiles, withLibrary } from './tools'
 import { globalOff, readPrecedence, readSmart, setPrecedence, watchTools } from './smart-tools'
-import { connections, ensureWeb, gitState, keepWebRetrying, installed, libraryInventory, listServers, newestPlan, phoneUrls, projectFolders, readChanges, syncLibrary, webUrl } from './local'
+import { connections, ensureWeb, gitState, keepWebRetrying, installed, libraryInventory, listServers, newestPlan, phoneUrls, projectFolders, readChanges, readListeners, run, syncLibrary, webUrl } from './local'
 import { kitDir } from '../constants'
 import { newPanelState } from './hub-panel-state'
 import { refuse } from './hub-panel-shared'
 import { sweepPanel } from './hub-panel-sweep'
 import { signInsPanel } from './hub-panel-signins'
+import { syncHandle } from './sync'
 import { codexPanel } from './hub-panel-codex'
 import { devPanel } from './hub-panel-dev'
-import { awsLogin, answerInTerminal, openLogin, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, setIndefinite, indefiniteDone, INDEFINITE_TEXT, REFINE_TEXT, setBudget, setCheckBack, type RunOpts } from './actions'
+import { awsLogin, answerInTerminal, openLogin, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, indefiniteDone, REFINE_TEXT, setBudget, setLoop, loopPrompt, type RunOpts } from './actions'
 import { dropEffortGuard, keepEffortDefault } from './picks'
 import { buildSmart } from './smart-select'
 import { approvedFields, closeApprovedRetry, idleResearch, staysOpenOnApprove } from './approve'
-import { tags, terminalAction, watchTerminals } from './terminals'
+import { openChat, tags, terminalAction, watchTerminals } from './terminals'
 import { signInTerminal } from './codex-login'
 import { AIS, chatTerminal, closeChatTerminal } from './ais'
+import { readCodexAccount } from './codex-account'
 import { touch } from './idle'
 import { archiveRow, goneRow, readArchive, readChains, recordArchive, removeArchive, searchNotes } from './chains'
 import { newestNotes, readStarred, starredRows, toggleStar, writeStarred } from './starred'
 import { rcTargets, readChats } from './sessions'
-import { ask, crossNote, mergeProjects, projectName, repoPlan, type RepoAsk } from './projects'
+import { ask, crossNote, mergeProjects, projectName, repoPlan, repoTop, type RepoAsk } from './projects'
 import { RESEARCH_ROOT, dismissOffer, isResearch } from './research'
-import { LIBRARY, deleteResearch, listResearch, markSeen } from './research-library'
+import { LIBRARY, addResearchAsk, cancelResearchAsk, deleteResearch, listResearch, markSeen } from './research-library'
+import { addFolder, beginOrganizeResearch, deleteFolder, FAILED_ORGANIZE, finishOrganizeResearch, moveResearch, organizePrompt, organizeResearch, parseOrganizeReply, researchState, renameFolder, setAutoResearch, undoOrganize } from './research-folders'
 import { openResearch } from './research-window'
+import { ADJUSTMENTS, applyStarts, readAdjust, runUndo, skipAction } from './adjustments'
 import { AWS_SESSION_MS, awsProfiles, browserEnv, cacheTimes, chromeChoice, OPEN_CHROME, openChromeScript, browserFor, dueHeadsUps, parseAwsConfig, readAwsConfig, readChrome, readPrefs, readSessions, trackSessions, validProfileName, writeOpenChrome, writeSessions } from './aws'
 import { execFile } from 'child_process'
 import * as fs from 'fs'
@@ -57,6 +61,7 @@ import type { ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../pr
 import { createLogger } from '../logger'
 import { forgetAccessNote, syncAccessNote } from './access-note'
 import { Posters, tickWork } from './posters'
+import { fieldsJson } from './state-json'
 import { kitHash, rulesState, syncRules, type SyncResult } from './rules'
 import { applyAgentBrowsers, NOTICE_KINDS, NOTICE_SPOTS, noticeSpot, type NoticeSpot } from './background'
 import { CLI_APPS, mergeTenants, readTenants } from './cli-logins'
@@ -64,7 +69,10 @@ import { LOGINS, pruneLinks, readLinks, readLogins, writeLogins } from './logins
 import { CODEX_EFFORTS, CODEX_MODELS, setRoleCodex, setRoleModel } from './roles'
 import { installGuard } from './git-guard'
 import { keyStatus, reconcileKeys } from './keys'
-import { ghPath, git, gitOp, inWorktree, liveIn, mergeOnEnd, readRepo, repoRoot } from './git'
+import { autoMergeOn, ghPath, git, gitOp, inWorktree, liveIn, mainOf, mergeBusy, mergeOnEnd, readRepo, realOf, repoReadKey, repoRoot, setAutoMerge, worktreeFolder } from './git'
+import { readShip, shipFolder } from './ship'
+import { idleChats, idleOffer } from './idle-chats'
+import { startedServer } from './reap'
 import { jevProject } from './jev-project'
 import { mirofishPage, savedReports } from './mirofish'
 import { toEnglish } from './translate'
@@ -98,6 +106,7 @@ const WATCHED_MS = 30 * 1000
 const AWS_EVERY_MS = 10 * 60 * 1000
 // Probing for the standalone app's page: at most once a minute, and on a manual refresh.
 const WEB_EVERY_MS = 60 * 1000
+const REPOS_EVERY_MS = 60 * 1000
 // An idle chat's uncommitted changes are read again at most once a minute; a busy chat's on every tick.
 const CHANGES_IDLE_MS = 60 * 1000
 const REPO_ROOTS = [path.join(os.homedir(), 'Documents', 'GitHub')]
@@ -180,7 +189,10 @@ export function refreshHub(): void {
   for (const fn of refreshers) fn(true).catch(err => log.warn('A hub refresh failed:', err))
 }
 
-const postState = () => { const h = hub.get(); posters.send({ type: 'hub-state', hub: h }, JSON.stringify(h)) }
+const postState = () => {
+  const h = hub.get(), fields = h as unknown as Record<string, unknown>
+  posters.sendState(fieldsJson(h), () => ({ type: 'hub-state', hub: h }), (set, del) => ({ type: 'hub-state', delta: { set: Object.fromEntries(set.map(k => [k, fields[k]])), del } }))
+}
 
 /** Adds an open view's sender (editor panel or sidebar), sends it the current state at once and refreshes. Returns the remover. visible: whether it is on screen. */
 export function addHubPoster(send: (m: ExtensionToWebviewMessage) => void, visible?: () => boolean): () => void {
@@ -192,6 +204,7 @@ export function addHubPoster(send: (m: ExtensionToWebviewMessage) => void, visib
 
 /** A reloaded webview lost its state; posters skip unchanged state, so send it directly. */
 export function resendHubState(send: (m: ExtensionToWebviewMessage) => void): void {
+  posters.forget()
   send({ type: 'hub-state', hub: hub.get() })
 }
 
@@ -213,6 +226,7 @@ export function startHub(context: vscode.ExtensionContext): void {
   editor.name = shortEditor(vscode.env.appName)
   hub.set({ editor: editor.name })
   hub.startMirofish(toEnglish)
+  void usageHistory.moveOldCache()
   hub.startCrowd()
   context.subscriptions.push({ dispose: () => hub.stopMirofish() })
   store = context.globalState
@@ -226,7 +240,7 @@ export function startHub(context: vscode.ExtensionContext): void {
     listDevices()
     promptDevices()
   }
-  context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused) { promptDevices(); focused() } }))
+  context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused) { promptDevices(); focused(); if (posters.shown) onShown() } }))
   if (vscode.window.state.focused) focused()
   // A stored onFull 'compact' from an older Switchboard is ignored: a full chat always continues fresh.
   const kept = store.get<{ freshBranch?: boolean }>(KEEP_KEY) ?? {}
@@ -276,8 +290,16 @@ export function startHub(context: vscode.ExtensionContext): void {
   envs = context.environmentVariableCollection
   try { reconcileKeys(keys) } catch (err) { log.warn(`API keys: could not read the store (${(err as Error).message})`) }
   readSignIns()
-  const history = new HistoryScanner()
-  addRefresher(async () => hub.set(await history.scan()))
+  let codexAccountAt = 0, codexAccountFailed = false
+  addRefresher(async () => {
+    if (Date.now() - codexAccountAt < 10 * 60_000) return
+    codexAccountAt = Date.now()
+    const status = await AIS.codex.detect()
+    if (!status.installed || !status.signedIn) return
+    try { hub.noteCodexAccount(await readCodexAccount()); codexAccountFailed = false }
+    catch (err) { if (!codexAccountFailed) log.warn('Codex account read failed:', err); codexAccountFailed = true }
+  })
+  addRefresher(async () => { await usageHistory.moveOldCache(); hub.set(await usageHistory.scan()) })
   const uploadsOnce = addRefresher(async () => hub.set({ uploads: await readUploads() }))
   const onUpload = () => { uploadsOnce(true).catch(err => log.warn('Uploads: could not read INDEX.md:', err)) }
   uploadEvents.on('saved', onUpload)
@@ -331,9 +353,14 @@ export function startHub(context: vscode.ExtensionContext): void {
     keepAccessNote()
     await refreshDev(servers)
     hub.set({ starred: starredRows(stars, hub.get(), notes, readChains()) })
+    // Ship and the other projects' lists are several git runs per repo and worktree; Ship's own buttons read it at once.
+    if (Date.now() - S.shipAt >= REPOS_EVERY_MS) await refreshShip().catch(err => log.warn('Ship list failed:', err))
     await refreshChanges(true)
     await loadTodos(todoFolders(ws)).catch(err => log.warn('To-do lists failed:', err))
-    await loadLocalTodos(extraTodoFolders(ws)).catch(err => log.warn('Other projects to-do lists failed:', err))
+    if (Date.now() - S.extraAt >= REPOS_EVERY_MS) {
+      S.extraAt = Date.now()
+      await loadLocalTodos(extraTodoFolders(ws)).catch(err => log.warn('Other projects to-do lists failed:', err))
+    }
     hub.set({ jevProjects: Object.fromEntries(todoFolders(ws).map(f => [f, jevProject(f)])) })
   }
   const near = () => nearOnce().catch(err => log.warn('Plan, git or servers failed:', err))
@@ -342,7 +369,7 @@ export function startHub(context: vscode.ExtensionContext): void {
   // Also while the standalone app reads /hub/state with no panel shown, so its chats stay current.
   // Otherwise only the chats, even with no view open, so handoffs, closing and holds still work.
   const fast = setInterval(() => {
-    const work = tickWork(posters.shown, Date.now() - hub.stateReadAt < WATCHED_MS)
+    const work = tickWork(posters.shown, Date.now() - hub.stateReadAt < WATCHED_MS, vscode.window.state.focused, Date.now() - S.nearAt)
     if (work === 'full') void near()
     else refreshChats().catch(err => log.warn('Chats failed:', err))
   }, LIVE_EVERY_MS)
@@ -363,7 +390,39 @@ export function startHub(context: vscode.ExtensionContext): void {
       approveChat(id)
     }
   }, 60_000)
-  context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); clearInterval(research); if (stuck) clearInterval(stuck) } })
+  const offer = idleOffer({
+    list: async () => {
+      // The waits come first: the chats are judged with nothing awaited after.
+      // This window listens too, so a list without it is cut short.
+      if (process.platform !== 'win32' && !(await readListeners(true)).split('\n').includes(`p${process.pid}`)) return []
+      const servers = await listServers()
+      const state = hub.get(), todos = Object.values(state.todos ?? {}).flatMap(list => list.todo)
+      return idleChats({
+        chats: state.chats, progress: state.progress, todos,
+        ours: id => !!tags.ourOf(id),
+        holds: id => {
+          const current = hub.get()
+          if (hub.retryIds().includes(id) || [...pendingWaits].some(([from, w]) => from === id || w.on.includes(id)) || current.waits.some(w => w.sessionId === id) || current.links?.some(l => l.from === id || l.to.includes(id)) || mergeOnEnd.has(id) || startedServer(id, servers)) return true
+          // An ended worktree chat's folder is merged and removed, so it could not be resumed.
+          if (inWorktree(state.chats.find(c => c.sessionId === id)?.cwd ?? '')) return true
+          const profile = readProfiles([id])[id]
+          return !!(profile?.checkBack || profile?.indefinite)
+        },
+      })
+    },
+    rss: async pids => {
+      try {
+        const out = await run('ps', ['-o', 'pid=,rss=', '-p', pids.join(',')])
+        const rows = out.trim().split('\n').filter(Boolean).map(row => row.trim().split(/\s+/).map(Number))
+        return new Map(rows.filter(([pid, kb]) => pid > 0 && Number.isFinite(kb)).map(([pid, kb]) => [pid, kb * 1024]))
+      } catch { return new Map() }
+    },
+    ask: text => vscode.window.showInformationMessage(text, 'Suspend', 'Close', 'Not now'),
+    suspend: suspendIdleChat,
+    close: approveChat,
+  })
+  const idle = setInterval(() => { void offer().catch(err => log.warn('Idle chat check failed:', err)) }, 5 * 60_000)
+  context.subscriptions.push({ dispose: () => { clearInterval(slow); clearInterval(fast); clearInterval(heads); clearInterval(research); clearInterval(idle); if (stuck) clearInterval(stuck) } })
   const sub = hub.onChange(() => {
     syncFirstRun()
     if (S.pending || !posters.shown) return
@@ -447,7 +506,7 @@ function setupAsk(ext: string): void {
   try {
     installAsk(path.join(ext, 'ask'), os.homedir(), server => {
       const c = claudeCall(['mcp', 'add', '--scope', 'user', 'switchboard', '--', 'node', server])
-      execFile(c.cmd, c.args, { timeout: 30_000, shell: c.shell, windowsHide: true }, err => {
+      execFile(c.cmd, c.args, { timeout: 30_000, shell: c.shell, windowsHide: true, windowsVerbatimArguments: c.windowsVerbatimArguments }, err => {
         if (err) log.warn('Ask tool not registered:', err.message)
         else log.info(`Ask tool registered: ${server}`)
       })
@@ -587,24 +646,54 @@ function applyWindowAws(projects: Record<string, string>, browsers: Record<strin
 }
 
 
-// The chat whose changes a panel asked for: one for all views, the last asked wins. Make it per view if two views ever disagree.
+// The chat, or the Ship repo or worktree, whose changes a panel asked for: one for all views, the last asked wins. Make it per view if two views ever disagree.
 let watched: string | undefined
 
-/** The watched chat's uncommitted changes, read again with each near refresh (onTick); an idle chat's at most once a minute. */
+const underDir = (dir: string, cwd?: string) => !!cwd && (cwd === dir || cwd.startsWith(dir + path.sep))
+
+/** Where a chat's, or a listed repo's or worktree's, git commands run. Anything else from the page: undefined. */
+const gitFolder = (id: string): string | undefined => hub.get().chats.find(c => c.sessionId === id)?.cwd ?? shipFolder(hub.get().ship, id)
+
+/** Ship's list: every known project's repo and every chat's, with their worktrees. */
+async function refreshShip(): Promise<void> {
+  const h = hub.get()
+  // Before the projects are listed the read is only the chats' repos, so it does not count.
+  if (h.projects.length) S.shipAt = Date.now()
+  const roots = [...h.projects.map(p => p.path), ...h.chats.flatMap(c => repoTop(c.cwd) ?? [])]
+  const queued = new Set([...mergeOnEnd.values()].flatMap(c => { const wt = worktreeFolder(c); return wt ? [realOf(wt)] : [] }))
+  const list = await readShip(roots, liveIn(h.chats, codexTied))
+  hub.set({ ship: list.map(r => ({ ...r, trees: r.trees.map(t => (queued.has(realOf(t.id)) ? { ...t, queued: true } : t)) })) })
+}
+
+/** The watched chat's uncommitted changes, read again with each near refresh (onTick); an idle chat's (or repo's) at most once a minute. */
 async function refreshChanges(onTick = false): Promise<void> {
   const id = watched
   const chat = id ? hub.get().chats.find(c => c.sessionId === id) : undefined
-  if (!id || !chat) { if (hub.get().changes) hub.set({ changes: null }); return }
-  if (!chat.cwd || !fs.existsSync(chat.cwd)) {
-    const problem = chat.cwd ? 'The chat\'s folder is gone.' : 'This chat has no folder.'
-    if (hub.get().changes?.sessionId !== id || hub.get().changes?.problem !== problem) hub.set({ changes: { sessionId: id, cwd: chat.cwd ?? '', files: [], at: Date.now(), problem } })
+  const cwd = id ? gitFolder(id) : undefined
+  if (!id || (!chat && !cwd)) { if (hub.get().changes) hub.set({ changes: null }); return }
+  if (!cwd || !fs.existsSync(cwd)) {
+    const problem = cwd ? `The ${chat ? 'chat\'s ' : ''}folder is gone.` : 'This chat has no folder.'
+    if (hub.get().changes?.sessionId !== id || hub.get().changes?.problem !== problem) hub.set({ changes: { sessionId: id, cwd: cwd ?? '', files: [], at: Date.now(), problem } })
     return
   }
-  if (onTick && chat.status === 'idle' && hub.get().changes?.sessionId === id && Date.now() - S.changesAt < CHANGES_IDLE_MS) return
+  const idle = chat ? !chat.live || chat.status === 'idle' : !hub.get().chats.some(c => c.live && c.status !== 'idle' && underDir(cwd, c.cwd))
+  if (onTick && idle && hub.get().changes?.sessionId === id && Date.now() - S.changesAt < CHANGES_IDLE_MS) return
   S.changesAt = Date.now()
-  const root = await repoRoot(chat.cwd)
+  const root = await repoRoot(cwd)
   let problem: string | undefined
-  const [files, repo] = await Promise.all([readChanges(chat.cwd).catch(err => { problem = `Git could not read the changes: ${err instanceof Error ? err.message : String(err)}`; return [] }), root ? readRepo(root, await ghPath()) : undefined])
+  const repo = root ? await readRepo(root, await ghPath()) : undefined
+  const key = root ? repoReadKey(root) : undefined
+  const fileCache = changesByCwd.get(cwd)
+  let files = key && fileCache?.key === key ? fileCache.files : undefined
+  if (!files) {
+    try {
+      files = await readChanges(cwd)
+      if (key) { changesByCwd.delete(cwd); changesByCwd.set(cwd, { key, files }); if (changesByCwd.size > 3) changesByCwd.delete([...changesByCwd.keys()][0]) }
+    } catch (err) {
+      problem = `Git could not read the changes: ${err instanceof Error ? err.message : String(err)}`
+      files = []
+    }
+  }
   if (watched !== id) return
   const was = hub.get().repo
   const keep = was?.sessionId === id ? { busy: was.busy, result: was.result } : {}
@@ -612,31 +701,42 @@ async function refreshChanges(onTick = false): Promise<void> {
   // A commit made anywhere since the draft took its changes.
   if (root && repo && drafts.has(root) && !drafts.get(root)!.busy && draftHead.get(root) !== (repo.log[0]?.hash ?? '')) drafts.delete(root)
   const draft = root ? drafts.get(root) : undefined
-  hub.set({ changes: { sessionId: id, cwd: chat.cwd, files, at: Date.now(), ...(problem ? { problem } : {}) }, repo: repo ? { ...repo, sessionId: id, ...keep, ...(draft ? { draft } : {}) } : null })
+  hub.set({ changes: { sessionId: id, cwd, files, at: Date.now(), ...(problem ? { problem } : {}) }, repo: repo ? { ...repo, sessionId: id, ...keep, ...(draft ? { draft } : {}) } : null })
 }
+
+const changesByCwd = new Map<string, { key: string; files: Awaited<ReturnType<typeof readChanges>> }>()
 
 // One git op per repo at a time.
 const gitBusy = new Set<string>()
 
-/** A Git panel button: the repo comes from the chat's own folder, never from the page. */
+// What may run while a worktree merges into the checkout: the rest would move files under its checks or its undo.
+const MERGE_SAFE: ReadonlySet<GitOp> = new Set<GitOp>(['push', 'pr', 'rerun', 'merge-back', 'merge-all'])
+
+/** A Git panel button: the repo comes from the chat's own folder or the Ship list, never from the page. */
 async function runGit(m: Extract<WebviewToExtensionMessage, { type: 'hub-git' }>): Promise<boolean | string> {
-  const chat = hub.get().chats.find(c => c.sessionId === m.sessionId)
-  const root = chat?.cwd && fs.existsSync(chat.cwd) ? await repoRoot(chat.cwd) : undefined
-  if (!root) return refuse('that chat\'s folder is not in a git repo')
+  const cwd = gitFolder(m.sessionId)
+  const root = cwd && fs.existsSync(cwd) ? await repoRoot(cwd) : undefined
+  if (!cwd || !root) return refuse('that folder is not in a git repo')
+  // A worktree merged from its repo's Ship page shows the outcome there.
+  const main = worktreeFolder(cwd) ? mainOf(worktreeFolder(cwd)!) : undefined
+  const mark = (patch: object) => { const r = hub.get().repo; if (r && (r.sessionId === m.sessionId || r.sessionId === main)) hub.set({ repo: { ...r, ...patch } }) }
+  const chat = hub.get().chats.find(c => c.sessionId === m.sessionId) ?? hub.get().chats.find(c => c.live && inWorktree(cwd) && underDir(cwd, c.cwd))
   if (m.op === 'merge-back' && m.confirmed && chat?.live && inWorktree(chat.cwd)) {
     mergeOnEnd.set(chat.sessionId, chat.cwd)
-    const r = hub.get().repo
-    if (r?.sessionId === m.sessionId) hub.set({ repo: { ...r, result: { text: 'Merges into main as soon as this chat ends', ok: true, at: Date.now() } } })
+    mark({ result: { text: 'Merges as soon as its chat ends', ok: true, at: Date.now() } })
+    void refreshShip().catch(err => log.warn('Ship list failed:', err))
     return true
   }
   if (gitBusy.has(root)) return refuse('another git command is still running in this repo')
+  if (!MERGE_SAFE.has(m.op) && mergeBusy(root)) {
+    mark({ result: { text: 'A worktree is merging here; wait for its checks to finish', ok: false, at: Date.now() } })
+    return refuse('a worktree is merging into this repo; wait for its checks to finish')
+  }
   gitBusy.add(root)
-  const mark = (patch: object) => { const r = hub.get().repo; if (r?.sessionId === m.sessionId) hub.set({ repo: { ...r, ...patch } }) }
   mark({ busy: m.op })
   try {
     const { sessionId: _s, type: _t, ...cmd } = m
-    const inRoot = (cwd?: string) => !!cwd && (cwd === root || cwd.startsWith(root + path.sep))
-    const r = await gitOp(root, cmd, await ghPath(), hub.get().chats.some(c => c.live && inRoot(c.cwd)), wt => liveIn(hub.get().chats, codexTied)(wt))
+    const r = await gitOp(root, cmd, await ghPath(), hub.get().chats.some(c => c.live && underDir(root, c.cwd)), wt => liveIn(hub.get().chats, codexTied)(wt))
     if (r.open) openPage(r.open)
     mark({ busy: undefined, result: { text: r.text, ok: r.ok, at: Date.now() } })
     return r.ok || refuse(r.text)
@@ -645,7 +745,10 @@ async function runGit(m: Extract<WebviewToExtensionMessage, { type: 'hub-git' }>
     return refuse((err as Error).message)
   } finally {
     gitBusy.delete(root)
-    watched = m.sessionId
+    // Pressed on Ship: the repo's page stays, and takes over from a worktree that is gone. A chat's page keeps its chat.
+    const onShip = main && m.sessionId === cwd && shipFolder(hub.get().ship, main)
+    watched = onShip && (watched === main || !fs.existsSync(cwd)) ? main : m.sessionId
+    void refreshShip().catch(err => log.warn('Ship list failed:', err))
     void refreshChanges().catch(err => log.warn('Changes failed:', err))
     refreshHub()
   }
@@ -660,9 +763,9 @@ let shownRoot: string | undefined
 
 /** Write commit message: Haiku over the repo's whole git status and the finished chats' messages, into Source Control and RepoView.draft. */
 async function runDraft(sessionId: string): Promise<boolean | string> {
-  const chat = hub.get().chats.find(c => c.sessionId === sessionId)
-  const root = chat?.cwd && fs.existsSync(chat.cwd) ? await repoRoot(chat.cwd) : undefined
-  if (!root) return refuse('that chat\'s folder is not in a git repo')
+  const cwd = gitFolder(sessionId)
+  const root = cwd && fs.existsSync(cwd) ? await repoRoot(cwd) : undefined
+  if (!root) return refuse('that folder is not in a git repo')
   if (drafting.has(root)) return true
   drafting.add(root)
   const mark = (draft: NonNullable<RepoView['draft']>) => {
@@ -682,9 +785,9 @@ async function runDraft(sessionId: string): Promise<boolean | string> {
 // One harden check per repo at a time, sharing gitBusy so neither runs over the other.
 async function runHarden(sessionId: string): Promise<boolean | string> {
   if (!hub.get().controls.switchboard.hardenBuild) return refuse('Harden build check is off in settings')
-  const chat = hub.get().chats.find(c => c.sessionId === sessionId)
-  const root = chat?.cwd && fs.existsSync(chat.cwd) ? await repoRoot(chat.cwd) : undefined
-  if (!root) return refuse('that chat\'s folder is not in a git repo')
+  const cwd = gitFolder(sessionId)
+  const root = cwd && fs.existsSync(cwd) ? await repoRoot(cwd) : undefined
+  if (!root) return refuse('that folder is not in a git repo')
   if (gitBusy.has(root)) return refuse('another command is still running in this repo')
   gitBusy.add(root)
   const mark = (patch: object) => { const r = hub.get().repo; if (r?.sessionId === sessionId) hub.set({ repo: { ...r, ...patch } }) }
@@ -752,7 +855,7 @@ function readSettings(): void {
   const s = read.settings
   const controls = hub.get().controls
   hub.set({
-    rc: { ...hub.get().rc, atStartup: s.remoteControlAtStartup === true },
+    rc: { ...hub.get().rc, atStartup: s.remoteControlAtStartup === true && !codeModeOn(s) },
     keep: { ...hub.get().keep, autoCompact: s.autoCompactEnabled !== false, window: typeof s.autoCompactWindow === 'number' ? s.autoCompactWindow : undefined, autoContinue: s.autoContinueAtUsageLimit === true },
     controls: { ...controls, claude: readControls(s), switchboard: { ...controls.switchboard, hooks: hasSwitchboardHook(s) }, statusLineReady: statusLineCommand() !== undefined },
   })
@@ -799,7 +902,7 @@ const LEARN_FILE = path.join(path.dirname(COMPANY_FILE), 'model-learn.json')
 /** usage-meter reads smart model switch and Advanced mode from company.json. */
 function saveCompany(): void {
   const sb = hub.get().controls.switchboard
-  try { writeCompany(COMPANY_FILE, { smartModelSwitch: sb.smartModelSwitch !== false, advancedMode: sb.advancedMode ?? {}, coderView: sb.coderView }) } catch (err) { log.warn('company.json not written:', err) }
+  try { writeCompany(COMPANY_FILE, { smartModelSwitch: sb.smartModelSwitch !== false, advancedMode: sb.advancedMode ?? {}, coderView: sb.coderView, codexFirst: sb.codexFirst !== false }) } catch (err) { log.warn('company.json not written:', err) }
 }
 
 /** Coder view for every window: globalState like the other switches, and company.json. */
@@ -881,7 +984,7 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
   hub.set({ controls: { ...controls, switchboard } })
   if (key === 'statusBar') applyStatusBar()
   if (key === 'noticeSpot') applyNoticeSpot()
-  if (key === 'smartModelSwitch') saveCompany()
+  if (key === 'smartModelSwitch' || key === 'codexFirst') saveCompany()
   if (key === 'askClaude' || key === 'claudeMode' || key === 'askCodex' || key === 'codexModel' || key === 'codexEffort') applyAsk()
   if (key === 'keepApp') keepApp(value !== false)
   if (key === 'syncRules') syncKit()
@@ -894,6 +997,7 @@ async function setSwitchboard(key: SwitchboardKey, value: boolean | number | str
 export function setRemoteControl(on: boolean): string | undefined {
   const read = readSettingsFile(SETTINGS_PATH)
   if (!read.ok) return `could not read ${SETTINGS_PATH} (${read.error}), so it was left alone`
+  if (on && codeModeOn(read.settings)) return 'Remote Control does not work in Code Mode; take CLAUDE_CODE_EXPERIMENTAL_CODE_MODE out of ~/.claude/settings.json first'
   writeJsonAtomic(SETTINGS_PATH, { ...read.settings, remoteControlAtStartup: on })
   const targets = on ? rcTargets(hub.get().chats) : []
   for (const id of targets) hub.queue(id, { kind: 'rc' })
@@ -909,21 +1013,34 @@ function approveChat(id: string): true | string {
   if (!chat && !p) return refuse('that chat is not listed')
   recordArchive({ ...archiveRow(chat ?? p!, p?.startedAt), ...approvedFields(id, p?.commit) })
   hub.set({ archive: readArchive() })
-  // The worktree's work goes into main once the chat ends (hub-panel-codex runs the queue).
-  const cwd = (chat ?? p!).cwd
-  if (inWorktree(cwd)) mergeOnEnd.set(id, cwd)
+  // The worktree's work goes into the checkout's branch once the chat ends (hub-panel-codex runs the queue), unless Ship turned that off for the repo.
+  const cwd = (chat ?? p!).cwd, wt = worktreeFolder(cwd)
+  if (wt && autoMergeOn(mainOf(wt))) mergeOnEnd.set(id, cwd)
   void chatApproved(id, (chat ?? p!).cwd).catch(err => log.warn('Clearing the approved chat\'s missed rows failed:', err))
   // Mid-turn it keeps running; it shows in History and is closed by hand. A needs-you chat with a prompt waiting keeps running too; one with none closes.
   // waiting: the lead's turn ended and only background jobs or subagents keep it marked working.
   if (staysOpenOnApprove(p)) return true
   if (chat?.ai === 'codex') { closeCodexChat(id); return true }
   const pids = s.chats.filter(c => c.sessionId === id && c.live && c.pid).map(c => c.pid)
-  if (!pids.length) return true
+  closeChatTerminals(id, pids, 'Could not close the approved chat; close its terminal by hand.')
+  return true
+}
+
+function suspendIdleChat(id: string): void {
+  const s = hub.get(), chat = s.chats.find(c => c.sessionId === id)
+  if (!chat) return
+  const p = s.progress.find(x => x.sessionId === id)
+  recordArchive(archiveRow(chat, p?.startedAt, true))
+  hub.set({ archive: readArchive() })
+  closeChatTerminals(id, s.chats.filter(c => c.sessionId === id && c.live && c.pid).map(c => c.pid), 'Could not close the suspended chat; close its terminal by hand.')
+}
+
+function closeChatTerminals(id: string, pids: number[], warning: string): void {
+  if (!pids.length) return
   hub.queue(id, { kind: 'close' })
   void closeApprovedRetry(pids, vscode.window.terminals, undefined, t => tags.ownerOf(t) === 'switchboard')
-    .then(ok => { if (!ok) void vscode.window.showWarningMessage('Could not close the approved chat; close its terminal by hand.') })
-    .catch(err => log.warn('Closing the approved chat failed:', err))
-  return true
+    .then(ok => { if (!ok) void vscode.window.showWarningMessage(warning) })
+    .catch(err => log.warn('Closing the chat failed:', err))
 }
 
 function snoozeEverywhere(id: string): void {
@@ -968,15 +1085,19 @@ const CARD_LINK = 'Kenneth linked these in Switchboard'
 // New chats from New chat that wait on others: sent once the chat runs and takes messages, which waitFor needs.
 const pendingWaits = new Map<string, { on: string[]; at: number }>()
 /** The run's own picks a hub-new-chat or hub-todo-run carries. */
-const runOpts = (m: { model?: string; effort?: RunOpts['effort']; ultracode?: boolean; auto?: boolean; research?: boolean }): RunOpts => ({ model: m.model, effort: m.effort, ultracode: m.ultracode, auto: m.auto, research: m.research })
+const runOpts = (m: { model?: string; effort?: RunOpts['effort']; ultracode?: boolean; auto?: boolean; research?: boolean; workbench?: boolean }): RunOpts => ({ model: m.model, effort: m.effort, ultracode: m.ultracode, auto: m.auto, research: m.research, workbench: m.workbench })
 /** newChat for a hub-new-chat: a Claude chat's id is picked here so its waits and group can find it; a new Codex chat's id is only known once it runs, so it cannot wait yet. */
 async function startChat(folder: string, m: Extract<WebviewToExtensionMessage, { type: 'hub-new-chat' }>): Promise<string | undefined> {
   const claude = (m.ai ?? 'claude') === 'claude', waits = m.waitOn ?? []
-  const id = claude && (waits.length || m.group) ? randomUUID() : undefined
+  // A loop needs the id up front too; New chat offers it to Claude chats only.
+  const loop = claude && m.loop?.mode !== 'turn' ? m.loop : undefined
+  const id = claude && (waits.length || m.group || loop) ? randomUUID() : undefined
   // A Codex chat has no id yet: its waits are applied once bindCodexTerminals ties it.
-  const text = [m.text, takeSeeded(folder)].filter(Boolean).join('\n\n') || m.text
+  const text = [m.text, takeSeeded(folder), loop?.mode === 'goal' ? loopPrompt(true, loop.doneWhen) : ''].filter(Boolean).join('\n\n') || m.text
   const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits, claude && m.worktree === true, runOpts(m))
   if (!problem && id && waits.length) pendingWaits.set(id, { on: waits, at: Date.now() })
+  // The goal text rode in the first prompt, so setLoop's own text is not sent.
+  if (!problem && id && loop) void setLoop(id, loop).catch(err => log.warn(`Loop not set for ${id.slice(0, 8)}: ${(err as Error).message}`))
   return problem
 }
 function startWaits(now = Date.now()): void {
@@ -1004,7 +1125,7 @@ function waitFor(from: string, to: string): true | string | Promise<true | strin
 
 /** Handles the panel's hub messages; false for anything else, a string for why it was refused. */
 export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string | Promise<boolean | string> {
-  const taken = sweepHandle(m) ?? devHandle(m) ?? signInsHandle(m)
+  const taken = sweepHandle(m) ?? devHandle(m) ?? signInsHandle(m) ?? syncHandle(m)
   if (taken !== undefined) return taken
   switch (m.type) {
     case 'hub-send':
@@ -1069,15 +1190,83 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-research-open':
       openResearch(m.sessionId)
       return true
+    case 'hub-research-ask': {
+      const question = m.text.trim()
+      if (!question || question.length > 2000) return refuse('Ask more needs a question under 2000 characters')
+      try {
+        const item = listResearch(LIBRARY).find(x => x.id === m.id)
+        if (!item) return refuse('that report is not saved')
+        addResearchAsk(LIBRARY, m.id, question)
+        const text = `/deep-research ${question}\n[adds to research: ${m.id}]\nThis follows up the saved report at ${path.join(LIBRARY, m.id)}, titled "${item.question}". Read it first; do not repeat what it covers. Report only what is new, with its own Sources section. If something changes an earlier statement, say so on a line starting "Changes the earlier report:". Do not edit the file; Switchboard adds the report to it.`
+        const chat = { type: 'hub-new-chat', path: RESEARCH_ROOT, text, remote: hub.get().rc.atStartup, research: true } as const
+        void (hub.get().projects.some(p => p.path === RESEARCH_ROOT) ? Promise.resolve() : refreshProjects().catch(() => undefined)).then(() => inHome(RESEARCH_ROOT, chat)).then(sent => sent ? undefined : startChat(RESEARCH_ROOT, chat as Extract<WebviewToExtensionMessage, { type: 'hub-new-chat' }>)).then(problem => { if (problem) { cancelResearchAsk(LIBRARY, m.id, question); refuse(problem) } }).catch(err => { cancelResearchAsk(LIBRARY, m.id, question); refuse((err as Error).message) })
+      } catch (err) { return refuse((err as Error).message) }
+      return true
+    }
+    case 'hub-research-folder':
+      try {
+        if (m.op === 'add') addFolder(LIBRARY, m.name)
+        else if (m.op === 'rename') renameFolder(LIBRARY, m.name, m.to ?? '')
+        else deleteFolder(LIBRARY, m.name)
+        hub.set(researchState(LIBRARY))
+      } catch (err) { return refuse((err as Error).message) }
+      return true
+    case 'hub-research-move':
+      try { moveResearch(LIBRARY, m.ids, m.folder); hub.set(researchState(LIBRARY)) } catch (err) { return refuse((err as Error).message) }
+      return true
+    case 'hub-research-organize': {
+      if (m.op === 'auto-on' || m.op === 'auto-off') { setAutoResearch(LIBRARY, m.op === 'auto-on'); hub.set(researchState(LIBRARY)); return true }
+      if (m.op === 'undo') { undoOrganize(LIBRARY); hub.set(researchState(LIBRARY)); return true }
+      if (!beginOrganizeResearch(LIBRARY)) return true
+      hub.set(researchState(LIBRARY))
+      void (async () => {
+        try {
+          const state = researchState(LIBRARY), rows = state.research.filter(x => m.op === 'all' || !x.folder)
+          if (!rows.length) {
+            finishOrganizeResearch(LIBRARY)
+            hub.set(researchState(LIBRARY))
+            return
+          }
+          const raw = await quickAsk(organizePrompt(state, rows), 60_000)
+          const { assignments, created } = parseOrganizeReply(raw, rows, state.researchFolders.names)
+          if (!Object.keys(assignments).length) {
+            finishOrganizeResearch(LIBRARY, FAILED_ORGANIZE)
+            hub.set(researchState(LIBRARY))
+            return
+          }
+          const moved = organizeResearch(LIBRARY, assignments, created)
+          finishOrganizeResearch(LIBRARY, moved ? undefined : FAILED_ORGANIZE)
+          hub.set(researchState(LIBRARY))
+        } catch {
+          finishOrganizeResearch(LIBRARY, FAILED_ORGANIZE)
+          hub.set(researchState(LIBRARY))
+        }
+      })()
+      return true
+    }
     case 'hub-research-seen':
     case 'hub-research-delete': {
       try {
         if (m.type === 'hub-research-seen') markSeen(LIBRARY, m.id)
         else deleteResearch(LIBRARY, m.id)
-        hub.set({ research: listResearch(LIBRARY) })
+        hub.set(researchState(LIBRARY))
       } catch (err) { return refuse((err as Error).message) }
       return true
     }
+    case 'hub-adjust-apply':
+      try {
+        for (const start of applyStarts(m.report, m.keys, hub.get().projects.map(p => p.path))) void handleHubMessage(start)
+      } catch (err) { return refuse((err as Error).message) }
+      return true
+    case 'hub-adjust-undo':
+      return runUndo(m.id, m.force).then(async problem => {
+        hub.set({ adjust: { ...await readAdjust(), said: problem ? { id: m.id, text: problem } : undefined } })
+        return problem ? refuse(problem) : true
+      })
+    case 'hub-adjust-skip':
+      try { skipAction(ADJUSTMENTS, m.report, m.key) } catch (err) { return refuse((err as Error).message) }
+      void readAdjust().then(a => hub.set({ adjust: { ...a, said: hub.get().adjust?.said } }))
+      return true
     case 'hub-mirofish-open':
       void mirofishPage(m.simId).then(r => 'url' in r ? openPage(r.url) : refuse(r.problem), err => refuse(`Could not open MiroFish: ${(err as Error).message}`))
       return true
@@ -1161,21 +1350,19 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     case 'hub-chat-tools':
       void saveChatTools(m.sessionId, m.tools).catch(err => `could not save the chat's tools (${(err as Error).message})`).then(problem => { if (problem) refuse(problem) })
       return true
-    case 'hub-indefinite': {
+    case 'hub-loop': {
       const chat = hub.get().chats.find(c => c.sessionId === m.sessionId)
-      void setIndefinite(m.sessionId, m.on).then(fresh => {
+      void setLoop(m.sessionId, m.loop).then(text => {
+        if (!text || !chat) return
         // Codex has no mod to queue through: type it into the terminal, if this window holds it.
-        if (fresh && chat?.ai === 'codex') { if (codexTied(chat.sessionId)) void sendToCodex(chat, INDEFINITE_TEXT).then(p => { if (p) refuse(p) }) }
-        else if (fresh && chat?.live && hub.takes(chat, false)) hub.queue(chat.sessionId, { kind: 'prompt', text: INDEFINITE_TEXT })
-      }).catch(err => { refuse(`could not turn Run indefinitely ${m.on ? 'on' : 'off'} (${(err as Error).message})`) })
+        if (chat.ai === 'codex') { if (codexTied(chat.sessionId)) void sendToCodex(chat, text).then(p => { if (p) refuse(p) }); else refuse('the goal loop is on, but its text was not sent: this window does not hold the Codex terminal') }
+        else if (chat.live && hub.takes(chat, false)) hub.queue(chat.sessionId, { kind: 'prompt', text })
+        else refuse('the goal loop is on, but its text was not sent: the chat is not running in this window')
+      }).catch(err => { refuse(`could not change the loop (${(err as Error).message})`) })
       return true
     }
     case 'hub-budget':
       void setBudget(m.sessionId, m).catch(err => refuse(`could not set the budget (${(err as Error).message})`))
-      return true
-    case 'hub-checkback':
-    case 'hub-checkback-clear':
-      void setCheckBack(m.sessionId, m.type === 'hub-checkback' ? m.everyMin : null).catch(err => refuse(`could not change check-back (${(err as Error).message})`))
       return true
     case 'hub-refine':
       return sendToChat(m.sessionId, REFINE_TEXT)
@@ -1229,6 +1416,9 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
         return chat.pid ? refuse(`that chat runs outside this ${editor.name} window`) : refuse('no terminal here holds that Codex chat; archive it from its menu if it has ended')
       })
     }
+    case 'hub-open-chat':
+      openChat(m.sessionId, true)
+      return true
     case 'hub-terminal': {
       const problem = terminalAction(m.id, m.act)
       if (problem) refuse(problem)
@@ -1276,6 +1466,11 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
       return true
     case 'hub-git':
       return runGit(m)
+    case 'hub-auto-merge':
+      if (!hub.get().ship?.some(r => r.id === m.repo)) return refuse('that repo is not listed')
+      try { setAutoMerge(m.repo, m.on) } catch (err) { return refuse(`could not save the switch (${(err as Error).message})`) }
+      hub.set({ ship: hub.get().ship!.map(r => (r.id === m.repo ? { ...r, auto: m.on } : r)) })
+      return true
     case 'hub-harden':
       return runHarden(m.sessionId)
     case 'hub-draft-commit':

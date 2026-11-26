@@ -180,7 +180,12 @@ function liveWrite(live, row) {
 }
 
 const JEV = path.join(os.homedir(), '.claude/skills/claude-x-jev/scripts/jev.py')
-const jevUp = () => fs.existsSync(JEV) && spawnSync('python3', [JEV, 'status'], { encoding: 'utf8', timeout: 30000 }).status === 0
+export function pythonRun(args, options, run = spawnSync, platform = process.platform) {
+  if (platform !== 'win32') return run('python3', args, options)
+  const result = run('py', ['-3', ...args], options)
+  return result.error?.code === 'ENOENT' ? run('python', args, options) : result
+}
+const jevUp = () => fs.existsSync(JEV) && pythonRun([JEV, 'status'], { encoding: 'utf8', timeout: 30000 }).status === 0
 
 // Jev's choice over shown options is ~99% "first" (2026-11 run), so each option is rated alone:
 // one item per persona per option, no position to be biased by.
@@ -224,7 +229,7 @@ function runJev(ps, texts, labels, call, goal, dir, tag) {
   const items = ps.flatMap(p => texts.map((t, o) => ({ _id: `${p.id}:${o}`, p: p.id, o, label: labels[o], call, persona: p.text, goal, option: t, ...p.seg })))
   const inp = path.join(dir, `items-${tag}.jsonl`), out = path.join(dir, `jev-${tag}.jsonl`)
   fs.writeFileSync(inp, items.map(x => JSON.stringify(x)).join('\n'))
-  const r = spawnSync('python3', [JEV, 'ask', '--preset', path.join(dir, 'crowd-ab.json'), '--input', inp, '--out', out], { encoding: 'utf8', stdio: ['ignore', 'inherit', 'inherit'] })
+  const r = pythonRun([JEV, 'ask', '--preset', path.join(dir, 'crowd-ab.json'), '--input', inp, '--out', out], { encoding: 'utf8', stdio: ['ignore', 'inherit', 'inherit'] })
   if (r.status !== 0) throw new Error('jev.py failed')
   const rows = fs.readFileSync(out, 'utf8').trim().split('\n').map(l => JSON.parse(l))
   const cost = rows.reduce((s, x) => s + (x._cost || 0), 0)

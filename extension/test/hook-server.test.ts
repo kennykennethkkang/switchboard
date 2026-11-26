@@ -1,6 +1,9 @@
 /** Hook posts need the window's token and no browser Origin, so a web page cannot forge chat events. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 class Emitter<T> {
   private fns: ((v: T) => void)[] = []
@@ -59,6 +62,33 @@ test('an edit of a file another open chat just edited gets a deny with the reaso
   } finally {
     server.dispose()
     hub.set({ progress: [] })
+  }
+})
+
+test('a refused closing question never counts as asked', async () => {
+  const { HookServer } = await import('../src/hook-server')
+  const { hub } = await import('../src/hub/hub-service')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'closing-'))
+  const transcript_path = path.join(dir, 't.jsonl')
+  fs.writeFileSync(transcript_path, [
+    { type: 'user', message: { content: 'fix it' } },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/r/a.ts' } }] } },
+  ].map(e => JSON.stringify(e)).join('\n') + '\n')
+  const server = new HookServer()
+  const port = await server.start()
+  const seen: string[] = []
+  server.onRaw(({ payload }) => seen.push(String(payload.tool_use_id)))
+  const ask = (tool_use_id: string, question: string) => fetch(`http://127.0.0.1:${port}/`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-switchboard-token': hub.token },
+    body: JSON.stringify({ session_id: 'c', cwd: '/r', hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_use_id, transcript_path, tool_input: { questions: [{ question, options: [{ label: 'Approve' }, { label: 'Send back' }] }] } }),
+  }).then(r => r.text())
+  try {
+    assert.match(await ask('early', 'Approve this chat as finished?'), /"deny"/)
+    assert.equal(await ask('other', 'Which layout?'), '')
+    assert.deepEqual(seen, ['other'])
+  } finally {
+    server.dispose()
+    fs.rmSync(dir, { recursive: true })
   }
 })
 

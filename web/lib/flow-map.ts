@@ -6,6 +6,7 @@ import { vscodeBridge } from './vscode-bridge'
 import { downReason } from './hub-remote'
 import type { GraphNode, MemoryGraph } from './memory-graph'
 import type { CheckBack, IndefiniteBudget } from './hub-types'
+import { insidePath } from '../../extension/src/hub/win-path'
 
 export type FlowKind = 'folder' | 'file' | 'chat' | 'skill' | 'plugin' | 'mod' | 'role'
 /** group: a chat node's split id; chats started from one message share it (groupTies). budget, checkBack, costUsd, elapsedMs: a live chat's Run indefinitely limits (budget-ui limitText). */
@@ -14,7 +15,7 @@ export type FlowEdge = { from: string; to: string; kind: 'import' | 'used' | 'to
 export type FlowMap = { project: string; nodes: FlowNode[]; edges: FlowEdge[]; cut?: boolean; builtAt: number }
 
 /** The registered project a folder belongs to: the deepest one holding it, so web/ folds into its repo. */
-export const projectOf = (projects: string[], cwd?: string) => (cwd ? projects.filter(p => cwd === p || cwd.startsWith(`${p}/`)).sort((a, b) => b.length - a.length)[0] : undefined)
+export const projectOf = (projects: string[], cwd?: string) => (cwd ? projects.filter(p => cwd === p || insidePath(p, cwd)).sort((a, b) => b.length - a.length)[0] : undefined)
 
 export async function loadFlowMap(cwd: string, f: typeof fetch = fetch): Promise<FlowMap | string> {
   if (vscodeBridge?.isVSCode) return vscodeBridge.flowMap(cwd)

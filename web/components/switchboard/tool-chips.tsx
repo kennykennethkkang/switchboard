@@ -11,7 +11,7 @@ export const chip = (on: boolean, flagged = false) => ({
 }) as const
 
 // Mirrors ALWAYS in extension/src/hub/tools.ts: on in every chat, so superpowers planning is never lost.
-export const LOCKED = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
+export const LOCKED = ['superpowers', 'ponytail', 'code-review', 'context7']
 
 const link = { font: 'inherit', padding: 0, border: 0, background: 'none', color: 'var(--hub-blue)', cursor: 'pointer', textTransform: 'inherit' } as const
 
@@ -22,7 +22,7 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
   // Title tips are hover only; this line shows the focused or tapped chip's tip (layouts b and c).
   const [tip, setTip] = useState<{ kind: string; text: string }>()
   const order = useRef<LibraryOrder>(undefined)
-  const group = (kind: 'plugins' | 'skills' | 'assets', label: string) => {
+  const group = (kind: 'plugins' | 'skills' | 'assets' | 'extras', label: string) => {
     const map = profile[kind] ?? {}
     const names = Object.keys(map).filter(n => !isLib(n)).sort()
     if (!names.length) return null
@@ -48,7 +48,7 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
                 title={why} onFocus={() => setTip({ kind, text: why })} onPointerDown={() => setTip({ kind, text: why })}
                 onClick={() => { if (!fixed) onChange({ ...profile, [kind]: { ...map, [n]: !on } }) }}>
                 {warn && <span aria-label="flagged" style={{ color: 'var(--hub-yellow)' }}>!</span>}
-                {kind === 'plugins' ? n.split('@')[0] : n}
+                {kind === 'plugins' ? n.split('@')[0] : kind === 'extras' ? n.replace(/^mcp:/, '') : n}
               </button>
             )
           })}
@@ -91,5 +91,5 @@ export function ToolChips({ profile, flagged, tips = {}, onChange }: { profile: 
       </div>
     )
   }
-  return <div style={{ display: 'grid', gap: 10 }}>{group('plugins', 'Plugins')}{group('skills', 'Skills')}{group('assets', 'Design references')}{library()}</div>
+  return <div style={{ display: 'grid', gap: 10 }}>{group('plugins', 'Plugins')}{group('skills', 'Skills')}{group('extras', 'Built-in tools and servers')}{group('assets', 'Design references')}{library()}</div>
 }

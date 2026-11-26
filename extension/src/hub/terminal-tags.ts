@@ -62,6 +62,8 @@ export class TerminalTags<T extends Term> {
 
   ownerOf(t: T) { return this.tags.get(t)?.owner }
   find(id: number) { return [...this.tags].find(([, tag]) => tag.id === id)?.[0] }
+  /** The chat running in a terminal. */
+  chatOf(t: T) { return this.tags.get(t)?.sessionId }
   /** The chat's terminal, ours first. */
   of(sessionId: string) {
     const all = [...this.tags].filter(([, tag]) => tag.sessionId === sessionId)

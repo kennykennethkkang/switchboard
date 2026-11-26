@@ -2,6 +2,7 @@ import { execFileSync, spawn } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { cliCall } from './windows'
 import type { MirofishPost, MirofishReport, MirofishState } from './types'
 
 const API = 'http://localhost:5001/api'
@@ -374,8 +375,8 @@ function mirofishFolder(): string | undefined {
 }
 
 // VS Code started from the Dock has a bare PATH, so look where Homebrew and nvm-less installs put npm.
-const npmPath = () => [...(process.env.PATH ?? '').split(':'), '/opt/homebrew/bin', '/usr/local/bin'].map(dir => path.join(dir, 'npm')).find(runnable)
-const runnable = (f: string) => { try { fs.accessSync(f, fs.constants.X_OK); return true } catch { return false } }
+const npmPath = () => [...(process.env.PATH ?? '').split(path.delimiter), ...(process.platform === 'win32' ? [] : ['/opt/homebrew/bin', '/usr/local/bin'])].map(dir => path.join(dir, process.platform === 'win32' ? 'npm.cmd' : 'npm')).find(runnable)
+const runnable = (f: string) => { try { if (process.platform === 'win32') return fs.existsSync(f); fs.accessSync(f, fs.constants.X_OK); return true } catch { return false } }
 
 /** Starts vite in <MiroFish>/frontend; returns a problem when it cannot. */
 function startWeb(dir: string): string | undefined {
@@ -385,7 +386,8 @@ function startWeb(dir: string): string | undefined {
     const logDir = path.join(os.homedir(), '.claude', 'switchboard')
     fs.mkdirSync(logDir, { recursive: true })
     const log = fs.openSync(path.join(logDir, 'mirofish-web.log'), 'a')
-    const child = spawn(npm, ['run', 'dev'], { cwd: path.join(dir, 'frontend'), detached: true, stdio: ['ignore', log, log], env: { ...process.env, PATH: `${path.dirname(npm)}:${process.env.PATH ?? ''}` } })
+    const call = cliCall(npm, ['run', 'dev'])
+    const child = spawn(call.cmd, call.args, { windowsVerbatimArguments: call.windowsVerbatimArguments, cwd: path.join(dir, 'frontend'), detached: true, stdio: ['ignore', log, log], env: { ...process.env, PATH: [path.dirname(npm), process.env.PATH ?? ''].join(path.delimiter) } })
     child.on('error', () => { /* shows as the 30s wait problem */ })
     child.unref()
     fs.closeSync(log)

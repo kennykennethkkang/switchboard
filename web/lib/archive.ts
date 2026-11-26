@@ -19,12 +19,12 @@ export function liveChats<T extends { sessionId: string }>(chats: T[], archive: 
   return chats.filter(c => !gone.has(c.sessionId))
 }
 
-type IdleCard = { chat: { sessionId: string }; progress?: { state: string; at: number } }
+type IdleCard = { chat: { sessionId: string; live?: boolean }; progress?: { state: string; at: number } }
 
-/** The rail's chats: a done chat quiet for longer than `minutes` is hidden; null hides none. An idle chat always stays, so it can be talked to. Find still lists it. */
+/** The rail's chats: a done chat quiet for longer than `minutes` is hidden; null hides none. An idle chat, or one still running in its terminal, always stays. Find still lists the rest. */
 export function hideDone<T extends IdleCard>(cards: T[], minutes: number | null, picked: string | undefined, now = Date.now()): T[] {
   if (minutes === null) return cards
-  return cards.filter(c => c.chat.sessionId === picked || c.progress?.state !== 'done' || now - c.progress.at <= minutes * 60e3)
+  return cards.filter(c => c.chat.sessionId === picked || c.chat.live || c.progress?.state !== 'done' || now - c.progress.at <= minutes * 60e3)
 }
 
 type Placed = { cwd: string; project?: string }

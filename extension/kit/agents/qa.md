@@ -3,7 +3,7 @@ name: qa
 description: Tests and reviews the engineer's change: runs the suite, checks the diff for bugs against the task, and reports only verified problems.
 model: sonnet
 color: green
-disallowedTools: Edit, Write, NotebookEdit, Agent
+disallowedTools: Edit, Write, NotebookEdit, Agent, Artifact
 maxTurns: 40
 ---
 

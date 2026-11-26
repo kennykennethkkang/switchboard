@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CHECK_BACK_MAX, dueCheckBacks, hasOpenWork } from '../src/hub/checkback'
+import { CHECK_BACK_MAX, CHECK_BACK_TEXT, checkBackText, dueCheckBacks, hasOpenWork } from '../src/hub/checkback'
 
 const MIN = 60_000
 const chat = (o: object = {}) => ({ sessionId: 'a', status: 'idle', updatedAt: 0, takes: true, open: true, ...o })
@@ -21,6 +21,13 @@ test('check-back: skips busy, closed, unowned, no-work and unset chats', () => {
   const s = { a: { everyMin: 10 as const, count: 0 } }
   for (const o of [{ status: 'busy' }, { stopped: true }, { takes: false }, { open: false }, { updatedAt: undefined }]) assert.deepEqual(dueCheckBacks(60 * MIN, [chat(o)], s), [])
   assert.deepEqual(dueCheckBacks(60 * MIN, [chat()], {}), [])
+})
+
+test('check-back: a custom prompt fires with no open work; the default text needs it', () => {
+  assert.deepEqual(dueCheckBacks(30 * MIN, [chat({ open: false })], { a: { everyMin: 30, count: 0, text: 'check the inbox' } }), ['a'])
+  assert.deepEqual(dueCheckBacks(30 * MIN, [chat({ open: false })], { a: { everyMin: 30, count: 0 } }), [])
+  assert.equal(checkBackText({ everyMin: 30, count: 0, text: 'check the inbox' }), 'check the inbox')
+  assert.equal(checkBackText({ everyMin: 30, count: 0 }), CHECK_BACK_TEXT)
 })
 
 test('hasOpenWork: an open task, a running agent or a background job', () => {

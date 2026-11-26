@@ -8,6 +8,7 @@ import { execFile } from 'child_process'
 import * as path from 'path'
 import { repoTop } from './projects'
 import { claudeBinary } from './setup'
+import { cliCall } from './windows'
 import type { BoardProject, ChatLink, HubState, Server, SessionLive, Suggestion } from './types'
 
 const CLASH_MS = 60 * 60 * 1000
@@ -223,7 +224,8 @@ export const quickAskArgs = (prompt: string, model = 'haiku') => ['-p', '--no-se
 /** One quick answer from Claude Code on the subscription, Haiku unless model says otherwise; rejects on error. */
 export function quickAsk(prompt: string, timeoutMs = ASK_TIMEOUT_MS, model = 'haiku'): Promise<string> {
   // CLAUDE_CODE_CHILD_SESSION keeps this throwaway call out of the chat list and /resume.
-  return new Promise((resolve, reject) => execFile(claudeBinary(), quickAskArgs(prompt, model), { timeout: timeoutMs, maxBuffer: 1 << 20, env: { ...process.env, CLAUDE_CODE_CHILD_SESSION: '1' } },
+  const call = cliCall(claudeBinary(), quickAskArgs(prompt, model))
+  return new Promise((resolve, reject) => execFile(call.cmd, call.args, { windowsVerbatimArguments: call.windowsVerbatimArguments, timeout: timeoutMs, maxBuffer: 1 << 20, env: { ...process.env, CLAUDE_CODE_CHILD_SESSION: '1' } },
     (err, stdout) => (err ? reject(err) : resolve(stdout.trim()))))
 }
 

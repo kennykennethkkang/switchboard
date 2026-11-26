@@ -2,6 +2,7 @@
  * The standalone app's hub proxy: which window it talks to, and which browser
  * requests it lets through.
  */
+import '../../extension/test/temp-home'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { allowed, codeLogin, macOnly, hostOk, lanNames, macNames, macNamesRead, commandSession, deniedAs, deviceAsks, editorOf, forwardedIp, lanCookie, lanFor, lanGate, lanSetCookie, commandFolder, liveToken, phoneCode, phoneSecret, pickWindow, proxyHub, signInPage, tailscaleName, tailscaleProblem, uaSummary, waitPage } from './hub-proxy'
@@ -555,6 +556,12 @@ describe('proxyHub to-do', () => {
     assert.equal(bare, 403)
   })
 
+  it('passes usage with no query through and adds the window token', async () => {
+    hops.length = 0; tokens.length = 0
+    assert.equal((await call(`127.0.0.1:${port}`, 'GET', '/hub/usage?token=evil&x=1')).status, 204)
+    assert.deepEqual([hops.map(h => h.url), tokens], [['/hub/usage'], ['tok']])
+  })
+
   it('passes the chat view reads on with only their own fields, GET only', async () => {
     hops.length = 0
     for (const q of ['/hub/chat/outputs?session=s-1&token=evil', '/hub/chat/transcript?session=s-1&before=99&x=1', '/hub/chat/shot?session=s-1&path=%2Fa%2Fb.png']) {
@@ -737,6 +744,83 @@ describe('proxyHub upstream dying', () => {
     // Drop any held socket, so a regression fails the test instead of hanging the run.
     app.closeAllConnections(); up.closeAllConnections(); app.close(); up.close()
     assert.notEqual(done, 'hang')
+  })
+})
+
+describe('proxyHub page disconnects', () => {
+  for (const route of ['/hub/graph', '/hub/voice', '/hub/upload?cwd=%2Fp&name=x.bin&session=s']) {
+    it(`does not throw when the page closes before ${route} answers`, async () => {
+      let upstreamSeen!: () => void
+      let upstreamClosed!: () => void
+      const reachedUpstream = new Promise<void>(resolve => { upstreamSeen = resolve })
+      const upstreamGone = new Promise<void>(resolve => { upstreamClosed = resolve })
+      const upstream = http.createServer((req, res) => {
+        req.socket.once('close', upstreamClosed)
+        req.resume()
+        req.on('end', () => { upstreamSeen(); setTimeout(() => { if (!res.destroyed) res.end('late') }, 2500) })
+      })
+      await new Promise<void>(ok => upstream.listen(0, '127.0.0.1', ok))
+      const upstreamPort = (upstream.address() as AddressInfo).port
+      const app = http.createServer((req, res) => {
+        void proxyHub(req, res, (app.address() as AddressInfo).port, '/p', undefined, async () => [{ port: upstreamPort, hubToken: 't', workspace: '/p', mtimeMs: 1, pid: process.pid }])
+      })
+      await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+      const port = (app.address() as AddressInfo).port
+      const uncaught: Error[] = []
+      const capture = (err: Error) => { uncaught.push(err) }
+      process.on('uncaughtException', capture)
+      try {
+        const client = http.request({ host: '127.0.0.1', port, method: route === '/hub/graph' ? 'GET' : 'POST', path: route, headers: { 'X-Switchboard': '1', Host: `127.0.0.1:${port}` } })
+        client.on('error', () => {})
+        client.end(route === '/hub/graph' ? undefined : route.startsWith('/hub/upload') ? 'file' : '{"type":"x"}')
+        await reachedUpstream
+        client.destroy()
+        const cancelled = await Promise.race([upstreamGone.then(() => true), new Promise<boolean>(resolve => setTimeout(() => resolve(false), 2000))])
+        assert.equal(cancelled, true, 'upstream request should close with the page')
+        await new Promise(ok => setTimeout(ok, 120))
+        assert.deepEqual(uncaught, [])
+      } finally {
+        process.off('uncaughtException', capture)
+        app.closeAllConnections(); upstream.closeAllConnections(); app.close(); upstream.close()
+      }
+    })
+  }
+
+  it('keeps forwarding a command after its page closes', async () => {
+    const body = JSON.stringify({ type: 'hub-send', text: 'x'.repeat(50_000) })
+    let upstreamStarted!: () => void
+    let forwarded!: (value: { body: string; aborted: boolean }) => void
+    const sawUpstream = new Promise<void>(resolve => { upstreamStarted = resolve })
+    const reachedWindow = new Promise<{ body: string; aborted: boolean }>(resolve => { forwarded = resolve })
+    const upstream = http.createServer((req, res) => {
+      let text = ''
+      let aborted = false
+      req.on('aborted', () => { aborted = true })
+      req.setEncoding('utf8')
+      req.on('data', c => { text += c })
+      req.on('end', () => { forwarded({ body: text, aborted }); setTimeout(() => res.end('done'), 40) })
+      req.pause()
+      upstreamStarted()
+      setTimeout(() => req.resume(), 40)
+    })
+    await new Promise<void>(ok => upstream.listen(0, '127.0.0.1', ok))
+    const upstreamPort = (upstream.address() as AddressInfo).port
+    const app = http.createServer((req, res) => {
+      void proxyHub(req, res, (app.address() as AddressInfo).port, '/p', undefined, async () => [{ port: upstreamPort, hubToken: 't', workspace: '/p', mtimeMs: 1, pid: process.pid }])
+    })
+    await new Promise<void>(ok => app.listen(0, '127.0.0.1', ok))
+    const port = (app.address() as AddressInfo).port
+    try {
+      const client = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hub/command', headers: { 'X-Switchboard': '1', Host: `127.0.0.1:${port}` } })
+      client.on('error', () => {})
+      client.end(body)
+      await sawUpstream
+      client.destroy()
+      const got = await Promise.race([reachedWindow, new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 250))])
+      assert.deepEqual(got, { body, aborted: false })
+    } finally {
+      app.closeAllConnections(); upstream.closeAllConnections(); app.close(); upstream.close()
+    }
   })
 })
 

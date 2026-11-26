@@ -4,6 +4,7 @@
  * (<session id>.settings.json), which the chat starts and resumes with (--settings).
  * enabledPlugins there merges per key, so every plugin is written out; skillOverrides only
  * hides user and project skills, plugin skills go with their plugin. Mods are never touched.
+ * Built-in tools start off; MCP servers start on except the ON_DEMAND_EXTRAS list.
  * Design references (assets) left on are named to the chat in its appended system note, to read before UI work.
  * The bundled design library (source 'library', absolute paths) is the opposite: off unless turned on by hand.
  * Every chat gets --settings with bypassPermissions (default with Ask before actions on, auto with Auto chosen), so a project's own mode cannot change it.
@@ -16,7 +17,7 @@ import { SHELL, ask, shellQuote, type Shell } from './projects'
 import type { ChatProfile, IndefiniteEntry, Installed } from './types'
 import type { HubService } from './hub-service'
 import { writeJsonAtomic } from '../fs-utils'
-import { LIBRARY, libraryCopies, libraryInventory, projectInventory } from './local'
+import { BUILTINS, LIBRARY, libraryCopies, libraryInventory, projectInventory } from './local'
 
 export const PROFILES = path.join(os.homedir(), '.claude', 'switchboard', 'chat-profiles')
 /** Run indefinitely flags, { session id: IndefiniteEntry }: onAt alone as a number, or an object with the budget; owned here, read by the usage-meter mod. */
@@ -25,12 +26,16 @@ export const INDEFINITE = path.join(os.homedir(), '.claude', 'switchboard', 'ind
 // the second security-guidance runs the same hooks twice.
 export const FLAGGED: string[] = ['security-guidance@claude-code-plugins']
 // Plugins every chat keeps, by the name before the @.
-export const ALWAYS = ['superpowers', 'ponytail', 'code-review', 'context7', 'playwright']
+export const ALWAYS = ['superpowers', 'ponytail', 'code-review', 'context7']
 // Big niche bundles, off in a new chat so the rest of the skill listing keeps its descriptions.
 // Smart turns one on from its keywords (smart-tools.ts RULES), tool_on any time. Short name -> what it is for.
-export const GATED: Record<string, string> = { 'marketing-skills': 'SEO, copy, ads, pricing, launches', 'aws-core': 'AWS services', bland: 'voice agents and phone calls', founder: 'startup pricing, pitch decks, go-to-market, fundraising' }
+export const GATED: Record<string, string> = { 'marketing-skills': 'SEO, copy, ads, pricing, launches', 'aws-core': 'AWS services', bland: 'voice agents and phone calls', founder: 'startup pricing, pitch decks, go-to-market, fundraising', playwright: 'browser automation over MCP, when agent-browser is not enough' }
 // Claude Code drops skill descriptions past this share of context (default 0.01).
 export const LISTING = { skillListingBudgetFraction: 0.02 }
+const MCP = 'mcp:'
+const CLAUDE_AI = 'claude.ai '
+// As Claude Code spells a server in tool names: mcp__claude_ai_Claude_Docs.
+const ruleOf = (name: string) => name.startsWith(MCP) ? `mcp__${name.slice(MCP.length).replace(/[^\w-]/g, '_')}` : name
 /** Appended to a profiled chat's system prompt, so it never asks for a tool. */
 export const TOOLS_NOTE = 'Every installed plugin and skill is yours to use without asking; if one is off, call the switchboard tool_on tool and use it at once from the file it points to.'
 
@@ -38,6 +43,12 @@ const short = (id: string) => id.split('@')[0]
 const plugins = (inv: Installed[]) => inv.filter(i => i.kind === 'plugin')
 // Archived skills cannot load anyway, so only ~/.claude/skills counts.
 const skills = (inv: Installed[]) => inv.filter(i => i.kind === 'skill' && i.enabled)
+const isExtra = (i: Installed) => i.kind === 'builtin' || i.kind === 'mcp'
+const ON_DEMAND_EXTRAS = new Set(['mcp:scrapling'])
+const extraMap = (inv: Installed[]) => {
+  const xs = inv.filter(isExtra)
+  return xs.length ? { extras: Object.fromEntries(xs.map(x => [x.name, x.kind === 'mcp' && !ON_DEMAND_EXTRAS.has(x.name)])) } : {}
+}
 const isLib = (i: Installed) => i.source === 'library'
 const allAssets = (inv: Installed[]) => inv.filter(i => i.kind === 'asset' && i.path)
 const library = (inv: Installed[]) => allAssets(inv).filter(isLib)
@@ -50,13 +61,14 @@ const fix = (id: string, on: boolean) => (ALWAYS.includes(short(id)) ? true : FL
 // Held by the sweep until Kenneth approves it: off in every chat, whatever the profile says.
 const heldNames = (inv: Installed[]) => new Set(inv.filter(i => i.held).map(i => i.name))
 
-/** A new chat's tools: everything on but FLAGGED, GATED, the library and what the sweep holds. */
+/** A new chat's tools: everything on but FLAGGED, GATED, BUILTINS, the library and what the sweep holds. */
 export function defaultProfile(inv: Installed[]): ChatProfile {
   const held = heldNames(inv)
   return {
     plugins: Object.fromEntries(plugins(inv).map(p => [p.name, !held.has(p.name) && fix(p.name, !Object.hasOwn(GATED, short(p.name)))])),
     skills: Object.fromEntries(skills(inv).map(s => [s.name, !held.has(s.name) && !FLAGGED.includes(s.name)])),
     ...assetMap(inv, a => !isLib(a)),
+    ...extraMap(inv),
   }
 }
 
@@ -65,7 +77,7 @@ export function cleanProfile(p: ChatProfile, inv: Installed[]): ChatProfile {
   const d = defaultProfile(inv), held = heldNames(inv)
   const pick = (from: Record<string, boolean>, base: Record<string, boolean>) =>
     Object.fromEntries(Object.entries(base).map(([k, v]) => [k, held.has(k) ? false : typeof from[k] === 'boolean' && !ALWAYS.includes(short(k)) ? from[k] : v]))
-  return { plugins: pick(p.plugins ?? {}, d.plugins), skills: pick(p.skills ?? {}, d.skills), ...(d.assets ? { assets: pick(p.assets ?? {}, d.assets) } : {}), ...keep(p) }
+  return { plugins: pick(p.plugins ?? {}, d.plugins), skills: pick(p.skills ?? {}, d.skills), ...(d.assets ? { assets: pick(p.assets ?? {}, d.assets) } : {}), ...(d.extras ? { extras: pick(p.extras ?? {}, d.extras) } : {}), ...keep(p) }
 }
 
 /** The Run indefinitely flag, its budget and the check-back ride every profile rewrite. */
@@ -89,21 +101,22 @@ export const cleanName = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+
 /** Appended to every chat Switchboard starts or resumes once a name is set. */
 export function nameNote(name: string): string | undefined {
   const n = cleanName(name)
-  return n ? `Address the user as ${n}. Speak to ${n} like a composed, quietly witty personal AI aide: brief, warm, capable. Use the name when talking to ${n} directly, not in every line. This is for chat replies only, never files, code or commits, and it never overrides the rules or formats the user set.` : undefined
+  return n ? `Address the user as ${n}. Speak to ${n} like a composed, quietly witty personal AI aide: brief, warm, capable. Write replies in ASD-STE100 Simplified Technical English: short sentences, one fact per sentence, common words except exact technical names, active voice. Use the name when talking to ${n} directly, not in every line. This is for chat replies only, never files, code or commits, and it never overrides the rules or formats the user set.` : undefined
 }
 
-// Off tools named in the note, at most this many.
+// Off plugins and skills named in the note, at most this many; built-in tools and servers are all named.
 const NOTE_MAX = 15
 
-/** TOOLS_NOTE plus what is off (GATED bundles with their use, then any other plugin or skill, with info's line for it) and the design references left on, for --append-system-prompt. */
+/** TOOLS_NOTE plus what is off (GATED bundles with their use, built-in tools and MCP servers, then any other plugin or skill, with info's line for it) and the design references left on, for --append-system-prompt. */
 export function toolsNote(p: ChatProfile, held?: Set<string>, info: Record<string, string> = {}): string {
   const refs = Object.entries(p.assets ?? {}).filter(([, on]) => on).map(([k]) => k)
   // Held ones need Approve, not tool_on, so they stay out of the line.
   const offs = [...Object.entries(p.plugins), ...Object.entries(p.skills)].filter(([k, on]) => !on && !held?.has(k) && !FLAGGED.includes(k))
-  const label = (k: string) => { const use = GATED[short(k)] ?? info[k]?.replace(/\s+/g, ' ').slice(0, 60); return use ? `${short(k)} (${use})` : short(k) }
+  const label = (k: string) => { const use = GATED[short(k)] ?? (Object.hasOwn(BUILTINS, k) ? BUILTINS[k].about : undefined) ?? info[k]?.replace(/\s+/g, ' ').slice(0, 60); return use ? `${short(k)} (${use})` : short(k) }
   const gated = offs.filter(([k]) => Object.hasOwn(GATED, short(k))).map(([k]) => label(k))
   const rest = offs.filter(([k]) => !Object.hasOwn(GATED, short(k))).map(([k]) => label(k))
-  const all = [...gated, ...rest], off = all.slice(0, NOTE_MAX)
+  const all = [...gated, ...rest], extras = offExtras(p).map(label)
+  const off = [...all.slice(0, gated.length), ...extras, ...all.slice(gated.length, NOTE_MAX)]
   if (all.length > NOTE_MAX) off.push(`and ${all.length - NOTE_MAX} more`)
   return [TOOLS_NOTE,
     off.length ? `Off until needed, turn on with tool_on when the task calls for it: ${off.join(', ')}.` : '',
@@ -137,11 +150,36 @@ const mode = () => ask.claude
   ? { ...LISTING, permissions: { defaultMode: 'auto' } }
   : { ...LISTING, permissions: { defaultMode: 'bypassPermissions' }, skipDangerousModePermissionPrompt: true, enableAllProjectMcpServers: true }
 
-export const profileSettings = (p: ChatProfile) => ({
-  enabledPlugins: { ...p.plugins },
-  skillOverrides: Object.fromEntries(Object.entries(p.skills).filter(([, on]) => !on).map(([k]) => [k, 'off'])),
-  ...mode(),
-})
+const offExtras = (p: ChatProfile) => Object.entries(p.extras ?? {}).filter(([, on]) => !on).map(([k]) => k)
+
+/**
+ * What turns a profile's extras off. Artifact goes by env: enableArtifact false in the user's settings could not be turned back on
+ * for one chat. Other built-ins and claude.ai connectors by a deny rule (deniedMcpServers prints an enterprise policy warning for those),
+ * other MCP servers by deniedMcpServers, so they never connect.
+ */
+function extraSettings(p: ChatProfile): { deny: string[]; rest: object } {
+  const off = offExtras(p)
+  const servers = off.filter(n => n.startsWith(MCP) && !n.startsWith(MCP + CLAUDE_AI))
+  const deny = off.filter(n => n !== 'Artifact' && !servers.includes(n)).map(ruleOf)
+  const art = p.extras?.Artifact
+  return { deny, rest: {
+    ...(art === undefined ? {} : { env: { CLAUDE_CODE_DISABLE_ARTIFACT: art ? '0' : '1' } }),
+    ...(servers.length ? { deniedMcpServers: servers.map(n => ({ serverName: n.slice(MCP.length) })) } : {}),
+  } }
+}
+
+// Deny rules beside the current mode.
+const modeWith = (deny?: string[]) => { const m = mode(); return deny?.length ? { ...m, permissions: { ...m.permissions, deny } } : m }
+
+export const profileSettings = (p: ChatProfile) => {
+  const x = extraSettings(p)
+  return {
+    enabledPlugins: { ...p.plugins },
+    skillOverrides: Object.fromEntries(Object.entries(p.skills).filter(([, on]) => !on).map(([k]) => [k, 'off'])),
+    ...modeWith(x.deny),
+    ...x.rest,
+  }
+}
 
 const ID = /^[0-9a-f-]{8,64}$/i
 const fileOf = (id: string, dir: string, ext = 'json') => {
@@ -213,8 +251,8 @@ export function resumeSettingsArg(id: string, dir = PROFILES, extra = '', shell:
 /** A settings file whose profile is unreadable keeps its tools but takes the current mode. */
 function remode(file: string): void {
   try {
-    const { permissions: _p, skipDangerousModePermissionPrompt: _s, enableAllProjectMcpServers: _e, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8'))
-    fs.writeFileSync(file, `${JSON.stringify({ ...rest, ...mode() }, null, 2)}\n`, { mode: 0o600 })
+    const { permissions: was, skipDangerousModePermissionPrompt: _s, enableAllProjectMcpServers: _e, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8'))
+    fs.writeFileSync(file, `${JSON.stringify({ ...rest, ...modeWith(was?.deny) }, null, 2)}\n`, { mode: 0o600 })
   } catch { /* unreadable: left for the CLI to report */ }
 }
 
@@ -232,15 +270,26 @@ export function savedProfile(id: string, dir = PROFILES, lib = LIBRARY): ChatPro
 
 /** A profile saved before chats started all on (its settings lack permissions): all on but FLAGGED, library copies off, other assets as saved. */
 function allOn(p: ChatProfile, lib: string): ChatProfile {
-  const on = (m: Record<string, boolean>) => Object.fromEntries(Object.keys(m).map(k => [k, !FLAGGED.includes(k)]))
+  const on = (m: Record<string, boolean>, plugins = false) => Object.fromEntries(Object.keys(m).map(k => [k, !FLAGGED.includes(k) && !(plugins && short(k) === 'playwright')]))
   const brand = (k: string) => /^design-md\/([^/]+)\//.exec(k)?.[1] ?? ''
   const copies = libraryCopies(Object.keys(p.assets ?? {}).map(brand).filter(Boolean), lib)
-  return { plugins: on(p.plugins), skills: on(p.skills), ...(p.assets ? { assets: Object.fromEntries(Object.entries(p.assets).map(([k, v]) => [k, v && !copies.has(brand(k))])) } : {}), ...keep(p) }
+  return { plugins: on(p.plugins, true), skills: on(p.skills), ...(p.assets ? { assets: Object.fromEntries(Object.entries(p.assets).map(([k, v]) => [k, v && !copies.has(brand(k))])) } : {}), extras: { ...p.extras, 'mcp:scrapling': p.extras?.['mcp:scrapling'] ?? false }, ...keep(p) }
 }
 
-/** A plugin (id or short name, either with :skill or :command) or a skill by name, on in the profile, and the file to read to use it now. */
-export function turnOn(p: ChatProfile, inv: Installed[], name: string, cwd?: string): { profile: ChatProfile; use: string } | undefined {
+/** How a chat that started without a built-in tool or MCP server gets it now. Bash inherits the off switch, so the call clears it first. */
+function useNow(name: string): string {
+  const now = BUILTINS[name]?.now
+  if (now) return now
+  const call = (pre: string, post: string) => `run it headless, ${pre}claude -p '<the whole task, with full paths and links>' --allowedTools '${ruleOf(name)}'${post}`
+  return name === 'Artifact' ? call('env -u CLAUDE_CODE_DISABLE_ARTIFACT CLAUDE_CODE_ARTIFACT=1 ', ` --settings '{"env":{"CLAUDE_CODE_DISABLE_ARTIFACT":"0"}}'`) : call('', '')
+}
+
+/** A plugin (id or short name, either with :skill or :command), a skill, a built-in tool or an MCP server by name, on in the profile, and the file to read to use it now (next: what to do until the next start). */
+export function turnOn(p: ChatProfile, inv: Installed[], name: string, cwd?: string): { profile: ChatProfile; use: string; next?: true } | undefined {
   const n = name.trim().replace(/^\//, '')
+  const extra = (k: string) => inv.some(i => isExtra(i) && i.name === k) ? { profile: { ...p, extras: { ...p.extras, [k]: true } }, use: useNow(k), next: true as const } : undefined
+  const exact = n.startsWith(MCP) ? extra(n) : undefined
+  if (exact) return exact
   const cut = n.indexOf(':'), plug = cut < 0 ? n : n.slice(0, cut), skill = cut < 0 ? '' : n.slice(cut + 1)
   // The first file that exists; none found, the folder to look in.
   const first = (paths: string[], dir: string) => paths.find(f => fs.existsSync(f)) ?? dir
@@ -249,10 +298,10 @@ export function turnOn(p: ChatProfile, inv: Installed[], name: string, cwd?: str
   if (pl) {
     const dir = pl.path
     const use = !dir ? pl.name : skill ? first([path.join(dir, 'skills', skill, 'SKILL.md'), path.join(dir, 'commands', `${skill}.md`)], dir) : dir
-    return { profile: { ...p, plugins: { ...p.plugins, [pl.name]: true } }, use }
+    return { profile: { ...p, plugins: { ...p.plugins, [pl.name]: true } }, use, ...(short(pl.name) === 'playwright' ? { next: true as const } : {}) }
   }
   const sk = skills(inv).find(i => i.name === n)
-  if (!sk) return undefined
+  if (!sk) return extra(n) ?? extra(MCP + n)
   const roots = [...(sk.source === 'project' && cwd ? [path.join(cwd, '.claude', 'skills'), path.join(cwd, '.agents', 'skills')] : []), path.join(os.homedir(), '.claude', 'skills')]
   return { profile: { ...p, skills: { ...p.skills, [sk.name]: true } }, use: first(roots.map(r => path.join(r, sk.name, 'SKILL.md')), roots[0]) }
 }
@@ -274,6 +323,9 @@ export async function toolOn(hub: HubService, session: string, name: string): Pr
   saveProfile(session, profile)
   const tools = hub.get().tools
   if (tools) hub.set({ tools: { ...tools, chats: { ...tools.chats, [session]: profile } } })
+  if (on.next || short(name) === 'playwright') return short(name) === 'playwright'
+    ? `${name} is on from the next start. Until then, use the agent-browser CLI.`
+    : `${name} is on for this chat from its next start. Until then: ${on.use}.`
   return `${name} is on for this chat. Use it now from ${on.use}. Its slash commands and MCP tools load when the chat next starts.`
 }
 

@@ -25,7 +25,7 @@ import { BoardTools, DEFAULT_CHROME, beltCounts, chromeOf } from './board-tools'
 import { SummaryFold } from './chat-cards'
 import { ModelEffort } from './model-effort'
 import { fiveHourUse, runFields, startPicks, type RunPicks } from '@/lib/model-effort'
-import { vscodeBridge } from '@/lib/vscode-bridge'
+import { onScreen as seen, vscodeBridge } from '@/lib/vscode-bridge'
 import { COARSE_DPR, MAX_DPR, frameLoop } from '@/lib/frame-loop'
 import './board.css'
 import './smart-select.css'
@@ -1188,7 +1188,7 @@ function Panel({ node, court, hub, shared, colors: c, cast: set, sent, onPick, o
   const [ask0, setAsk0] = useState(''), [asked, setAsked] = useState('')
   const [picks, setPicks] = useState<RunPicks>(() => startPicks(hub))
   const [now, setNow] = useState(() => Date.now())
-  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
+  useEffect(() => { const i = setInterval(() => { if (seen()) setNow(Date.now()) }, 1000); return () => clearInterval(i) }, [])
   // A pavilion's chats are its AI's, wherever they hang.
   const desks = court.nodes.filter(n => n.kind === 'desk'), kids = court.nodes.filter(m => node.kind === 'pavilion' ? m.kind === 'courtyard' && m.ai === node.ai : node.kind === 'window' ? m.kind === 'courtyard' && homeOf(court, m) === node.id : m.parent === node.id)
   const p = node.chatId ? hub.progress.find(x => x.sessionId === node.chatId) : undefined
@@ -1230,13 +1230,14 @@ function Panel({ node, court, hub, shared, colors: c, cast: set, sent, onPick, o
       {stats.length > 0 && <dl className="bp-stats">{stats.map(([v, l, hot]) => <div key={l}><dt>{l}</dt><dd className={hot ? 'hot' : undefined}>{v}</dd></div>)}</dl>}
       {node.kind === 'pavilion' && node.ai === 'research' && (() => {
         const proj = hub.projects.find(p => p.isOpen)?.path ?? hub.projects[0]?.path
-        const go = () => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false, research: true, ...runFields(picks, 'claude') }); setAsked(ask0.trim()); setAsk0('') } }
+        const go = (workbench?: boolean) => { if (ask0.trim() && proj) { send({ type: 'hub-new-chat', path: proj, text: workbench ? ask0.trim() : `Deep research this and report with checked citations: ${ask0.trim()}`, remote: false, research: true, ...(workbench ? { workbench } : {}), ...runFields(picks, 'claude') }); setAsked(`${workbench ? 'Workbench' : 'Research'}: ${ask0.trim()}`); setAsk0('') } }
         return <div className="bp-pad bp-form">
-          <textarea className="bp-text" rows={3} aria-label="Research question" placeholder="What should the research chat look into?" value={ask0}
+          <textarea className="bp-text" rows={3} aria-label="Research question" placeholder="What should it look into, or change on this device?" value={ask0}
             onChange={e => setAsk0(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go() }} />
           <ModelEffort ai="claude" value={picks} onChange={setPicks} usage={fiveHourUse(hub, 'claude')} compact />
-          <button type="button" className="hub-btn primary sm" disabled={!ask0.trim() || !proj} onClick={go}>Research</button>
-          <p className="bp-said" role="status">{asked && <>Started in the Research window: {asked}</>}</p>
+          <button type="button" className="hub-btn primary sm" disabled={!ask0.trim() || !proj} onClick={() => go()}>Research</button>
+          <button type="button" className="hub-btn sm" disabled={!ask0.trim() || !proj} onClick={() => go(true)} title="Starts a Workbench chat that makes the change on this device, with a log and Undo">Change it</button>
+          <p className="bp-said" role="status">{asked && <>Started in the Research window. {asked}</>}</p>
         </div>
       })()}
       {node.kind === 'courtyard' && node.chatId && onSummary && <div className="bp-pad"><SummaryFold id={node.chatId} name={node.label} summary={hub.summaries?.[node.chatId]} onAsk={refresh => onSummary(node.chatId!, refresh)} onCopy={onCopy} /></div>}
@@ -1277,8 +1278,10 @@ function Panel({ node, court, hub, shared, colors: c, cast: set, sent, onPick, o
 /** on*: the tool belt's way out to the rest of Switchboard; todoCount and files are its badges. */
 export type BoardWays = { onNew?: () => void; onTodo?: () => void; /** The Memory and Flow map views, from the library and the map room. */ onMemory?: () => void; onFlow?: () => void; onLimits?: () => void; onChanges?: () => void; todoCount?: number; files?: number
   /** A courtyard card's Summary fold, as on the chat cards. */
-  onSummary?: (sessionId: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean> }
-export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, onLimits, onChanges, todoCount, files, onSummary, onCopy, onMemory, onFlow }: { hub: HubState; isDemo: boolean; send: Send; onClose: () => void } & BoardWays) {
+  onSummary?: (sessionId: string, refresh: boolean) => void; onCopy?: (text: string) => Promise<boolean>
+  /** The chat open on the other pages, and a chat whose card opened here. */
+  chat?: string; onChat?: (sessionId: string) => void }
+export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, onLimits, onChanges, todoCount, files, onSummary, onCopy, onMemory, onFlow, chat, onChat }: { hub: HubState; isDemo: boolean; send: Send; onClose: () => void } & BoardWays) {
   // Demo: a sample Learn run so the study hall's Approve and Discard show; deciding it clears it here.
   const [learned, setLearned] = useState<string[]>([])
   const send: Send = m => { if (isDemo && m.type === 'hub-learn') setLearned(l => [...l, m.id]); else sendHub(m) }
@@ -1294,7 +1297,7 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     if (isDemo) { setMem({ graph: demoGraph() }); return }
     let stop = false
     const read = () => void loadGraph().then(g => { if (!stop) setMem(m => keepGraph(m, g)) })
-    read(); const i = setInterval(read, 60_000)
+    read(); const i = setInterval(() => { if (seen()) read() }, 60_000)
     return () => { stop = true; clearInterval(i) }
   }, [isDemo])
   const court = useMemo(() => buildCourt(shown, { w: stage[0], h: stage[1] }, mem?.graph), [shown, stage, mem?.graph])
@@ -1308,6 +1311,18 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     court, kit: kitOf('court'), night: false, ta: 0, view: { x: 0, y: 0, z: 0.5 }, zc: 0.5, colors: skin.court.colors, bands: skin.court.bands, hits: [], fx: new Map(), fit: false, stage: '', ropes: [], ends: new Map(), waits: new Set(),
     wake: () => {}, zoom: () => {}, refit: () => {}, show: () => {}, go: () => {},
   })
+  // An open chat card follows the chat opened elsewhere, and a card opened here counts as opening its chat.
+  const card = court.nodes.find(n => n.id === picked)
+  const cardChat = card && (card.kind === 'courtyard' || card.kind === 'desk') ? chatOf(court, card.id) : undefined
+  const lastChat = useRef(chat)
+  useEffect(() => {
+    const moved = chat !== lastChat.current
+    lastChat.current = chat
+    if (!cardChat || cardChat === chat) return
+    if (moved && court.nodes.some(n => n.id === `yard:${chat}`)) setPicked(`yard:${chat}`)
+    else if (!moved) onChat?.(cardChat)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat, cardChat])
   // A sprite tap hops and opens its details; the panel's Open terminal link is the way to the chat.
   const go = (id: string) => {
     const s = st.current
@@ -1415,10 +1430,11 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     const live = () => fading() || awake() || s.fx.size > 0 || s.court.nodes.some(n => n.state === 'working' || n.state === 'needs')
     // Runs while something moves and can be seen; reduced motion still ticks once a second for the timers, and runs a fade through.
     const run = () => (!motion.matches || fading()) && onScreen && !document.hidden && vscodeBridge?.shown !== false && live()
-    const { wake, stop, running } = frameLoop(now => frame(now), run, matchMedia('(pointer: coarse)').matches ? 30 : 0)
+    // 30 fps; a drag, zoom or hover draws its own frame, so the camera keeps the screen's rate.
+    const { wake, stop, running } = frameLoop(now => frame(now), run, 30)
     s.wake = wake
     // Once a second also lifts the Zzz of idle sprites, so a quiet board needs no rAF.
-    tick = window.setInterval(() => { if (!running() && onScreen && !document.hidden && (live() || !!s.pause || s.court.nodes.some(n => n.kind === 'desk' && n.state === 'idle'))) frame(performance.now()) }, 1000)
+    tick = window.setInterval(() => { if (!running() && onScreen && seen() && (live() || !!s.pause || s.court.nodes.some(n => n.kind === 'desk' && n.state === 'idle'))) frame(performance.now()) }, 1000)
     const size = () => {
       const r = el.getBoundingClientRect()
       dpr = Math.min(matchMedia('(pointer: coarse)').matches ? COARSE_DPR : MAX_DPR, devicePixelRatio || 1)

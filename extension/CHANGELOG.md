@@ -1,5 +1,211 @@
 # Changelog
 
+## 0.21.185
+
+- Stuck notes: a quiet subagent's note waits for the lead's turn to end too, so a subagent that finished by then sends none
+
+## 0.21.184
+
+- Stuck notes: a quiet job with nothing to stop waits for the lead's turn to end before its note is sent, and the sample then checks the job again. Claude Code holds a plugin prompt until the turn ends, so a note sent mid-turn reached the chat up to 2 h later, after the job had ended with exit 0
+- A job also counts as ended when its output file ends with "[exited with code N]", and the lead's Stop drops subagent jobs its transcript says ended
+
+## 0.21.183
+
+- Rules audit: two kit rules that lived only in the prompt now have hooks. repo-rules refuses `pkill -f` (it matches other chats' processes) and System Events keystrokes (they land in the window the user is typing in). done-check holds a lead reply that has an em dash or a commit message attribution trailer (Co-Authored-By, Generated with Claude Code), Codex chats included
+
+## 0.21.182
+
+- Reply style: with a name set, chat replies are written in ASD-STE100 Simplified Technical English (short sentences, one fact per sentence, common words except exact technical names, active voice). The aide tone stays, and files, code and commits are untouched
+
+## 0.21.181
+
+- Loop picker: the chat page and New chat get one Loop control with the four kinds from Anthropic's loop engineering post. Turn does the task and waits. Goal is Run indefinitely with an optional "Done when" that the goal skill turns into the goal file and its Check; limits and the gate moved under it. Timer repeats a prompt of your own every 10 min, 30 min, 1 h, 3 h or daily (up to 12 times), and a custom prompt fires even with no open tasks. Proactive starts a Claude chat that makes a cloud routine with /schedule, which runs with this Mac off; See routines opens claude.ai/code/routines
+- The Run indefinitely switch, Set limits and the Check back menu are gone from the chat head; the map yard tag reads "goal" and "timer 3/12", the flow view "timer every 30 min 3/12", the chat card "Goal loop"
+
+## 0.21.180
+
+- Worktree merges get past clashes: when a worktree's work does not apply over edits in the main checkout, each file is merged three-way from where the worktree started. It lands only when no file has both sides changing the same lines, then the repo checks run as before and a failure puts main's files back byte for byte. Otherwise the worktree stays and the note names the files ("both changed the same lines in README.md") instead of "patch failed". Renames, mode changes, binaries and links still wait for you
+
+## 0.21.179
+
+- Sync across computers: Settings, Sync signs in with GitHub (VS Code's own sign-in) and keeps Claude memory notes, the vault, Jev presets and Switchboard's settings the same on every computer through a private `switchboard-sync` repo in your account. Memory is matched by each project's git remote, so a Mac and a Windows path share notes. Nothing is deleted on a first sync, a new or recreated repo, or when a project's folder changes; files both computers edited are merged (notes) or kept in `~/.claude/switchboard/backups/sync/` (settings). A public repo of that name is refused
+- Updates itself: a push to main with a new version publishes a GitHub release (tests on Linux, macOS and Windows; Windows does not block yet). Each window checks a minute after start and every 6 hours, installs a newer VSIX after a SHA-256 check from GitHub's download hosts only, and asks before reloading. It also pulls claude-mods when that repo has no local edits. Off with `agentVisualizer.autoUpdate`; Switchboard: Check for updates runs it by hand
+- Windows: claude, codex, npm and pnpm shims start through `cmd.exe` with cross-spawn's escaping (a user's text can no longer break out); the browser app, process checks and a new chat with no editor window work without lsof, ps or osascript; Windows paths show by their file names; `pnpm dev` and `dev:demo` set their env the same way on every OS
+- Bundled mods: bash-approve refuses Windows deletes of a drive root, the home folder or Documents\GitHub in cmd, PowerShell and Git Bash forms, plus format, Clear-Disk and diskpart; done-check, usage-meter, account-guard, side-pane, chat-wait, repo-rules and phone-mode handle Windows paths, USERPROFILE, cmd.exe and the py launcher
+
+## 0.21.178
+
+- Phone alerts cover finished Claude chats too, not only Codex: a push goes out when a chat asks its closing question, or when it is done without asking; none follows your Approve
+- A closing question Switchboard refuses (no aar yet) no longer marks the chat as waiting on you or notifies
+- The rules no longer tell chats to send their own phone push
+- Less memory: an open view drops the usage history between its five-minute reads (about 18 MB a window); before, only a window with no view open did
+
+## 0.21.177
+
+- Less CPU: the pixel map draws 30 times a second instead of 60; dragging and zooming keep the screen's rate
+- The browser app reads transcripts only once something opens its event stream
+
+## 0.21.176
+
+- Skill copies stay current without Set up: half a minute after a window starts, Codex's copies (`~/.agents/skills`) and Switchboard's bundled skills are refreshed in the background, by one window. None is added, and an edited copy stays
+
+## 0.21.175
+
+- Memory page: the Back / Agents / Code / Memory bar stays when you switch between Map and Notebook; before, the switch left its place empty
+
+## 0.21.174
+
+- Workbench and research chats that changed something now end with the adjust skill's finish steps (aar, standup, Approve question); one that changed nothing still ends without them
+- AWS Sign in runs `aws sso login` for a single sign-on profile; `aws login` refuses those. Such a profile gets no 12 hour session or heads-up, and the map no longer counts it as a problem when signed out
+
+## 0.21.173
+
+- Less CPU: an unchanged repo costs one git call instead of 16 each time the changes panel refreshes, and every window shares one ps, lsof, pgrep, sysctl and tailscale read
+- Less memory: Codex transcript tails and the usage history no longer stay in memory between reads
+- A window watches transcript folders instead of checking every file each second; a full check runs every 10 s
+- One hook process per event instead of two: hook.js v14 also posts to the browser app, and the app's own entries come out of settings.json and Codex's hooks.json
+- The browser app no longer crashes when a page closes before the window answers
+- A hidden Switchboard view stops its animations, timers and once-a-minute memory read
+- Chats idle for three hours, with nothing running or owed, get one notice per window with the memory they hold: Suspend (resume it from History), Close or Not now
+- Now board: lanes lose a stray divider, padding and right border, and cards fill the lane; the memory notebook shared its class names and now has its own
+- Plan page: a memory hold's dot is red, as on the Now board; every other hold stays yellow
+- Set up refreshes a Codex skill copy (`~/.agents/skills`) that nobody edited when Claude's changed; before, it only added missing ones. An edited copy stays
+- Codex's tool map says how to list and message chats, so a Codex chat no longer takes its own subagents for every busy chat
+
+## 0.21.172
+
+- A subagent's answer to the closing question never approves or sends back its chat; before, it approved one that was waiting on you, idle or done. approve.log says "a subagent asked it"
+
+## 0.21.171
+
+- An Approve or Send back whose hook a busy window missed is read from the chat's transcript once its turn is over; answers from before the window started, or with anything typed after them, are left alone
+
+## 0.21.170
+
+- A new chat no longer starts the playwright and scrapling servers (about 130 MB and 70 MB each): they go on when the first message asks for them, or with `tool_on`, which points to agent-browser until the chat's next start
+- Autopilot waits to start the next to-do while the Mac is short of memory and many chats are open (8 at a warning, 4 when critical); the to-do list says so
+- Idle chats use far less CPU: the bundled usage-meter 0.6.13 and side-pane 0.1.4 back off after a quiet minute
+- A done chat's tab no longer stays because a For you line names a file like page.tsx
+
+## 0.21.169
+
+- Chrome tabs a chat opens (through `$BROWSER` or Claude in Chrome) close once it finishes, ends, or gets the answer to the question that named the page (macOS). A tab you are looking at, one a question or a For you step needs, and one you took to another site stay
+- The setting is now "Stop dev servers and close tabs when a chat ends"; off turns both off
+
+## 0.21.168
+
+- Workbench: a Codex chat is refused a patch outside the Workbench folder until the change is logged, as Claude chats already were (bundled repo-rules 0.2.8)
+
+## 0.21.167
+
+- To-do: a chat you approved no longer gets missed suggestions when Jev's score lands after Approve, and any it left are cleared
+
+## 0.21.166
+
+- An Approve is taken even when the hub never saw the question open (its hook timed out) or it was asked through Switchboard's own ask tool; before, it was refused as "the chat is still working". Open tasks and running subagents still refuse
+
+## 0.21.165
+
+- Learn starts no run in a window that still has to reload into a newer Switchboard, so an old build no longer saves notes where no chat loads them
+- Chats waiting for a Learn review are kept across a reload
+
+## 0.21.164
+
+- Research: Ask more on a saved report adds the new answer to the same file, with its sources merged in
+- Research folders: make, rename and delete them, move reports by menu, and see folders, reports and the open one in three panes
+- Smart organize sorts reports into folders, with Undo; new reports file themselves (a switch turns that off)
+- Two reports saved at the same moment with the same name no longer overwrite each other
+- Bundled mods: usage-meter 0.6.12 (hub_recall asks the window that started last, then older ones)
+- Chats in Code Mode are no longer refused when the Mac is loaded: Switchboard's hooks get 10 s instead of 2 (existing installs are raised on activation), still exit 1.5 s after they start, and read only window files
+
+## 0.21.163
+
+- A Workbench undo that stops halfway can be run again without forcing, and shows as failed until then
+- adjust refuses token files (.netrc, .npmrc and the like) and secrets folders
+
+## 0.21.162
+
+- Much less lag: the 27 MB usage cache moved out of the folder that every window, hook, mod and the browser app parsed over and over
+- Ended Codex chats in temp folders are no longer archived again every 15 s by every window
+- A reloaded window reads only new transcript lines instead of two weeks of them (about 4 GB)
+- The panel gets only the fields that changed instead of the whole 1.3 MB state
+- A window that is not focused reads git, servers and to-do lists once a minute; the Ship list and other projects' lists are read once a minute everywhere
+- The shipped check on to-do items matches each item once per release note, and looks once a minute
+- The Usage page's records leave memory ten minutes after the last visit
+- Bundled mods: chat-wait 0.2.7 (asks for the few fields it reads)
+- A late pick never brings an older chat's terminal back up
+
+## 0.21.161
+
+- Workbench: research that changes things. A report can list Actions, each with Apply and Skip; Apply starts a chat that checks the change still fits this device, makes it and proves it
+- The Workbench page lists suggested changes and every change made outside a project, with its check and Undo, which shows what it will run first and stops when the file has newer edits
+- New chat has a Workbench switch, and the map's Research island a Change it button
+- New kit skill adjust: backs up, logs, checks and undoes each change; undoable ones run, the rest asks first, root commands are handed over
+- Bundled mods: repo-rules 0.2.7 (a Workbench chat's edit needs a logged change), chat-wait 0.2.7, usage-meter 0.6.11
+- A chat whose hook a busy window missed reads what its terminal shows within half a minute, in every window: idle, working, done or waiting for you
+- Clicking a chat's terminal opens that chat on every Switchboard page not in use, and picking a chat on a page brings up its terminal
+- A done chat still running stays on the Chats page
+- A late request score no longer leaves an ended chat listed as working
+
+## 0.21.160
+
+- A web-fetch agent ends when its call returns, follow-up messages included: no more "has been quiet" notes about a finished one, and its chat settles at its Stop instead of showing as working for up to an hour
+
+## 0.21.159
+
+- A waiting question stays on the hub while Code Mode runs or polls code
+- Results and answers of calls made by Code Mode show in the chat view and live panel
+- Remote Control reads as off and refuses to turn on while Code Mode is on
+- Bundled mods: done-check 0.1.12, tab-close 0.1.5, usage-meter 0.6.10
+
+## 0.21.158
+
+- Deep research with background researchers saves its report: a researcher that returns no longer resets the run
+- A background agent that returns mid-turn closes its lane in the live panel
+- A saved research report opens without its file header
+- Bundled rules: work done after Finish here also goes into the aar, and the standup is reprinted
+
+## 0.21.157
+
+- hub_recall ranks by how rare each word is, reads the whole note instead of its name and description, and shows the lines that match
+- hub_recall and hub_ask wait long enough for a slow answer (2 seconds cut every hub_ask off), say when nothing answered in time, and recall works from a folder no window holds
+- A note with `status: unproven` ranks lower, says so in recall, stays out of MEMORY.md, and is a health issue after 14 days; recall also says when a project note is over 90 days old
+- Memory health lists notes naming files that moved or were deleted, with the new place when there is one
+
+## 0.21.156
+
+- A to-do item whose text starts with "On or after" or "Not before" and a future date (2026-11-30) waits for that day; auto-start leaves it until then
+
+## 0.21.155
+
+- Learn's aar on a worktree or subfolder chat reads and saves notes in the main checkout's memory, the folder Claude loads there, instead of one no chat reads
+- Bundled rules: "To-do later" on the Left question calls nothing; the standup's Left lines fill the Suggested tray
+
+## 0.21.154
+
+- Smart select also covers Claude Code's own heavy tools (Artifact, Workflow, ScheduleWakeup, ReportFindings, SendFeedback) and MCP servers: built-ins start off and go on when the first message needs them, servers go off when it clearly does not
+- tool_on turns one on for the chat's next start and says how to use it until then; a chat's Tools card lists them, and Settings, Installed has the Always on, Auto and Never switch for each
+- A smart pick mid chat no longer drops the chat's Run indefinitely, budget or check-back settings
+
+## 0.21.153
+
+- Usage page: Claude and Codex side by side, with tokens by kind, list-price cost, cache savings, plan limits and a cost chart per day, over today, 7 or 30 days, then by model, project and role, and the costliest chats
+- Codex runs count: their limits and daily totals are read from the Codex account every 10 minutes, and role runs leave a record without showing up as chats
+- Codex first, a switch under Models: an engineer or qa start goes to Codex while Codex has more of its week left than Claude, unless the brief says why it needs Claude
+- Token, cost and spend numbers left the Plan stats, the Today card and the Now page's Jev tile; the limit meters in the status bar open Usage
+
+## 0.21.152
+
+- Clearing a merged worktree copies its git-ignored files (env files, local settings) to `.git/switchboard-merged` first, and leaves the worktree if the copy fails
+
+## 0.21.151
+
+- Ship lists every repo with uncommitted or unpushed work, and the worktrees under it, with or without a chat open; pick any of them to commit, push or merge
+- Ship has a Worktrees card: merge one, merge all that are ready, or merge one when its chat ends, with the last result shown in every window
+- A worktree merges on its own about 2 minutes after its chat ends, with a switch per repo on Ship; off there also stops the merge on Approve
+- Worktrees merge into whichever branch the repo is on, and every label names it; if the repo moved to another branch since, the old branch's commits stay out
+- Git buttons other than push and pull request wait while a worktree merge runs its checks
+
 ## 0.21.150
 
 - Run indefinitely rounds that touch UI build a Safe and an Explore version behind a toggle, test both with crowd-ab and a MiroFish sim, keep the winner and log it in .switchboard/design-rounds.md

@@ -10,7 +10,7 @@ import { sayLeft, type Left } from '@/lib/eta'
 import { clockDur, count, loadRuns, roleLeft, runState, statusTone, type RunDetail } from '@/lib/runs'
 import { storyOf } from '@/lib/run-story'
 import { demoRunDetails } from '@/lib/hub-demo'
-import { vscodeBridge } from '@/lib/vscode-bridge'
+import { onScreen, vscodeBridge } from '@/lib/vscode-bridge'
 import type { ChatProgress } from '@/lib/hub-types'
 import { Glyph, NAME, TONE, leadState } from './parts'
 import { almostDone } from '@/lib/look'
@@ -181,7 +181,7 @@ export function RoleDrawer({ chat, role, all, demo, sheet, onClose, onFocus, onC
       else { setRuns(r); setProblem(undefined) }
     })
     go()
-    const t = active ? setInterval(go, 15_000) : undefined
+    const t = active ? setInterval(() => { if (onScreen()) go() }, 15_000) : undefined
     return () => { stop = true; clearInterval(t) }
   }, [chat.id, role, demo, active, steps.length])
   useEffect(() => { setRuns(undefined); setProblem(undefined) }, [chat.id, role])

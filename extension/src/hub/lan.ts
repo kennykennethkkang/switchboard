@@ -1,7 +1,7 @@
 /** This Mac's tailnet name for the phone link, shared by the standalone app (server) and the panel (phone links). */
-import { execFile } from 'child_process'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
+import { sharedRun } from './shared-run'
 
 /** The 6 digits typed on a new device instead of the QR. From the secret, so it stays the same across restarts. */
 export const phoneCode = (secret: string) => String(crypto.createHmac('sha256', secret).update('switchboard-code').digest().readUInt32BE(0) % 1e6).padStart(6, '0')
@@ -42,7 +42,7 @@ export function macNamesOf(json: string | undefined): MacNames {
   const certs = (JSON.parse(json!) as { CertDomains?: unknown }).CertDomains
   return { tailscale: tailscaleName(json!), https: Array.isArray(certs) && certs.length > 0 }
 }
-const out = (bin: string, args: string[]) => new Promise<string>(done => execFile(bin, args, { timeout: 5000 }, (err, stdout) => done(err ? '' : String(stdout))))
+const out = (bin: string, args: string[]) => sharedRun(bin, args, { ttlMs: 60_000, timeoutMs: 5000 })
 /** json '' is a failed or timed-out read: `tailscale status` hangs now and then, and losing the name would refuse the phone. */
 export const afterRead = (last: MacNames, json: string | undefined) => json === '' && last.tailscale ? last : macNamesOf(json)
 export async function readMacNames(): Promise<MacNames> {

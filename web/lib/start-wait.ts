@@ -1,10 +1,11 @@
 /** Wait on chat for a chat not started yet: which live chats it can wait on, and the line that says so. */
 import type { AiId, ChatRow } from './hub-types'
 import { projectName } from './archive'
+import { insidePath } from '../../extension/src/hub/win-path'
 
 /** project: a folder path (the chat's folder or one under it) or a project name. */
 export const inProject = (c: ChatRow, project: string) =>
-  project.includes('/') ? c.cwd === project || c.cwd.startsWith(`${project.replace(/\/+$/, '')}/`) : projectName(c) === project
+  /[\\/]/.test(project) ? c.cwd === project || insidePath(project, c.cwd) : projectName(c) === project
 
 /** Live chats in the picked project. None for a new Codex chat: its id is only known once it runs, so waits cannot be attached. */
 export const startTargets = (chats: ChatRow[], project: string, ai: AiId = 'claude') =>

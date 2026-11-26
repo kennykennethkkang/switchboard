@@ -103,7 +103,7 @@ test('doneKind and doneGroups: merged when its commit is in the log, approved, s
 test('?demo=stations shows a send-back, a Verified chat at Review and all three Done groups', async () => {
   const { demoHub } = await import('./hub-demo')
   const { demoStations } = await import('./stations-demo')
-  const now = Date.now(), h = demoStations(demoHub(now), now, '?demo=stations')
+  const now = new Date(2026, 10, 20, 15).getTime(), h = demoStations(demoHub(now), now, '?demo=stations')
   const p = (id: string) => h.progress.find(x => x.sessionId === id)
   assert.deepEqual([track(p('d-wrap')).round, track(p('d-wrap')).back], [2, 'review'])
   assert.equal(track(p('d-tree')).at, 'review')

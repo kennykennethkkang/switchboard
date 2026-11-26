@@ -53,6 +53,12 @@ test('pickTools: other rules by keyword, nothing for a plain task, never a flagg
   assert.ok(!names(pickTools('security review of the UI', 'designer', inv)).includes('security-guidance@claude-code-plugins'))
 })
 
+test('pickTools: browser and scraping words turn on their matching tools', () => {
+  const inv: Installed[] = [...jinv, { kind: 'plugin', name: 'playwright@claude-plugins-official', enabled: true }, { kind: 'mcp', name: 'mcp:scrapling', enabled: true }]
+  assert.ok(names(pickTools('Run the end-to-end suite', undefined, inv)).includes('playwright@claude-plugins-official'))
+  for (const word of ['scrapling', 'scrape', 'scraping', 'crawl', 'crawler', 'anti-bot']) assert.ok(names(pickTools(`Use ${word} on this site`, undefined, inv)).includes('mcp:scrapling'), word)
+})
+
 test('indexPick: a named brand first, else the index lines sharing the most words', () => {
   const index = '- `linear.app`: near-black, one lavender accent, hairline panels. A dense dark app that should feel crafted and calm.\n- `vercel`: black and white duet. Developer platform pages, deploy or status UI.'
   assert.deepEqual(indexPick('make it look like vercel', index, inv), ['/lib/vercel/DESIGN.md'])
@@ -187,6 +193,22 @@ test('jevStart: regex picks stay on over a Jev no; empty message and Jev failure
   assert.deepEqual(boom.profile, defaultProfile(jinv))
 })
 
+test('jevStart: scrapling needs a sure Jev score and stays off when Jev is down or unsure', async () => {
+  const inv: Installed[] = [{ kind: 'mcp', name: 'mcp:scrapling', enabled: true }]
+  const base = defaultProfile(inv)
+  assert.equal(base.extras?.['mcp:scrapling'], false)
+  assert.equal((await jevStart(base, 'Research a page', inv, {}, scores({ 'mcp:scrapling': 0.69 }))).profile.extras?.['mcp:scrapling'], false)
+  assert.equal((await jevStart(base, 'Research a page', inv, {}, scores({ 'mcp:scrapling': 0.7 }))).profile.extras?.['mcp:scrapling'], true)
+  assert.equal((await jevStart(base, 'Research a page', inv, {}, async () => undefined)).profile.extras?.['mcp:scrapling'], false)
+})
+
+test('jevStart: the gated playwright plugin is not a Jev candidate', async () => {
+  const inv: Installed[] = [{ kind: 'plugin', name: 'playwright@claude-plugins-official', enabled: true }]
+  let asked: string[] = []
+  await jevStart(defaultProfile(inv), 'Fix a parser', inv, {}, async (_task, items) => { asked = items.map(i => i.name); return {} })
+  assert.deepEqual(asked, [])
+})
+
 test('precedence store: only always and never kept, auto deletes', () => {
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'prec-')), 'p.json')
   assert.deepEqual(readPrecedence(f), {})
@@ -204,4 +226,45 @@ test('toolsNote: lists every off plugin and skill with what it is for, capped', 
   assert.doesNotMatch(n, /chart-kit/)
   const many = { plugins: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`p${i}@x`, false])), skills: {} }
   assert.match(toolsNote(many), /and 25 more/)
+})
+
+const xinv: Installed[] = [
+  ...jinv,
+  { kind: 'builtin', name: 'Artifact', enabled: true },
+  { kind: 'builtin', name: 'Workflow', enabled: true },
+  { kind: 'mcp', name: 'mcp:posthog', enabled: true },
+  { kind: 'mcp', name: 'mcp:claude.ai Claude Docs', enabled: true },
+]
+const DOCS = 'mcp:claude.ai Claude Docs'
+
+test('jevStart: a built-in goes on only at 0.7, an MCP server off only under 0.3, precedence wins', async () => {
+  const at = async (m: Record<string, number>, prec: Record<string, 'always' | 'never'> = {}) => jevStart(defaultProfile(xinv), 'fix the parser', xinv, prec, scores(m))
+  const r = await at({ Artifact: 0.69, Workflow: 0.71, 'mcp:posthog': 0.29, [DOCS]: 0.31 })
+  assert.deepEqual(r.profile.extras, { Artifact: false, Workflow: true, 'mcp:posthog': false, [DOCS]: true })
+  assert.match(r.why.Artifact, /^Jev: 69% likely to be needed, goes on at 70%$/)
+  assert.equal(r.why['mcp:posthog'], 'Jev: not needed (0.29)')
+  assert.deepEqual((await at({ Artifact: 0.1, 'mcp:posthog': 0.1 }, { Artifact: 'always', 'mcp:posthog': 'always', [DOCS]: 'never' })).profile.extras, { Artifact: true, Workflow: false, 'mcp:posthog': true, [DOCS]: false })
+})
+
+test('jevStart: Jev down keeps built-ins off and servers on, keywords still count', async () => {
+  const r = await jevStart(defaultProfile(xinv), 'run a workflow over the chats', xinv, {}, async () => undefined)
+  assert.deepEqual(r.profile.extras, { Artifact: false, Workflow: true, 'mcp:posthog': true, [DOCS]: true })
+})
+
+test('pickTools: built-ins and servers by their words, a server by its name, never by a word inside another', () => {
+  assert.deepEqual(names(pickTools('Read https://claude.ai/artifact/Htpnb2JA first', undefined, xinv)), ['Artifact'])
+  assert.deepEqual(names(pickTools('Publish it as an artifact', undefined, xinv)), ['Artifact'])
+  assert.deepEqual(names(pickTools('Give me a doc with everything in it', undefined, xinv)), [DOCS])
+  assert.deepEqual(names(pickTools('Check PostHog for the funnel', undefined, xinv)), ['mcp:posthog'])
+  for (const t of ['clean the build artifacts', 'fix the posthogger class', 'rename the github workflow file']) assert.deepEqual(pickTools(t, undefined, xinv), [], t)
+})
+
+test('applyPicks: a built-in goes on in extras, and the rest of the profile rides along', () => {
+  const p: ChatProfile = { ...defaultProfile(xinv), indefinite: 5 }
+  const r = applyPicks(p, xinv, pickTools('ultracode this', undefined, xinv), undefined, 1)
+  assert.equal(r.profile.extras!.Workflow, true)
+  assert.equal(r.profile.extras!['mcp:posthog'], true)
+  assert.equal(r.profile.indefinite, 5)
+  const back = applyPicks(r.profile, xinv, pickTools('publish it as an artifact', undefined, xinv), r.record, 2)
+  assert.deepEqual([back.profile.extras!.Workflow, back.profile.extras!.Artifact], [false, true])
 })

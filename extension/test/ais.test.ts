@@ -36,7 +36,7 @@ describe('ais', () => {
   })
   it('archives an ended Codex row only with no running terminal and an exit or long silence', () => {
     const now = 10 * 3_600_000
-    const row = (sessionId: string, updatedAt: number, live = false) => ({ ai: 'codex', sessionId, updatedAt, live } as never)
+    const row = (sessionId: string, updatedAt: number, live = false) => ({ ai: 'codex', sessionId, cwd: '/Users/k/repo', updatedAt, live } as never)
     const none = (_id: string) => false
     const ids = (cs: unknown[], tied = none, exited = new Set<string>()) => endedCodex(cs as never, tied, exited, now).map(c => c.sessionId)
     assert.deepEqual(ids([row('exit', now - 60_000)], none, new Set(['exit'])), ['exit'])
@@ -53,6 +53,12 @@ describe('ais', () => {
     assert.equal(row?.name, 'Fix the closet regen button please')
     assert.equal(row?.live, true)
     assert.equal(codexRow([meta, ask], now - 3_600_000, now)?.live, false)
+  })
+  it('does not show Codex role runs as chats', () => {
+    const role = user('You are the engineer. Read the task and the code it touches.')
+    assert.equal(codexRow([meta, role], 0, 0), undefined)
+    assert.equal(codexRow([meta, user('You are qa. Review the change.')], 0, 0), undefined)
+    assert.ok(codexRow([meta, user('Why does this prompt say:\nYou are the engineer. Read the task')], 0, 0))
   })
 
   it('reads the context fill from the last token count', () => {
@@ -269,4 +275,27 @@ describe('hermes', () => {
     assert.equal(fs.readFileSync(`${cfg}.switchboard-bak`, 'utf8'), 'model: x\n')
     fs.rmSync(home, { recursive: true, force: true })
   })
+})
+
+
+it('compaction keeps the first and the last session_meta of a forked rollout', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-fork-')), file = path.join(dir, 'r.jsonl')
+  const m = (id: string, cwd: string) => JSON.stringify({ type: 'session_meta', payload: { id, cwd } })
+  const lines = [m('aaaaaaaa-1', '/a'), m('bbbbbbbb-2', '/b'), JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'Fix it' } })]
+  fs.writeFileSync(file, lines.join('\n') + '\n')
+  assert.deepEqual(codexRow(await rolloutLines(file, 1), 0, 0), codexRow(lines, 0, 0))
+})
+
+it('keeps only copied rollout lines needed by row and turn readers', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-compact-'))
+  const file = path.join(dir, 'r.jsonl')
+  const event = (type: string, extra = {}) => JSON.stringify({ type: 'event_msg', payload: { type, ...extra } })
+  const lines = [meta, JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'Fix the doors' } }), JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Fix the doors' }] } }), ...Array.from({ length: 1000 }, (_, i) => JSON.stringify({ type: 'response_item', payload: { type: 'reasoning', text: `discard-${i}` } })), ask, event('agent_message', { message: 'done' }), event('turn_complete')]
+  fs.writeFileSync(file, lines.join('\n') + '\n')
+  const kept = await rolloutLines(file, 1)
+  assert.ok(kept.length < 10)
+  assert.equal(codexRow(kept, 0, 0)?.name, 'Fix the doors')
+  assert.equal(codexRow(kept, 0, 0)?.status, 'idle')
+  assert.equal(lastCodexPrompt(kept), 'Fix the closet regen button please')
+  assert.deepEqual((await import('../src/hub/ais')).lastCodexTurn(kept), { answer: 'done', aborted: false })
 })

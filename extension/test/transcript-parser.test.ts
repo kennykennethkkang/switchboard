@@ -115,6 +115,18 @@ describe('background subagents (#92)', () => {
     assert.equal(ofType(events, 'tool_call_end').length, 1)
   })
 
+  it('completes it when the notification lands mid-turn, as a queued command', () => {
+    const { events, feed } = setup()
+    feed(agentToolUse('toolu_1', 'Find callers'))
+    feed(agentToolResult('toolu_1', asyncLaunch()))
+    const prompt = taskNotification('toolu_1').message.content
+    feed({ type: 'attachment', uuid: 'q1', attachment: { type: 'queued_command', prompt, commandMode: 'task-notification' } })
+    feed({ type: 'attachment', uuid: 'q2', attachment: { type: 'queued_command', prompt: [{ type: 'text', text: 'typed while it worked' }] } })
+    assert.equal(ofType(events, 'subagent_return').length, 1)
+    assert.deepEqual(ofType(events, 'agent_complete').map(e => e.payload), [{ name: 'Find callers' }])
+    assert.equal(ofType(events, 'message').length, 0)
+  })
+
   it('completes it when its task-notification arrives', () => {
     const { events, feed } = setup()
     feed(agentToolUse('toolu_1', 'Find callers'))
@@ -159,6 +171,13 @@ describe('background subagents (#92)', () => {
     assert.deepEqual(ofType(events, 'agent_complete').map(e => e.payload), [{ name: 'Find callers' }])
   })
 
+  it('reads a Code Mode inner call from toolUseResult, its result block being empty', () => {
+    const { events, feed } = setup()
+    feed({ type: 'assistant', uuid: 'a-v', isVirtual: true, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'repl_1', name: 'Bash', input: { command: 'cat b.txt' } }] } })
+    feed({ type: 'user', uuid: 'r-v', isVirtual: true, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'repl_1', content: '', is_error: false }] }, toolUseResult: { stdout: 'hi', stderr: '' } })
+    assert.deepEqual(ofType(events, 'tool_call_end').map(e => (e.payload as { result: string }).result), ['hi'])
+  })
+
   it('completes subagents launched before attach once their notification arrives', () => {
     const { session, events, parser, feed } = setup()
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-parser-'))
@@ -167,6 +186,9 @@ describe('background subagents (#92)', () => {
       agentToolUse('toolu_old', 'Already done'),
       agentToolResult('toolu_old', asyncLaunch()),
       taskNotification('toolu_old'),
+      agentToolUse('toolu_mid', 'Done mid-turn'),
+      agentToolResult('toolu_mid', asyncLaunch()),
+      { type: 'attachment', uuid: 'q0', attachment: { type: 'queued_command', prompt: taskNotification('toolu_mid').message.content } },
       agentToolUse('toolu_live', 'Still running'),
       agentToolResult('toolu_live', asyncLaunch()),
     ].map(e => JSON.stringify(e)).join('\n') + '\n'
@@ -174,6 +196,7 @@ describe('background subagents (#92)', () => {
     parser.prescanExistingContent(file, Buffer.byteLength(history), session)
 
     feed({ ...taskNotification('toolu_old'), uuid: 'n-old-repeat' })
+    feed({ ...taskNotification('toolu_mid'), uuid: 'n-mid-repeat' })
     assert.equal(ofType(events, 'agent_complete').length, 0)
 
     feed(taskNotification('toolu_live'))

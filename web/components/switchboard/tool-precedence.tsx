@@ -1,6 +1,6 @@
 'use client'
 import type { KeyboardEvent } from 'react'
-import type { HubState } from '@/lib/hub-types'
+import type { HubState, Installed } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { LOCKED } from './tool-chips'
 import './tool-precedence.css'
@@ -8,8 +8,9 @@ import './tool-precedence.css'
 type Prec = 'always' | 'auto' | 'never'
 const SAY: Record<Prec, string> = { always: 'Always on', auto: 'Auto', never: 'Never' }
 const ORDER: Prec[] = ['always', 'auto', 'never']
-const short = (n: string) => n.split('@')[0]
-const HINT = 'Smart select turns off what a new chat does not need. Always on is never turned off; Never stays off unless you turn it on in a chat.'
+const short = (n: string) => n.split('@')[0].replace(/^mcp:/, '')
+const KIND: Partial<Record<Installed['kind'], string>> = { plugin: 'plugin', skill: 'skill', builtin: 'built in', mcp: 'MCP server' }
+const HINT = 'Smart select turns off what a new chat does not need; built-in tools start off and go on when a chat needs one. Always on is never turned off; Never stays off unless you turn it on in a chat.'
 
 /** Jev's 'needed (0.91)' reads as 'needed, 91% sure'; the number is P(needed), so 'not needed (0.12)' is 88% sure. */
 const plain = (w: string) => w.replace(/\b(not needed|needed) \((0(?:\.\d+)?|1(?:\.0+)?)\)/, (_, v, n) => `${v}, ${Math.round((v === 'needed' ? +n : 1 - +n) * 100)}% sure`)
@@ -27,7 +28,7 @@ export function ToolPrecedence({ hub, send }: { hub: HubState; send: (c: HubComm
   const prec = hub.tools?.precedence ?? {}
   const of = (n: string): Prec => prec[n] ?? 'auto'
   const why = reasons(hub)
-  const tools = hub.installed.filter(i => (i.kind === 'plugin' || i.kind === 'skill') && !(i.kind === 'plugin' && LOCKED.includes(short(i.name))))
+  const tools = hub.installed.filter(i => KIND[i.kind] && !(i.kind === 'plugin' && LOCKED.includes(short(i.name))))
     .sort((a, b) => short(a.name).localeCompare(short(b.name)))
   const set = (name: string, value: Prec) => send({ type: 'hub-tool-precedence', name, value })
   if (!tools.length) return null
@@ -61,7 +62,7 @@ export function ToolPrecedence({ hub, send }: { hub: HubState; send: (c: HubComm
       <ul role="list" className="tp-list">
         {tools.map(t => (
           <li key={t.name} className="tp-row">
-            {label(t.name, t.kind)}
+            {label(t.name, KIND[t.kind]!)}
             <span role="radiogroup" aria-label={`${short(t.name)} in smart select`} className="tp-seg" onKeyDown={e => keys(e, t.name)}>
               {ORDER.map(p => <button key={p} type="button" role="radio" data-v={p} aria-checked={of(t.name) === p} tabIndex={of(t.name) === p ? 0 : -1}
                 onClick={() => { if (of(t.name) !== p) set(t.name, p) }}>{SAY[p]}</button>)}

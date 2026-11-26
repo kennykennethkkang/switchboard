@@ -14,6 +14,10 @@ const CHOICES = new Map<string, readonly unknown[]>([
   ['tui', ['default', 'fullscreen']],
 ])
 
+/** Claude Code's Code Mode, which a chat started with --remote-control does not get. */
+export const codeModeOn = (settings: Record<string, unknown>) =>
+  String((settings.env as Record<string, unknown> | undefined)?.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE) === '1'
+
 /** The one change a control may make: values to write, null to unset; undefined when refused. */
 export function controlPatch(key: string, value: unknown, statusLineCommand?: string): Record<string, unknown> | undefined {
   if (BOOLEANS.has(key)) return typeof value === 'boolean' ? { [key]: value } : undefined

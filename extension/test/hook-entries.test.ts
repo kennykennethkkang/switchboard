@@ -14,7 +14,8 @@ import * as path from 'node:path'
 import {
   isLegacyHookUrl, isSwitchboardHook, hasSwitchboardHook,
   mergeSwitchboardHooks, CODEX_HOOK_EVENTS, migrateLegacyHttpHooks, removeSwitchboardHooks,
-  readSettingsFile, writeJsonAtomic, HOOK_EVENTS, missingHookEvents,
+  readSettingsFile, writeJsonAtomic, HOOK_EVENTS, missingHookEvents, raiseHookTimeouts,
+  removeAppHooks,
 } from '../src/hook-entries'
 
 const HOOK_CMD = '"/usr/bin/node" "/home/u/.claude/switchboard/hook.js"'
@@ -89,6 +90,28 @@ describe('removeSwitchboardHooks', () => {
   })
 })
 
+describe('removeAppHooks', () => {
+  it('removes only app-forwarder entries and is idempotent', () => {
+    const app = { matcher: 'Bash', hooks: [
+      { type: 'command', command: '"node" "/home/u/.claude/switchboard-app/hook.js"' },
+      { type: 'command', command: 'notify-user' },
+    ] }
+    const ext = { hooks: [{ type: 'command', command: HOOK_CMD }] }
+    const other = { hooks: [{ type: 'command', command: 'notify' }] }
+    const hooks: Record<string, unknown> = Object.fromEntries(HOOK_EVENTS.map(event => [event, [app, ext, other]]))
+    hooks.PreToolUse = [app, { matcher: 'Bash', hooks: [{ type: 'command', command: 'notify-bash' }] }, ext, other]
+    const settings: Record<string, unknown> = { hooks }
+    assert.equal(removeAppHooks(settings), true)
+    const remaining = settings.hooks as Record<string, Array<{ hooks?: Array<{ command?: string }>; matcher?: string }>>
+    for (const event of HOOK_EVENTS) assert.equal(remaining[event].filter(entry => entry.hooks?.some(h => h.command === HOOK_CMD)).length, 1, event)
+    assert.deepEqual(remaining.PreToolUse, [
+      { matcher: 'Bash', hooks: [{ type: 'command', command: 'notify-user' }] },
+      { matcher: 'Bash', hooks: [{ type: 'command', command: 'notify-bash' }] }, ext, other,
+    ])
+    assert.equal(removeAppHooks(settings), false)
+  })
+})
+
 describe('hasSwitchboardHook', () => {
   it('is false when only another tool has loopback hooks', () => {
     assert.equal(hasSwitchboardHook({ hooks: { SessionStart: [foreignHttp()] } }), false)
@@ -121,6 +144,25 @@ describe('missingHookEvents', () => {
   })
   it('names every event when there are no hooks', () => {
     assert.deepEqual(missingHookEvents({}, ['Stop']), ['Stop'])
+  })
+})
+
+describe('raiseHookTimeouts', () => {
+  it('raises our old entries and leaves other hooks and longer timeouts alone', () => {
+    const other = () => ({ hooks: [{ type: 'command', command: 'other-tool notify', timeout: 2 }] })
+    const app = () => ({ hooks: [{ type: 'command', command: '"/usr/bin/node" "/home/u/.claude/switchboard-app/hook.js"', timeout: 2 }] })
+    const longer = () => ({ hooks: [{ type: 'command', command: HOOK_CMD, timeout: 30 }] })
+    const settings: Record<string, unknown> = { model: 'opus', hooks: {
+      PreToolUse: [other(), { matcher: 'Bash', hooks: [{ type: 'command', command: HOOK_CMD, timeout: 2 }, { type: 'command', command: 'mine too', timeout: 2 }] }],
+      Stop: [app(), longer()],
+    } }
+    assert.equal(raiseHookTimeouts(settings, 10), true)
+    assert.deepEqual(settings, { model: 'opus', hooks: {
+      PreToolUse: [other(), { matcher: 'Bash', hooks: [{ type: 'command', command: HOOK_CMD, timeout: 10 }, { type: 'command', command: 'mine too', timeout: 2 }] }],
+      Stop: [app(), longer()],
+    } })
+    assert.equal(raiseHookTimeouts(settings, 10), false)
+    assert.equal(raiseHookTimeouts({}, 10), false)
   })
 })
 

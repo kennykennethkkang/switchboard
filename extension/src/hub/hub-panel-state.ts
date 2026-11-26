@@ -10,6 +10,8 @@ export const newPanelState = () => ({
   awsAt: -Infinity,
   webAt: -Infinity,
   changesAt: 0,
+  shipAt: -Infinity,
+  extraAt: -Infinity,
   nearAt: 0,
   pending: undefined as NodeJS.Timeout | undefined,
 })

@@ -8,10 +8,10 @@ import './worktree-merge.css'
 /** The worktree folder name of a chat started in its own worktree, else undefined. */
 export const worktreeOf = (cwd: string) => /\/\.claude\/worktrees\/([^/]+)/.exec(cwd)?.[1]
 
-const ASK = "Merge this worktree's changes into the main checkout? They land as uncommitted changes, the repo's checks run first, and the worktree is removed. Nothing is committed or pushed."
+const askText = (base: string) => `Merge this worktree's changes into ${base}? They land as uncommitted changes, the repo's checks run first, and the worktree is removed. Nothing is committed or pushed.`
 const WAIT = 'Merge back once the chat ends'
 
-const Branch = () => (
+export const Branch = () => (
   <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
     <circle cx="3" cy="2.5" r="1.5" /><circle cx="3" cy="9.5" r="1.5" /><circle cx="9" cy="4" r="1.5" /><path d="M3 4v4M9 5.5c0 2-6 1.5-6 2.5" />
   </svg>
@@ -25,9 +25,9 @@ export function WorktreeMark({ cwd }: { cwd: string }) {
 
 /**
  * The band in the open chat: merge the worktree into the main checkout, with a confirm step.
- * Held while the chat still runs. base: the main checkout's branch; files: changed files, when known; result: the Git op's answer for this chat.
+ * Held while the chat still runs. base: the branch the main checkout is on; auto: it merges on its own (Ship's switch); files: changed files, when known; result: the Git op's answer for this chat.
  */
-export function WorktreeMerge({ chat, progress, send, base = 'main', files, result }: { chat: ChatRow; progress?: ChatProgress; send: (c: HubCommand) => void; base?: string; files?: number; result?: string }) {
+export function WorktreeMerge({ chat, progress, send, base = 'your branch', auto = true, files, result }: { chat: ChatRow; progress?: ChatProgress; send: (c: HubCommand) => void; base?: string; auto?: boolean; files?: number; result?: string }) {
   const [ask, setAsk] = useState(false)
   const [sent, setSent] = useState(false)
   const before = useRef<string | undefined>(undefined)
@@ -47,7 +47,7 @@ export function WorktreeMerge({ chat, progress, send, base = 'main', files, resu
     return (
       <div className="wt" role="group" aria-label={`Worktree ${slug}`}>
         <span className="wt-name"><Branch />Worktree <code>{slug}</code></span>
-        <span className="wt-note" role="status">Approve merges it into {base} as uncommitted changes, after the repo checks pass.{count}</span>
+        <span className="wt-note" role="status">{auto ? `Approve merges it into ${base} as uncommitted changes, after the repo checks pass.` : 'Auto merge is off for this repo, so Approve leaves it here. Merge it on Ship.'}{count}</span>
       </div>
     )
   }
@@ -66,7 +66,7 @@ export function WorktreeMerge({ chat, progress, send, base = 'main', files, resu
         aria-describedby={`${id}-note`} aria-expanded={ask} title={running ? WAIT : `Merge into ${base}, then remove the worktree`}
         onClick={() => { if (!held) setAsk(!ask) }}>Merge into {base}</button>
       {ask && <div role="alertdialog" aria-label="Merge back" aria-describedby={`${id}-ask`} className="wt-ask" onKeyDown={e => { if (e.key === 'Escape') close() }}>
-        <p id={`${id}-ask`}>{ASK}</p>
+        <p id={`${id}-ask`}>{askText(base)}</p>
         <span className="wt-acts">
           <button type="button" className="hub-btn sm primary" autoFocus onClick={() => { before.current = result; setLate(false); send({ type: 'hub-git', sessionId: chat.sessionId, op: 'merge-back', confirmed: true }); setSent(true); close() }}>Merge back</button>
           <button type="button" className="hub-btn sm" onClick={close}>Cancel</button>

@@ -3,7 +3,7 @@ name: designer
 description: UI and visual work: layout, type, color, motion and copy on screen, matched to the project's design system.
 model: opus
 color: orange
-disallowedTools: Agent
+disallowedTools: Agent, Artifact
 maxTurns: 40
 ---
 

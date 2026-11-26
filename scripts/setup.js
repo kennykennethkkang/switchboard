@@ -21,8 +21,8 @@ const DISCOVERY_DIR = path.join(os.homedir(), '.claude', 'switchboard-app')
 const HOOK_SCRIPT_PATH = path.join(DISCOVERY_DIR, 'hook.js')
 const SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json')
 
-const HOOK_TIMEOUT_S = 2
-const HOOK_SAFETY_MARGIN_MS = 500
+const HOOK_TIMEOUT_S = 10
+const HOOK_EXIT_MS = 1500
 const HOOK_FORWARD_TIMEOUT_MS = 1000
 const HOOK_COMMAND_MARKER = 'switchboard-app/hook.js'
 // Written before the rename; still ours, so setup swaps them for the new one.
@@ -56,7 +56,7 @@ const path = require('path');
 const http = require('http');
 const os = require('os');
 
-setTimeout(() => process.exit(0), ${HOOK_TIMEOUT_S * 1000 - HOOK_SAFETY_MARGIN_MS});
+setTimeout(() => process.exit(0), ${HOOK_EXIT_MS});
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard-app');
 const IS_WIN = process.platform === 'win32';
@@ -175,7 +175,7 @@ const CODEX_HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Po
 const CODEX_HOOKS_PATH = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'hooks.json')
 
 function hookPath(h) {
-  return h.command?.replace(/\\/g, '/') ?? ''
+  return h?.command?.replace(/\\/g, '/') ?? ''
 }
 
 function isCurrentHook(entry) {
@@ -227,7 +227,8 @@ function writeJsonAtomic(target, value) {
 
 /** Returns true if hooks were written, false if the settings file was left alone. */
 function configureHooks(settingsPath = SETTINGS_PATH, hookCommand, events = HOOK_EVENTS) {
-  if (!hookCommand) hookCommand = `"${resolveNodePath()}" "${HOOK_SCRIPT_PATH}"`
+  const forward = value => process.platform === 'win32' ? value.replace(/\\/g, '/') : value
+  if (!hookCommand) hookCommand = `"${forward(resolveNodePath())}" "${forward(HOOK_SCRIPT_PATH)}"`
   const hookEntry = { hooks: [{ type: 'command', command: hookCommand, timeout: HOOK_TIMEOUT_S }] }
 
   const { settings, error } = readSettings(settingsPath)
@@ -249,10 +250,73 @@ function configureHooks(settingsPath = SETTINGS_PATH, hookCommand, events = HOOK
   return true
 }
 
+/** Our entries from before the longer timeout; other tools' hooks and longer timeouts stay. True if the file changed. */
+function raiseHookTimeouts(settingsPath = SETTINGS_PATH) {
+  const { settings } = readSettings(settingsPath)
+  const hooks = settings?.hooks
+  if (!hooks || typeof hooks !== 'object') return false
+  let changed = false
+  for (const entries of Object.values(hooks)) {
+    for (const h of Array.isArray(entries) ? entries.flatMap(e => e?.hooks ?? []) : []) {
+      if (!hookPath(h).includes(HOOK_COMMAND_MARKER) || !(h.timeout < HOOK_TIMEOUT_S)) continue
+      h.timeout = HOOK_TIMEOUT_S
+      changed = true
+    }
+  }
+  if (changed) writeJsonAtomic(settingsPath, settings)
+  return changed
+}
+
 /** Same entry in Codex's hooks.json; skipped when Codex has no home folder. */
 function configureCodexHooks(hooksPath = CODEX_HOOKS_PATH, hookCommand) {
   if (!fs.existsSync(path.dirname(hooksPath))) return false
   return configureHooks(hooksPath, hookCommand, CODEX_HOOK_EVENTS)
+}
+
+function removeAppHooks(settingsPath) {
+  const { settings, error } = readSettings(settingsPath)
+  if (error) return false
+  const hooks = settings.hooks
+  if (!hooks || typeof hooks !== 'object') return false
+  let changed = false
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (!Array.isArray(entries)) continue
+    let eventChanged = false
+    const kept = entries.flatMap(entry => {
+      if (!Array.isArray(entry?.hooks)) return [entry]
+      const remaining = entry.hooks.filter(h => !hookPath(h).includes(HOOK_COMMAND_MARKER))
+      if (remaining.length === entry.hooks.length) return [entry]
+      eventChanged = true
+      return remaining.length ? [{ ...entry, hooks: remaining }] : []
+    })
+    if (!eventChanged) continue
+    changed = true
+    if (kept.length) hooks[event] = kept
+    else delete hooks[event]
+  }
+  if (!changed) return false
+  if (Object.keys(hooks).length === 0) delete settings.hooks
+  writeJsonAtomic(settingsPath, settings)
+  return true
+}
+
+function extensionOwnsHooks(settingsPath = SETTINGS_PATH, hookScriptPath = path.join(os.homedir(), '.claude', 'switchboard', 'hook.js')) {
+  try {
+    const version = /Switchboard hook forwarder v(\d+)/.exec(fs.readFileSync(hookScriptPath, 'utf8'))
+    if (!version || Number(version[1]) < 14) return false
+  } catch { return false }
+  const { settings } = readSettings(settingsPath)
+  const hooks = settings?.hooks
+  const marker = hookScriptPath.replace(/\\/g, '/')
+  return !!hooks && typeof hooks === 'object' && Object.values(hooks).some(entries =>
+    Array.isArray(entries) && entries.some(entry => entry?.hooks?.some(h => hookPath(h).includes(marker))),
+  )
+}
+
+function removeAppHookEntries() {
+  removeAppHooks(SETTINGS_PATH)
+  // Codex keeps the app's entry until the extension's own is there.
+  if (extensionOwnsHooks(CODEX_HOOKS_PATH)) removeAppHooks(CODEX_HOOKS_PATH)
 }
 
 // ─── Detection ──────────────────────────────────────────────────────────────
@@ -272,8 +336,9 @@ function isAlreadySetup(settingsPath = SETTINGS_PATH, hookScriptPath = HOOK_SCRI
 
 /** Ensure hooks are configured, skip silently if already set up. */
 function ensureSetup() {
+  if (extensionOwnsHooks()) { removeAppHookEntries(); return }
   // An older hook.js sends no token and every hook gets a 403; ensureHookScript skips when it matches.
-  if (isAlreadySetup()) { ensureHookScript(); configureCodexHooks(); return }
+  if (isAlreadySetup()) { ensureHookScript(); raiseHookTimeouts(); configureCodexHooks(); return }
   console.log('Setting up agent hooks...')
   ensureHookScript()
   configureHooks()
@@ -281,13 +346,20 @@ function ensureSetup() {
   console.log('')
 }
 
-module.exports = { ensureSetup, getHookScriptContent, isSwitchboardHook, configureHooks, configureCodexHooks, isAlreadySetup, CODEX_HOOK_EVENTS }
+module.exports = { ensureSetup, getHookScriptContent, isSwitchboardHook, configureHooks, configureCodexHooks, isAlreadySetup, raiseHookTimeouts, removeAppHooks, extensionOwnsHooks, CODEX_HOOK_EVENTS }
 
 // Run directly: node scripts/setup.js [--force]
 if (require.main === module) {
   const force = process.argv.includes('--force')
 
+  if (extensionOwnsHooks()) {
+    removeAppHookEntries()
+    console.log("Switchboard extension hook already covers the app.")
+    process.exit(0)
+  }
+
   if (!force && isAlreadySetup()) {
+    raiseHookTimeouts()
     console.log('Switchboard is already set up. Run with --force to reconfigure.')
     process.exit(0)
   }

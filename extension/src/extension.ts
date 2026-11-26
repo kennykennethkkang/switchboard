@@ -11,16 +11,22 @@ import { startHub, addHubPoster, handleHubMessage, bindStatusBar, hubViewShown, 
 from './hub/hub-panel'
 import { kitDir } from './constants'
 import { startSelfUpdate } from './hub/self-update'
+import { startSkillRefresh } from './hub/skill-refresh'
+import { startSync } from './hub/sync'
+import { startUpdater } from './hub/updater'
 import { watchCloseForMove } from './close-for-move'
 import type { AgentRuntime, AgentRuntimeMode } from './session-runtime'
 import { withSkipShell } from './hub/controls'
 import { orphanTab } from './orphan-tab'
 import { hub } from './hub/hub-service'
-import { LIBRARY, listResearch, readResearch } from './hub/research-library'
+import { LIBRARY, readResearch } from './hub/research-library'
+import { researchState } from './hub/research-folders'
+import { ADJUSTMENTS, readAdjust } from './hub/adjustments'
 import { SliceUploads, chatLabel } from './hub/uploads'
 import { setResearchOpener, sweepResearch } from './hub/research-window'
 import { readGraph } from './hub/graph'
 import { readRuns } from './hub/runs'
+import { usageHistory } from './hub/history'
 import { buildFlowMap, flowChatDirs, flowLabels, flowRoots, withLimits } from './hub/flowmap'
 import { readGroups } from './hub/split'
 import { chatOutputs, chatShot, chatTranscript, progressOutputs } from './hub/chat-view'
@@ -67,14 +73,26 @@ async function startRuntimes(
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  hub.set({ research: listResearch(LIBRARY) })
+  hub.set(researchState(LIBRARY))
+  // Workbench follows both folders: a change logged by a chat, and a report with new actions.
+  let readjust: NodeJS.Timeout | undefined
+  const adjust = () => { clearTimeout(readjust); readjust = setTimeout(() => { void readAdjust().then(a => hub.set({ adjust: { ...a, said: hub.get().adjust?.said } }), err => log.warn('Workbench read failed:', err)) }, 400) }
+  context.subscriptions.push({ dispose: () => clearTimeout(readjust) })
+  adjust()
+  for (const dir of [ADJUSTMENTS, LIBRARY]) {
+    try {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
+      const w = fs.watch(dir, { recursive: true }, adjust)
+      context.subscriptions.push({ dispose: () => w.close() })
+    } catch (err) { log.warn('Workbench watch failed:', err) }
+  }
   // Another window saves, marks seen or deletes a report: relist here too.
   try {
     fs.mkdirSync(LIBRARY, { recursive: true })
     let relist: NodeJS.Timeout | undefined
     const w = fs.watch(LIBRARY, { recursive: true }, () => {
       clearTimeout(relist)
-      relist = setTimeout(() => hub.set({ research: listResearch(LIBRARY) }), 300)
+      relist = setTimeout(() => hub.set(researchState(LIBRARY)), 300)
     })
     context.subscriptions.push({ dispose: () => { clearTimeout(relist); w.close() } })
   } catch (err) { log.warn('Research library watch failed:', err) }
@@ -96,6 +114,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const sweep = setInterval(() => sweepResearch(new Set(hub.get().chats.filter(c => c.live).map(c => c.sessionId))), 60_000)
   context.subscriptions.push({ dispose: () => clearInterval(sweep) })
   startSelfUpdate(context, kitDir())
+  startSkillRefresh(context)
+  startSync(context)
+  startUpdater(context)
   watchCloseForMove(context)
 
   // Activity Bar icon: VS Code can only open a sidebar view from it, so the view opens Switchboard as an
@@ -375,6 +396,12 @@ function wirePanel(panel: VisualizerPanel): void {
       case 'runs-get': {
         const { id, sessionId, role } = message
         void readRuns(sessionId, role).then(runs => panel.postMessage({ type: 'runs', id, runs }), err => panel.postMessage({ type: 'runs', id, problem: (err as Error).message }))
+        break
+      }
+
+      case 'usage-get': {
+        const { id } = message
+        void usageHistory.report().then(usage => panel.postMessage({ type: 'usage', id, usage }), err => panel.postMessage({ type: 'usage', id, problem: (err as Error).message }))
         break
       }
 

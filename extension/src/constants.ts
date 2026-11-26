@@ -61,10 +61,11 @@ export const HOOK_SERVER_NOT_STARTED = -1
 export const HOOK_MAX_BODY_SIZE = 1024 * 1024 // 1 MB
 
 /** Hook timeout value written to settings.json (seconds) */
-export const HOOK_TIMEOUT_S = 2
+export const HOOK_TIMEOUT_S = 10
 
-/** Safety margin subtracted from hook timeout to guarantee exit before kill (ms) */
-export const HOOK_SAFETY_MARGIN_MS = 500
+/** The hook exits this long after node boots (ms). Far under HOOK_TIMEOUT_S, since boot alone can take seconds
+ *  on a loaded machine and Code Mode refuses a call whose hook times out. */
+export const HOOK_EXIT_MS = 1500
 
 /** Timeout for HTTP requests in hook forwarding script (ms) */
 export const HOOK_FORWARD_TIMEOUT_MS = 1000

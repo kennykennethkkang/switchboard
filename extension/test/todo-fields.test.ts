@@ -96,6 +96,41 @@ describe('needsOk and notBefore', () => {
     assert.match(r.said, /needs your OK/)
     assert.equal('needsOk' in toolStep(doc(), { op: 'add', text: 'plain item', session: 'c1' }, 5, 'n2').doc.todo[0], false)
   })
+
+  describe('a date the text opens with', () => {
+    const day = new Date(2026, 10, 30).getTime(), before = day - 6 * DAY
+    const added = (text: string, more: Partial<TodoItem> = {}, at = before) => addTodo(emptyDoc(), text, at, 'a', more).todo[0]
+
+    it('sets notBefore to that day while it is ahead', () => {
+      assert.equal(added('On or after 2026-11-30, compare token use').notBefore, day)
+      assert.equal(added('not before 2026-11-30: compare token use').notBefore, day)
+      assert.deepEqual(upcoming([added('On or after 2026-11-30, compare')], 0, new Set(), before), { runs: [], held: [{ id: 'a', why: 'date' }] })
+      assert.deepEqual(upcoming([added('On or after 2026-11-30, compare')], 0, new Set(), day).runs, [{ n: 1, ids: ['a'] }])
+    })
+
+    it('sets nothing once the day has come', () => {
+      assert.equal('notBefore' in added('On or after 2026-11-30, compare', {}, day), false)
+      assert.equal('notBefore' in added('On or after 2026-11-30, compare', {}, day + DAY), false)
+    })
+
+    it('a date mid-sentence, or not a date, holds nothing', () => {
+      for (const t of ['Read the runs on or after 2026-11-30, then retire ntfy', 'Check alerts (not before 2026-11-30)', 'AAR fix plan: 4c31f78a ("On or after 2026-11-30, ...") ran early', 'On or after 2026-11-301, compare', 'On or after 2026-13-30, compare', 'On or after 2026-12-32, compare', 'After 2026-11-30, compare'])
+        assert.equal('notBefore' in added(t), false, t)
+    })
+
+    it('a notBefore passed in wins, 0 too', () => {
+      assert.equal(added('On or after 2026-11-30, compare', { notBefore: before + 5 }).notBefore, before + 5)
+      assert.equal(added('On or after 2026-11-30, compare', { notBefore: 0 }).notBefore, 0)
+    })
+
+    it('an accepted suggestion, a todo_add and a put back item get it too', () => {
+      const text = 'On or after 2026-11-30, compare token use'
+      assert.equal(acceptSuggestion(doc({ suggested: [item('s', { text })] }), 's', before).todo[0].notBefore, day)
+      assert.equal(toolStep(doc(), { op: 'add', text, session: 'c1' }, before, 'n1').doc.todo[0].notBefore, day)
+      const ticked = finishItem(doc({ todo: [item('t', { text, notBefore: day })] }), 't', 'c1', before)
+      assert.equal(restoreTicked(ticked, 't', before, 't2').todo[0].notBefore, day)
+    })
+  })
 })
 
 describe('stale suggestions', () => {

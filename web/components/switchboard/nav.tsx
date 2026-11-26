@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isMap, type Page } from '@/lib/route'
 import { useResearchUnseen } from './research-library'
+import { pending, useWorkbench } from '@/lib/workbench-store'
 import './nav.css'
 
 const Ic = ({ d }: { d: string }) => <svg className="hub-ic" aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
@@ -13,28 +14,33 @@ const ICON = {
   plan: 'M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01',
   live: 'M1.5 8h3l2-4.5 3 9 2-4.5h3',
   research: 'M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2zM3 11.5a2 2 0 0 1 2-2h7.5M6 5.5h4',
+  workbench: 'M3 4.5h10v8H3zM6 4.5V3h4v1.5M3 8h10',
   ship: 'M8 10.5V2.5M4.5 6 8 2.5 11.5 6M3 13.5h10',
   map: 'M8 2v3M8 5 4 9M8 5l4 4M4 9v2.5M12 9v2.5M2.5 13.5h3M10.5 13.5h3',
+  usage: 'M2.5 13.5h11M4.5 11V8M8 11V3M11.5 11V6',
   settings: 'M6.84 3.34L7.08 1.46L8.92 1.46L9.16 3.34A4.8 4.8 0 0 1 11.45 4.67L13.2 3.94L14.12 5.53L12.61 6.68A4.8 4.8 0 0 1 12.61 9.32L14.12 10.47L13.2 12.06L11.45 11.33A4.8 4.8 0 0 1 9.16 12.66L8.92 14.54L7.08 14.54L6.84 12.66A4.8 4.8 0 0 1 4.55 11.33L2.8 12.06L1.88 10.47L3.39 9.32A4.8 4.8 0 0 1 3.39 6.68L1.88 5.53L2.8 3.94L4.55 4.67A4.8 4.8 0 0 1 6.84 3.34ZM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
 }
 
 type Counts = { needs: number; chats: number; plan: number; live?: number; ship: number }
 
 /** Left rail of labelled pages; a fixed bottom tab bar at 760px or less. Map holds its three modes.
- *  simple: the Simple view's five pages, Now named Home; onCoder: the Coder view switch at the foot of the rail. */
+ *  simple: the Simple view's six pages, Now named Home; onCoder: the Coder view switch at the foot of the rail. */
 export function Nav({ page, go, counts, onFind, findKey, simple, onCoder }: { page: Page; go: (p: Page) => void; counts: Counts; onFind: () => void; findKey: string; simple?: boolean; onCoder?: (on: boolean) => void }) {
   const unseen = useResearchUnseen()
+  const wbN = pending(useWorkbench()).length
   const all: [Page, string, keyof typeof ICON, number?, boolean?][] = [
     ['now', simple ? 'Home' : 'Now', 'now', counts.needs, true],
     ['chats', 'Chats', 'chats', counts.chats],
     ['research', 'Research', 'research', unseen],
+    ['workbench', 'Workbench', 'workbench', wbN],
     ['plan', 'Plan', 'plan', counts.plan],
     ['live', 'Live', 'live', counts.live],
     ['ship', 'Ship', 'ship', counts.ship],
     ['map-board', 'Map', 'map'],
+    ['usage', 'Usage', 'usage'],
     ['settings', 'Settings', 'settings'],
   ]
-  const items = simple ? all.filter(([p]) => p === 'now' || p === 'chats' || p === 'research' || p === 'plan' || p === 'settings') : all
+  const items = simple ? all.filter(([p]) => p === 'now' || p === 'chats' || p === 'research' || p === 'workbench' || p === 'plan' || p === 'usage' || p === 'settings') : all
   return (
     <nav className="nav" aria-label="Pages">
       <strong className="hub-brand nav-brand"><i aria-hidden />Switchboard</strong>
@@ -44,9 +50,9 @@ export function Nav({ page, go, counts, onFind, findKey, simple, onCoder }: { pa
       <ul>
         {items.map(([p, label, icon, n, hot]) => {
           const on = p === page || (p === 'map-board' && isMap(page))
-          return <li key={p}>
+          return <li key={p} data-page={p}>
             <a href={`#${p}`} className="nav-item" aria-current={on ? 'page' : undefined} onClick={e => { e.preventDefault(); go(p) }}>
-              <Ic d={ICON[icon]} /><span>{p === 'research' ? <><span className="nav-full">{label}</span><span className="nav-tight">Reports</span></> : label}</span>
+              <Ic d={ICON[icon]} /><span>{p === 'research' || p === 'workbench' ? <><span className="nav-full">{label}</span><span className="nav-tight">{p === 'research' ? 'Reports' : 'Bench'}</span></> : label}</span>
               {!!n && <span className="nav-n" data-hot={hot || undefined}>{n}<span className="sr-only"> {hot ? 'need you' : 'open'}</span></span>}
             </a>
           </li>
@@ -70,8 +76,9 @@ export function MapBar({ page, go, onBack }: { page: Page; go: (p: Page) => void
   const [host, setHost] = useState<HTMLElement | null>(null)
   useEffect(() => {
     setHost(null)
-    const find = () => { const d = document.querySelector<HTMLElement>(`dialog[open][aria-label="${label}"]`); if (d) { setHost(d); mo.disconnect() } }
+    const find = () => setHost(document.querySelector<HTMLElement>(`dialog[open][aria-label="${label}"]`))
     // The map dialogs open with showModal, which sets open; watching only that skips every other DOM change.
+    // Keeps watching: Memory's Map and Notebook each mount their own dialog.
     const mo = new MutationObserver(find)
     mo.observe(document.body, { subtree: true, attributeFilter: ['open'] })
     find()

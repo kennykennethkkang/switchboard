@@ -55,4 +55,4 @@ export async function loadShot(session: string, path: string, f: typeof fetch = 
   }
 }
 
-export const fileName = (p: string) => p.split('/').filter(Boolean).pop() ?? p
+export const fileName = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p

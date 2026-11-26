@@ -55,6 +55,7 @@ export function defaultCommands(o: { cards: Cards; repoChanges: boolean; vscode:
     ...go('map-board', 'Map: Agents', 'board'),
     ...go('map-flow', 'Map: Code', 'flow'),
     ...go('map-memory', 'Map: Memory', 'vault notes'),
+    ...go('usage', 'Usage', 'tokens cost limits spend codex'),
     ...go('settings', 'Settings', 'gear preferences'),
     { id: 'do:new', label: 'New chat', group: 'Do', keywords: 'start' },
     ...(o.repoChanges ? [{ id: 'do:commit-draft', label: 'Write commit message', group: 'Do' as const, keywords: 'git' }] : []),

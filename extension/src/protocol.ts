@@ -1,6 +1,7 @@
 import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub/types'
 import type { MemoryGraph } from './hub/graph'
 import type { RunDetail } from './hub/runs'
+import type { UsageReport } from './hub/usage'
 import type { FlowMap } from './hub/flowmap'
 import type { ChatOutputs, ChatTranscript } from './hub/chat-view'
 import type { ScreenSnap } from './hub/screen'
@@ -56,6 +57,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'session-ended'; sessionId: string }
   | { type: 'session-updated'; sessionId: string; label: string }
   | { type: 'hub-state'; hub: HubState }
+  /** The fields that moved since the last one this view was sent. */
+  | { type: 'hub-state'; delta: { set: Record<string, unknown>; del: string[] } }
   /** The mic's level, 0..1, about 12 a second while it listens; kept out of hub-state. */
   | { type: 'hub-voice-level'; level: number }
   /** The asks hub-split found, same reqId; [text] on timeout or error. */
@@ -70,6 +73,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'graph'; id: string; graph?: MemoryGraph; problem?: string }
   /** The answer to runs-get. */
   | { type: 'runs'; id: string; runs?: RunDetail[]; problem?: string }
+  | { type: 'usage'; id: string; usage?: UsageReport; problem?: string }
   /** The answer to flowmap-get. */
   | { type: 'flowmap'; id: string; map?: FlowMap; problem?: string }
   /** The answer to chat-get: the one asked for, a shot as a data URL; none of them for an unknown chat or a screen no window holds. */
@@ -100,6 +104,7 @@ export type WebviewToExtensionMessage =
   | { type: 'graph-get'; id: string }
   /** The node drawer asks for a role's runs in a chat; answered by 'runs' with the same id. */
   | { type: 'runs-get'; id: string; sessionId: string; role: string }
+  | { type: 'usage-get'; id: string }
   /** The Flow map asks for cwd's map; answered by 'flowmap' with the same id. */
   | { type: 'flowmap-get'; id: string; cwd: string }
   /** The chat view asks for a chat's outputs, a transcript page, one screenshot or its terminal screen; answered by 'chat' with the same id. */
@@ -120,6 +125,18 @@ export type WebviewToExtensionMessage =
   /** Marks a saved research run seen, or moves it to the trash. */
   | { type: 'hub-research-seen'; id: string }
   | { type: 'hub-research-delete'; id: string }
+  /** Ask more: a research chat digs into text, and its report is added to this saved run. */
+  | { type: 'hub-research-ask'; id: string; text: string }
+  /** Folders: make, rename, or delete one (its reports go back to unfiled). */
+  | { type: 'hub-research-folder'; op: 'add' | 'rename' | 'delete'; name: string; to?: string }
+  /** Files runs in a folder (made when new), or unfiles them without one. */
+  | { type: 'hub-research-move'; ids: string[]; folder?: string }
+  /** Smart organize: files the unfiled runs (all: every run), undoes its last run, or switches filing new runs on and off. */
+  | { type: 'hub-research-organize'; op: 'run' | 'all' | 'undo' | 'auto-on' | 'auto-off' }
+  /** Workbench: start a chat on these actions of a saved report, undo a logged change, or hide a suggested one. */
+  | { type: 'hub-adjust-apply'; report: string; keys: string[] }
+  | { type: 'hub-adjust-undo'; id: string; force?: boolean }
+  | { type: 'hub-adjust-skip'; report: string; key: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
@@ -128,7 +145,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean; /** With research: start in the Workbench folder with its note. */ workbench?: boolean; /** Claude only: start in a Goal or Timer loop (loop.ts). */ loop?: { mode: 'turn' | 'goal' | 'timer'; doneWhen?: string; everyMin?: 10 | 30 | 60 | 180 | 1440; text?: string } }
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
@@ -144,13 +161,10 @@ export type WebviewToExtensionMessage =
   /** Clears a smart model switch escalation: its model-learn.json rows go. */
   | { type: 'hub-escalation-reset'; project: string; role: string; files: string[] }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
-  /** Run indefinitely on or off for one chat. */
-  | { type: 'hub-indefinite'; sessionId: string; on: boolean }
+  /** A chat's loop (loop.ts): turn clears Run indefinitely and the check-back, goal turns Run indefinitely on, timer sets the check-back with its prompt. */
+  | { type: 'hub-loop'; sessionId: string; loop: { mode: 'turn' | 'goal' | 'timer'; doneWhen?: string; everyMin?: 10 | 30 | 60 | 180 | 1440; text?: string } }
   /** Run indefinitely limits for one chat; a field set to null clears it, one left out keeps it. */
   | { type: 'hub-budget'; sessionId: string; maxHours?: number | null; maxCostUsd?: number | null; gate?: string | null }
-  /** Check-back on for one chat at this interval (count starts over), or off. */
-  | { type: 'hub-checkback'; sessionId: string; everyMin: 10 | 30 | 60 }
-  | { type: 'hub-checkback-clear'; sessionId: string }
   /** Refine now: tells the chat to run the aar skill on itself. */
   | { type: 'hub-refine'; sessionId: string }
   /** Reload HubState.snapshots. */
@@ -175,6 +189,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-approve'; sessionId: string }
   | { type: 'hub-open-note'; sessionId: string }
   | { type: 'hub-focus-chat'; sessionId: string }
+  | { type: 'hub-open-chat'; sessionId: string }
   | { type: 'hub-terminal'; id: number; act: 'show' | 'close' }
   | { type: 'hub-keep'; onFull?: 'compact' | 'fresh'; freshBranch?: boolean }
   | { type: 'hub-aws-login'; profile: string; chrome?: string }
@@ -200,6 +215,9 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-key-remove'; name: ApiKeyName }
   | { type: 'hub-env-setup'; folder: string }
   | { type: 'hub-kit-export' }
+  | { type: 'hub-sync-sign-in' }
+  | { type: 'hub-sync-now' }
+  | { type: 'hub-sync-off' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
   | { type: 'hub-role-model'; role: string; model: 'inherit' | 'fable' | 'opus' | 'sonnet' | 'haiku' }
@@ -238,6 +256,8 @@ export type WebviewToExtensionMessage =
   /** The Jarvis mic: on records the Mac mic, off stops it; the transcript lands in the box as HubState.heard. */
   | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
+  /** Ship's per-repo switch; repo is a listed ShipRepo id. */
+  | { type: 'hub-auto-merge'; repo: string; on: boolean }
   | { type: 'hub-harden'; sessionId: string }
   /** One message for every uncommitted change in the chat's repo, into Source Control and RepoView.draft. */
   | { type: 'hub-draft-commit'; sessionId: string }

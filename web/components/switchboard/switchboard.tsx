@@ -38,7 +38,9 @@ import { PhoneAddress, PhoneMail, PhoneQr } from './phone-qr'
 import { DevRows, onMac } from './dev-rows'
 import { Terminals } from './terminals'
 import { PlanPage } from './plan-page'
+import { UsagePage } from './usage-page'
 import { ShipPage } from './ship-page'
+import { isShipId, shipCount, shipOf, shipPick, shipRows } from '@/lib/ship-list'
 import { StuckStrip } from './stuck-strip'
 import { Jarvis } from './jarvis'
 import { ChatMenu } from './chat-menu'
@@ -56,9 +58,11 @@ import './needs.css'
 import { CardStages } from './stages'
 import { FirstRunCard, SimpleHome, ViewChoice, type Step } from './simple-home'
 import { readyChat, ticked } from '@/lib/simple-home'
+import { follows } from '@/lib/open-chat'
 import { ResearchOffers, ResearchTracker } from './research-offer'
 import { ResearchPanel } from './research-panel'
 import { ResearchPage, ResearchSignal } from './research-library'
+import { Workbench, WorkbenchSignal } from './workbench'
 // Its own chunk with three in it, loaded on the first open.
 const MemoryView = lazy(() => import('./memory').then(m => ({ default: m.MemoryView })))
 const FlowMapView = lazy(() => import('./flow-map').then(m => ({ default: m.FlowMapView })))
@@ -74,6 +78,8 @@ const NARROW = '(max-width: 760px)'
 const Ic = ({ d }: { d: string }) => <svg className="hub-ic" aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 const PLUS = 'M8 3v10M3 8h10'
 const FIND = 'M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM11 11l3.5 3.5'
+
+const NO_ADJUST = { device: '', changes: [], suggestions: [] }
 
 export function Switchboard() {
   const { hub, send, upload, isDemo, isVSCode, isLive, problem, down, inert } = useHub()
@@ -130,10 +136,37 @@ export function Switchboard() {
   const projectChips = useMemo(() => chatProjects(cards.map(c => c.chat), projects), [cards, projects])
   const idleMinutes = hub.controls.switchboard.idleMinutes
   const rail = useMemo(() => hideDone(shown, idleMinutes, pick.id), [shown, idleMinutes, pick.id])
+  // The chat opened last in a terminal or on another page shows here too, once this page is not in use.
+  const followed = useRef(0)
+  useEffect(() => {
+    const follow = () => {
+      const o = hub.openChat
+      if (!follows(o, followed.current, document.hasFocus(), id => shown.some(c => c.chat.sessionId === id))) return
+      followed.current = o.at
+      setPick({ id: o.sessionId, key: true })
+      writeStore(CHAT_KEY, o.sessionId)
+    }
+    follow()
+    addEventListener('blur', follow)
+    return () => removeEventListener('blur', follow)
+  }, [hub.openChat, shown])
+  // Not from a phone: a pick there would switch the terminal under someone typing on the Mac.
+  const pickChat = (id: string, key: boolean) => {
+    setPick({ id, key })
+    writeStore(CHAT_KEY, id)
+    followed.current = Date.now()
+    if (!onPhone) send({ type: 'hub-open-chat', sessionId: id })
+  }
   const current = shown.find(c => c.chat.sessionId === pick.id) ?? rail[0] ?? shown[0]
   const currentId = current?.chat.sessionId
   // The extension reads the shown chat's changes, then again with each refresh; asked again only when the chat or the connection changes.
-  useEffect(() => { if (currentId) sendRef.current({ type: 'hub-changes', sessionId: currentId }) }, [currentId, isDemo, isVSCode, isLive])
+  // On Ship it reads the picked repo or worktree instead, chat or no chat.
+  const [shipAt, setShipAt] = useState<string>()
+  const shipList = useMemo(() => shipRows(hub.ship ?? [], projects), [hub.ship, projects])
+  const shipping = shipPick(hub.ship ?? [], shipList, shipAt, current?.chat.cwd)
+  const shipId = shipping && (shipping.tree?.id ?? shipping.repo.id)
+  const readId = view === 'ship' ? shipId : currentId
+  useEffect(() => { if (readId) sendRef.current({ type: 'hub-changes', sessionId: readId }) }, [readId, isDemo, isVSCode, isLive])
   useEffect(() => { sendRef.current({ type: 'hub-trend' }) }, [isDemo, isVSCode, isLive])
   // Cmd+K (Ctrl+K elsewhere), caught before VS Code's webview takes it as the start of a chord.
   useEffect(() => {
@@ -151,8 +184,7 @@ export function Switchboard() {
     [finding, cards, hub.archive, ready, isVSCode, hub.awake, phoneOn, coder])
   // On a phone the chat page sits below the whole rail, so a tap brings it up.
   const select = (id: string, key: boolean) => {
-    setPick({ id, key })
-    writeStore(CHAT_KEY, id)
+    pickChat(id, key)
     if (!matchMedia(NARROW).matches) return
     const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches
     requestAnimationFrame(() => document.querySelector('.hub-chat-main')?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }))
@@ -196,7 +228,7 @@ export function Switchboard() {
   const plan = planFolder(Object.keys(todos), pickedCwd, here, planPick)
   const todoAt = plan.at
   const pickPlan = (folder: string) => { if (!todoAt) return; const v = { at: todoAt, folder }; setPlanPick(v); writeStore(PLAN_KEY, JSON.stringify(v)) }
-  const today = useMemo(() => todayView(cards, hub.history, hub.live, Date.now(), hub.jev, hub.archive, hub.stuck), [cards, hub.history, hub.live, hub.jev, hub.archive, hub.stuck])
+  const today = useMemo(() => todayView(cards, hub.history, Date.now(), hub.archive, hub.stuck), [cards, hub.history, hub.archive, hub.stuck])
   const tasks = useMemo(() => taskTotals(cards), [cards])
   const models = useMemo(() => roleModels(hub.installed, hub.controls.claude.model), [hub.installed, hub.controls.claude.model])
   // Redraws the countdown every 30 s while a limit or pause shows one.
@@ -229,7 +261,7 @@ export function Switchboard() {
 
   const scrollTo = (id: string) => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }))
   const toGit = () => {
-    if (ready && ready.sessionId !== currentId) jump(ready.sessionId)
+    if (ready) setShipAt(isShipId(ready.sessionId) ? ready.sessionId : cards.find(c => c.chat.sessionId === ready.sessionId)?.chat.cwd)
     go('ship'); scrollTo('hub-git')
   }
   const phonePop = (
@@ -282,7 +314,8 @@ export function Switchboard() {
   const chatName = (id: string) => { const c = cards.find(x => x.chat.sessionId === id)?.chat; return c ? c.name || projectName(c) : 'A chat' }
   const jarvis = <Jarvis reply={hub.jarvis} voice={hub.voice} heard={hub.heard} mic={isDemo || isVSCode || mac} demo={isDemo} send={send} />
   const ci = hub.repo?.ci
-  const allFails = ci?.conclusion === 'failure' && hub.repo ? [{ sessionId: hub.repo.sessionId, url: ci.url, what: `CI failed: ${ci.workflow}${ci.jobs.find(j => j.step)?.step ? ` at ${ci.jobs.find(j => j.step)!.step}` : ''}` }] : []
+  // A repo picked on Ship belongs to no chat, so it asks nothing here.
+  const allFails = ci?.conclusion === 'failure' && hub.repo && !isShipId(hub.repo.sessionId) ? [{ sessionId: hub.repo.sessionId, url: ci.url, what: `CI failed: ${ci.workflow}${ci.jobs.find(j => j.step)?.step ? ` at ${ci.jobs.find(j => j.step)!.step}` : ''}` }] : []
   // Now follows the project filter; the nav count does not, so a pick never hides an ask.
   const fails = picked(allFails, cards, projects)
   const pickedStuck = picked(hub.stuck ?? [], cards, projects)
@@ -319,7 +352,7 @@ export function Switchboard() {
   const message = current && ((tools: ReactNode) => <MessageBox key={current.chat.sessionId} chat={current.chat} send={send} upload={upload} problem={problem} tools={tools} />)
   const picture = current
     ? <ChatPicture chat={current.chat} progress={current.progress} stuckItems={hub.stuck} all={hub.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models} demo={isDemo} repo={hub.repo} links={chipsOf(current.chat.sessionId)}
-        profile={hub.tools?.chats[current.chat.sessionId]} flagged={hub.tools?.flagged} smart={hub.tools?.smart?.[current.chat.sessionId]} globalOff={hub.tools?.globalOff} onProfile={tools => send({ type: 'hub-chat-tools', sessionId: current.chat.sessionId, tools })} onCommand={send} onIndefinite={on => send({ type: 'hub-indefinite', sessionId: current.chat.sessionId, on })}
+        profile={hub.tools?.chats[current.chat.sessionId]} flagged={hub.tools?.flagged} smart={hub.tools?.smart?.[current.chat.sessionId]} globalOff={hub.tools?.globalOff} onProfile={tools => send({ type: 'hub-chat-tools', sessionId: current.chat.sessionId, tools })} onCommand={send}
         place={place} message={message} menu={<><button type="button" className="hub-btn" onClick={read(current.chat)} title="Live screen, what this chat produced, and its transcript">{vscodeBridge?.isVSCode ? 'Outputs' : 'Screen and outputs'}</button><ChatMenu chat={current.chat} starred={starred.includes(current.chat.sessionId)} send={send} onMac={isVSCode} inPicture {...waitProps(current.chat)} /></>}
         installed={hub.installed} connections={hub.connections} onInstalled={() => openGear('Installed')}
         onFocus={() => send({ type: 'hub-focus-chat', sessionId: current.chat.sessionId })}
@@ -329,17 +362,21 @@ export function Switchboard() {
         limits={hub.live.flatMap(l => l.limits)} autoContinue={hub.keep.autoContinue}
         onSend={text => send(boxNote(current.chat) ? { type: 'hub-new-chat', path: current.chat.cwd, text, remote: false } : { type: 'hub-send', sessionId: current.chat.sessionId, text })} />
     : <section style={{ padding: 20, color: 'var(--hub-ash)' }}>No chat open. Pick one from the list, or press New chat to start one.</section>
-  const changes = current && <ChangesPanel editor={editorName(hub)} key={current.chat.sessionId} changes={hub.changes} sessionId={current.chat.sessionId} cwd={current.chat.cwd} commit={current.progress?.commit}
-    onCopy={copy} onOpen={file => send({ type: 'hub-open-diff', sessionId: current.chat.sessionId, file })} />
-  const ship = current?.progress?.state === 'done' && <ShipCard key={`ship-${current.chat.sessionId}`} repo={hub.repo} progress={current.progress} sessionId={current.chat.sessionId} send={send} onCopy={copy} phone={onPhone} harden={!!hub.controls.switchboard.hardenBuild} />
-  const git = current && <>{ship}<GitPanel key={`git-${current.chat.sessionId}`} repo={hub.repo} sessionId={current.chat.sessionId} chat={current.chat} commit={current.progress?.commit} isVSCode={isVSCode} send={send} shipping={!!ship} phone={onPhone} /></>
+  // The newest chat in the shown folder that finished: its commit message and test run go on the Ship card.
+  const shipper = shipping && cards.filter(c => { const at = shipOf([shipping.repo], c.chat.cwd); return c.progress?.state === 'done' && at && at.tree?.id === shipping.tree?.id })
+    .sort((a, b) => (b.progress?.finishedAt ?? 0) - (a.progress?.finishedAt ?? 0))[0]
+  const changes = shipId && <ChangesPanel editor={editorName(hub)} key={shipId} changes={hub.changes} sessionId={shipId} cwd={shipId} commit={shipper?.progress?.commit}
+    onCopy={copy} onOpen={file => send({ type: 'hub-open-diff', sessionId: shipId, file })} />
+  // A worktree's work goes out through its repo, so no Commit and push card there.
+  const ship = shipId && !shipping.tree && shipper?.progress && <ShipCard key={`ship-${shipId}`} repo={hub.repo} progress={shipper.progress} sessionId={shipId} send={send} onCopy={copy} phone={onPhone} harden={!!hub.controls.switchboard.hardenBuild} />
+  const git = shipId && <>{ship}<GitPanel key={`git-${shipId}`} repo={hub.repo} sessionId={shipId} cwd={shipId} chat={shipper?.chat} commit={shipper?.progress?.commit} isVSCode={isVSCode} send={send} shipping={!!ship} phone={onPhone} merging={shipping.repo.merging && !shipping.tree} /></>
   const switcher = finding && <Switcher items={items} tint={itemTint} onPick={choose} onClose={() => setFinding(false)} />
   const chatView = reading && <ChatView key={reading.id} sessionId={reading.id} name={reading.name} demo={isDemo ? hub : undefined} onCopy={copy} onClose={() => setReading(undefined)} />
   const mapView = !coder ? null : page === 'map-memory' ? <Suspense fallback={null}><MemoryView isDemo={isDemo} onClose={() => go(back.current)} /></Suspense>
     : page === 'map-flow' ? <Suspense fallback={null}><FlowMapView isDemo={isDemo} cwds={hub.projects.map(p => p.path)} here={projectOf(hub.projects.map(p => p.path), hub.thisWindow)} cwd={projectOf(hub.projects.map(p => p.path), current?.chat.cwd)} hub={hub} onClose={() => go(back.current)} /></Suspense>
     : page === 'map-board' && <Suspense fallback={null}><BoardView hub={hub} isDemo={isDemo} send={send} onClose={() => go(back.current)}
       onNew={() => { go(back.current); setPanel('new') }} onTodo={() => { if (!todoCount) { const b = busiestTodo(todos); if (b) pickPlan(b) } go('plan'); scrollTo('hub-todo') }} onChanges={() => { go('ship'); scrollTo('hub-git') }} onMemory={() => go('map-memory')} onFlow={() => go('map-flow')}
-      onLimits={() => setUsage(true)} todoCount={todoCount} files={files}
+      onLimits={() => setUsage(true)} todoCount={todoCount} files={files} chat={pick.id} onChat={id => pickChat(id, false)}
       onSummary={(sessionId, refresh) => send({ type: 'hub-summary', sessionId, ...(refresh ? { refresh } : {}) })} onCopy={copy} /></Suspense>
   const lanes = nowLanes(shown, (hub.archive ?? []).filter(a => inProjects(a, projects)))
   const needsCount = hubCounts(hub, projects).needs
@@ -372,16 +409,18 @@ export function Switchboard() {
     </div>,
     plan: <PlanPage hub={hub} folder={plan.folder} todo={todo} today={todayCard} jev={coder && jev} />,
     live: <LivePage smart={hub.smart} mirofish={hub.mirofish} crowd={hub.crowdAb} reports={hub.mirofishReports} sourceChecks={hub.sourceChecks} send={send} />,
-    ship: <ShipPage hub={hub} cards={shown} pickedId={currentId} onPick={id => { setPick({ id, key: false }); writeStore(CHAT_KEY, id) }}
+    ship: <ShipPage hub={hub} cards={cards} rows={shipList} pick={shipping} onPick={setShipAt} onChat={openChat} phone={onPhone} send={send}
       dev={dev} terminals={<Terminals hub={hub} send={send} />} tracker={tracker} changes={changes} git={git} />,
     settings: gear,
     research: <ResearchPage onChat={openChat} />,
+    workbench: <Workbench onChat={openChat} />,
+    usage: <UsagePage hub={hub} isDemo={isDemo} meters={meters} send={send} onOpen={openChat} live={id => cards.some(c => c.chat.sessionId === id)} />,
   }
 
   return (
     <div className="hub hub-shell" data-page={view} data-map={isMap(view) || undefined} style={{ background: 'var(--hub-surface)', color: 'var(--hub-body)', font: '400 14px/1.6 var(--hub-sans)' }}>
       <Nav page={view} go={go} onFind={() => setFinding(true)} findKey={isMac() ? '⌘K' : 'Ctrl K'} simple={!coder} onCoder={on => send({ type: 'hub-coder-view', on })}
-        counts={{ needs: needsAll, chats: cards.length, plan: todoCount, live: liveCount(hub), ship: ready?.files.length ?? 0 }} />
+        counts={{ needs: needsAll, chats: cards.length, plan: todoCount, live: liveCount(hub), ship: shipCount(hub.ship) }} />
       <div className="hub-col">
         {header}
         {phoneHint}
@@ -398,7 +437,8 @@ export function Switchboard() {
       {mapView}
       {coder && isMap(page) && <MapBar page={page} go={go} onBack={() => go(back.current)} />}
       {chatView}
-      <ResearchSignal items={isDemo ? undefined : hub.research ?? []} go={go} page={view} />
+      <WorkbenchSignal adjust={isDemo ? undefined : hub.adjust ?? NO_ADJUST} path={hub.projects[0]?.path} />
+      <ResearchSignal items={hub.research} folders={hub.researchFolders} send={send} demo={isDemo} go={go} page={view} />
     </div>
   )
 }

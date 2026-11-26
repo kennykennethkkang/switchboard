@@ -104,6 +104,7 @@ describe('merge back uncommitted worktree work', () => {
     const r = await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, idle)
     assert.equal(r.ok, false)
     assert.match(r.text, /clashes with main/)
+    assert.match(r.text, /same lines in a\.txt/)
     assert.equal(fs.readFileSync(path.join(main, 'a.txt'), 'utf8'), 'main edit\n')
     assert.ok(fs.existsSync(wt))
     sh(main, 'checkout', '--', 'a.txt')
@@ -177,5 +178,64 @@ describe('merge back uncommitted worktree work', () => {
     assert.ok(!fs.existsSync(path.join(main, 'e.txt')))
     assert.ok(fs.existsSync(wt))
     sh(main, 'checkout', '--', 'a.txt')
+  })
+
+  // Last: these commit a longer file to main's history.
+  const lines = (edit: Record<number, string>) => Array.from({ length: 9 }, (_, i) => edit[i + 1] ?? `l${i + 1}`).join('\n') + '\n'
+  const nearby = (slug: string) => {
+    if (!fs.existsSync(path.join(main, 'list.txt'))) { fs.writeFileSync(path.join(main, 'list.txt'), lines({})); sh(main, 'add', 'list.txt'); sh(main, 'commit', '-qm', 'list') }
+    const wt = add(slug)
+    // Two lines apart: inside the patch's context, so a plain apply fails, but the edits do not touch.
+    fs.writeFileSync(path.join(wt, 'list.txt'), lines({ 6: 'w6' }))
+    fs.writeFileSync(path.join(wt, 'n.txt'), 'n\n')
+    fs.writeFileSync(path.join(main, 'list.txt'), lines({ 4: 'm4' }))
+    return wt
+  }
+
+  it('merges a clashing file three-way when the two sides changed different lines', async () => {
+    const wt = nearby('threeway')
+    const r = await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, idle)
+    assert.equal(r.ok, true, r.text)
+    assert.equal(fs.readFileSync(path.join(main, 'list.txt'), 'utf8'), lines({ 4: 'm4', 6: 'w6' }))
+    assert.equal(fs.readFileSync(path.join(main, 'n.txt'), 'utf8'), 'n\n')
+    assert.ok(!fs.existsSync(wt))
+    sh(main, 'checkout', '--', 'list.txt'); fs.rmSync(path.join(main, 'n.txt'))
+  })
+
+  it('puts main back exactly when checks fail after a three-way merge', async () => {
+    const wt = nearby('threecheck')
+    const r = await mergeWorktrees(wt, idle, async () => ({ ok: !fs.existsSync(path.join(main, 'n.txt')), text: 'test failed' }), wt)
+    assert.equal(r.ok, false)
+    assert.match(r.text, /test failed, undone/)
+    assert.equal(fs.readFileSync(path.join(main, 'list.txt'), 'utf8'), lines({ 4: 'm4' }))
+    assert.ok(!fs.existsSync(path.join(main, 'n.txt')))
+    assert.ok(fs.existsSync(wt))
+    sh(main, 'checkout', '--', 'list.txt')
+  })
+
+  it('lands nothing when one file merges and another conflicts', async () => {
+    const wt = nearby('threehalf')
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'wt a\n')
+    fs.writeFileSync(path.join(main, 'a.txt'), 'main a\n')
+    const r = await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, idle)
+    assert.equal(r.ok, false)
+    assert.match(r.text, /same lines in a\.txt/)
+    assert.equal(fs.readFileSync(path.join(main, 'list.txt'), 'utf8'), lines({ 4: 'm4' }))
+    assert.equal(fs.readFileSync(path.join(main, 'a.txt'), 'utf8'), 'main a\n')
+    assert.ok(!fs.existsSync(path.join(main, 'n.txt')))
+    assert.ok(fs.existsSync(wt))
+    sh(main, 'checkout', '--', 'list.txt', 'a.txt')
+  })
+
+  it('never overwrites a file both sides added, even an empty one in main', async () => {
+    const wt = add('bothnew')
+    fs.writeFileSync(path.join(wt, 'e0.txt'), 'wt\n')
+    fs.writeFileSync(path.join(main, 'e0.txt'), '')
+    const r = await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, idle)
+    assert.equal(r.ok, false)
+    assert.match(r.text, /same lines in e0\.txt/)
+    assert.equal(fs.readFileSync(path.join(main, 'e0.txt'), 'utf8'), '')
+    assert.ok(fs.existsSync(wt))
+    fs.rmSync(path.join(main, 'e0.txt'))
   })
 })

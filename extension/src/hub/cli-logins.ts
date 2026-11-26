@@ -5,6 +5,7 @@
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import type { AwsStatus, WebApp, WebLogin } from './types'
+import { cliCall } from './windows'
 
 /** bins: where to look first (VS Code's PATH often lacks Homebrew). check: a cheap call that needs a live token. */
 export type CliApp = { bins: string[]; login: string[]; list: string[]; check: (tenant: string) => string[]; tenantFlag: string; url: string }
@@ -92,7 +93,8 @@ export const cliBusy = () => [...running]
 
 /** Runs a CLI call with no shell; ok and stdout plus stderr. */
 export function runCli(bin: string, args: string[], timeout = 8000): Promise<{ ok: boolean; out: string }> {
-  return new Promise(resolve => execFile(bin, args, { timeout, maxBuffer: 1 << 20, windowsHide: true },
+  const call = cliCall(bin, args)
+  return new Promise(resolve => execFile(call.cmd, call.args, { windowsVerbatimArguments: call.windowsVerbatimArguments, timeout, maxBuffer: 1 << 20, windowsHide: true },
     (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout}\n${stderr}`.trim() })))
 }
 

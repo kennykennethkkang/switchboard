@@ -20,7 +20,7 @@ import {
 
 /** Truncate a file path to the last N segments (e.g. '/a/b/c/d.ts' → 'c/d.ts') */
 function tailPath(filePath: string, segments = 2): string {
-  return String(filePath).split('/').slice(-segments).join('/')
+  return String(filePath).split(/[\\/]/).slice(-segments).join('/')
 }
 
 /** Summarize tool input into a short human-readable string */
@@ -113,6 +113,23 @@ export function summarizeResult(content: unknown): string {
     try { return JSON.stringify(content).slice(0, RESULT_MAX) } catch { /* fall through */ }
   }
   return String(content || '').slice(0, RESULT_MAX)
+}
+
+/** A Code Mode inner call leaves its result block empty; the output sits in the entry's toolUseResult. */
+export function virtualResult(id: string, r: unknown): string {
+  return id.startsWith('repl_') ? outputText(r) : ''
+}
+
+function outputText(r: unknown): string {
+  if (typeof r === 'string') { return r }
+  if (Array.isArray(r)) { return r.map(b => (typeof b?.text === 'string' ? b.text : '')).filter(Boolean).join('\n') }
+  if (!r || typeof r !== 'object') { return '' }
+  const o = r as { isAsync?: unknown; status?: unknown; stdout?: unknown; stderr?: unknown; content?: unknown; file?: { content?: unknown }; answers?: unknown }
+  if (o.isAsync === true || o.status === 'async_launched') { return 'Async agent launched' }
+  if (typeof o.stdout === 'string' || typeof o.stderr === 'string') { return [o.stdout, o.stderr].filter(Boolean).join('\n') }
+  if (typeof o.file?.content === 'string') { return o.file.content }
+  if (o.answers && typeof o.answers === 'object') { return Object.values(o.answers).join(', ') }
+  return o.content === undefined ? '' : outputText(o.content)
 }
 
 /** Extract structured input data for rich display in the transcript */

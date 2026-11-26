@@ -3,13 +3,14 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'child_process'
-import * as fs from 'fs'
+import { execFileSync, spawnSync } from 'child_process'
+import fs from 'fs'
+import { syncBuiltinESMExports } from 'module'
 import * as os from 'os'
 import * as path from 'path'
 import { claudeBinary, claudeCall, codexState, setupState, setupSteps, type SetupKit } from '../src/hub/setup'
 // @ts-expect-error plain .mjs, no types
-import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, mirrorAllSkills, mirrorSkill, readKey, storeKey } from '../kit/setup-run.mjs'
+import { commandFor, expand, installOwnSkills, installSkills, keyFor, mcpConfig, mirrorAllSkills, mirrorSkill, readKey, refreshSkills, storeKey } from '../kit/setup-run.mjs'
 
 const KIT: SetupKit = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'kit', 'setup.json'), 'utf8'))
 const fresh = { plugins: [], marketplaces: [], mcps: [], plain: [] as string[], skills: [] as string[], agentsSkills: [] as string[], codex: { plugins: [] as string[], marketplaces: [] as string[], mcps: [] as string[] }, key21st: false, modsDir: '/ext/kit/mods', skillsDir: '/ext/kit/skills' }
@@ -85,6 +86,12 @@ describe('setup steps', () => {
     assert.match(text(), /21st: no key/)
   })
 
+  it('uses an absolute Windows executable for stdio MCPs installed by uv', () => {
+    const s = steps({ platform: 'win32' }).find(x => x.run?.includes('scrapling'))
+    assert.ok(s?.run?.at(-1)?.endsWith('scrapling-mcp.exe'))
+    assert.ok(path.isAbsolute(s!.run!.at(-1)!))
+  })
+
   it('stores a new key even when 21st is there, and moves a plain-text key without asking', () => {
     const k = (o = {}) => steps({ mcps: ['21st'], ...o }).filter(x => x.key).length
     assert.equal(k({ key21st: true }), 1)
@@ -109,8 +116,8 @@ describe('setup steps', () => {
   })
 
   it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
-    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft'])
-    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft'] } }])
+    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft', 'adjust'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft', 'adjust'] } }])
     assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
   })
@@ -168,16 +175,14 @@ describe('setup steps', () => {
   it('installs each python tool with uv, its skill and its mcp for both AIs, all needing uv', () => {
     const t = (KIT.tools ?? []).find(x => x.uv === 'scrapling[ai]')
     assert.deepEqual(t, { uv: 'scrapling[ai]', skill: { repo: 'D4Vinci/Scrapling', path: 'agent-skill', name: 'scrapling-official' }, mcp: { name: 'scrapling', command: 'scrapling-mcp' } })
-    assert.ok(KIT.tools?.some(x => x.uv === 'agent-reach' && x.skill?.file === 'SKILL_en.md'))
     const s = steps()
     assert.deepEqual(s.find(x => x.run?.join(' ') === 'uv tool install scrapling[ai]'), { label: 'scrapling[ai]', needs: ['uv'], quiet: true, run: ['uv', 'tool', 'install', 'scrapling[ai]'] })
     assert.deepEqual(s.find(x => x.skills?.names.includes('scrapling-official')), { label: 'D4Vinci/Scrapling', needs: ['uv'], skills: { repo: 'D4Vinci/Scrapling', names: ['scrapling-official'], path: 'agent-skill' } })
-    assert.deepEqual(s.find(x => x.skills?.names.includes('agent-reach'))?.skills, { repo: 'Panniantong/Agent-Reach', names: ['agent-reach'], path: 'agent_reach', file: 'SKILL_en.md' })
     const bin = '~/.local/bin/scrapling-mcp'
     assert.ok(s.some(x => x.run?.join(' ') === `claude mcp add --scope user scrapling -- ${bin}` && x.needs?.join() === 'uv'))
     assert.ok(s.some(x => x.run?.join(' ') === `codex mcp add scrapling -- ${bin}` && x.needs?.join() === 'uv,codex'))
-    const done = steps({ mcps: ['scrapling'], codex: { ...fresh.codex, mcps: ['scrapling'] }, skills: ['scrapling-official', 'agent-reach'], agentsSkills: ['scrapling-official', 'agent-reach'] })
-    assert.ok(!done.some(x => x.skills?.names.some(n => ['scrapling-official', 'agent-reach'].includes(n)) || x.run?.includes('scrapling')))
+    const done = steps({ mcps: ['scrapling'], codex: { ...fresh.codex, mcps: ['scrapling'] }, skills: ['scrapling-official'], agentsSkills: ['scrapling-official'] })
+    assert.ok(!done.some(x => x.skills?.names.includes('scrapling-official') || x.run?.includes('scrapling')))
   })
 
   it('installs agent-browser everywhere and agent-desktop on macOS and Windows with npm, skipped when already on PATH', () => {
@@ -394,6 +399,76 @@ describe('setup runner', () => {
     fs.rmSync(home, { recursive: true, force: true })
   })
 
+  it('refreshes a mirrored copy nobody edited, and leaves an edited, marked, linked or unknown one', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mirror-'))
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const read = (p: string) => fs.readFileSync(p, 'utf8')
+    const claude = path.join(home, '.claude', 'skills'), agents = path.join(home, '.agents', 'skills')
+    const MARK = '<!-- switchboard generic copy -->'
+    const all = ['adopted', 'edited', 'emptied', 'extra', 'fresh', 'linked', 'marked', 'unknown']
+    for (const n of all) { put(path.join(claude, n, 'SKILL.md'), `${n} v1`); put(path.join(claude, n, 'old.md'), 'v1 only') }
+    put(path.join(claude, 'fresh', 'scripts', '__pycache__', 'a.pyc'), 'c')
+    fs.cpSync(path.join(claude, 'adopted'), path.join(agents, 'adopted'), { recursive: true })
+    put(path.join(agents, 'unknown', 'SKILL.md'), 'unknown v0')
+    const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mirror-link-'))
+    put(path.join(elsewhere, 'SKILL.md'), 'linked v1')
+    fs.symlinkSync(elsewhere, path.join(agents, 'linked'))
+    assert.deepEqual(mirrorAllSkills(home), ['edited', 'emptied', 'extra', 'fresh', 'marked'])
+    assert.ok(!fs.existsSync(path.join(agents, 'fresh', 'scripts', '__pycache__')))
+
+    put(path.join(agents, 'edited', 'SKILL.md'), 'edited in Codex')
+    put(path.join(agents, 'extra', 'mine.md'), 'added in Codex')
+    fs.mkdirSync(path.join(agents, 'emptied', 'drafts'))
+    put(path.join(agents, 'marked', 'SKILL.md'), `marked v1\n\n${MARK}\n`)
+    // Running a skill leaves bytecode, which is no edit.
+    put(path.join(agents, 'fresh', '__pycache__', 'b.pyc'), 'c')
+    for (const n of all) { put(path.join(claude, n, 'SKILL.md'), `${n} v2`); fs.rmSync(path.join(claude, n, 'old.md')) }
+    const lines: string[] = []
+    assert.deepEqual(mirrorAllSkills(home, (l: string) => lines.push(l)), ['adopted', 'fresh'])
+    assert.deepEqual(lines, ['Updated skill adopted for Codex', 'Updated skill fresh for Codex'])
+    for (const n of ['adopted', 'fresh']) {
+      assert.equal(read(path.join(agents, n, 'SKILL.md')), `${n} v2`)
+      assert.ok(!fs.existsSync(path.join(agents, n, 'old.md')))
+    }
+    assert.equal(read(path.join(agents, 'edited', 'SKILL.md')), 'edited in Codex')
+    assert.equal(read(path.join(agents, 'extra', 'SKILL.md')), 'extra v1')
+    assert.equal(read(path.join(agents, 'extra', 'mine.md')), 'added in Codex')
+    assert.ok(fs.existsSync(path.join(agents, 'emptied', 'drafts')))
+    assert.match(read(path.join(agents, 'marked', 'SKILL.md')), /marked v1/)
+    assert.equal(read(path.join(agents, 'unknown', 'SKILL.md')), 'unknown v0')
+    assert.equal(read(path.join(elsewhere, 'SKILL.md')), 'linked v1')
+    assert.deepEqual(mirrorAllSkills(home), [])
+    // A lost or broken record only stops refreshes of copies that differ.
+    fs.writeFileSync(path.join(home, '.claude', 'switchboard', 'codex-skills.json'), 'not json')
+    put(path.join(claude, 'fresh', 'SKILL.md'), 'fresh v3')
+    assert.deepEqual(mirrorAllSkills(home), [])
+    put(path.join(claude, 'adopted', 'SKILL.md'), 'adopted v3')
+    assert.deepEqual(mirrorAllSkills(home), ['adopted'])
+    for (const d of [home, elsewhere]) fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('keeps the old mirrored copy when a refresh fails, says so, and goes on to the next skill', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mirror-'))
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const claude = path.join(home, '.claude', 'skills'), agents = path.join(home, '.agents', 'skills')
+    for (const n of ['bad', 'next']) put(path.join(claude, n, 'SKILL.md'), `${n} v1`)
+    assert.deepEqual(mirrorAllSkills(home), ['bad', 'next'])
+    for (const n of ['bad', 'next']) put(path.join(claude, n, 'SKILL.md'), `${n} v2`)
+    const locked = path.join(claude, 'bad', 'locked.md')
+    put(locked, 'x')
+    fs.chmodSync(locked, 0o000)
+    const lines: string[] = []
+    try {
+      assert.deepEqual(mirrorAllSkills(home, (l: string) => lines.push(l)), ['next'])
+      assert.equal(fs.readFileSync(path.join(agents, 'bad', 'SKILL.md'), 'utf8'), 'bad v1')
+      assert.match(lines.join('\n'), /bad: could not copy for Codex/)
+      assert.deepEqual(fs.readdirSync(agents).sort(), ['bad', 'next'])
+    } finally {
+      fs.chmodSync(locked, 0o644)
+      fs.rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('copies own skills into ~/.agents/skills too, by the same rules', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-')), from = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-kit-'))
     fs.mkdirSync(path.join(from, 'aar'), { recursive: true })
@@ -427,6 +502,112 @@ describe('setup runner', () => {
     assert.ok(fs.lstatSync(path.join(skills, 'link')).isSymbolicLink())
     assert.equal(fs.readFileSync(path.join(elsewhere, 'SKILL.md'), 'utf8'), 'claude-mods copy')
     for (const d of [home, from, elsewhere]) fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('refreshes both roots at a window start: copies that exist and nobody edited, nothing added', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-refresh-')), kit = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-refresh-kit-'))
+    const MARK = '<!-- switchboard generic copy -->'
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const read = (p: string) => fs.readFileSync(p, 'utf8')
+    const claude = path.join(home, '.claude', 'skills'), agents = path.join(home, '.agents', 'skills'), from = path.join(kit, 'skills')
+    const bundle = (v: string) => { for (const n of ['both', 'edited', 'absent']) put(path.join(from, n, 'SKILL.md'), `${n} ${v}\n\n${MARK}\n`) }
+    put(path.join(kit, 'setup.json'), JSON.stringify({ own: ['both', 'edited', 'absent'] }))
+    bundle('v1')
+    const lines: string[] = []
+    const refresh = () => { lines.length = 0; refreshSkills(kit, home, (l: string) => lines.push(l)) }
+
+    // Nothing installed: nothing made, not even a record.
+    refresh()
+    assert.deepEqual(fs.readdirSync(home), [])
+
+    for (const root of [claude, agents]) for (const n of ['both', 'edited']) fs.cpSync(path.join(from, n), path.join(root, n), { recursive: true })
+    for (const n of ['user', 'claudeonly']) put(path.join(claude, n, 'SKILL.md'), `${n} v1`)
+    put(path.join(agents, 'user', 'SKILL.md'), 'user v1')
+    refresh()
+    assert.deepEqual(lines, [])
+
+    bundle('v2')
+    for (const n of ['user', 'claudeonly']) put(path.join(claude, n, 'SKILL.md'), `${n} v2`)
+    for (const root of [claude, agents]) {
+      put(path.join(root, 'edited', 'SKILL.md'), `my edit\n\n${MARK}\n`)
+      put(path.join(root, 'both', '__pycache__', 'a.pyc'), 'c')
+    }
+    refresh()
+    assert.deepEqual(lines, ['Updated skill both', 'Updated skill both', 'Updated skill user for Codex'])
+    for (const root of [claude, agents]) {
+      assert.match(read(path.join(root, 'both', 'SKILL.md')), /both v2/)
+      assert.match(read(path.join(root, 'edited', 'SKILL.md')), /my edit/)
+      assert.ok(!fs.existsSync(path.join(root, 'absent')))
+    }
+    assert.equal(read(path.join(agents, 'user', 'SKILL.md')), 'user v2')
+    assert.ok(!fs.existsSync(path.join(agents, 'claudeonly')))
+    // Bytecode from a run is no reason to copy again.
+    put(path.join(agents, 'both', '__pycache__', 'a.pyc'), 'c')
+    refresh()
+    assert.deepEqual(lines, [])
+    // A copy edited in Codex stays too.
+    put(path.join(agents, 'user', 'SKILL.md'), 'user in Codex')
+    put(path.join(claude, 'user', 'SKILL.md'), 'user v3')
+    refresh()
+    assert.deepEqual(lines, [])
+    assert.equal(read(path.join(agents, 'user', 'SKILL.md')), 'user in Codex')
+    // A file swapped for a link to the same bytes is an edit.
+    const elsewhere = path.join(kit, 'linked.md')
+    put(path.join(claude, 'tied', 'SKILL.md'), 'tied v1')
+    put(path.join(agents, 'tied', 'SKILL.md'), 'tied v1')
+    refresh()
+    put(elsewhere, 'tied v1')
+    fs.rmSync(path.join(agents, 'tied', 'SKILL.md'))
+    fs.symlinkSync(elsewhere, path.join(agents, 'tied', 'SKILL.md'))
+    put(path.join(claude, 'tied', 'SKILL.md'), 'tied v2')
+    refresh()
+    assert.deepEqual(lines, [])
+    assert.ok(fs.lstatSync(path.join(agents, 'tied', 'SKILL.md')).isSymbolicLink())
+    // Set up itself still replaces an edited copy of ours, and a window start then keeps that one current.
+    installOwnSkills({ from, names: ['edited'] }, { home, log: () => {} })
+    bundle('v3')
+    refresh()
+    assert.match(read(path.join(claude, 'edited', 'SKILL.md')), /edited v3/)
+    assert.match(read(path.join(agents, 'edited', 'SKILL.md')), /my edit/)
+    for (const d of [home, kit]) fs.rmSync(d, { recursive: true, force: true })
+  })
+
+  it('puts the old copy back when the new one cannot take its place', t => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-refresh-'))
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const claude = path.join(home, '.claude', 'skills', 'a'), agents = path.join(home, '.agents', 'skills')
+    put(path.join(claude, 'SKILL.md'), 'v1')
+    mirrorAllSkills(home)
+    put(path.join(claude, 'SKILL.md'), 'v2')
+    const real = fs.renameSync
+    t.mock.method(fs, 'renameSync', (a: string, b: string) => { if (a.includes('.sb-new-')) throw new Error('busy'); real(a, b) })
+    syncBuiltinESMExports()
+    const lines: string[] = []
+    try { assert.deepEqual(mirrorAllSkills(home, (l: string) => lines.push(l)), []) } finally { t.mock.restoreAll(); syncBuiltinESMExports() }
+    assert.deepEqual(lines, ['a: could not copy for Codex (busy), the copy there stays.'])
+    assert.equal(fs.readFileSync(path.join(agents, 'a', 'SKILL.md'), 'utf8'), 'v1')
+    assert.deepEqual(fs.readdirSync(agents), ['a'])
+    // Set up put its copy there first: that one stays, and nothing is left beside it.
+    t.mock.method(fs, 'renameSync', (a: string, b: string) => { if (a.includes('.sb-new-')) put(path.join(b, 'SKILL.md'), 'set up'); real(a, b) })
+    syncBuiltinESMExports()
+    try { assert.deepEqual(mirrorAllSkills(home), []) } finally { t.mock.restoreAll(); syncBuiltinESMExports() }
+    assert.equal(fs.readFileSync(path.join(agents, 'a', 'SKILL.md'), 'utf8'), 'set up')
+    assert.deepEqual(fs.readdirSync(agents), ['a'])
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('runs the refresh from the command line', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-refresh-'))
+    const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
+    const script = path.join(__dirname, '..', 'kit', 'setup-run.mjs')
+    const go = () => spawnSync(process.execPath, [script, '--refresh'], { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home } })
+    for (const root of ['.claude', '.agents']) put(path.join(home, root, 'skills', 'mine', 'SKILL.md'), 'v1')
+    assert.equal(go().status, 0)
+    put(path.join(home, '.claude', 'skills', 'mine', 'SKILL.md'), 'v2')
+    const r = go()
+    assert.equal(r.stdout, 'Updated skill mine for Codex\n')
+    assert.equal(fs.readFileSync(path.join(home, '.agents', 'skills', 'mine', 'SKILL.md'), 'utf8'), 'v2')
+    fs.rmSync(home, { recursive: true, force: true })
   })
 
   it('refuses an own skill name that is not a plain folder name', () => {
@@ -480,7 +661,7 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
-    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain memory-fix goal local-draft from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
+    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain memory-fix goal local-draft adjust from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
     assert.match(out, /codex plugin add superpowers@superpowers-dev/)
@@ -500,13 +681,13 @@ describe('setup runner', () => {
 })
 
 describe('claude call', () => {
-  it('registers the ask tool directly on macOS and through a shell with quoted paths on Windows', () => {
+  it('registers the ask tool directly when the Windows command is unresolved', () => {
     const args = ['mcp', 'add', '--scope', 'user', 'switchboard', '--', 'node', 'C:\\Users\\A B\\.claude\\switchboard\\ask\\ask-server.mjs']
     assert.deepEqual(claudeCall(args, 'darwin'), { cmd: claudeBinary(), args, shell: false })
     const w = claudeCall(args, 'win32')
-    assert.equal(w.shell, true)
-    assert.deepEqual(w.args.slice(0, 7), args.slice(0, 7))
-    assert.equal(w.args[7], '"C:\\Users\\A B\\.claude\\switchboard\\ask\\ask-server.mjs"')
+    assert.equal(w.shell, false)
+    assert.equal(w.cmd, 'claude')
+    assert.deepEqual(w.args, args)
   })
 })
 

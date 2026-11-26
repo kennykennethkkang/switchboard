@@ -23,7 +23,8 @@ export function ToolsCard({ profile, flagged = [], smart, globalOff = [], instal
     ? (['plugins', 'skills', 'assets'] as const).flatMap(k => Object.entries(profile[k] ?? {}).filter(([, v]) => v).map(([n]) => ({ kind: k === 'plugins' ? 'plugin' : k === 'skills' ? 'skill' : 'asset', name: n })))
     : installed.filter(i => i.enabled && (i.kind === 'plugin' || i.kind === 'skill')).map(i => ({ kind: i.kind, name: i.name }))
   const count = (k: string) => on.filter(o => o.kind === k).length
-  const said = [plural(count('plugin'), 'plugin'), plural(count('skill'), 'skill'), count('asset') ? plural(count('asset'), 'design reference') : ''].filter(Boolean).join(', ')
+  const extras = Object.values(profile?.extras ?? {}).filter(Boolean).length
+  const said = [plural(count('plugin'), 'plugin'), plural(count('skill'), 'skill'), extras ? plural(extras, 'other tool') : '', count('asset') ? plural(count('asset'), 'design reference') : ''].filter(Boolean).join(', ')
   const links = connections.filter(c => c.kind === 'mcp' || c.kind === 'app')
   const described = on.filter(o => tips[o.name])
   return (

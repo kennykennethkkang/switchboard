@@ -15,7 +15,7 @@ import * as path from 'path'
 import * as os from 'os'
 import * as crypto from 'crypto'
 import { execSync } from 'child_process'
-import { HOOK_TIMEOUT_S, HOOK_SAFETY_MARGIN_MS, HOOK_FORWARD_TIMEOUT_MS, WORKSPACE_HASH_LENGTH } from './constants'
+import { HOOK_TIMEOUT_S, HOOK_EXIT_MS, HOOK_FORWARD_TIMEOUT_MS, WORKSPACE_HASH_LENGTH } from './constants'
 import { createLogger } from './logger'
 import { hub } from './hub/hub-service'
 import { editor } from './editor'
@@ -164,7 +164,7 @@ const VAR_RE = /\$\{?\w*(KEY|TOKEN|SECRET|PASS|CRED|AUTH)|\$\{?\w*_PAT\b/i
 /** The forwarder script's text; exported for the test that runs it. */
 export function getHookScriptContent(): string {
   return `#!/usr/bin/env node
-// Switchboard hook forwarder v12, installed by the Switchboard VS Code extension.
+// Switchboard hook forwarder v14, installed by the Switchboard VS Code extension.
 // Claude Code invokes this as a command hook. It reads a discovery directory to
 // find live extension instances, checks their PIDs, and forwards the event via
 // HTTP POST. Dead instances are cleaned up automatically.
@@ -180,6 +180,8 @@ export function getHookScriptContent(): string {
 // v10: SWITCHBOARD_ROLE_RUN in the env tags the event role_run.
 // v11: a role run also carries role_parent, the Claude chat that started it.
 // v12: no Bash allow in default or plan mode, or with Ask before actions on.
+// v13: reads only window files.
+// v14: forwards to the matching standalone app instances too.
 //
 // Discovery dir: ~/.claude/switchboard/
 // Discovery file: {workspace-hash}-{pid}.json  →  { port, pid, workspace }
@@ -189,10 +191,10 @@ const path = require('path');
 const http = require('http');
 const os = require('os');
 
-// Hard safety deadline: guarantees exit well before Claude Code's
-// ${HOOK_TIMEOUT_S}s kill timeout (500ms margin). Prevents ANY hanging scenario
-// (stdin stall, HTTP hang, unexpected blocking) from blocking Claude Code.
-setTimeout(() => process.exit(0), ${HOOK_TIMEOUT_S * 1000 - HOOK_SAFETY_MARGIN_MS});
+// Hard safety deadline, counted from boot: exits well before Claude Code's
+// ${HOOK_TIMEOUT_S}s kill timeout, which counts from launch. Prevents ANY hanging
+// scenario (stdin stall, HTTP hang, unexpected blocking) from blocking Claude Code.
+setTimeout(() => process.exit(0), ${HOOK_EXIT_MS});
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard');
 const IS_WIN = process.platform === 'win32';
@@ -203,7 +205,7 @@ function appFiles() {
   try { names = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.json')); } catch { return []; }
   const out = [];
   for (const n of names) {
-    try { const d = JSON.parse(fs.readFileSync(path.join(APP_DIR, n), 'utf8')); if (d.pid && d.port && isAlive(d.pid)) out.push(d); } catch {}
+    try { const d = JSON.parse(fs.readFileSync(path.join(APP_DIR, n), 'utf8')); if (d.pid && d.port) { if (isAlive(d.pid)) out.push(d); else fs.unlinkSync(path.join(APP_DIR, n)); } } catch {}
   }
   return out;
 }
@@ -216,11 +218,12 @@ function normPath(p) {
   return IS_WIN ? r.toLowerCase() : r;
 }
 
-/** Check if a process is alive. On Windows, process.kill(pid, 0) is unreliable
- *  (can throw even for live processes), so we skip the check and let stale
- *  discovery files be cleaned up by the extension on activation instead. */
+/** Checks PIDs without relying on Windows' unreliable process.kill(pid, 0). */
 function isAlive(pid) {
-  if (IS_WIN) return true;
+  if (!Number.isSafeInteger(Number(pid)) || Number(pid) <= 0) return false;
+  if (IS_WIN) {
+    try { return require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-Command', '(Get-Process -Id ' + Number(pid) + ' -ErrorAction SilentlyContinue).Id'], { encoding: 'utf8', timeout: 1500, windowsHide: true }).trim() === String(pid); } catch { return false; }
+  }
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
@@ -258,10 +261,19 @@ process.stdin.on('end', () => {
   if (!cwd) process.exit(0);
 
   const resolvedCwd = normPath(cwd);
+  const appLive = appFiles();
+  const appMatches = appLive.filter(d => {
+    const ws = normPath(d.workspace || '/');
+    return resolvedCwd === ws || resolvedCwd.startsWith(ws + path.sep);
+  });
+  const appTargets = appMatches.length
+    ? appMatches.filter(d => normPath(d.workspace || '/').length === Math.max(...appMatches.map(a => normPath(a.workspace || '/').length)))
+    : [];
 
   let allFiles;
   try {
-    allFiles = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && f !== 'workspaces.json');
+    // Window files only: the folder also holds big caches, and parsing those on every call can outlast the exit above.
+    allFiles = fs.readdirSync(DIR).filter(f => /^[0-9a-f]+-\\d+\\.json$/.test(f));
   } catch { allFiles = []; }
 
   // Longest match wins so /project/sub matches before /project.
@@ -289,8 +301,11 @@ process.stdin.on('end', () => {
   // A chat in a folder no window has open goes to the live window with the lowest pid, so Switchboard
   // still sees it and the target stays put when another window opens mid-chat.
   if (!matches.length) {
-    // No editor window: the standalone app takes the chat. Its own hook (switchboard-app/hook.js) already sends it the chats under its folder.
-    if (!live.length) live.push(...appFiles().filter(d => { const ws = normPath(d.workspace || '/'); return resolvedCwd !== ws && !resolvedCwd.startsWith(ws + path.sep); }));
+    // No editor window: use a live app instance for the chat when available.
+    if (!live.length) {
+      const fallback = appLive.filter(d => { const ws = normPath(d.workspace || '/'); return resolvedCwd !== ws && !resolvedCwd.startsWith(ws + path.sep); });
+      live.push(...(fallback.length ? fallback : appTargets));
+    }
     if (!live.length) process.exit(0);
     matches.push({ d: [...live].sort((a, b) => a.pid - b.pid)[0], file: '', wsLen: 0 });
   }
@@ -302,19 +317,20 @@ process.stdin.on('end', () => {
   const targets = matches.filter(m => m.wsLen === bestLen);
   // Owners first; the rest only update their chat status, so every window shows the same.
   const owned = new Set(targets.map(t => t.d.port));
-  const posts = [...targets.map(t => ({ d: t.d, mirror: false })), ...live.filter(d => !owned.has(d.port)).map(d => ({ d, mirror: true }))];
+  const posts = [...targets.map(t => ({ d: t.d, mirror: false, app: appTargets.includes(t.d) })), ...appTargets.map(d => ({ d, mirror: false, app: true })), ...live.filter(d => !owned.has(d.port) && !appTargets.some(a => a.port === d.port)).map(d => ({ d, mirror: true, app: false }))]
+    .filter((p, i, all) => all.findIndex(other => other.d.port === p.d.port) === i);
 
   let pending = posts.length;
   let printed = false;
-  for (const { d, mirror } of posts) {
+  for (const { d, mirror, app } of posts) {
     let settled = false;
     const finish = () => { if (settled) return; settled = true; done(); };
     const req = http.request({
       hostname: '127.0.0.1', port: d.port, method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-switchboard-token': String(d.hubToken || ''), ...(mirror ? { 'x-switchboard-mirror': '1' } : {}) },
-      timeout: mirror ? 300 : ${HOOK_FORWARD_TIMEOUT_MS},
+      timeout: mirror || app ? 300 : ${HOOK_FORWARD_TIMEOUT_MS},
     }, res => {
-      if (mirror) { res.resume(); res.on('end', finish); return; }
+      if (mirror || app) { res.resume(); res.on('end', finish); return; }
       let body = '';
       res.setEncoding('utf8');
       res.on('data', c => { body += c; });

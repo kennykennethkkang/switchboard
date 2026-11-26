@@ -32,6 +32,19 @@ function tail(f: string): string {
   } catch { return '' }
 }
 
+// Finished run files never change and only pile up, so each is parsed once per mtime and size.
+type RunFile = { start?: Record<string, unknown>; end?: Record<string, unknown> }
+const parsed = new Map<string, { key: string; run: RunFile }>()
+function runFile(f: string): RunFile {
+  let key = ''
+  try { const s = fs.statSync(f); key = `${s.mtimeMs}:${s.size}` } catch { return {} }
+  const hit = parsed.get(f)
+  if (hit?.key === key) return hit.run
+  const rows = lines(read(f)), run = { start: rows.find(r => r.t === 'start'), end: rows.find(r => r.t === 'end') }
+  parsed.set(f, { key, run })
+  return run
+}
+
 export function jevProject(folder: string, presets = PRESETS, live = LIVE): JevProject {
   const project = projectSlug(folder)
   const has = (kind: string) => fs.existsSync(path.join(presets, `${project}-${kind}.json`))
@@ -45,8 +58,7 @@ export function jevProject(folder: string, presets = PRESETS, live = LIVE): JevP
   let files: string[] = []
   try { files = fs.readdirSync(live).filter(f => f.endsWith('.jsonl') && f !== 'gate.jsonl' && f !== 'corrections.jsonl') } catch { /* no runs yet */ }
   for (const f of files) {
-    const rows = lines(read(path.join(live, f)))
-    const start = rows.find(r => r.t === 'start'), end = rows.find(r => r.t === 'end')
+    const { start, end } = runFile(path.join(live, f))
     const job = mine(start?.preset)
     if (!job || !start) continue
     const flagged = Number(end?.flagged ?? 0)

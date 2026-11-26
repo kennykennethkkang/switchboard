@@ -211,6 +211,17 @@ describe('readRuns', () => {
   })
 })
 
+describe('GET /hub/usage', () => {
+  const h = new HubService()
+  const ask = (q: string, usage = async () => ({ at: 1, from: '2026-11-01', rows: [], chats: [] })) => handleHub(h, 'GET', `/hub/usage?${q}`, '', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, usage) as HubReply | Promise<HubReply>
+
+  it('answers only with the token, and passes a read failure on', async () => {
+    assert.equal((await ask('token=wrong')).status, 403)
+    assert.equal(JSON.parse((await ask(`token=${h.token}`)).body).from, '2026-11-01')
+    assert.equal((await ask(`token=${h.token}`, async () => { throw new Error('no disk') })).status, 500)
+  })
+})
+
 describe('GET /hub/runs', () => {
   const h = new HubService()
   const runs = async (session: string, role: string) => [{ ...parseRun(FIXTURE, META, 'a1', ''), title: `${session}/${role}` }]

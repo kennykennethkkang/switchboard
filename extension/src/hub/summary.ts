@@ -12,6 +12,7 @@ import { transcriptFile } from './chat-view'
 import { hub } from './hub-service'
 import { learnEnv } from './learn'
 import { claudeBinary } from './setup'
+import { cliCall } from './windows'
 import type { ChatSummary, TaskRow } from './types'
 
 export const PROMPT_MAX = 12_000
@@ -76,7 +77,8 @@ export type Runner = (args: string[]) => Promise<string>
 export const realRun: Runner = async args => {
   const cwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'switchboard-summary-'))
   try {
-    return await new Promise((resolve, reject) => execFile(claudeBinary(), args, { cwd, timeout: RUN_MS, maxBuffer: 1 << 20, env: learnEnv() },
+    const call = cliCall(claudeBinary(), args)
+    return await new Promise((resolve, reject) => execFile(call.cmd, call.args, { windowsVerbatimArguments: call.windowsVerbatimArguments, cwd, timeout: RUN_MS, maxBuffer: 1 << 20, env: learnEnv() },
       // err.message starts with the whole argv, prompt included; stderr says what went wrong.
       (err, stdout, stderr) => err ? reject(new Error(err.killed ? 'timed out' : stderr.trim().split('\n')[0] || stdout.trim().split('\n')[0] || `claude exited ${err.code}`)) : resolve(stdout)))
   } finally { void fs.promises.rm(cwd, { recursive: true, force: true }) }

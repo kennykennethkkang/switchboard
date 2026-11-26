@@ -579,6 +579,14 @@ test('the Research island counts source checks and names the one still running',
   assert.deepEqual([r.runs, r.shipped, r.task], [2, 1, 'Source check: q b'])
 })
 
+test('the Research island names the change being made, else how many are suggested', () => {
+  const act = (key: string, state: 'new' | 'applied') => ({ key, area: 'dev' as const, ask: false, title: key, detail: '', cites: [], state })
+  const adjust = (changes: unknown[]) => ({ device: '', changes, suggestions: [{ report: 'general/a.md', question: 'q', at: NOW, actions: [act('a', 'new'), act('b', 'applied')] }] }) as HubState['adjust']
+  const task = (changes: unknown[]) => buildCourt(hub({ adjust: adjust(changes) })).nodes.find(n => n.id === 'ai:research')!.task
+  assert.equal(task([]), '1 suggested change')
+  assert.equal(task([{ id: 'x', title: 'Cache completions', status: 'open' }]), 'Changing: Cache completions')
+})
+
 test('plainWord explains the court jargon and nothing else', async () => {
   const { plainWord, YARD_TAG_CAP } = await import('./court-map')
   assert.match(plainWord('council')!, /role agents/)

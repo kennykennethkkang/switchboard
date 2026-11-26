@@ -3,7 +3,6 @@ import { createContext, useEffect, useState, type ReactNode } from 'react'
 import type { HubState } from '@/lib/hub-types'
 import { rowsOf, splitA, type Row } from '@/lib/todo-layout'
 import { recentDone, shownProjects, titleOf } from '@/lib/todo-view'
-import { tokenText } from '@/lib/today'
 import { baseName } from '@/lib/path'
 import { PageStats, Seg } from './page-kit'
 import { RailCtx } from './today'
@@ -12,7 +11,6 @@ import './plan-page.css'
 /** True in the narrow layout: every to-do section shows open, whatever was folded before. */
 export const ForceOpen = createContext(false)
 type Tab = 'decide' | 'queue' | 'running' | 'done'
-const dayKey = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }
 
 /** Narrow screens get the tabs layout; the hook follows a resize. */
 function useNarrow() {
@@ -31,7 +29,6 @@ export function PlanPage({ hub, folder, todo, today, jev }: { hub: HubState; fol
   const per = shownProjects(todos, folder, now).map(f => { const d = rowsOf(todos[f] ?? { todo: [] }, live, now, () => false); return { f, a: splitA(d), done: recentDone(todos[f], now).length } })
   const sum = (k: 'decide' | 'running' | 'queue' | 'waiting') => per.reduce((n, p) => n + p.a[k].length, 0)
   const n = { decide: sum('decide'), running: sum('running'), queue: sum('queue') + sum('waiting'), done: per.reduce((x, p) => x + p.done, 0) }
-  const u = hub.history.find(d => dayKey(Date.parse(d.day + 'T12:00:00')) === dayKey(now)), tokens = u && u.written + u.io
   const first = (k: 'decide' | 'queue') => { for (const p of per) { const r: Row | undefined = k === 'queue' ? p.a.queue.find(x => x.status === 'ready') ?? p.a.queue[0] : p.a.decide[0]; if (r) return { r, f: p.f } } }
   const nx = first('decide') ? { k: 'decide' as const, ...first('decide')! } : first('queue') ? { k: 'queue' as const, ...first('queue')! } : undefined
 
@@ -62,7 +59,6 @@ export function PlanPage({ hub, folder, todo, today, jev }: { hub: HubState; fol
     { label: 'Queued', value: n.queue, onClick: () => go('queue') },
     { label: 'Running', value: n.running, tone: n.running ? 'blue' : undefined, onClick: () => go('running') },
     { label: 'Done this week', value: n.done, tone: n.done ? 'green' : undefined, onClick: () => go('done') },
-    { label: 'Tokens today', value: tokens ? tokenText(tokens) : '0' },
   ]} />
   const next = nx && <button type="button" className="pl-next" onClick={goNext}>
     <span className="pl-next-k">{nx.k === 'decide' ? 'Decide next' : 'Up next'}</span>

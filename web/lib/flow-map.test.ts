@@ -88,7 +88,7 @@ test('components: flow depth runs entry first, cycles do not loop, loners go las
 })
 
 test('components: memory notes match by path or file name, project notes kept apart', () => {
-  const mem: MemoryGraph = { health: { dangling: [], orphans: [], duplicates: [], contradictions: [], superseded: [], invalid: [], stale: [], loops: [] },
+  const mem: MemoryGraph = { health: { dangling: [], orphans: [], duplicates: [], contradictions: [], superseded: [], invalid: [], stale: [], loops: [], unproven: [] },
     nodes: [
       { id: 'project:/w/switchboard', kind: 'project', label: 'switchboard' }, { id: 'project:/w/other', kind: 'project', label: 'other' },
       { id: 'm:1', kind: 'memory', label: 'today-card', text: 'today.ts reads the hub once' },

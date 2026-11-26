@@ -22,7 +22,7 @@ import {
 import { readNewFileLines } from './fs-utils'
 import { createLogger } from './logger'
 import {
-  CodexRolloutParser, CodexRolloutState, createCodexRolloutState,
+  CodexRolloutParser, CodexRolloutState, createCodexRolloutState, isCodexRoleRun,
 } from './codex-rollout-parser'
 import type { AgentSessionWatcher, SessionLifecycleEvent } from './session-runtime'
 import { TypedEventEmitter } from './typed-event-emitter'
@@ -144,6 +144,9 @@ function readSessionCwd(filePath: string): string | null {
 
 // ─── Watcher ───────────────────────────────────────────────────────────────
 
+// session_meta and the AGENTS.md message come before the prompt.
+const HEAD_BYTES = 256 * 1024
+
 export class CodexSessionWatcher implements AgentSessionWatcher {
   private dirWatchers = new Map<string, fs.FSWatcher>()
   private sessions = new Map<string, WatchedCodexSession>()
@@ -151,6 +154,8 @@ export class CodexSessionWatcher implements AgentSessionWatcher {
   private scanInterval: NodeJS.Timeout | null = null
   /** Workspace match per rollout path, so scans don't re-read every first line */
   private cwdMatches = new Map<string, boolean>()
+  /** Role run per rollout path, kept once the first turn is written. */
+  private roleRuns = new Map<string, boolean>()
   /** One-shot flag so the cwd-mismatch hint is logged at most once per process. */
   private cwdMismatchWarned = false
 
@@ -260,6 +265,7 @@ export class CodexSessionWatcher implements AgentSessionWatcher {
         if (stat.size === 0) continue
         const ageS = (Date.now() - stat.mtimeMs) / 1000
         if (ageS > ACTIVE_SESSION_AGE_S) continue
+        if (this.isRoleRun(filePath)) continue
 
         // Parked on inactivity: resume once it is written again
         if (existing) {
@@ -298,6 +304,19 @@ export class CodexSessionWatcher implements AgentSessionWatcher {
         `directory where Codex runs (or open that folder in ${editor.name}).`,
       )
     }
+  }
+
+  private isRoleRun(filePath: string): boolean {
+    const kept = this.roleRuns.get(filePath)
+    if (kept !== undefined) return kept
+    let head = ''
+    try {
+      const fd = fs.openSync(filePath, 'r')
+      try { const buf = Buffer.alloc(HEAD_BYTES); head = buf.toString('utf8', 0, fs.readSync(fd, buf, 0, HEAD_BYTES, 0)) } finally { fs.closeSync(fd) }
+    } catch { return false }
+    const role = isCodexRoleRun(head.split('\n'))
+    if (role || head.length >= HEAD_BYTES || head.includes('"token_count"')) this.roleRuns.set(filePath, role)
+    return role
   }
 
   private sessionIdFor(filePath: string): string {

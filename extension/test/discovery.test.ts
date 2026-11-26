@@ -29,10 +29,10 @@ test('a chat no window contains goes to the live window with the lowest pid, not
   const high = await listen(hits, 'high')
   const port = (s: http.Server) => (s.address() as { port: number }).port
   const [lowPid, highPid] = [process.pid, process.ppid].sort((a, b) => a - b)
-  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: lowPid, port: port(low), workspace: '/nowhere/a' }))
-  fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ pid: highPid, port: port(high), workspace: '/nowhere/b' }))
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: lowPid, port: port(low), workspace: '/nowhere/a' }))
+  fs.writeFileSync(path.join(dir, 'bb-2.json'), JSON.stringify({ pid: highPid, port: port(high), workspace: '/nowhere/b' }))
   // The higher pid's file is the newest.
-  fs.utimesSync(path.join(dir, 'a.json'), new Date(1000), new Date(1000))
+  fs.utimesSync(path.join(dir, 'aa-1.json'), new Date(1000), new Date(1000))
 
   try {
     const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
@@ -119,7 +119,7 @@ test('the forwarder sends each window its own token', async () => {
     const srv = http.createServer((req, res) => { got.push(String(req.headers['x-switchboard-token'])); req.resume(); req.on('end', () => res.end()) })
     srv.listen(0, '127.0.0.1', () => resolve(srv))
   })
-  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: process.pid, port: (s.address() as { port: number }).port, workspace: home, hubToken: 'tok-a' }))
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: (s.address() as { port: number }).port, workspace: home, hubToken: 'tok-a' }))
   try {
     const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
     child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'Stop' }))
@@ -146,8 +146,8 @@ test('the owning window gets the event plain, every other live window gets it ma
   const owner = await window('owner')
   const other = await window('other')
   const port = (s: http.Server) => (s.address() as { port: number }).port
-  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
-  fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ pid: process.ppid, port: port(other), workspace: '/nowhere/b' }))
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
+  fs.writeFileSync(path.join(dir, 'bb-2.json'), JSON.stringify({ pid: process.ppid, port: port(other), workspace: '/nowhere/b' }))
 
   try {
     const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
@@ -159,6 +159,104 @@ test('the owning window gets the event plain, every other live window gets it ma
     other.close()
     fs.rmSync(home, { recursive: true, force: true })
   }
+})
+
+test('the hook forwards once to the owning window and the most specific matching app', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-app-forward-'))
+  const windows = path.join(home, '.claude', 'switchboard')
+  const apps = path.join(home, '.claude', 'switchboard-app')
+  fs.mkdirSync(windows, { recursive: true })
+  fs.mkdirSync(apps, { recursive: true })
+  const script = path.join(home, 'hook.js')
+  fs.writeFileSync(script, getHookScriptContent())
+  const hits: string[] = []
+  const listen = (name: string, reply: string) => new Promise<http.Server>(resolve => {
+    const server = http.createServer((req, res) => { hits.push(`${name}:${req.headers['x-switchboard-mirror'] ?? ''}`); req.resume(); req.on('end', () => res.end(reply)) })
+    server.listen(0, '127.0.0.1', () => resolve(server))
+  })
+  const window = await listen('window', '{"window":true}')
+  const app = await listen('app', '{"app":true}')
+  const broad = await listen('broad', '')
+  const port = (server: http.Server) => (server.address() as { port: number }).port
+  fs.writeFileSync(path.join(windows, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: port(window), workspace: home, hubToken: 'window-token' }))
+  fs.writeFileSync(path.join(apps, 'app.json'), JSON.stringify({ pid: process.pid, port: port(app), workspace: home, hubToken: 'app-token' }))
+  fs.writeFileSync(path.join(apps, 'app-copy.json'), JSON.stringify({ pid: process.pid, port: port(app), workspace: home, hubToken: 'app-token' }))
+  fs.writeFileSync(path.join(apps, 'broad.json'), JSON.stringify({ pid: process.pid, port: port(broad), workspace: path.dirname(home) }))
+  try {
+    const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    let out = ''
+    child.stdout.on('data', c => { out += c })
+    child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'Stop' }))
+    await new Promise(resolve => child.on('exit', resolve))
+    assert.deepEqual(hits.sort(), ['app:', 'window:'])
+    assert.equal(out, '{"window":true}')
+  } finally {
+    window.close(); app.close(); broad.close()
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('a hanging app forwarder does not hold the hook to its 1.5 s exit', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-app-hang-'))
+  const windows = path.join(home, '.claude', 'switchboard')
+  const apps = path.join(home, '.claude', 'switchboard-app')
+  fs.mkdirSync(windows, { recursive: true })
+  fs.mkdirSync(apps, { recursive: true })
+  const script = path.join(home, 'hook.js')
+  fs.writeFileSync(script, getHookScriptContent())
+  const listen = (answer: boolean) => new Promise<http.Server>(resolve => {
+    const server = http.createServer((req, res) => { if (answer) { req.resume(); req.on('end', () => res.end('{"ok":true}')) } })
+    server.listen(0, '127.0.0.1', () => resolve(server))
+  })
+  const window = await listen(true)
+  const app = await listen(false)
+  const port = (server: http.Server) => (server.address() as { port: number }).port
+  fs.writeFileSync(path.join(windows, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: port(window), workspace: home }))
+  fs.writeFileSync(path.join(apps, 'app.json'), JSON.stringify({ pid: process.pid, port: port(app), workspace: home }))
+  try {
+    const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'Stop' }))
+    const start = Date.now()
+    await new Promise(resolve => child.on('exit', resolve))
+    assert.ok(Date.now() - start < 1200, `took ${Date.now() - start}ms`)
+  } finally {
+    window.close(); app.closeAllConnections(); app.close()
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('only window files are read: a big json beside them gets no post and cannot cost the deny', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-files-'))
+  const dir = path.join(home, '.claude', 'switchboard')
+  fs.mkdirSync(dir, { recursive: true })
+  const script = path.join(home, 'hook.js')
+  fs.writeFileSync(script, getHookScriptContent())
+
+  const hits: string[] = []
+  const decoy = await listen(hits, 'decoy')
+  const deny = JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'held' } })
+  const owner = await new Promise<http.Server>(resolve => { const s = http.createServer((req, res) => { req.resume(); req.on('end', () => res.end(deny)) }); s.listen(0, '127.0.0.1', () => resolve(s)) })
+  const port = (s: http.Server) => (s.address() as { port: number }).port
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
+  fs.writeFileSync(path.join(dir, 'usage-cache.json'), JSON.stringify({ pid: process.pid, port: port(decoy), workspace: home, pad: 'x'.repeat(2_000_000) }))
+
+  try {
+    const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    let out = ''
+    child.stdout.on('data', c => { out += c })
+    child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: {} }))
+    await new Promise(resolve => child.on('close', resolve))
+    assert.equal(out, deny)
+    assert.deepEqual(hits, [])
+  } finally {
+    owner.close()
+    decoy.close()
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('the hook exits 1.5s after it boots, whatever Claude Code allows it', () => {
+  assert.match(getHookScriptContent(), /setTimeout\(\(\) => process\.exit\(0\), 1500\)/)
 })
 
 test('a frozen mirror window holds the hook up for a short timeout only', async () => {
@@ -173,8 +271,8 @@ test('a frozen mirror window holds the hook up for a short timeout only', async 
   // Takes the post and never answers.
   const frozen = await new Promise<http.Server>(resolve => { const s = http.createServer(() => {}); s.listen(0, '127.0.0.1', () => resolve(s)) })
   const port = (s: http.Server) => (s.address() as { port: number }).port
-  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
-  fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ pid: process.ppid, port: port(frozen), workspace: '/nowhere/b' }))
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
+  fs.writeFileSync(path.join(dir, 'bb-2.json'), JSON.stringify({ pid: process.ppid, port: port(frozen), workspace: '/nowhere/b' }))
 
   try {
     const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
@@ -210,8 +308,8 @@ test("the forwarder prints the owning window's reply as the hook output, never a
   const owner = await window(deny)
   const other = await window('{"mirror":true}')
   const port = (s: http.Server) => (s.address() as { port: number }).port
-  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
-  fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ pid: process.ppid, port: port(other), workspace: '/nowhere/b' }))
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: port(owner), workspace: home }))
+  fs.writeFileSync(path.join(dir, 'bb-2.json'), JSON.stringify({ pid: process.ppid, port: port(other), workspace: '/nowhere/b' }))
   try {
     const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
     let out = ''
@@ -259,7 +357,7 @@ test('a Codex role run (SWITCHBOARD_ROLE_RUN set) posts its events tagged role_r
     const srv = http.createServer((req, res) => { let b = ''; req.on('data', c => { b += c }); req.on('end', () => { got.push(b); res.end() }) })
     srv.listen(0, '127.0.0.1', () => resolve(srv))
   })
-  fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ pid: process.pid, port: (s.address() as { port: number }).port, workspace: home }))
+  fs.writeFileSync(path.join(dir, 'aa-1.json'), JSON.stringify({ pid: process.pid, port: (s.address() as { port: number }).port, workspace: home }))
   try {
     const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home, SWITCHBOARD_ROLE_RUN: 'qa-codex', CLAUDE_CODE_SESSION_ID: 'lead' } })
     child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'Stop' }))
@@ -272,7 +370,7 @@ test('a Codex role run (SWITCHBOARD_ROLE_RUN set) posts its events tagged role_r
   }
 })
 
-test('with no editor window live, the standalone app gets the chat; with one live, only the editor does', async () => {
+test('with no editor window live, the app gets the chat; when a window is live, both receive it', async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-app-'))
   const appDir = path.join(home, '.claude', 'switchboard-app')
   fs.mkdirSync(appDir, { recursive: true })
@@ -291,20 +389,51 @@ test('with no editor window live, the standalone app gets the chat; with one liv
   try {
     await fire()
     assert.deepEqual(hits, ['app'])
-    // Under the app's own folder its own hook delivers, so this one stays out of the way.
+    // A matching app instance still gets the extension-forwarded event.
     fs.writeFileSync(path.join(appDir, 'a.json'), JSON.stringify({ pid: process.pid, port: port(app), workspace: home, hubToken: 't' }))
     hits.length = 0
     await fire()
-    assert.deepEqual(hits, [])
+    assert.deepEqual(hits, ['app'])
     const dir = path.join(home, '.claude', 'switchboard')
     fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, 'w.json'), JSON.stringify({ pid: process.pid, port: port(ed), workspace: '/nowhere/w' }))
+    fs.writeFileSync(path.join(dir, 'cc-3.json'), JSON.stringify({ pid: process.pid, port: port(ed), workspace: '/nowhere/w' }))
     hits.length = 0
     await fire()
-    assert.deepEqual(hits, ['editor'])
+    assert.deepEqual(hits.sort(), ['app', 'editor'])
   } finally {
     app.close()
     ed.close()
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('without a window, the lowest-pid app owns the chat and other apps get mirrors', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-app-fallback-'))
+  const apps = path.join(home, '.claude', 'switchboard-app')
+  fs.mkdirSync(apps, { recursive: true })
+  const script = path.join(home, 'hook.js')
+  fs.writeFileSync(script, getHookScriptContent())
+  const hits: string[] = []
+  const app = (name: string, reply: string) => new Promise<http.Server>(resolve => {
+    const server = http.createServer((req, res) => { hits.push(`${name}:${req.headers['x-switchboard-mirror'] ?? ''}`); req.resume(); req.on('end', () => res.end(reply)) })
+    server.listen(0, '127.0.0.1', () => resolve(server))
+  })
+  const low = await app('low', '{"x":1}')
+  const high = await app('high', '{"x":2}')
+  const port = (server: http.Server) => (server.address() as { port: number }).port
+  const [lowPid, highPid] = [process.pid, process.ppid].sort((a, b) => a - b)
+  fs.writeFileSync(path.join(apps, 'a.json'), JSON.stringify({ pid: lowPid, port: port(low), workspace: '/outside/a' }))
+  fs.writeFileSync(path.join(apps, 'b.json'), JSON.stringify({ pid: highPid, port: port(high), workspace: '/outside/b' }))
+  try {
+    const child = spawn(process.execPath, [script], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    let out = ''
+    child.stdout.on('data', c => { out += c })
+    child.stdin.end(JSON.stringify({ cwd: home, session_id: 's', hook_event_name: 'Stop' }))
+    await new Promise(resolve => child.on('exit', resolve))
+    assert.deepEqual(hits.sort(), ['high:1', 'low:'])
+    assert.equal(out, '{"x":1}')
+  } finally {
+    low.close(); high.close()
     fs.rmSync(home, { recursive: true, force: true })
   }
 })

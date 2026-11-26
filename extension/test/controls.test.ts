@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyPatch, controlPatch, readControls, tuiEnv } from '../src/hub/controls'
+import { applyPatch, codeModeOn, controlPatch, readControls, tuiEnv } from '../src/hub/controls'
 
 const LINE = 'node "/k/claude-mods/kit/statusline.mjs"'
 
@@ -83,4 +83,11 @@ describe('tuiEnv', () => {
   it('leaves the default layout alone', () => {
     assert.deepEqual(tuiEnv('default'), {})
   })
+})
+
+it('Code Mode is on only with the variable at 1 in the settings env', () => {
+  const on = (v: unknown) => codeModeOn({ env: { CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: v } })
+  assert.equal(on('1'), true)
+  assert.equal(on('0'), false)
+  assert.equal(codeModeOn({}), false)
 })

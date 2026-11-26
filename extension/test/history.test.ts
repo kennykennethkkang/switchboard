@@ -95,3 +95,78 @@ describe('history', () => {
     assert.equal(scan.history[13].day, dayKey(at('2026-10-23T12:00:00')))
   })
 })
+
+
+it('drops tallies after saving and restores them without recounting lines', async () => {
+  const { root, file } = fixture()
+  const cache = path.join(root, 'history.json')
+  const now = at('2026-10-23T12:00:00')
+  const first = new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache)
+  const before = await first.scan(now)
+  await first.drop(now + 5 * 60_000)
+  assert.ok(fs.statSync(cache).size > 0)
+  const restored = await new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache).scan(now + 6 * 60_000)
+  assert.deepEqual(restored.sessions.map(s => [s.reread, s.calls]), before.sessions.map(s => [s.reread, s.calls]))
+  fs.appendFileSync(file, usage('2026-10-23T10:00:00', 's1', 50) + '\n')
+  const resumed = await new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache).scan(now + 12 * 60_000)
+  assert.equal(resumed.sessions[0].reread, 4050)
+  assert.equal(resumed.sessions[0].calls, 3)
+})
+
+
+it('an open view that scans every five minutes does not keep the totals in memory between scans', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const { root } = fixture()
+  const cache = path.join(root, 'history.json')
+  const now = at('2026-10-23T12:00:00')
+  const scanner = new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache)
+  const tallies = (scanner as unknown as { tallies: Map<string, unknown> }).tallies
+  const first = await scanner.scan(now)
+  for (let i = 1; i <= 2; i++) {
+    assert.ok(tallies.size > 0)
+    t.mock.timers.tick(4 * 60_000)
+    for (let turn = 0; turn < 500 && tallies.size; turn++) await new Promise(resolve => setImmediate(resolve))
+    assert.equal(tallies.size, 0)
+    assert.deepEqual(await scanner.scan(now + i * 5 * 60_000), first)
+  }
+})
+
+it('drops after save only when no scan started during drop', async () => {
+  const { root } = fixture()
+  const cache = path.join(root, 'history.json')
+  const now = at('2026-10-23T12:00:00')
+  const scanner = new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache)
+  await scanner.scan(now)
+  const dropping = scanner.drop(now + 5 * 60_000)
+  const scanning = scanner.scan(now + 6 * 60_000)
+  await Promise.all([dropping, scanning])
+  assert.ok((scanner as any).tallies.size > 0)
+})
+
+it('loads duplicate message owners once, keeping the first file', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'history-owner-'))
+  const project = path.join(root, 'project')
+  fs.mkdirSync(project)
+  const fileA = path.join(project, 'a.jsonl'), fileB = path.join(project, 'b.jsonl')
+  const message = (n: number) => JSON.stringify({ type: 'assistant', timestamp: '2026-10-23T10:00:00', cwd: '/tmp/repo', message: { id: 'shared', role: 'assistant', usage: { input_tokens: n, output_tokens: 1, cache_read_input_tokens: n } } })
+  fs.writeFileSync(fileA, message(10) + '\n')
+  fs.writeFileSync(fileB, message(90) + '\n')
+  const cache = path.join(root, 'history.json'), now = at('2026-10-23T12:00:00')
+  await new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache).scan(now)
+  const saved = JSON.parse(fs.readFileSync(cache, 'utf8'))
+  const owner = saved.files[fileA], duplicate = saved.files[fileB]
+  saved.files[fileB] = { ...duplicate, reread: owner.reread, calls: owner.calls, startedAt: owner.startedAt, lastAt: owner.lastAt, days: owner.days, messages: owner.messages }
+  fs.writeFileSync(cache, JSON.stringify(saved))
+  const loaded = await new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache).scan(now)
+  assert.equal(loaded.sessions[0].reread, 10)
+  assert.equal(loaded.sessions[0].calls, 1)
+})
+
+it('removes tallies older than the window from the saved history', async () => {
+  const { root } = fixture()
+  const cache = path.join(root, 'history.json')
+  const now = Date.now()
+  await new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache).scan(now)
+  await new HistoryScanner(root, 14, path.join(root, 'codex'), path.join(root, 'usage.json'), cache).scan(now + 20 * 86_400_000)
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(cache, 'utf8')).files), [])
+})

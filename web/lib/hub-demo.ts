@@ -6,7 +6,8 @@ import type { HubCommand } from './vscode-bridge'
 import { holdOf, runIds, type Held } from './todo'
 import { projectName, splitVersion } from './archive'
 import { looksMulti } from './split-plan'
-import type { ChangedFile, ChatLink, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, TodoList, ToolCall } from './hub-types'
+import type { ChangedFile, ChatLink, ChatProfile, ChatProgress, HubState, RepoView, TodoItem, TodoList, ToolCall, ShipRepo, ShipTree } from './hub-types'
+import { isShipId, shipOf } from './ship-list'
 import type { RunCall, RunDetail } from './runs'
 import type { ChatAnswer, ChatAsk, ChatMessage, ChatOutputs } from './chat-view'
 import { demoSourceChecks } from './source-check-demo'
@@ -37,6 +38,7 @@ const demoPick = (h: HubState, goal: string): ChatProfile => {
   return {
     plugins: Object.fromEntries(h.installed.filter(i => i.kind === 'plugin').map(i => [i.name, !DEMO_FLAGGED.includes(i.name) && (i.name.startsWith('superpowers@') || named(i.name))])),
     skills: Object.fromEntries(h.installed.filter(i => i.kind === 'skill' && i.enabled).map(i => [i.name, named(i.name)])),
+    extras: Object.fromEntries(h.installed.filter(i => i.kind === 'builtin' || i.kind === 'mcp').map(i => [i.name, i.kind === 'mcp' || named(i.name)])),
   }
 }
 
@@ -177,18 +179,98 @@ Pace by **tokens per minute** with a token bucket sized from the window, and sto
 - [4] OpenAI rate limit guide https://platform.openai.com/docs/guides/rate-limits
 - [5] AWS backoff and jitter https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
 - [6] Google SRE handling overload https://sre.google/sre-book/handling-overload/
+
+## Added 2026-11-22: What happens when two chats share one window?
+Both draw from the same bucket, so pace by the account, not the chat [1][2].
+- Give each chat a floor of one request a minute so none starves [2].
+- Re-read the window size from the response headers, not a constant [1].
+
+## Added 2026-11-24: Does the 85% stop apply to background runs too?
+Yes, but let background runs stop at 70% so a foreground chat always has headroom [3].
+- Mark runs as background when no one has typed for 10 minutes [3].
+`,
+  r4: `## Answer
+The first prompt is slow because zsh rebuilds its completion cache and loads nvm on every start. Caching the completions and loading nvm on demand brings it from 1.4 s to about 0.3 s [1][2].
+
+confidence: high
+
+## Findings
+- compinit scans every fpath folder each time unless it reads a dump file younger than a day [1].
+- nvm.sh alone costs about 0.4 s; a lazy wrapper pays that on the first node call instead [3].
+- Spotlight indexing node_modules adds CPU load that shows up as stalls after installs [4].
+- Xcode simulator caches hold 18 GB here and rebuild on demand [5].
+
+## Sources
+- [1] zsh compinit docs https://zsh.sourceforge.io/Doc/Release/Completion-System.html
+- [2] Faster zsh startup https://htr3n.github.io/2018/07/faster-zsh/
+- [3] nvm lazy loading https://github.com/nvm-sh/nvm#deeper-shell-integration
+- [4] Excluding folders from Spotlight https://support.apple.com/guide/mac-help/spotlight-privacy-mchl1b9d5bf2/mac
+- [5] simctl delete https://developer.apple.com/documentation/xcode/simulator
+`,
+  r5: `## Answer
+A Mac stays awake overnight for a run if a launch agent holds caffeinate for the life of the run. App Nap and a changing router address are the other two causes of dropped runs [1][2].
+
+confidence: medium
+
+## Findings
+- caffeinate -i blocks idle sleep and ends when its parent exits [1].
+- A DHCP reservation keeps the phone link address stable across sleeps [2].
+
+## Sources
+- [1] caffeinate man page https://ss64.com/mac/caffeinate.html
+- [2] DHCP reservations explained https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol
 `,
 }
+
+/** The folder each demo report belongs in; Smart organize files the unfiled ones by this. */
+const DEMO_FOLDERS = ['Memory and search', 'Web platform', 'Agents and cost', 'Release and CI', 'Design']
+const DEMO_FILING: Record<string, string> = {
+  r1: 'Memory and search', r2: 'Web platform', r3: 'Agents and cost', r17: 'Web platform', r18: 'Memory and search', r6: 'Design', r7: 'Release and CI', r8: 'Agents and cost',
+  r9: 'Web platform', r10: 'Design', r11: 'Release and CI', r12: 'Design', r13: 'Memory and search', r14: 'Design', r15: 'Web platform', r16: 'Release and CI',
+}
+const DEMO_UNFILED = ['r1', 'r17', 'r6', 'r14']
+const SRC_POOL: [string, string][] = [
+  ['MDN reference', 'https://developer.mozilla.org/en-US/docs/Web'], ['web.dev guide', 'https://web.dev/articles'], ['SQLite docs', 'https://sqlite.org/docs.html'],
+  ['WebKit blog', 'https://webkit.org/blog/'], ['Apple HIG', 'https://developer.apple.com/design/human-interface-guidelines/'], ['Anthropic docs', 'https://docs.anthropic.com/en/docs'],
+]
+type Spec = [id: string, question: string, project: string | undefined, agoMin: number, seen: boolean, summary: string, findings: string[]]
+const SPECS: Spec[] = [
+  ['r17', 'Which image format should closet previews use, AVIF or WebP?', 'Armasu', 40, false, 'Serve AVIF with a WebP fallback. AVIF is about 30% smaller at the same look, and every browser Armasu supports decodes it now.', ['AVIF beat WebP by 25 to 35% on photos of clothing [1][2].', 'Encoding AVIF is slow, so do it at upload time, not on request [2].', 'Safari decodes AVIF since 16.4, so the fallback only matters for old iPads [3].']],
+  ['r18', 'How should long chat transcripts be chunked so recall keeps the question with its answer?', 'Switchboard', 31 * 60, false, 'Chunk by turn pairs, not by size. A question and its reply stay together, and a small overlap of one turn keeps follow-ups attached.', ['Fixed 500 token chunks split a reply from its question in 38% of cases [1].', 'Turn-pair chunks with one turn of overlap raised recall at 5 by 11 points [2].', 'Store the chunk title as the question, so keyword search finds it too [3].']],
+  ['r6', 'Should receipt OCR run on the device or through an API?', 'Receipts', 2 * 1440 + 60, true, 'Start on the device with Apple Vision, and send only low confidence receipts to the API. It is free, private and good enough for printed totals.', ['Vision reads printed totals at 97% on a 200 receipt sample [1].', 'Handwritten tips and faded thermal paper drop to 70% [2].', 'An API fallback for the weak ones costs under a cent a receipt [3].']],
+  ['r7', 'What does a safe staged rollout look like for a desktop app updater?', 'Atlas', 2 * 1440 + 400, true, 'Roll out in three steps: 5%, 25%, all. Gate on crash free sessions, and keep the previous build one click away.', ['Every mature updater ships by percentage with a kill switch [1][2].', 'Crash free sessions under 99.5% is the common stop line [2].', 'Keep one older build downloadable for at least 30 days [3].']],
+  ['r8', 'Does prompt caching survive a model switch in the middle of a chat?', 'Switchboard', 3 * 1440 + 200, true, 'No. The cache is per model, so a switch re-reads the whole context at full price once. Switch at the start of a task, not in the middle.', ['Cache entries are keyed by model and prefix [1].', 'A switch costs one full read of the context, then caches again [1][2].', 'The five minute lifetime means idle chats lose it anyway [3].']],
+  ['r9', 'Are scroll driven animations safe to use in Safari 26?', 'Armasu', 4 * 1440, true, 'Yes for animation-timeline: scroll() and view(), with a static fallback. Ranges work; named timelines on nested scrollers are still buggy.', ['Safari 26 shipped scroll() and view() timelines [1].', 'animation-range works, but nested named timelines flicker [2].', 'Wrap in @supports so older Safari sees the final state [3].']],
+  ['r10', 'Which tap target size do WCAG 2.2 and Apple guidance agree on?', 'Atlas', 5 * 1440, true, 'Use 44 by 44 points. WCAG 2.2 AA asks for 24 px with spacing, Apple asks for 44, so 44 satisfies both.', ['WCAG 2.5.8 sets a 24 px minimum, with a spacing exception [1].', 'Apple HIG asks for 44 points on touch [2].', 'Inline links in text are exempt, but give them room [3].']],
+  ['r11', 'Can the app ship through a Homebrew cask without notarization?', 'Switchboard', 6 * 1440, true, 'Technically yes, but users then see a quarantine warning on first run. Notarize, then publish the cask against the notarized zip.', ['Casks can strip the quarantine flag, but Homebrew discourages it [1].', 'Notarization needs a paid developer account and takes about a minute [2].', 'Cask audit fails on unsigned apps for new submissions [3].']],
+  ['r12', 'What do empty states in finance apps show first?', 'Receipts', 7 * 1440, true, 'A single next step with a sample row. Apps that showed an example entry had more first-day adds than ones with only a prompt.', ['Top apps lead with one action, not a tour [1].', 'A greyed sample row teaches the layout without a tutorial [2].', 'Import from a bank is the second action, never the first [3].']],
+  ['r13', 'SQLite FTS5 or trigram index for fuzzy file name search?', 'Atlas', 8 * 1440, false, 'Trigram for file names, FTS5 for note text. Trigram finds typos and partial words; FTS5 ranks prose better.', ['FTS5 trigram tokenizer handles substring and typo search [1].', 'Index size is about 3x larger than plain FTS5 [2].', 'Query time stays under 5 ms at 200k names [3].']],
+  ['r14', 'How do other tools show queued agent work on a phone?', 'Switchboard', 9 * 1440, true, 'One list, grouped by state, with the thing that needs you on top. Nobody shows a board on a phone.', ['Linear and Things both group by state on mobile [1].', 'Needs you items get a badge on the tab, not a banner [2].', 'Swipe actions beat buttons for approve and dismiss [3].']],
+  ['r15', 'Do container queries for card grids cost layout time on Safari?', 'Armasu', 10 * 1440, true, 'No measurable cost under 200 containers. Keep containment to inline-size and avoid querying height.', ['Safari lays out 150 query containers in under 4 ms [1].', 'size containment (both axes) is the costly one [2].', 'Name the containers so a rule never matches the wrong parent [3].']],
+  ['r16', 'Should a staged web rollout flag travel in a cookie or a header?', 'Atlas', 12 * 1440, true, 'A cookie for the browser, a header for API calls. Both read one assignment made at the edge, so a user never flips between versions.', ['Sticky assignment needs a stable id, and a cookie is the simplest [1].', 'Headers suit service to service calls [2].', 'Assign at the edge so cache keys include the bucket [3].']],
+]
+const specBody = (s: Spec) => {
+  const i = Number(s[0].slice(1)), n = 3 + (i % 3)
+  const srcs = SRC_POOL.slice(0, n).map(([t, u], k) => `- [${k + 1}] ${t} ${u}`).join('\n')
+  return `## Answer\n${s[5]} [1][2]\n\n**Confidence:** ${i % 3 === 0 ? 'Medium' : 'High'}\n\n## Key findings\n${s[6].map(f => `- ${f}`).join('\n')}\n\n## What to do\n1. Try it on one screen first.\n2. Keep the old path as a fallback until it holds.\n\n## Sources\n${srcs}\n`
+}
+for (const s of SPECS) DEMO_RESEARCH_BODY[s[0]] = specBody(s)
+// Parts the demo's Ask more adds while it runs, keyed "<id>:<n>".
+const DEMO_ADDED: Record<string, string> = {}
+let organizeAt = 0
+let organizeOp: 'run' | 'all' = 'run'
+let organizeUndo: Record<string, string | undefined> | undefined
 
 /** Saved research runs for the demo; their markdown comes from demoResearchBody. */
 export function demoResearch(now = Date.now()): DemoResearch[] {
   const MIN = 60_000, DAY = 86_400_000
   const t0 = now
-  return [
+  const base: DemoResearch[] = [
   {
     id: 'r1', question: 'Which local vector store fits a VS Code extension that cannot ship native modules?', project: 'Switchboard',
     chat: 'Memory recall speedup', sessionId: 'demo-research-1', at: t0 - 4 * MIN, sources: 9, seen: false,
     summary: 'Use sqlite-vec through the WASM build of SQLite. It loads in the extension host with no native binary, handles 50k notes under 20 ms per query, and keeps the memory graph in one file.',
+    asks: [{ question: 'Compare index size at 100k notes for sqlite-vec and hnswlib-wasm', at: t0 - 90_000, sessionId: 'demo-research-ask-1' }],
   },
   {
     id: 'r2', question: 'Where do Safari and Chrome still differ on cross-document View Transitions?', project: 'Armasu',
@@ -199,12 +281,31 @@ export function demoResearch(now = Date.now()): DemoResearch[] {
     id: 'r3', question: 'How should an agent fan-out be paced under a rolling 5 hour usage window?',
     chat: 'Research space', sessionId: 'demo-research-3', at: t0 - 3 * DAY, sources: 11, seen: true,
     summary: 'Cap live workers by tokens per minute, not by count. A token bucket refilled from the window size, with a hard stop at 85% used, kept every tested setup inside the window with no 429 storms.',
+    added: { at: t0 - 5 * MIN, n: 2 },
   },
-]
+  {
+    id: 'r4', question: 'Why does the first shell prompt take 1.4 seconds?',
+    chat: 'Shell speed', sessionId: 'demo-research-4', at: t0 - 2 * 60 * MIN, sources: 5, seen: true,
+    summary: 'zsh rebuilds its completion cache and loads nvm on every start. Caching completions and loading nvm on demand cuts the prompt from 1.4 s to about 0.3 s.',
+  },
+  {
+    id: 'r5', question: 'Which Mac settings keep long agent runs alive overnight?',
+    chat: 'Overnight runs', sessionId: 'demo-research-5', at: t0 - 5 * DAY, sources: 2, seen: true,
+    summary: 'Hold caffeinate with a launch agent for the life of the run, and give the Mac a fixed address so the phone link survives sleeps.',
+  },
+  ...SPECS.map((s, k): DemoResearch => ({ id: s[0], question: s[1], project: s[2], chat: ['Closet previews', 'Recall tuning', 'Scan flow', 'Updater', 'Cost pass', 'Scroll pass', 'Touch pass', 'Packaging', 'First run', 'Fuzzy find', 'Phone queue', 'Card grid', 'Rollout'][k % 13], sessionId: `demo-research-${s[0].slice(1)}`, at: t0 - s[3] * MIN, sources: 3 + (Number(s[0].slice(1)) % 3), seen: s[4], summary: s[5] })),
+  ]
+  return base.map(r => ({ ...r, folder: DEMO_UNFILED.includes(r.id) ? undefined : DEMO_FILING[r.id] })).sort((a, b) => b.at - a.at)
 }
+export const demoResearchFolders = (): NonNullable<HubState['researchFolders']> => ({ names: [...DEMO_FOLDERS], auto: false })
 
 /** The saved markdown for a demo research run, or undefined. */
-export const demoResearchBody = (id: string): string | undefined => DEMO_RESEARCH_BODY[id]
+export const demoResearchBody = (id: string): string | undefined => {
+  const base = DEMO_RESEARCH_BODY[id]
+  if (base === undefined) return undefined
+  const more = Object.keys(DEMO_ADDED).filter(k => k.startsWith(`${id}:`)).sort().map(k => DEMO_ADDED[k]).join('')
+  return base + more
+}
 
 export const demoHub = (now = Date.now()): HubState => {
   const h = { ...demoStations(withPlans(baseHub(now), now), now), smart: demoSmart(now) } as HubState
@@ -242,6 +343,22 @@ function baseHub(now: number): HubState {
       { id: 'codex', label: 'Codex CLI on PATH', status: 'fail', detail: 'not found', fixable: false },
     ] },
     pipelines: [{ slug: 'research-build-qa', name: 'Research, build, QA', stages: 3, savedAt: now - DAY }],
+    codexKept: [{ kind: 'codex_five_hour', percentUsed: 7, resetsAt: new Date(now + 3 * 3600e3).toISOString() }, { kind: 'codex_seven_day', percentUsed: 2, resetsAt: new Date(now + 5 * DAY).toISOString() }], codexResets: 1, codexDaily: [13.9e6, 15.4e6, 56e3, 6.8e6].map((tokens, i) => ({ day: new Date(now - (5 - i) * DAY).toISOString().slice(0, 10), tokens })),
+    spend: [{ key: 'openrouter', label: 'OpenRouter', mode: 'ask', monthlyUsd: 10, calls: 3, usd: 1.2 }],
+    // claude-mods and Gemini-Test have work and no chat; one Armasu worktree is ready, two have chats, one still running.
+    ship: [
+      { id: '/Users/k/GitHub/Armasu', name: 'Armasu', branch: 'fix/login-redirect', files: 4, ahead: 2, behind: 0, auto: true, trees: [
+        { id: '/Users/k/GitHub/Armasu/.claude/worktrees/cookie-banner', name: 'cookie-banner', branch: 'worktree-cookie-banner', files: 3, commits: 0, live: true, queued: true },
+        { id: '/Users/k/GitHub/Armasu/.claude/worktrees/fix-login', name: 'fix-login', branch: 'worktree-fix-login', files: 2, commits: 1, live: true },
+        { id: '/Users/k/GitHub/Armasu/.claude/worktrees/size-chart', name: 'size-chart', branch: 'worktree-size-chart', files: 5, commits: 0, live: false },
+        { id: '/Users/k/GitHub/Armasu/.claude/worktrees/old-footer', name: 'old-footer', branch: 'worktree-old-footer', files: 1, commits: 0, live: false },
+      ], merge: { text: 'Merged hero-copy into fix/login-redirect as uncommitted changes; typecheck and test passed. Nothing was committed or pushed', ok: true, at: now - 22 * 60e3 } },
+      { id: '/Users/k/GitHub/claude-mods', name: 'claude-mods', branch: 'main', files: 71, ahead: 0, behind: 0, auto: true, trees: [] },
+      { id: '/Users/k/Documents/GitHub/Gemini-Test', name: 'Gemini-Test', branch: 'main', files: 42, ahead: 0, behind: 0, auto: false, trees: [] },
+      { id: '/Users/k/GitHub/switchboard', name: 'switchboard', branch: 'main', files: 2, ahead: 2, behind: 0, auto: true, trees: [] },
+      { id: '/Users/k/Documents/GitHub/GogoOrder', name: 'GogoOrder', branch: 'main', files: 0, ahead: 0, behind: 0, auto: true, trees: [] },
+      { id: '/Users/k/Documents/GitHub/QR-Test', name: 'QR-Test', branch: 'main', files: 0, ahead: 0, behind: 0, auto: true, trees: [] },
+    ],
     trend: { day: '2026-11-13', chats: { value: 6, vsDay: 2, vsWeek: -1 }, costUsd: { value: 12.4, vsDay: -3.1, vsWeek: 0 }, approved: { value: 5, vsDay: 1, vsWeek: 2 }, sentBack: { value: 1, vsDay: 0, vsWeek: -1 } },
     // Advanced mode in Armasu: one run running, one sent back, one waiting on review.
     stages: { '/Users/k/Documents/GitHub/Armasu': [
@@ -353,6 +470,7 @@ function baseHub(now: number): HubState {
     firstRun: { github: true, claude: true, project: true, chat: false, approved: false },
     researchOffers: [{ sessionId: 'd-ask', score: 0.82, reason: 'Picker copy leans on claims about what shoppers prefer; a research run can check them', at: now - 3 * 60e3 }],
     research: demoResearch(now),
+    researchFolders: demoResearchFolders(),
     sourceChecks: demoSourceChecks(now),
     // The hung test run that started this check: a subagent's pnpm test, two hours on one core.
     stuck: [
@@ -487,6 +605,7 @@ function baseHub(now: number): HubState {
       { kind: 'role', name: 'researcher', enabled: true, model: 'haiku' }, { kind: 'role', name: 'engineer', enabled: true, model: 'opus' }, { kind: 'role', name: 'qa', enabled: true, model: 'sonnet' },
       { kind: 'role', name: 'designer', enabled: true, model: 'opus' }, { kind: 'role', name: 'ops', enabled: true, model: 'haiku' }, { kind: 'role', name: 'growth', enabled: true, model: 'sonnet' },
       { kind: 'role', name: 'qa-codex', enabled: true, model: 'sonnet', codex: true, codexModel: 'gpt-6-luna', codexEffort: 'high' },
+      { kind: 'builtin', name: 'Artifact', enabled: true, description: 'publish an HTML page to claude.ai, or upload an image or file into a Claude Docs document' }, { kind: 'builtin', name: 'Workflow', enabled: true, description: 'run a scripted multi-agent workflow, only when the user asks for one' }, { kind: 'mcp', name: 'mcp:openrouter', enabled: true },
       { kind: 'preset', name: 'armasu-copy-check', enabled: true }, { kind: 'preset', name: 'armasu-route-release', enabled: true },
     ],
     connections: [
@@ -570,6 +689,36 @@ export function demoTick(h: HubState, now: number): HubState {
   if (h.pause?.resumeAt && now >= h.pause.resumeAt) h = { ...h, pause: undefined }
   // Pure, since strict mode runs state updaters twice.
   if (unlinkAt && now >= unlinkAt && h.links?.some(l => l.auto)) h = { ...h, links: h.links.filter(l => !l.auto) }
+  if (h.researchFolders?.busy && now - organizeAt >= 1500 && organizeOp === 'run' && !h.research?.some(r => !r.folder)) {
+    h = { ...h, researchFolders: { ...h.researchFolders, busy: false, problem: 'Nothing is unfiled. Use Re-sort everything to start over.' } }
+  }
+  if (h.researchFolders?.busy && now - organizeAt >= 1500) {
+    const was: Record<string, string | undefined> = {}
+    const research = h.research?.map(r => {
+      const to = DEMO_FILING[r.id]
+      if (!to || (organizeOp === 'run' && r.folder) || r.folder === to) return r
+      was[r.id] = r.folder
+      return { ...r, folder: to }
+    })
+    organizeUndo = was
+    h = { ...h, research, researchFolders: { ...h.researchFolders, busy: false, undo: Object.keys(was).length ? { moved: Object.keys(was).length, at: now } : undefined } }
+  }
+  if (h.research?.some(r => r.asks?.some(a => a.sessionId?.startsWith('demo-ask-') ? now - a.at >= 9000 : !a.sessionId && now - a.at >= 2500))) {
+    h = { ...h, research: h.research.map(r => {
+      if (!r.asks?.length) return r
+      let added = r.added
+      const asks: NonNullable<typeof r.asks> = []
+      for (const a of r.asks) {
+        if (a.sessionId?.startsWith('demo-ask-') && now - a.at >= 9000) {
+          const n = (added?.n ?? 0) + 1
+          const date = new Date(now).toLocaleDateString('en-CA')
+          DEMO_ADDED[`${r.id}:${String(n).padStart(3, '0')}`] = `\n## Added ${date}: ${a.question}\nThe follow up found two more points worth keeping [1].\n- The first holds up in the sources already read [1].\n- The second needs a quick test on real data before it is trusted.\n`
+          added = { at: now, n }
+        } else asks.push(!a.sessionId && now - a.at >= 2500 ? { ...a, sessionId: `demo-ask-${a.at}` } : a)
+      }
+      return { ...r, asks, added, seen: added === r.added ? r.seen : false }
+    }) }
+  }
   if (h.voice === 'listening' && now - listenAt > 3500) h = { ...h, voice: null, heard: { text: DEMO_HEARD, at: now } }
   if (h.repo?.draft?.busy && now - h.repo.draft.at >= 1500) h = { ...h, repo: { ...h.repo, draft: { text: DEMO_DRAFT, box: 'filled', at: now } } }
   const i = Math.floor((now % 20_000) / (20_000 / 3)), role = ROLES[i]
@@ -612,6 +761,8 @@ const CHANGES: Record<string, ChangedFile[]> = {
 
 /** The demo's Git panel: the chat's changed files on a feature branch two commits ahead. */
 const demoRepo = (h: HubState, sessionId: string): RepoView => {
+  const own = shipOf(h.ship ?? [], isShipId(sessionId) ? sessionId : undefined)
+  if (own) return demoShipRepo(own, sessionId)
   const cwd = h.chats.find(x => x.sessionId === sessionId)?.cwd ?? ''
   const files = (CHANGES[sessionId] ?? []).map(f => ({ path: f.path, status: f.status }))
   const branch = sessionId === 'd-done' ? 'main' : sessionId === 'd-tree' ? 'worktree-fix-login' : 'fix/login-redirect'
@@ -622,9 +773,23 @@ const demoRepo = (h: HubState, sessionId: string): RepoView => {
     stashes: 0, github: `https://github.com/kennykennethkkang/${cwd.split('/').pop()}`, at: Date.now(),
     ...(sessionId === 'd-work' ? demoMerge(Date.now()) : {}),
     ...(sessionId === 'd-done' ? demoLanes(Date.now()) : {}),
-    ...(sessionId === 'd-tree' ? { worktree: true, worktrees: 1, branch: 'worktree-fix-login', upstream: undefined, branches: ['worktree-fix-login', 'main'], sync: { kind: 'publish' as const, label: 'Publish branch' } } : {}),
+    ...(sessionId === 'd-tree' ? { worktree: true, into: 'fix/login-redirect', auto: true, branch: 'worktree-fix-login', upstream: undefined, branches: ['worktree-fix-login', 'main'], sync: { kind: 'publish' as const, label: 'Publish branch' } } : {}),
   }
 }
+
+/** A repo or worktree picked on Ship, as many files as its row says. */
+const demoShipRepo = ({ repo, tree }: { repo: ShipRepo; tree?: ShipTree }, sessionId: string): RepoView => {
+  const branch = (tree ?? repo).branch ?? 'main', ahead = tree ? 0 : repo.ahead
+  const files = demoShipFiles((tree ?? repo).files).map(f => ({ path: f.path, status: f.status }))
+  return {
+    sessionId, name: (tree ?? repo).name, branch, ...(tree ? { worktree: true, into: repo.branch, auto: repo.auto } : { upstream: `origin/${branch}` }), ahead, behind: 0, files, ship: { files: files.map(f => f.path), kept: [] },
+    branches: [...new Set([branch, 'main'])], sync: tree ? { kind: 'publish', label: 'Publish branch' } : ahead ? { kind: 'push', label: `Push ${ahead}` } : { kind: 'fetch', label: 'Fetch' },
+    log: [{ hash: '7d03b18', subject: 'Read the session cookie on Safari', when: '40 minutes ago' }, { hash: '1f9e0aa', subject: 'Add login page hero', when: '2 days ago' }],
+    stashes: 0, github: `https://github.com/kennykennethkkang/${repo.name}`, at: Date.now(),
+    ...(!tree && files.length ? { pending: { text: 'Size chart copy and hook fixes\n\n- size chart reads the saved unit\n- paid-guard asks once per provider', last: 'Size chart copy and hook fixes', at: 1 } } : {}),
+  }
+}
+const demoShipFiles = (n: number): ChangedFile[] => Array.from({ length: n }, (_, i) => ({ path: `src/part-${i + 1}.ts`, added: 12 + i, removed: i % 5, status: i % 4 ? 'modified' : 'added', diff: diffOf(['@@ -1,2 +1,2 @@', "-const unit = 'cm'", "+const unit = saved.unit ?? 'cm'"]) }))
 
 /** The ship card's lanes: two local commits on main, one from Sam already on origin. */
 const demoLanes = (now: number): Pick<RepoView, 'lanes' | 'outgoing'> => {
@@ -722,12 +887,17 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     case 'hub-pick-tools': return h.tools ? { ...h, tools: { ...h.tools, pick: { goal: c.text, folder: c.path, profile: demoPick(h, c.text) } } } : h
     case 'hub-chat-tools': return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.tools } } } : h
     case 'hub-tool-precedence': { if (!h.tools) return h; const p = { ...h.tools.precedence }; if (c.value === 'auto') delete p[c.name]; else p[c.name] = c.value; return { ...h, tools: { ...h.tools, precedence: p } } }
-    case 'hub-indefinite': {
+    case 'hub-loop': {
+      // Goal is Run indefinitely in the profile; Timer is the chat row's check-back, as the extension reports it.
       const cur = h.tools?.chats[c.sessionId] ?? { plugins: {}, skills: {} }
-      const { indefinite: _, ...rest } = cur
-      return h.tools ? { ...h, tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: c.on ? { ...rest, indefinite: Date.now() } : rest } } } : h
+      const { indefinite: was, checkBack: _, ...rest } = cur
+      const goal = c.loop.mode === 'goal', timer = c.loop.mode === 'timer' && c.loop.everyMin
+      const checkBack = timer ? { everyMin: c.loop.everyMin!, count: 0, ...(c.loop.text ? { text: c.loop.text } : {}) } : undefined
+      const chats = h.chats.map(x => (x.sessionId === c.sessionId ? { ...x, checkBack } : x))
+      return { ...h, chats, ...(h.tools ? { tools: { ...h.tools, chats: { ...h.tools.chats, [c.sessionId]: goal ? { ...rest, indefinite: was ?? Date.now() } : rest } } } : {}) }
     }
     case 'hub-focus-chat': return h
+    case 'hub-open-chat': return { ...h, openChat: { sessionId: c.sessionId, at: Date.now() } }
     case 'hub-terminal': return h
     case 'hub-summary': {
       const name = h.chats.find(x => x.sessionId === c.sessionId)?.name ?? 'This chat'
@@ -735,10 +905,21 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
       return { ...h, summaries: { ...h.summaries, [c.sessionId]: { text, at: Date.now() } } }
     }
     case 'hub-changes': {
+      const own = shipOf(h.ship ?? [], isShipId(c.sessionId) ? c.sessionId : undefined)
+      if (own) return { ...h, changes: { sessionId: c.sessionId, cwd: c.sessionId, files: demoShipFiles((own.tree ?? own.repo).files), at: Date.now() }, repo: demoRepo(h, c.sessionId) }
       const cwd = h.chats.find(x => x.sessionId === c.sessionId)?.cwd ?? ''
       return { ...h, changes: { sessionId: c.sessionId, cwd, files: CHANGES[c.sessionId] ?? [], at: Date.now() }, repo: demoRepo(h, c.sessionId) }
     }
+    case 'hub-auto-merge': return { ...h, ship: h.ship?.map(r => (r.id === c.repo ? { ...r, auto: c.on } : r)) }
     case 'hub-git': {
+      const at = shipOf(h.ship ?? [], isShipId(c.sessionId) ? c.sessionId : undefined)
+      if (at && (c.op === 'merge-back' || c.op === 'merge-all')) {
+        const gone = c.op === 'merge-all' ? at.repo.trees.filter(t => !t.live) : at.tree ? [at.tree] : []
+        const trees = at.tree?.live ? at.repo.trees.map(t => (t.id === at.tree!.id ? { ...t, queued: true } : t)) : at.repo.trees.filter(t => !gone.includes(t))
+        const merge = { text: `Merged ${gone.map(t => t.name).join(', ')} into ${at.repo.branch} as uncommitted changes; typecheck and test passed. Nothing was committed or pushed`, ok: true, at: Date.now() }
+        const next = { ...h, ship: h.ship!.map(r => (r.id === at.repo.id ? { ...r, trees, ...(at.tree?.live ? {} : { merge, files: r.files + gone.reduce((n, t) => n + t.files, 0) }) } : r)) }
+        return h.repo && isShipId(h.repo.sessionId) ? demoApply(next, { type: 'hub-changes', sessionId: h.repo.sessionId }) : next
+      }
       const r = h.repo?.sessionId === c.sessionId ? h.repo : demoRepo(h, c.sessionId)
       const done = (text: string, patch: Partial<RepoView> = {}) => ({ ...h, repo: { ...r, ...patch, result: { text: `Demo: ${text}`, ok: true, at: Date.now() } } })
       // A commit moves HEAD, which drops the draft like the extension does.
@@ -806,6 +987,29 @@ export function demoApply(h: HubState, c: HubCommand): HubState {
     case 'hub-research-dismiss': return { ...h, researchOffers: h.researchOffers?.filter(o => o.sessionId !== c.sessionId) }
     case 'hub-research-seen': return { ...h, research: h.research?.map(r => (r.id === c.id ? { ...r, seen: true } : r)) }
     case 'hub-research-delete': return { ...h, research: h.research?.filter(r => r.id !== c.id) }
+    case 'hub-research-ask': {
+      const text = c.text.trim()
+      if (!text) return h
+      return { ...h, research: h.research?.map(r => r.id === c.id ? { ...r, asks: [...(r.asks ?? []), { question: text, at: Date.now() }] } : r) }
+    }
+    case 'hub-research-folder': {
+      const f = h.researchFolders ?? { names: [], auto: false }
+      const name = c.name.trim(), to = c.to?.trim()
+      if (c.op === 'add') return !name || f.names.includes(name) ? h : { ...h, researchFolders: { ...f, names: [...f.names, name] } }
+      if (c.op === 'rename') return !to || !f.names.includes(name) || f.names.includes(to) ? h : { ...h, researchFolders: { ...f, names: f.names.map(n => n === name ? to : n) }, research: h.research?.map(r => r.folder === name ? { ...r, folder: to } : r) }
+      return { ...h, researchFolders: { ...f, names: f.names.filter(n => n !== name) }, research: h.research?.map(r => r.folder === name ? { ...r, folder: undefined } : r) }
+    }
+    case 'hub-research-move': return { ...h, research: h.research?.map(r => c.ids.includes(r.id) ? { ...r, folder: c.folder || undefined } : r) }
+    case 'hub-research-organize': {
+      const f = h.researchFolders ?? { names: [], auto: false }
+      if (c.op === 'auto-on' || c.op === 'auto-off') return { ...h, researchFolders: { ...f, auto: c.op === 'auto-on' } }
+      if (c.op === 'undo') {
+        const was = organizeUndo
+        return { ...h, researchFolders: { ...f, undo: undefined }, research: h.research?.map(r => was && r.id in was ? { ...r, folder: was[r.id] } : r) }
+      }
+      organizeAt = Date.now(); organizeOp = c.op
+      return { ...h, researchFolders: { ...f, busy: true, undo: undefined, problem: undefined } }
+    }
     case 'hub-first-run': return h.firstRun ? { ...h, firstRun: { ...h.firstRun, dismissed: c.dismissed || undefined } } : h
     case 'hub-advanced': return { ...h, controls: { ...h.controls, switchboard: { ...h.controls.switchboard, advancedMode: { ...h.controls.switchboard.advancedMode, [c.path]: c.on } } } }
     case 'hub-stage': return { ...h, stages: { ...h.stages, [c.path]: (h.stages?.[c.path] ?? []).map(r => r.run !== c.run ? r : { ...r, stages: r.stages.map(st => {

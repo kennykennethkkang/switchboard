@@ -7,12 +7,15 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Keep } from '../types'
 
 const MIN = 60_000
-const PROMPT = 'Keep-alive ping from cache-keeper. Reply with one word: ok.'
+// Mid-tool, a fork asked only for a word tries the tool again.
+const PROMPT = 'Keep-alive ping from cache-keeper. Do not call any tool. Reply with one word: ok.'
 // ponytail: the engine does not expose the cache TTL, so it is a setting (60m on a subscription,
 // 5m in overage). A wrong guess shows up as a cold ping, which stops that idle stretch.
 let ttl = 60 * MIN
 let margin = 5 * MIN
 let idleCap = 3 * 60 * MIN
+// A tool left open (a question, a long command) always comes back, so it earns a longer keep.
+let waitCap = 8 * 60 * MIN
 // Read under half the context: the conversation prefix was gone, only system/tools hit.
 const COLD_SHARE = 0.5
 const RETRY_MS = MIN
@@ -73,6 +76,9 @@ let gen = 0
 // mid-fork are taken as the fork's own. A real prompt landing in that second is caught at its end.
 let forking = false
 let timer: Timer | undefined
+// The lead's tool calls running now. shortcut: module-only, so a mod reload mid-question loses
+// the wait until the next call; keep it in $.state if reloads during questions get common.
+let open = 0
 
 async function set($: EngineInterface, k: Keep, sessionId?: string) {
   await update($, keep, () => k)
@@ -80,10 +86,17 @@ async function set($: EngineInterface, k: Keep, sessionId?: string) {
   await post($, k, sessionId).catch(() => undefined)
 }
 
-function schedule($: EngineInterface, at: number, now: number) {
+// since: when the open tool started, for a ping fired while the lead's turn runs.
+function schedule($: EngineInterface, at: number, now: number, since?: number) {
   timer?.cancel()
   const mine = gen
-  timer = $.clock.after(Math.max(0, at - now), () => { void ping($, mine).catch(() => undefined) })
+  timer = $.clock.after(Math.max(0, at - now), () => { void ping($, mine, since).catch(() => undefined) })
+}
+
+function stop() {
+  gen++
+  timer?.cancel()
+  timer = undefined
 }
 
 // ponytail: sees the hold only through limits.json, which the Switchboard hub writes. A chat
@@ -96,21 +109,28 @@ async function hubHeld($: EngineInterface, now: number) {
   } catch { return false }
 }
 
-async function ping($: EngineInterface, mine: number) {
-  const k = await read($, keep)
-  if (k?.busy || mine !== gen || k?.state !== 'warm') return
+// The first ping of an open tool starts its own keep: the turn has no turn.complete yet.
+async function waitKeep($: EngineInterface, since: number, now: number): Promise<Keep> {
+  const tokens = (await $.session.usage()).context.tokens ?? 0
+  return { state: 'warm', warmUntil: since + ttl, tokens, pings: 0, idleSince: since, now, busy: true }
+}
+
+async function ping($: EngineInterface, mine: number, since?: number) {
   const now = await $.clock.now()
-  if (now - k.idleSince >= idleCap) return set($, { ...k, state: 'off', now })
+  const old = await read($, keep)
+  const k = since === undefined || old?.idleSince === since ? old : await waitKeep($, since, now)
+  if (mine !== gen || k?.state !== 'warm' || (k.busy && since === undefined)) return
+  if (now - k.idleSince >= (since === undefined ? idleCap : waitCap)) return set($, { ...k, state: 'off', now })
   // Held at the usage limit: a fork is a paid call, and the cache is long gone by the reset.
   if (await hubHeld($, now)) return set($, { ...k, state: 'off', now })
   forking = true
   const r = await $.model.fork({ prompt: PROMPT }).finally(() => { forking = false })
-  if ((await read($, keep))?.busy || mine !== gen) return
   const at = await $.clock.now()
+  if ((since === undefined && (await read($, keep))?.busy) || mine !== gen) return
   if (!r.isAnswered && r.reason === 'nothing-to-fork') return set($, { ...k, state: 'off', now: at })
   if (!r.isAnswered && r.reason !== 'empty-reply') {
     // api-error or aborted: the cache was not touched, try again while it may still be warm.
-    if (at + RETRY_MS < k.warmUntil) schedule($, at + RETRY_MS, at)
+    if (at + RETRY_MS < k.warmUntil) schedule($, at + RETRY_MS, at, since)
     else await set($, { ...k, state: 'cold', now: at })
     return
   }
@@ -120,12 +140,14 @@ async function ping($: EngineInterface, mine: number) {
   }
   const next = { ...k, warmUntil: at + ttl, pingAt: at + ttl - margin, pings: k.pings + 1, now: at }
   await set($, next)
-  schedule($, next.warmUntil - margin, at)
+  if (mine !== gen) return
+  schedule($, next.warmUntil - margin, at, since)
 }
 
 export const register: Register = (on, options) => {
   if (typeof options.ttlMinutes === 'number' && options.ttlMinutes > 0) ttl = options.ttlMinutes * MIN
   if (typeof options.idleHours === 'number' && options.idleHours > 0) idleCap = options.idleHours * 60 * MIN
+  if (typeof options.waitHours === 'number' && options.waitHours > 0) waitCap = options.waitHours * 60 * MIN
   margin = Math.min(5 * MIN, ttl / 5)
 
   on('session.start', async ($, e, next) => {
@@ -146,12 +168,20 @@ export const register: Register = (on, options) => {
 
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined && !forking) {
-      gen++
-      timer?.cancel()
-      timer = undefined
+      stop()
       await update($, keep, c => c && { ...c, busy: true })
     }
     return next(e)
+  })
+
+  // A question can sit open for hours with no turn end to start the keep.
+  on('tool.call', async ($, e, next) => {
+    if (e.agentId !== undefined) return next(e)
+    if (open++ === 0) {
+      const now = await $.clock.now()
+      schedule($, now + ttl - margin, now, now)
+    }
+    try { return await next(e) } finally { if (--open === 0) stop() }
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -170,8 +200,7 @@ export const register: Register = (on, options) => {
   on('session.end', async ($, e, next) => {
     const k = await read($, keep)
     if (k && k.state !== 'off') {
-      gen++
-      timer?.cancel()
+      stop()
       await set($, { ...k, state: 'off', now: await $.clock.now() }, e.sessionId)
     }
     return next(e)

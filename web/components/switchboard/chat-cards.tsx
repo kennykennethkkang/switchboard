@@ -201,7 +201,7 @@ function CardList({ send, looping, cards, label, stripe, grouped, waits, held, l
               {/* Stuck and cache warm ride in the meta line, so the name keeps the room beside the one chip. */}
               <span style={{ font: '400 12px/1.5 var(--hub-mono)', color: 'var(--hub-ash)' }}>
                 {tone && <span title="Something in this chat looks stuck: see Needs attention" style={{ color: `var(--hub-${tone})`, fontWeight: 500 }}>Stuck{meta ? ' · ' : ''}</span>}
-                {looping.includes(chat.sessionId) && <span title="Run indefinitely is on: it keeps working until nothing is left" style={{ color: 'var(--hub-blue)', fontWeight: 500 }}>Run indefinitely{meta ? ' · ' : ''}</span>}
+                {looping.includes(chat.sessionId) && <span title="Goal loop: it keeps going until the goal is met or nothing is left" style={{ color: 'var(--hub-blue)', fontWeight: 500 }}>Goal loop{meta ? ' · ' : ''}</span>}
                 {meta}
                 {warm && <span title={warm.title}>{meta ? ' · ' : ''}<span style={{ whiteSpace: 'nowrap' }}>{warm.label}</span></span>}
               </span>

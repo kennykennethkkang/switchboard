@@ -1,10 +1,11 @@
 'use client'
 import type { ReactNode } from 'react'
 import { laneRow, type Day } from '@/lib/now'
+import { tokenText } from '@/lib/today'
 import type { ArchivedChat, StuckItem } from '@/lib/hub-types'
 import { stuckTone } from '@/lib/stuck'
 import { chatShown } from '@/lib/chat-state'
-import { plural, type Card } from './chat-cards'
+import type { Card } from './chat-cards'
 import { ago } from '@/lib/look'
 import './layout.css'
 
@@ -68,7 +69,6 @@ export function NowPage({ day, needs, needsCount, working, done, onOpen, onDone,
   day: Day; needs: ReactNode; needsCount?: number; working: Card[]; done: ArchivedChat[]; onOpen: (id: string) => void; onDone: (a: ArchivedChat) => void
   jarvis?: ReactNode; filter?: ReactNode; tint?: (cwd: string) => string | undefined; stuck?: StuckItem[]; now?: number
 }) {
-  const cost = day.jev ? `$${day.jev.costUsd.toFixed(2)}` : '$0'
   return (
     <div className="now">
       {jarvis}
@@ -76,7 +76,7 @@ export function NowPage({ day, needs, needsCount, working, done, onOpen, onDone,
         <div><dt>tasks done today</dt><dd>{day.done} / {day.total}</dd></div>
         <div><dt>{day.working === 1 ? 'chat working' : 'chats working'}</dt><dd>{day.working}</dd></div>
         <div><dt>approved today</dt><dd>{day.approved}</dd></div>
-        <div><dt>{day.jev ? `Jev, ${plural(day.jev.runs, 'run')}` : 'Jev, no runs'}</dt><dd>{cost}</dd></div>
+        <div><dt><a href="#usage" className="hub-link">tokens today</a></dt><dd>{day.tokens ? tokenText(day.tokens) : '0'}</dd></div>
       </dl>
       {filter}
       <div className="now-lanes">

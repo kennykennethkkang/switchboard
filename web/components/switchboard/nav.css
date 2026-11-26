@@ -85,6 +85,8 @@
   }
   .nav ul { display: flex; flex: 1; gap: 0; }
   .nav li { flex: 1 1 0; min-width: 0; }
+  /* Coder view has nine pages; here Usage opens from the meters above the tabs */
+  .nav li:nth-child(n + 8)[data-page='usage'] { display: none; }
   .nav-item {
     position: relative; flex-direction: column; justify-content: center; gap: 3px; height: 48px; padding: 0 2px;
     font-size: 11px; overflow: hidden;

@@ -43,12 +43,12 @@ test('limit text for the map badge', () => {
   assert.equal(limitText({ budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' } }), 'limit 4h / $5, gate')
   assert.equal(limitText({ budget: { gate: 'x' } }), 'limit gate')
   assert.equal(limitText({ budget: { maxHours: 1.5 } }), 'limit 1.5h')
-  assert.equal(limitText({ checkBack: { everyMin: 30, count: 3 } }), 'check back 30m 3/12')
-  assert.equal(limitText({ budget: { maxCostUsd: 2 }, checkBack: { everyMin: 10, count: 0 } }), 'limit $2 \u00b7 check back 10m 0/12')
+  assert.equal(limitText({ checkBack: { everyMin: 30, count: 3 } }), 'timer every 30 min 3/12')
+  assert.equal(limitText({ budget: { maxCostUsd: 2 }, checkBack: { everyMin: 10, count: 0 } }), 'limit $2 \u00b7 timer every 10 min 0/12')
 })
 
 test('short limit tag for the yard', () => {
   assert.equal(limitTag({}), '')
-  assert.equal(limitTag({ budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' }, checkBack: { everyMin: 30, count: 3 } }), '4h $5 gate · back 3/12')
-  assert.equal(limitTag({ checkBack: { everyMin: 10, count: 0 } }), 'back 0/12')
+  assert.equal(limitTag({ budget: { maxHours: 4, maxCostUsd: 5, gate: 'pnpm test' }, checkBack: { everyMin: 30, count: 3 } }), '4h $5 gate · timer 3/12')
+  assert.equal(limitTag({ checkBack: { everyMin: 10, count: 0 } }), 'timer 0/12')
 })

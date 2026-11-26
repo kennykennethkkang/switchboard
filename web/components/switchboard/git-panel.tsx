@@ -34,8 +34,9 @@ const target = (r: RepoView) => {
 
 /** Kenneth's git buttons for the chat's repo: each one a plain git or gh command in the extension, never run by a chat. */
 /** shipping: the Ship card above has the primary button, so Commit steps back. */
-export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shipping, phone }: {
-  repo: RepoView | null | undefined; sessionId: string; chat?: ChatRow; commit?: string; isVSCode: boolean; send: (c: HubCommand) => void; shipping?: boolean; phone?: boolean
+/** sessionId: a chat's id or a Ship repo's path; cwd: its folder. merging: a worktree merges into it now. */
+export function GitPanel({ repo, sessionId, cwd, chat, commit, isVSCode, send, shipping, phone, merging }: {
+  repo: RepoView | null | undefined; sessionId: string; cwd: string; chat?: ChatRow; merging?: boolean; commit?: string; isVSCode: boolean; send: (c: HubCommand) => void; shipping?: boolean; phone?: boolean
 }) {
   const mine = repo?.sessionId === sessionId ? repo : null
   // Files flipped from the default (every change but agent files); picking shows the list.
@@ -46,7 +47,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   const [description, setDescription] = useState('')
   const [typed, setTyped] = useState(false)
   // Summary and description saved as one message; a restored draft counts as typed, so the auto-fill leaves it alone.
-  const formKey = `commit:${chat?.cwd ?? repo?.name ?? sessionId}`
+  const formKey = `commit:${cwd}`
   const [draft, setDraft, clearDraft, restored] = useDraft(formKey)
   useEffect(() => {
     if (!restored || !draft) return
@@ -120,11 +121,11 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
   if (!mine) return repo === null ? null : (
     <section aria-label="Git" style={panel}>
       <h3 style={caps}><span>Git</span></h3>
-      <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading git in {chat ? baseName(chat.cwd) : 'this repo'}…</p>
+      <p style={{ margin: 0, color: 'var(--hub-ash)', fontSize: 13 }}>Reading git in {baseName(cwd)}…</p>
     </section>
   )
   const r = mine
-  const busy = !!r.busy
+  const busy = !!r.busy || !!merging
   const may = (op: GitOp) => !phone || !MAC_ONLY_GIT.has(op)
   const run = (cmd: Git) => { sent.current = { op: cmd.op, at: Date.now() }; setAsk(null); send({ type: 'hub-git', sessionId, ...cmd }) }
   const open = (url: string) => (isVSCode ? send({ type: 'hub-open-url', url }) : window.open(url, '_blank', 'noopener'))
@@ -151,9 +152,9 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
     : compare && <a className="hub-btn sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href={compare} target="_blank" rel="noopener noreferrer">Create pull request ↗</a>)
   // The chat itself merges and fixes; a chat that cannot take a message gets a new one in its folder.
   const resolve = () => {
-    if (!r.merge || !chat) return
+    if (!r.merge) return
     const text = resolvePrompt(r.merge)
-    send(boxNote(chat) ? { type: 'hub-new-chat', path: chat.cwd, text, remote: false } : { type: 'hub-send', sessionId, text })
+    send(!chat || boxNote(chat) ? { type: 'hub-new-chat', path: chat?.cwd ?? cwd, text, remote: false } : { type: 'hub-send', sessionId, text })
   }
 
   return (
@@ -198,7 +199,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
       </div>
 
       {r.merge
-        ? <PrCard repo={r} create={createPr} busy={busy || !chat} onOpen={open} onResolve={resolve} />
+        ? <PrCard repo={r} create={createPr} busy={busy} onOpen={open} onResolve={resolve} />
         : <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 12 }}>
             {r.pr
               ? <button type="button" className="hub-link" style={{ padding: '2px 0', fontSize: 12, textAlign: 'left' }} onClick={() => open(r.pr!.url)}>
@@ -265,10 +266,6 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
         {head && (!r.upstream || r.ahead > 0) && <button type="button" className="hub-link git-undo" disabled={busy} title="git reset --soft HEAD~1: the commit's changes stay, staged"
           onClick={() => setAsk({ text: `Undo the last commit, "${head.subject}"? Its changes stay as staged files.`, yes: 'Undo', danger: true, cmd: { op: 'undo', confirmed: true } })}>Undo last commit</button>}
         {r.files.length > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'stash' })} title="git stash push -u">Stash</button>}
-        {r.worktree && may('merge-back') && <button type="button" className="hub-link" disabled={busy} title="Fold this worktree's work into the main checkout. Committed branches merge; uncommitted work lands as uncommitted changes after the checks pass. Nothing is committed or pushed."
-          onClick={() => setAsk({ text: `Merge ${r.branch} back into the main checkout? Its changes land in main uncommitted, the repo's checks run first and the merge is undone if they fail, then the worktree is removed. Nothing is committed or pushed.`, yes: 'Merge back', cmd: { op: 'merge-back', confirmed: true } })}>Merge back</button>}
-        {!!r.worktrees && may('merge-all') && <button type="button" className="hub-link" disabled={busy} title="Every worktree with no running chat goes into the main checkout as uncommitted changes. The repo's checks run first and after each one; one that breaks them is undone and kept. Never commits or pushes."
-          onClick={() => setAsk({ text: `Merge ${r.worktrees === 1 ? 'the worktree' : `all ${r.worktrees} worktrees`} into the main checkout? Ones with a running chat are skipped, the repo's checks run after each, and one that breaks them is undone. Nothing is committed or pushed.`, yes: 'Merge all', cmd: { op: 'merge-all', confirmed: true } })}>Merge all worktrees ({r.worktrees})</button>}
         {r.stashes > 0 && <button type="button" className="hub-link" disabled={busy} onClick={() => run({ op: 'pop' })} title="git stash pop">Pop stash ({r.stashes})</button>}
         {checked.length > 0 && may('discard') && <button type="button" className="hub-link" disabled={busy} style={{ color: 'var(--hub-red)' }}
           onClick={() => setAsk({ text: `Discard the changes in ${plural(checked.length, 'checked file')}? New files are deleted. This cannot be undone.`, yes: 'Discard', danger: true, cmd: { op: 'discard', files: checked, confirmed: true } })}>Discard checked ({checked.length})</button>}
@@ -284,7 +281,7 @@ export function GitPanel({ repo, sessionId, chat, commit, isVSCode, send, shippi
       </div>}
 
       <p aria-live="polite" style={{ margin: 0, fontSize: 12, minHeight: 0, color: r.result?.ok === false ? 'var(--hub-red)' : 'var(--hub-mute)' }}>
-        {r.busy ? 'Running git…' : r.result?.text ?? ''}
+        {r.busy ? 'Running git…' : merging ? 'A worktree is merging here; git waits for its checks.' : r.result?.text ?? ''}
       </p>
 
       {r.log.length > 0 && <details className="hub-fold-list">

@@ -22,7 +22,7 @@ import {
   generateSubagentFallbackName,
   resolveSubagentChildName,
 } from './constants'
-import { summarizeInput, summarizeResult, extractInputData, detectError, buildDiscovery } from './tool-summarizer'
+import { summarizeInput, summarizeResult, virtualResult, extractInputData, detectError, buildDiscovery } from './tool-summarizer'
 import { estimateTokensFromContent, estimateTokensFromText } from './token-estimator'
 import { createLogger } from './logger'
 
@@ -111,6 +111,12 @@ export function parseTaskNotification(text: string): { toolUseId: string; status
   }
 }
 
+/** A notification that landed while the lead was mid-turn: queued, then written as an attachment, not a user entry. */
+function queuedNotification(entry: unknown) {
+  const a = isRecord(entry) && entry.type === 'attachment' ? entry.attachment : undefined
+  return isRecord(a) && a.type === 'queued_command' && typeof a.prompt === 'string' ? parseTaskNotification(a.prompt.trim()) : null
+}
+
 export class TranscriptParser {
   /** Per-subagent dedup state for inline progress events, keyed by parentToolUseID */
   private inlineSubagentState = new Map<string, {
@@ -165,6 +171,9 @@ export class TranscriptParser {
       this.handleProgressEvent(parsed, sessionId)
       return
     }
+
+    const queued = queuedNotification(parsed)
+    if (queued) { this.handleTaskNotification(queued, sessionId) }
 
     // Only process actual conversation entries (user/assistant turns)
     if (parsed.type !== 'user' && parsed.type !== 'assistant') {
@@ -376,7 +385,7 @@ export class TranscriptParser {
     // Skip orphaned tool_results (their tool_use was deduped during catch-up)
     if (!pending) { return }
     const toolName = pending.name
-    const result = summarizeResult(block.content)
+    const result = summarizeResult(block.content || virtualResult(block.tool_use_id, toolUseResult))
     const tokenCost = estimateTokensFromContent(block.content)
 
     // Update context breakdown
@@ -546,6 +555,8 @@ export class TranscriptParser {
             const notification = parseTaskNotification(userContentText(entry.message.content))
             if (notification) { this.backgroundSubagents.delete(notification.toolUseId) }
           }
+          const queued = queuedNotification(entry)
+          if (queued) { this.backgroundSubagents.delete(queued.toolUseId) }
           // Build dedup sets for tool_use blocks and messages + accumulate token counts
           const isUser = entry.message?.role === 'user' || entry.message?.role === 'human'
           if (entry.message && Array.isArray(entry.message.content)) {

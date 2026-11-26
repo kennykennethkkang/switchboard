@@ -51,6 +51,7 @@ export function flagsOf(g: MemoryGraph): Map<string, Flag[]> {
   h.invalid.forEach(id => add(id, 'Invalid'))
   h.orphans.forEach(id => add(id, 'Unlinked'))
   h.stale.forEach(id => add(id, 'Stale'))
+  g.nodes.filter(n => n.unproven).forEach(n => add(n.id, 'Unproven'))
   h.superseded.forEach(id => add(id, 'Superseded'))
   const dup = new Set(h.duplicates)
   g.nodes.filter(n => dup.has(n.label.toLowerCase()) || n.aliases?.some(a => dup.has(a.toLowerCase()))).forEach(n => add(n.id, 'Shared name'))
@@ -174,24 +175,24 @@ export function NoteReader({ g, node, home, flags, onOpen, innerRef, children }:
   useEffect(() => { const el = ref.current; if (el) { el.scrollTop = 0; if (el.parentElement) el.parentElement.scrollTop = 0 } }, [node.id, ref])
   const typed = (t: string) => rel.typed.find(x => x.title === t)?.list
   const chips = (title: string, list?: GraphNode[]) => list?.length ? (
-    <section className="nb-rel">
+    <section className="mnb-rel">
       <h4 className="mk-label">{title}<span>{list.length}</span></h4>
       <div>{list.map(n => <button key={n.id} type="button" className="mk-wl" data-sup={n.superseded ? '' : undefined} onClick={() => onOpen(n.id)}><Dot n={n} />{shortLabel(n)}</button>)}</div>
     </section>
   ) : null
   const plain = new Set(['Superseded by', 'Contradicts', 'Contradicted by'])
   return (
-    <article ref={ref} tabIndex={-1} className="nb-read" aria-label={node.label}>
+    <article ref={ref} tabIndex={-1} className="mnb-read" aria-label={node.label}>
       {children}
-      <p className="nb-kicker"><Dot n={node} />{node.kind === 'project' ? 'Project' : `${kindLabel(node)} in ${home(node)}`}</p>
+      <p className="mnb-kicker"><Dot n={node} />{node.kind === 'project' ? 'Project' : `${kindLabel(node)} in ${home(node)}`}</p>
       <h1>{shortLabel(node)}</h1>
-      {node.description && <p className="nb-lead">{node.description}</p>}
-      {typed('Superseded by')?.map(n => <p key={n.id} className="nb-note" data-tone="warn">Replaced by <button type="button" className="mk-wl" onClick={() => onOpen(n.id)}><Dot n={n} />{n.label}</button></p>)}
-      {[...(typed('Contradicts') ?? []), ...(typed('Contradicted by') ?? [])].map(n => <p key={n.id} className="nb-note" data-tone="bad">Disagrees with <button type="button" className="mk-wl" onClick={() => onOpen(n.id)}><Dot n={n} />{n.label}</button></p>)}
-      {node.missing?.length ? <p className="nb-note" data-tone="bad">Links to {[...new Set(node.missing)].map(m => <span key={m} className="mk-wl" data-broken="">{m}</span>)}, which no note is called.</p> : null}
-      {flags.get(node.id)?.some(f => f.text === 'Unlinked') && <p className="nb-note" data-tone="warn">Nothing links here and it links nowhere.</p>}
-      {node.text && node.text !== node.label && <div className="nb-body"><NoteText g={g} text={node.text} onOpen={onOpen} /></div>}
-      <div className="nb-rels">
+      {node.description && <p className="mnb-lead">{node.description}</p>}
+      {typed('Superseded by')?.map(n => <p key={n.id} className="mnb-note" data-tone="warn">Replaced by <button type="button" className="mk-wl" onClick={() => onOpen(n.id)}><Dot n={n} />{n.label}</button></p>)}
+      {[...(typed('Contradicts') ?? []), ...(typed('Contradicted by') ?? [])].map(n => <p key={n.id} className="mnb-note" data-tone="bad">Disagrees with <button type="button" className="mk-wl" onClick={() => onOpen(n.id)}><Dot n={n} />{n.label}</button></p>)}
+      {node.missing?.length ? <p className="mnb-note" data-tone="bad">Links to {[...new Set(node.missing)].map(m => <span key={m} className="mk-wl" data-broken="">{m}</span>)}, which no note is called.</p> : null}
+      {flags.get(node.id)?.some(f => f.text === 'Unlinked') && <p className="mnb-note" data-tone="warn">Nothing links here and it links nowhere.</p>}
+      {node.text && node.text !== node.label && <div className="mnb-body"><NoteText g={g} text={node.text} onOpen={onOpen} /></div>}
+      <div className="mnb-rels">
         {chips('Links to', rel.to)}
         {chips('Backlinks', rel.from)}
         {rel.typed.filter(t => !plain.has(t.title)).map(t => <div key={t.title}>{chips(t.title, t.list)}</div>)}

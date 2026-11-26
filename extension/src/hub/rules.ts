@@ -30,9 +30,10 @@ The rules above name Claude Code tools. In Codex use these instead:
 
 - AskUserQuestion: \`mcp__switchboard__ask\` (\`request_user_input\` is a fallback only and takes title and options, not question), same question and options. "Approve this chat as finished?" keeps its exact wording and options "Approve" and "Send back".
 - Agent and role subagents: \`spawn_agent\` (roles live in ~/.codex/agents), then \`wait_agent\`.
+- ListAgents: run both \`claude agents --json\` in the shell (Claude chats in every project) and \`mcp__switchboard__chats_check\` (this project, Codex chats too). \`list_agents\` shows only your own subagents.
+- SendMessage: \`send_message\` or \`send_input\`, whichever is listed, to your own subagents only. No tool reaches another chat: ask the user instead through \`mcp__switchboard__ask\`, naming each busy chat, what you will change and when, and whether to go ahead.
 - Skill tool: read the SKILL.md under ~/.agents/skills/<name>/.
 - Task tools: \`update_plan\` when listed, else keep the task list in your replies. ToolSearch: not needed, tools are already loaded.
-- Phone push at the end: skip it, Switchboard sends it when the chat is done.
 - \`mcp__switchboard__*\` tools keep their names (the switchboard MCP is in ~/.codex/config.toml).
 `
 

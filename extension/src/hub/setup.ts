@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { ApiKey } from './types'
+import { cliCall } from './windows'
 
 const CLAUDE_ONLY = 'openai-codex'
 
@@ -121,7 +122,9 @@ export function setupSteps(kit: SetupKit, o: SetupState & { key21st: boolean; mo
     if (k && lacking(k.name)) out.push({ label: k.repo, needs: ['uv'], skills: { repo: k.repo, names: [k.name], path: k.path, ...(k.file ? { file: k.file } : {}) } })
     if (!t.mcp) continue
     // ponytail: uv's default bin folder, no .exe; Windows needs the real path.
-    const bin = `~/.local/bin/${t.mcp.command}`
+    const bin = platform === 'win32'
+      ? path.join(os.homedir(), '.local', 'bin', `${t.mcp.command}.exe`)
+      : `~/.local/bin/${t.mcp.command}`
     if (!o.mcps.includes(t.mcp.name)) out.push({ label: t.mcp.name, needs: ['uv'], run: ['claude', 'mcp', 'add', '--scope', 'user', t.mcp.name, '--', bin] })
     if (!cx.mcps.includes(t.mcp.name)) out.push({ label: `${t.mcp.name} (Codex)`, needs: ['uv', 'codex'], run: ['codex', 'mcp', 'add', t.mcp.name, '--', bin] })
   }
@@ -173,9 +176,8 @@ export function claudeBinary(): string {
   return fs.existsSync(local) ? local : 'claude'
 }
 
-/** claude is claude.cmd on Windows, which runs only through a shell; args with spaces or quotes are quoted for it. */
-export function claudeCall(args: string[], platform: NodeJS.Platform = process.platform): { cmd: string; args: string[]; shell: boolean } {
-  if (platform !== 'win32') return { cmd: claudeBinary(), args, shell: false }
-  // Backslashes before a quote, or the closing one, double.
-  return { cmd: 'claude', args: args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"` : a)), shell: true }
+/** Calls the Windows command shim with quoted args. */
+export function claudeCall(args: string[], platform: NodeJS.Platform = process.platform): { cmd: string; args: string[]; shell: boolean; windowsVerbatimArguments?: boolean } {
+  if (platform === 'win32') return { ...cliCall('claude', args, platform), shell: false }
+  return { cmd: claudeBinary(), args, shell: false }
 }

@@ -15,8 +15,10 @@ import { codexOf, modelOf } from './roles'
 import { digest, needsApproval, readSweep } from '../../kit/sweep.mjs'
 import { newerVersion } from './self-update'
 import { macNames, phoneCode, type MacNames } from './lan'
+import { sharedRun } from './shared-run'
 import { editor } from '../editor'
 import { RESEARCH_ROOT, ensureResearchRoot } from './research'
+import { insidePath } from './windows'
 
 const HOME = os.homedir()
 const CLAUDE = path.join(HOME, '.claude')
@@ -116,12 +118,15 @@ export function parseNetstat(netstat: string, tasklistCsv: string): Omit<Server,
 
 const lastTwo = (p: string) => p.split(/[\\/]/).filter(Boolean).slice(-2).join('/')
 
-export async function listServers(): Promise<Server[]> {
+/** What lsof printed; '' or part of it when it failed. */
+export const readListeners = (fresh = false) => sharedRun('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-F', 'pcn'], { ttlMs: 12_000, timeoutMs: 5000, fresh, partial: true })
+
+export async function listServers(fresh = false): Promise<Server[]> {
   if (process.platform === 'win32') {
     const list = parseNetstat(await run('netstat', ['-ano', '-p', 'tcp']), await run('tasklist', ['/fo', 'csv']))
     return list.map(s => ({ ...s, folder: '' }))
   }
-  const list = parseLsof(await run('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-F', 'pcn']))
+  const list = parseLsof(await readListeners(fresh))
   for (const pid of serverFolders.keys()) if (!list.some(s => s.pid === pid)) serverFolders.delete(pid)
   return Promise.all(list.map(async s => {
     let cwd = serverFolders.get(s.pid)
@@ -168,9 +173,9 @@ const UNTRACKED_BYTES = 256 * 1024
 
 /** A relative path that stays inside the chat's folder. */
 export function insideCwd(cwd: string, file: string): boolean {
-  if (!file || path.isAbsolute(file)) return false
-  const full = path.resolve(cwd, file)
-  return full.startsWith(path.resolve(cwd) + path.sep)
+  const api = process.platform === 'win32' ? path.win32 : path
+  if (!file || api.isAbsolute(file)) return false
+  return insidePath(cwd, api.resolve(cwd, file))
 }
 
 const capped = (lines: string[]): Pick<ChangedFile, 'diff' | 'note'> => {
@@ -224,7 +229,7 @@ export async function safeFile(cwd: string, file: string): Promise<string | unde
     const full = path.join(cwd, file)
     if ((await fs.promises.lstat(full)).isSymbolicLink()) return undefined
     const [real, root] = await Promise.all([fs.promises.realpath(full), fs.promises.realpath(cwd)])
-    return real.startsWith(root + path.sep) ? real : undefined
+    return insidePath(root, real) ? real : undefined
   } catch { return undefined }
 }
 
@@ -333,7 +338,12 @@ let starting: { p: Promise<{ url: string } | { problem: string }>; refresh: bool
 // window sees it. An app started by hand is never in it and is left alone.
 const PID_FILE = path.join(os.homedir(), '.claude', 'switchboard', 'app.pid')
 // Listening pids on a port. A pid that is gone or was reused by something else is not here.
-const portListeners = async (p: string) => (await run('lsof', ['-nP', `-iTCP:${p}`, '-sTCP:LISTEN', '-t'])).split('\n').filter(Boolean).map(Number)
+const portListeners = async (p: string) => process.platform === 'win32'
+  ? (await run('netstat', ['-ano', '-p', 'tcp'])).split(/\r?\n/).flatMap(row => {
+    const m = /^\s*TCP\s+\S*:(\d+)\s+\S+\s+LISTENING\s+(\d+)/i.exec(row)
+    return m && m[1] === p ? [Number(m[2])] : []
+  })
+  : (await run('lsof', ['-nP', `-iTCP:${p}`, '-sTCP:LISTEN', '-t'])).split('\n').filter(Boolean).map(Number)
 
 type WebDeps = {
   find?: () => Promise<string | null>
@@ -362,7 +372,9 @@ type WebDeps = {
  * differs from a bundle no older than it is restarted, keeping --lan, so an update reaches the browser and the phone. */
 export function ensureWeb(root: string, phone = false, deps: WebDeps = {}): Promise<{ url: string } | { problem: string }> {
   const { find = () => webUrl(), start = spawnApp, stop = (pid: number) => process.kill(pid), lan = (w: string) => phoneUrls(w),
-    listeners = portListeners, pidFile = PID_FILE, tries = 25, waitMs = 200, bundle, stage = STAGE, refresh = false, version, rebuilds = true, command = (pid: number) => run('ps', ['-o', 'command=', '-p', String(pid)]) } = deps
+    listeners = portListeners, pidFile = PID_FILE, tries = 25, waitMs = 200, bundle, stage = STAGE, refresh = false, version, rebuilds = true, command = (pid: number) => process.platform === 'win32'
+      ? run('powershell.exe', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`])
+      : run('ps', ['-o', 'command=', '-p', String(pid)]) } = deps
   const wait = async (done: () => Promise<boolean>) => {
     for (let i = 0; i < tries; i++) {
       await new Promise(r => setTimeout(r, waitMs))
@@ -376,7 +388,7 @@ export function ensureWeb(root: string, phone = false, deps: WebDeps = {}): Prom
     const on = await listeners(port(url))
     if (pid > 0 && on.includes(pid)) return pid
     const app = ` ${path.join(stage, 'app.js')} `
-    for (const p of on) if (` ${await command(p)} `.includes(app)) return p
+    for (const p of on) if ((process.platform === 'win32' ? (await command(p)).toLowerCase().replace(/\\/g, '/') : await command(p)).includes(process.platform === 'win32' ? app.toLowerCase().replace(/\\/g, '/') : app)) return p
     return undefined
   }
   const remember = (pid: number | undefined) => {
@@ -563,6 +575,34 @@ function kitSources(): Record<string, string> {
   return {}
 }
 
+// Built-in tools that load whole into every chat (Artifact 12.7k tokens, the rest 0.8k to 2k), off until a first message needs one.
+// about: what Jev and the chat read; now: what a chat that started without it does, a headless call when unset.
+export const BUILTINS: Record<string, { about: string; now?: string }> = {
+  Artifact: { about: 'publish an HTML page to claude.ai, or upload an image or file into a Claude Docs document' },
+  Workflow: { about: 'run a scripted multi-agent workflow, only when the user asks for one', now: 'use Agent subagents' },
+  ScheduleWakeup: { about: 'self-paced /loop: wake up later and check again', now: 'use CronCreate or Monitor' },
+  ReportFindings: { about: 'typed findings list for the built-in code review', now: 'give the findings as text' },
+  SendFeedback: { about: 'draft feedback about Claude Code itself', now: 'give the user the text to send' },
+}
+
+// What Jev reads for the servers Set up adds; any other server goes by its name.
+const MCP_ABOUT: Record<string, string> = {
+  posthog: 'PostHog product analytics', composio: 'actions in outside apps (Gmail, Slack, Notion and others)',
+  scrapling: 'scrape web pages past bot protection', cloudflare: 'Cloudflare API and docs',
+  'claude.ai Claude Docs': 'write, edit and share Claude Docs documents', 'claude.ai Google Drive': 'read and edit Google Drive files',
+}
+
+/** Claude Code's own heavy tools and the user's MCP servers and claude.ai connectors, for smart select. switchboard is never off. */
+async function extras(claude: string): Promise<Installed[]> {
+  const j = await fs.promises.readFile(`${claude}.json`, 'utf8').then(t => JSON.parse(t) as { mcpServers?: object; claudeAiMcpEverConnected?: unknown }).catch(() => undefined)
+  const ai = Array.isArray(j?.claudeAiMcpEverConnected) ? j.claudeAiMcpEverConnected.filter((n): n is string => typeof n === 'string' && n.startsWith('claude.ai ')) : []
+  const servers = [...Object.keys(j?.mcpServers ?? {}).filter(n => n !== 'switchboard'), ...ai]
+  return [
+    ...Object.entries(BUILTINS).map(([name, b]): Installed => ({ kind: 'builtin', name, enabled: true, source: 'Claude Code', description: b.about })),
+    ...servers.map((n): Installed => ({ kind: 'mcp', name: `mcp:${n}`, enabled: true, source: 'user', ...(MCP_ABOUT[n] ? { description: MCP_ABOUT[n] } : {}) })),
+  ]
+}
+
 /** sources: skill name to its source label; the rest are the user's. */
 export async function installed(claude = CLAUDE, sources = kitSources()): Promise<Installed[]> {
   const out: Installed[] = []
@@ -587,6 +627,7 @@ export async function installed(claude = CLAUDE, sources = kitSources()): Promis
     out.push({ kind: 'role', name: f.slice(0, -3), enabled: true, ...(model ? { model } : {}), ...(cx ? { codex: true } : {}), ...(cx?.model ? { codexModel: cx.model } : {}), ...(cx?.effort ? { codexEffort: cx.effort } : {}) })
   }
   for (const f of await list('jev-presets')) if (f.endsWith('.json')) out.push({ kind: 'preset', name: f.slice(0, -5), enabled: true })
+  out.push(...await extras(claude))
   // Only tools held at intake are hashed, so this stays cheap.
   const sweep = readSweep(path.dirname(claude))
   for (const i of out) {
@@ -717,7 +758,7 @@ export async function connections(repoRoots: string[]): Promise<Connection[]> {
   // Dir names are the cwd with / and . as -, so the temp prefix still reads; bench-kit needs its own check.
   for (const p of projects) if (!p.startsWith('.') && !p.includes('-claude-bench-kit') && !isTempDir(p.replace(/-/g, '/'))) out.push({ kind: 'project', name: decodeProjectDir(p), status: 'on', detail: 'Claude Code history' })
   let windows: string[] = []
-  try { windows = (await fs.promises.readdir(path.join(CLAUDE, 'switchboard'))).filter(n => n.endsWith('.json') && n !== 'workspaces.json') } catch { /* none */ }
+  try { windows = (await fs.promises.readdir(path.join(CLAUDE, 'switchboard'))).filter(n => /-\d+\.json$/.test(n)) } catch { /* none */ }
   for (const w of windows) {
     const f = await readJson(path.join(CLAUDE, 'switchboard', w))
     if (typeof f?.workspace === 'string') out.push({ kind: 'window', name: path.basename(f.workspace), status: 'on', detail: 'Switchboard window' })

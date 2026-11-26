@@ -3,7 +3,8 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import * as path from 'path'
 import * as fs from 'fs'
-import { accountOf, addProfile, AWS_SESSION_MS, awsProfiles, awsStatus, browserEnv, chromeCall, chromeChoice, chromeProfiles, chromeState, dueHeadsUps, HEADS_UP_MS, loginCacheFile, loginError, openChromeScript, rowText, identityOf, moveProfile, browserFor, hasSection, renameLabel, parseAwsConfig, renameProfile, sameLogin, profileFor, trackSessions, validProfileName, validRegion } from '../src/hub/aws'
+import * as os from 'os'
+import { accountOf, addProfile, AWS_SESSION_MS, awsProfiles, awsStatus, browserEnv, chromeCall, chromeChoice, chromeProfiles, chromeState, dueHeadsUps, HEADS_UP_MS, loginCacheFile, loginError, openChromeScript, rowText, identityOf, moveProfile, browserFor, hasSection, renameLabel, parseAwsConfig, renameProfile, sameLogin, profileFor, readSessions, ssoProfile, trackSessions, validProfileName, validRegion } from '../src/hub/aws'
 
 const ARN = (acct: string) => `arn:aws:iam::${acct}:root`
 const CONFIG = [
@@ -214,6 +215,8 @@ describe('aws status and helpers', () => {
     assert.match(text, /AccessDeniedException/)
     assert.match(text, /signin\.aws\.amazon\.com\/authorize/)
     assert.equal(loginError('  \n'), '')
+    // aws sso login's device code goes too.
+    assert.equal(loginError('Then enter the code:\n\nABCD-EFGH\nToken has expired'), 'Then enter the code:\nToken has expired')
     assert.ok(loginError('x'.repeat(5000)).length <= 600)
   })
 })
@@ -236,6 +239,30 @@ describe('aws session length', () => {
     assert.deepEqual(s, { live: { at: H } })
     // The next refresh writes the file: still the same session.
     assert.deepEqual(trackSessions(s, on, 2.3 * H, { live: { birth: 1, mtime: 2.25 * H } }), { live: { at: H } })
+  })
+
+  it('never gives a single sign-on profile a 12 hour session', async () => {
+    const rows = await awsProfiles(1, async () => ({ ok: true, account: '111122223333', stderr: '' }), CONFIG)
+    assert.deepEqual(rows.map(r => [r.name, r.sso]), [['default', undefined], ['live', undefined], ['yo', undefined], ['sso', true]])
+    // Nor keeps one an older build wrote.
+    assert.deepEqual(Object.keys(trackSessions({ sso: { at: 100 } }, rows, 200)), ['default', 'live', 'yo'])
+    assert.deepEqual(trackSessions({ sso: { at: 100 } }, [{ name: 'sso', status: 'expired', sso: true }], 200), {})
+  })
+
+  it('reads no session for a single sign-on profile, whoever wrote it', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-aws-')), f = path.join(dir, 's.json')
+    fs.writeFileSync(f, JSON.stringify({ sso: { at: 1 }, live: { at: 2, warned: 2 } }))
+    assert.deepEqual(readSessions(f, CONFIG), { live: { at: 2, warned: 2 } })
+    fs.rmSync(dir, { recursive: true })
+  })
+
+  it('knows a single sign-on profile by sso_session or sso_start_url', () => {
+    assert.equal(ssoProfile('sso', CONFIG), true)
+    assert.equal(ssoProfile('live', CONFIG), false)
+    assert.equal(ssoProfile('gone', CONFIG), false)
+    assert.equal(ssoProfile('old', '[profile old]\nsso_start_url = https://x.awsapps.com/start\n'), true)
+    // An account id alone is not a sign-in.
+    assert.equal(ssoProfile('id', '[profile id]\nsso_account_id = 111122223333\n'), false)
   })
 
   it('says a status check could not tell when STS gave no sign-out answer', async () => {

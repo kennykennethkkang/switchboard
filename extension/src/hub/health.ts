@@ -6,6 +6,7 @@ import { execFile } from 'child_process'
 import { readWindows } from './dev'
 import { rulesState, syncRules } from './rules'
 import { claudeBinary } from './setup'
+import { cliCall } from './windows'
 import type { HealthResult } from './types'
 
 export type HealthDeps = {
@@ -39,7 +40,7 @@ function defaults(): HealthDeps {
     }),
     onPath,
     sync: write => syncRules({ home, kit, write }).changed,
-    run: (cmd, ...args) => new Promise(res => execFile(cmd === 'claude' ? claudeBinary() : cmd, args, { timeout: 120_000, windowsHide: true }, err => res(!err))),
+    run: (cmd, ...args) => { const c = cliCall(cmd === 'claude' ? claudeBinary() : cmd, args); return new Promise(res => execFile(c.cmd, c.args, { windowsVerbatimArguments: c.windowsVerbatimArguments, timeout: 120_000, windowsHide: true }, err => res(!err))) },
   }
 }
 

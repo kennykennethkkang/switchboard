@@ -1,5 +1,5 @@
 /** The shell's page lives in the URL hash; the old ?board link still opens the Board. */
-export const PAGES = ['now', 'chats', 'plan', 'live', 'ship', 'map-board', 'map-flow', 'map-memory', 'settings', 'research'] as const
+export const PAGES = ['now', 'chats', 'plan', 'live', 'ship', 'map-board', 'map-flow', 'map-memory', 'settings', 'research', 'workbench', 'usage'] as const
 export type Page = typeof PAGES[number]
 
 /** Simple view leaves these out; a link to one shows Home instead. */
@@ -22,7 +22,9 @@ export const pageBlurb = (p: Page) => isMap(p) ? 'How chats, code and memory con
   chats: 'Every chat across your projects, with its status and changes.',
   plan: 'The shared to-do: work saved for later chats.',
   live: 'Crowd tests, MiroFish sims and source checks: running now and their results.',
-  ship: 'Pick a chat to see its changes, branch, PR and next step.',
+  ship: 'Pick a repo or worktree to commit, push or merge, chat or no chat.',
   settings: 'Tools, models and how Switchboard behaves.',
   research: 'Finished research reports, newest first.',
+  workbench: 'Research turned into changes on this Mac, with a log and Undo.',
+  usage: 'What Claude and Codex used, what it would cost, and how much of each plan is left.',
 } as Record<string, string>)[p] ?? ''

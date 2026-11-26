@@ -20,11 +20,10 @@ test('nowLanes: working newest first; done is chats approved today, newest first
   assert.deepEqual(done.map(a => a.sessionId), ['a2', 'a1'])
 })
 
-test('dayNumbers: tasks, working chats, approved today and Jev', () => {
-  const today = { done: ['a', 'b', 'c'], approve: [], needs: [], working: ['x', 'y'], jev: { runs: 2, costUsd: 0.0184 } }
-  assert.deepEqual(dayNumbers(today, { done: 12, total: 17, chats: 3, text: '' }), { done: 12, total: 17, working: 2, approved: 3, jev: { runs: 2, costUsd: 0.0184 } })
-  assert.deepEqual(dayNumbers({ ...today, jev: undefined, working: [] }, { done: 0, total: 0, chats: 0, text: '' }, { runs: 1, costUsd: 0.01 }),
-    { done: 0, total: 0, working: 0, approved: 3, jev: { runs: 1, costUsd: 0.01 } })
+test('dayNumbers: tasks, working chats, approved today and tokens', () => {
+  const today = { done: ['a', 'b', 'c'], approve: [], needs: [], working: ['x', 'y'], tokens: 12_000 }
+  assert.deepEqual(dayNumbers(today, { done: 12, total: 17, chats: 3, text: '' }), { done: 12, total: 17, working: 2, approved: 3, tokens: 12_000 })
+  assert.deepEqual(dayNumbers({ ...today, tokens: undefined, working: [] }, { done: 0, total: 0, chats: 0, text: '' }), { done: 0, total: 0, working: 0, approved: 3 })
 })
 
 test('laneRow: name, active role, task count and the step in progress', () => {

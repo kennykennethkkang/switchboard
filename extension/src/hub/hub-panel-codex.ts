@@ -17,14 +17,15 @@ import { chainVersion, codexNote, handoffFile, planLabel, projectName } from './
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import { readGroups } from './split'
-import { cleanWorktree, endedMerges, endedWorktrees, gitOp, liveIn, mergeDue, mergeOnEnd, sweepChats, worktreeDirs, type MergeClock } from './git'
+import { autoMergeOn, cleanWorktree, endedMerges, endedWorktrees, gitOp, liveIn, mainOf, mergeDue, mergeOnEnd, queueEnded, sweepChats, triedLately, worktreeDirs, type MergeClock } from './git'
 import { learnTick, usageOk } from './learn'
 import { rememberChats } from './reap'
 import { autoStartPlan, changeTodo, claimTodo, holdReason, holdShown, START_GRACE_MS, clearGoneChats, loadTodos, runLabel, runMessage, projectOf, startTodo } from './todo'
 import { follow, outcomeIn } from '../../ask/chats.mjs'
 import { randomUUID } from 'crypto'
 import { notifyIndefiniteDone, notifyMerged } from './notify'
-import { CHECK_BACK_TEXT, dueCheckBacks, hasOpenWork } from './checkback'
+import { checkBackText, dueCheckBacks, hasOpenWork } from './checkback'
+import { readMemoryPressure } from './memory-pressure'
 
 const log = createLogger('Hub')
 
@@ -49,15 +50,21 @@ export function codexPanel(d: {
       return { ...c, project: projectName(c.cwd), takes: hub.takes(c, codexTied(c.sessionId)), ...(groups[c.sessionId] ? { group: groups[c.sessionId] } : {}),
         ...(p ? { elapsedMs: Math.max(0, now - p.startedAt) } : {}), ...(cost === undefined ? {} : { costUsd: cost }), ...(prof?.budget ? { budget: prof.budget } : {}), ...(prof?.checkBack ? { checkBack: prof.checkBack } : {}) }
     }), ais, doneChecks })
+    hub.trueUp()
     startWaits()
     // Every known repo is scanned, a chat or not; a worktree whose chat ended (SessionEnd) goes at once, others after 10 idle minutes.
+    // One that still holds work is queued to merge, when its chat was seen ending here.
+    const auto = hub.get().controls.switchboard.autoMerge !== false
     const fast: string[] = []
     const roots = hub.get().projects.map(p => p.path)
     for (const w of [...endedWorktrees(wtSeen, sweepChats(chats, hub.get().progress), Date.now(), worktreeDirs(chats.map(c => c.cwd), roots), fast), ...fast]) {
-      void cleanWorktree(w).then(gone => { if (gone) log.info(`Removed merged worktree ${w}`) }).catch(err => log.warn('Worktree cleanup failed:', err))
+      void cleanWorktree(w).then(gone => { if (gone) log.info(`Removed merged worktree ${w}`); else if (fast.includes(w)) queueEnded(mergeOnEnd, w, auto && autoMergeOn(mainOf(w))) }).catch(err => log.warn('Worktree cleanup failed:', err))
     }
     for (const [id, wt] of endedMerges(mergeOnEnd, liveIn(chats, codexTied))) {
-      void gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, w => liveIn(hub.get().chats, codexTied)(w))
+      // Another window may have tried it while this one waited on the lock.
+      if (id === wt && triedLately(wt)) continue
+      // Auto merge (keyed by folder) always lands uncommitted; Approve and the button take Merge back.
+      void gitOp(id === wt ? mainOf(wt) : wt, id === wt ? { op: 'merge-all', only: wt, confirmed: true } : { op: 'merge-back', confirmed: true }, undefined, false, w => liveIn(hub.get().chats, codexTied)(w))
         .then(m => {
           // Another merge holds the repo: try again next tick.
           if (/^A merge is already running/.test(m.text)) { mergeOnEnd.set(id, wt); return }
@@ -65,8 +72,8 @@ export function codexPanel(d: {
         })
         .catch(err => log.warn('Merge back failed:', err))
     }
-    if (hub.get().controls.switchboard.autoMerge !== false) {
-      for (const r of mergeDue(mergeClock, chats, roots)) {
+    if (auto) {
+      for (const r of mergeDue(mergeClock, chats, roots.filter(autoMergeOn))) {
         void gitOp(r, { op: 'merge-all', confirmed: true }, undefined, false, wt => liveIn(hub.get().chats, codexTied)(wt))
           .then(m => { log.info(`Auto merge in ${r}: ${m.text}`); if (m.ok || !/^(No worktrees|Every worktree|A merge is already running)/.test(m.text)) notifyMerged(projectName(r), m.text) })
           .catch(err => log.warn('Auto merge failed:', err))
@@ -162,7 +169,7 @@ export function codexPanel(d: {
     const view = mine.map(c => ({ sessionId: c.sessionId, status: c.status, updatedAt: c.updatedAt, takes: c.takes, open: hasOpenWork(s.progress.find(p => p.sessionId === c.sessionId)), stopped: s.archive.some(a => a.sessionId === c.sessionId) }))
     for (const id of dueCheckBacks(Date.now(), view, cb)) {
       noteCheckBack(id)
-      const sent = await sendToChat(id, CHECK_BACK_TEXT)
+      const sent = await sendToChat(id, checkBackText(cb[id]))
       if (sent !== true) { noteCheckBack(id, Date.now(), -1); log.warn(`Check-back not sent to ${id.slice(0, 8)}: ${sent}`) }
     }
     // Approved or ended chats drop the setting.
@@ -187,7 +194,7 @@ export function codexPanel(d: {
   }
 
   /** The inputs autoStartPlan and holdReason share for one folder. resumed, failed and tried starts belong to this window, so only its own folder gets them. */
-  function gateFor(folder: string, on: boolean, own: boolean) {
+  function gateFor(folder: string, on: boolean, own: boolean, pressure?: number) {
     const s = hub.get(), now = Date.now(), chats = s.chats
     const windows = s.live.flatMap(l => l.limits), pauseAt = s.controls.switchboard.pauseAt
     const cap = pauseAt === null ? 100 : pauseAt ?? 99
@@ -197,6 +204,7 @@ export function codexPanel(d: {
       // The project's own pilot wins over the global switch; other chats in the project no longer hold it.
       on, pilot: s.todos?.[folder]?.pilot, folder, todo: s.todos?.[folder]?.todo ?? [], tried: own ? autoTried : new Set<string>(), now,
       live: new Set(chats.filter(c => c.live).map(c => c.sessionId)),
+      ...(pressure === undefined ? {} : { memory: { level: pressure, chats: chats.filter(c => c.live).length } }),
       // Same hold as Learn: a pause, a retry, or at pauseAt; a window with no chats of its own must not start one mid-pause.
       limited: !usageOk({ windows, pauseAt, paused: !!s.pause, retrying: hub.retrying() }),
       resumed: started.length ? Math.max(...started) : undefined,
@@ -209,9 +217,9 @@ export function codexPanel(d: {
   }
 
   /** Every folder's hold from the shared state, so windows that see the same state show the same text; set only when it changed. */
-  function showHolds(on: boolean, own?: string): void {
+  function showHolds(on: boolean, own?: string, pressure?: number): void {
     for (const folder of Object.keys(hub.get().todos ?? {})) {
-      const hold = holdReason(gateFor(folder, on, folder === own)) ?? null
+      const hold = holdReason(gateFor(folder, on, folder === own, pressure)) ?? null
       if (JSON.stringify(hub.get().todos?.[folder]?.plan?.hold ?? null) !== JSON.stringify(hold)) holdShown(folder, hold)
     }
   }
@@ -219,6 +227,7 @@ export function codexPanel(d: {
   /** Chats that ended on a usage limit come back once it resets; with Auto-start on, an idle project starts its next to-do item. */
   async function keepGoing(): Promise<void> {
     const s = hub.get()
+    const pressure = await readMemoryPressure()
     const live = (id: string) => s.chats.some(c => c.sessionId === id && c.live)
     hub.pauseTick()
     void learnTick()
@@ -232,7 +241,7 @@ export function codexPanel(d: {
     const ws = workspace()
     // Holds show for every folder, with or without a window of its own; only the own folder auto-starts.
     const own = ws ? projectOf(ws) : undefined
-    showHolds(on, own)
+    showHolds(on, own, pressure)
     if (autoBusy || !ws || !own) return
     const folder = own
     // newChat refuses a folder the project list does not have yet; wait for it rather than burn the item.
@@ -240,7 +249,7 @@ export function codexPanel(d: {
     autoBusy = true
     try {
       if (!s.todos?.[folder]) await loadTodos([folder])
-      const plan = autoStartPlan({ ...gateFor(folder, on, true), busy: false })
+      const plan = autoStartPlan({ ...gateFor(folder, on, true, pressure), busy: false })
       if (!plan) return
       log.info(`Auto-start in ${folder}: ${plan.items.map(t => t.id).join(', ')}`)
       if (await runInNewChat(plan.folder, plan.items)) claimFailed.delete(folder)

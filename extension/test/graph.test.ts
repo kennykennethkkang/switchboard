@@ -482,6 +482,29 @@ describe('the knowledge graph', () => {
     assert.match(recall(buildGraph(state(), [note('qa-runs', 'description: qa in webkit\n')], []), 'qa'), /^qa-runs:/)
   })
 
+  it('ranks a rare word over common ones, finds text past the 6000 a node keeps, and shows the lines that match', () => {
+    const b = buildGraph(state(), [
+      note('gta-mods', 'description: what selling game content earns\n', 'FiveM pays through Tebex.'),
+      note('app-notes', 'description: income from the app and the mod\n'),
+      note('mod-notes', 'description: income from the mod\n'),
+      note('long', 'description: many topics\n', `## First\n${'filler line\n'.repeat(700)}## Ship\nThe zeppelin gate needs a token.\n## After\nmore`),
+    ], [])
+    assert.match(recall(b, 'FiveM modding income'), /^gta-mods:/)
+    assert.match(recall(b, 'how do I open the zeppelin gate'), /^long: many topics\n {2}The zeppelin gate needs a token\. ## After more/)
+    // A plural finds its word, "mod" is not "model".
+    assert.match(recall(b, 'zeppelins'), /^long: many topics\n {2}The zeppelin gate/)
+    assert.equal(recall(b, 'model'), 'Nothing in memory matches "model".')
+  })
+
+  it('ranks an unproven note below a proven one, says so, and lists it in health after 14 days', () => {
+    const now = Date.parse('2026-11-24T00:00:00Z')
+    const b = buildGraph(state(), [note('cache-a', 'description: cache misses after a deploy\nstatus: unproven\nmodified: 2026-11-01T00:00:00Z\n'), note('cache-b-longer', 'description: cache misses after a deploy\n'), note('fresh', 'description: zebra\nstatus: Unproven\nmodified: 2026-11-20T00:00:00Z\n')], [], [], now)
+    assert.match(recall(b, 'cache misses deploy'), /^cache-b-longer: .*[\s\S]*\ncache-a \(unproven, check it first\): /)
+    assert.deepEqual(b.health.unproven, [`memory:${dir}/cache-a`])
+    assert.equal(b.nodes.find(n => n.label === 'fresh')!.unproven, true)
+    assert.match(recall(buildGraph(state(), [note('plan', 'description: quokka plan\ntype: project\nmodified: 2026-01-01T00:00:00Z\n')], [], [], now), 'quokka'), /^plan \(not updated in 90 days\): /)
+  })
+
   it('stays redacted and near 1500 characters on a big graph', () => {
     const many = Array.from({ length: 80 }, (_, i) => note(`n${i}`, `related: [${Array.from({ length: 10 }, (_, j) => `n${(i + j + 1) % 80}`).join(', ')}]\n`, `body sk-abcdefghijklmnopqrstuvwxyz ${i}`))
     const r = recall(buildGraph(state(), many, []), 'n1')

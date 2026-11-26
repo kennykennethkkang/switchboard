@@ -5,7 +5,7 @@
  * change fires onChange, which extension.ts throttles into `hub-state`.
  */
 import { onMidTurn } from './idle'
-import { approvalBlock, closingPick, stampedChats } from './approve'
+import { approvalBlock, closingAnswer, closingPick, stampedChats } from './approve'
 import { isTempDir } from './temp'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
@@ -27,6 +27,8 @@ import { crowdLive, dismissCrowd } from './crowd-live'
 import { sourceChecks } from './source-check'
 import type { AiId, Ask, CacheKeep, ChatLink, ChatUnlink, ChatProgress, ChatRow, ChatState, DeviceAsk, HandoffWait, HubState, InboxDraft, InboxItem, JevRun, KeptLimits, Limit, LimitPause, Server, SessionLive, StuckItem } from './types'
 import { isTabCommand } from './window-tabs'
+import { lastTurn, missedHook, turnOver, type LastTurn } from './true-state'
+import { transcriptOf } from './sessions'
 
 const log = createLogger('Hub')
 
@@ -172,6 +174,11 @@ export class HubService {
   private readonly closeAtStop = new Set<string>()
   // A prompt answered from Switchboard, by chat: the tap marks the chat working before its PostToolUse lands.
   private readonly answeredHere = new Map<string, string>()
+  /** When this window started: a closing answer from before is never read back from a transcript. */
+  private readonly since = Date.now()
+  // Closing answers already handled, by tool_use_id, and each chat's transcript size when it was last read for one.
+  private readonly closings = new Set<string>()
+  private readonly closingRead = new Map<string, number>()
   /** Refused Approves, one JSON line each, so the reason survives a reload. Set by keepRetries; none: not kept. */
   approveLog?: string
   // Handoffs held while the full chat still has subagents running.
@@ -196,6 +203,12 @@ export class HubService {
   private readonly tabAsked = new TypedEventEmitter<string>()
   /** A tab command another window posted; routes.ts let only isTabCommand ones through. */
   readonly onTab = this.tabAsked.event
+  private readonly missedHook = new TypedEventEmitter<{ payload: Record<string, unknown>; mirror: boolean }>()
+  /** A hook this window missed, made up by trueUp; claude-runtime.ts takes it as if it had come. */
+  readonly onMissed = this.missedHook.event
+  private readonly openedChat = new TypedEventEmitter<string>()
+  /** A chat opened on a Switchboard page: the window holding its terminal shows it. */
+  readonly onOpened = this.openedChat.event
   private readonly promptedChat = new TypedEventEmitter<string>()
   private readonly endedChat = new TypedEventEmitter<ChatProgress>()
   /** A chat this window owns ended (SessionEnd), with its last progress; never one that handed off to a fresh chat. */
@@ -324,13 +337,18 @@ export class HubService {
   }
 
   /** A feed's codex windows replace the kept ones of the same kind; meter only, never read by a pause. */
-  private noteCodex(live: Limit[]): void {
+  noteCodex(live: Limit[]): void {
     const fed = live.filter(l => !isClaudeLimit(l))
     if (!fed.length) return
     const codexKept = [...(this.state.codexKept ?? []).filter(k => !fed.some(l => l.kind === k.kind)), ...fed]
     if (JSON.stringify(codexKept) === JSON.stringify(this.state.codexKept)) return
     this.state = { ...this.state, codexKept }
     if (this.codexFile) try { writeJsonAtomic(this.codexFile, { windows: codexKept }) } catch (err) { log.warn('Codex limits not kept:', err) }
+  }
+
+  noteCodexAccount(account: { windows: Limit[]; daily: { day: string; tokens: number }[]; resets?: number }): void {
+    this.noteCodex(account.windows)
+    this.set({ codexDaily: account.daily, ...(account.resets === undefined ? {} : { codexResets: account.resets }) })
   }
 
   /** After a feed: keeps the highest % per window, and pauses this window's running chats at the threshold. */
@@ -529,15 +547,58 @@ export class HubService {
     else if (!mirror && payload.hook_event_name === 'Stop' && (next?.state === 'done' || next?.state === 'idle' || next?.waiting) && this.closeAtStop.delete(id)) this.approvedChat.fire(id)
     const tapped = payload.hook_event_name === 'PostToolUse' && typeof payload.tool_use_id === 'string' && this.answeredHere.get(id) === payload.tool_use_id
     if (tapped || payload.hook_event_name === 'SessionEnd') this.answeredHere.delete(id)
-    const pick = mirror ? undefined : closingPick(payload)
-    if (pick === 'Send back') try { recordSentBack(id, now, undefined, typeof payload.tool_use_id === 'string' ? payload.tool_use_id : undefined) } catch (err) { log.warn('Send back not recorded:', err) }
-    if (pick === 'Approve') {
-      // Answered from Switchboard: judge the chat as it stood while the question was open.
-      const why = approvalBlock(tapped && was ? { ...was, state: 'needs-you' } : was, now)
-      if (why) this.refusedApprove(id, why, now)
-      else { this.closeAtStop.add(id); this.approvedChat.fire(id) }
-    }
+    const pick = closingPick(payload)
+    if (pick && typeof payload.tool_use_id === 'string') this.closings.add(payload.tool_use_id)
+    if (pick && !mirror && this.takeClosing(id, payload, was, now, tapped)) { this.closeAtStop.add(id); this.approvedChat.fire(id) }
     return !mirror && next && next.state !== (was?.state ?? 'working') ? { from: was?.state, to: next } : undefined
+  }
+
+  /** Records the answer to a closing question; true when it approves the chat. */
+  private takeClosing(id: string, payload: Record<string, unknown>, was: ChatProgress | undefined, now: number, tapped = false): boolean {
+    const pick = closingPick(payload)
+    // Only the lead closes its chat: a subagent's answer counts for neither.
+    if (pick === 'Send back' && !payload.agent_id) try { recordSentBack(id, now, undefined, typeof payload.tool_use_id === 'string' ? payload.tool_use_id : undefined) } catch (err) { log.warn('Send back not recorded:', err) }
+    if (pick !== 'Approve') return false
+    // The lead's own answer proves the question was open, even if the hub missed it opening: judge the chat as it stood then.
+    const why = payload.agent_id ? 'a subagent asked it' : approvalBlock(was && (tapped || typeof payload.tool_use_id === 'string') ? { ...was, state: 'needs-you' } : was, now)
+    if (why) this.refusedApprove(id, why, now)
+    return !why
+  }
+
+  /** A closing answer whose PostToolUse never came, read from the transcript once the turn is over. Not sent through hook(): a late call would mark the ended chat working. */
+  private missedClosing(c: ChatRow, p: ChatProgress, now: number): void {
+    const id = c.sessionId
+    if (!this.owned.has(id) || !turnOver(p, c, now)) return
+    const file = transcriptOf(c), size = fs.statSync(file, { throwIfNoEntry: false })?.size
+    if (!size || this.closingRead.get(id) === size) return
+    this.closingRead.set(id, size)
+    const a = closingAnswer(file)
+    if (!a || !(a.at >= this.since) || this.closings.has(a.id)) return
+    this.closings.add(a.id)
+    log.info(`Chat ${id.slice(0, 8)}: closing answer read from its transcript, its hook was missed`)
+    if (this.takeClosing(id, a.payload, p, now)) this.approvedChat.fire(id)
+  }
+
+  /** Chats that Claude Code's own status says moved on while their hooks got lost. */
+  trueUp(now = Date.now(), last: (c: ChatRow) => LastTurn | undefined = c => lastTurn(transcriptOf(c))): void {
+    for (const c of this.state.chats) {
+      // The Claude panel and a terminal on one session each have a status; a chat waiting on its reset resumes by itself.
+      if (this.retries.has(c.sessionId) || this.state.chats.some(x => x !== c && x.live && x.sessionId === c.sessionId)) continue
+      const p = this.state.progress.find(x => x.sessionId === c.sessionId)
+      const payload = missedHook(p, c, now, () => last(c), this.answeredHere.has(c.sessionId))
+      if (!payload) { if (p) this.missedClosing(c, p, now); continue }
+      // Nothing known of it yet (a reload): its state only, no notices or boxes filled for a turn long over.
+      if (!p) this.hook(payload, now, true)
+      else this.missedHook.fire({ payload, mirror: !this.owned.has(c.sessionId) })
+    }
+  }
+
+  /** The chat now open in a terminal or on a page; false when one opened later is known.
+   * at: when it was opened, so posts crossing between windows end on the same chat. */
+  open(sessionId: string, at = Date.now()): boolean {
+    if ((this.state.openChat?.at ?? 0) > at) return false
+    this.set({ openChat: { sessionId, at } })
+    return true
   }
 
   private refusedApprove(id: string, why: string, now: number): void {
@@ -576,7 +637,7 @@ export class HubService {
     // A subagent's jobs end in its own transcript, read once at its SubagentStop.
     const agent = payload.hook_event_name === 'SubagentStop' && was?.subJobs?.some(j => j.agent === payload.agent_id)
     const file = agent ? payload.agent_transcript_path : payload.transcript_path
-    if (!agent && (payload.hook_event_name !== 'Stop' || !was?.jobs?.length)) return payload
+    if (!agent && (payload.hook_event_name !== 'Stop' || !(was?.jobs?.length || was?.subJobs?.length))) return payload
     if (typeof file !== 'string') return payload
     // Reads the whole transcript, but only on a Stop with jobs pending (or a SubagentStop with its own); read from an offset if that gets slow.
     try { return { ...payload, bg_finished: finishedJobs(fs.readFileSync(file, 'utf8')) } } catch { return payload }
@@ -632,6 +693,13 @@ export class HubService {
         const from = str(b.from), to = idList(b.to)
         if (!from || !to) return false
         this.link({ from, to, reason: str(b.reason)?.slice(0, 400) ?? '', auto: b.auto === true, since: num(b.since) ?? now }, now)
+        return true
+      }
+      case 'open-chat': {
+        const sessionId = str(b.sessionId)
+        if (!sessionId) return false
+        // A post that arrives late never brings an older chat back up.
+        if (this.open(sessionId, num(b.at) ?? now) && b.show === true) this.openedChat.fire(sessionId)
         return true
       }
       case 'link-end': {
@@ -754,6 +822,9 @@ export class HubService {
     const held = new Set([...(this.state.pause?.chats ?? []).map(c => c.sessionId), ...this.retries.keys()])
     for (const item of (this.state.stuck ?? []).filter(i => this.owned.has(i.sessionId) && !held.has(i.sessionId))) {
       const why = this.waitsOnUser(item.sessionId)
+      // A note with nothing to stop reaches the lead only once its turn ends, so it waits for that and the sample then.
+      const p = this.state.progress.find(x => x.sessionId === item.sessionId)
+      if (!why && item.pid === undefined && p?.state === 'working' && !p.waiting) continue
       if (!why) fix.push(item)
       else if (!this.paused.has(item.sessionId)) { this.paused.add(item.sessionId); paused.push({ sessionId: item.sessionId, why }) }
     }

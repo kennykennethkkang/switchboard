@@ -2,7 +2,7 @@
 // One chat's deep research as it happens: searches, sources, researcher lanes, the answer.
 // A Research-space chat gets it as its own tab; a project chat gets it inline on the Chats page.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { vscodeBridge } from '@/lib/vscode-bridge'
+import { onScreen, vscodeBridge } from '@/lib/vscode-bridge'
 import type { ChatState, HubState } from '@/lib/hub-types'
 import { answerBlocks, citations, elapsedOf, emptyRun, fmtElapsed, inline, isCited, isRealResearch, looksLikeAnswer, reduceResearch, siteOf, visibleLanes, type FeedItem, type Lane, type ResearchRun } from '@/lib/research'
 import { DEMO_CHAT, DEMO_SESSION, demoScript } from '@/lib/research-demo'
@@ -49,7 +49,7 @@ function useNow(on: boolean) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!on) { setNow(Date.now()); return }
-    const t = setInterval(() => { if (!document.hidden) setNow(Date.now()) }, 1000)
+    const t = setInterval(() => { if (onScreen()) setNow(Date.now()) }, 1000)
     return () => clearInterval(t)
   }, [on])
   return now

@@ -83,3 +83,112 @@ describe('session watcher', () => {
     } finally { w.dispose() }
   })
 })
+
+
+it('stats only changed files between deep scans and finds watched appends', async () => {
+  const { SessionWatcher } = await import('../src/session-watcher')
+  const dir = path.join(home, '.claude', 'projects', '-p')
+  fs.mkdirSync(dir, { recursive: true })
+  for (let i = 0; i < 500; i++) { const file = path.join(dir, `idle-${i}.jsonl`); fs.writeFileSync(file, ''); fs.utimesSync(file, new Date(0), new Date(0)) }
+  const w = new SessionWatcher() as unknown as { workspacePath: string; resolvedWorkspace: string; watchProjectDirs(): void; scanForActiveSessions(force?: boolean): void; pendingFiles: Set<string>; dispose(): void }
+  w.workspacePath = '-p'; w.resolvedWorkspace = '/p'
+  const disk = require('fs') as { statSync: typeof fs.statSync }
+  const originalStat = disk.statSync
+  let statCalls = 0
+  disk.statSync = ((...args: Parameters<typeof fs.statSync>) => { statCalls++; return originalStat(...args) }) as typeof fs.statSync
+  try {
+    w.watchProjectDirs()
+    w.scanForActiveSessions(true)
+    statCalls = 0
+    for (let i = 0; i < 9; i++) w.scanForActiveSessions()
+    assert.equal(statCalls, 0, `expected no idle file stats, got ${statCalls}`)
+    const file = path.join(dir, 'resumed.jsonl')
+    fs.writeFileSync(file, line('user', 'old'))
+    fs.utimesSync(file, new Date(0), new Date(0))
+    w.scanForActiveSessions(true)
+    fs.appendFileSync(file, line('assistant', 'resumed'))
+    const now = new Date()
+    fs.utimesSync(file, now, now)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    const sessions = (w as unknown as { sessions: Map<string, unknown> }).sessions
+    assert.ok(sessions.has('resumed'))
+    const fallback = path.join(dir, 'fallback.jsonl')
+    fs.writeFileSync(fallback, line('user', 'fallback'))
+    fs.utimesSync(fallback, now, now)
+    w.scanForActiveSessions(true)
+    assert.ok(sessions.has('fallback'))
+  } finally { w.dispose(); disk.statSync = originalStat }
+})
+
+it('a deep scan finds a new subfolder project with no watch event', async () => {
+  const { SessionWatcher } = await import('../src/session-watcher')
+  const root = path.join(home, '.claude', 'projects'), dir = path.join(root, '-deep')
+  fs.mkdirSync(dir, { recursive: true })
+  const disk = require('fs') as { watch: typeof fs.watch }
+  const originalWatch = disk.watch
+  disk.watch = (() => ({ on() { return this }, close() {} } as unknown as fs.FSWatcher)) as unknown as typeof fs.watch
+  const w = new SessionWatcher() as unknown as { workspacePath: string; resolvedWorkspace: string; isContainedProject(n: string): boolean; watchProjectDirs(): void; scanForActiveSessions(force?: boolean): void; sessions: Map<string, unknown>; dispose(): void }
+  try {
+    w.workspacePath = '-deep'; w.resolvedWorkspace = '/deep'; w.isContainedProject = () => true
+    w.watchProjectDirs(); w.scanForActiveSessions(true)
+    const sub = path.join(root, '-deep-sub')
+    fs.mkdirSync(sub); fs.writeFileSync(path.join(sub, 'newsub.jsonl'), line('user', 'hi'))
+    w.scanForActiveSessions(true)
+    assert.ok(w.sessions.has('newsub'))
+  } finally { w.dispose(); disk.watch = originalWatch }
+})
+
+it('ignores appends for watched sessions and finds an ended session on its next append', async () => {
+  const { SessionWatcher } = await import('../src/session-watcher')
+  const dir = path.join(home, '.claude', 'projects', '-watch')
+  fs.mkdirSync(dir, { recursive: true })
+  const busy = path.join(dir, 'busy.jsonl')
+  const resumed = path.join(dir, 'resumed.jsonl')
+  fs.writeFileSync(busy, line('user', 'busy'))
+  fs.writeFileSync(resumed, line('user', 'before end'))
+  const callbacks = new Map<string, (event: string, filename: string | null) => void>()
+  const disk = require('fs') as { watch: typeof fs.watch }
+  const originalWatch = disk.watch
+  disk.watch = ((target: fs.PathLike, _options: unknown, callback?: (event: string, filename: string | null) => void) => {
+    const fn = typeof _options === 'function' ? _options as (event: string, filename: string | null) => void : callback!
+    callbacks.set(String(target), fn)
+    return { on() { return this }, close() {} } as unknown as fs.FSWatcher
+  }) as typeof fs.watch
+  const w = new SessionWatcher() as unknown as {
+    workspacePath: string
+    watchDirForJsonl(dir: string): void
+    scanForActiveSessions(force?: boolean): void
+    sessions: Map<string, unknown>
+    ended: Map<string, { mtime: number; info: unknown; model: null; fileSize: number }>
+    pendingFiles: Set<string>
+    dispose(): void
+  }
+  try {
+    w.workspacePath = '-watch'
+    w.watchDirForJsonl(dir)
+    const session = { filePath: busy }
+    w.sessions.set('busy', session)
+    let scans = 0
+    const scan = w.scanForActiveSessions.bind(w)
+    w.scanForActiveSessions = (force?: boolean) => { scans++; scan(force) }
+    const changed = callbacks.get(dir)!
+    for (let i = 0; i < 100; i++) changed('change', 'busy.jsonl')
+    assert.equal(scans, 0)
+    assert.equal(w.pendingFiles.size, 0)
+
+    const fresh = path.join(dir, 'fresh.jsonl')
+    fs.writeFileSync(fresh, line('user', 'fresh'))
+    changed('rename', 'fresh.jsonl')
+    assert.ok(w.sessions.has('fresh'))
+
+    w.sessions.delete('busy')
+    const old = new Date(0)
+    fs.utimesSync(resumed, old, old)
+    w.ended.set('resumed', { info: {}, model: null, fileSize: fs.statSync(resumed).size, mtime: 0 })
+    fs.appendFileSync(resumed, line('assistant', 'resumed'))
+    const now = new Date()
+    fs.utimesSync(resumed, now, now)
+    changed('change', 'resumed.jsonl')
+    assert.ok(w.sessions.has('resumed'))
+  } finally { w.dispose(); disk.watch = originalWatch }
+})

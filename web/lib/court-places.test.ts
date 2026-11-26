@@ -53,10 +53,10 @@ test('study: last learn run and proposals waiting', () => {
 test('keys: names and ok or missing only, never a value', () => {
   const l = keyList(hub({
     signIns: { chrome: [], projects: {}, keys: [{ name: 'GEMINI_API_KEY', saved: true, last4: 'abcd', checked: { ok: false, at: 1 } }, { name: 'ZEP_API_KEY', saved: false }] },
-    aws: [{ name: 'dev', status: 'expired', checkedAt: 1 }, { name: 'prod', label: 'Work', status: 'signed-in', checkedAt: 1 }, { name: 'previous-default-20261029-073925', status: 'expired', checkedAt: 1 }, { name: 'scratch', status: 'never', checkedAt: 1 }],
+    aws: [{ name: 'dev', status: 'expired', checkedAt: 1 }, { name: 'prod', label: 'Work', status: 'signed-in', checkedAt: 1 }, { name: 'previous-default-20261029-073925', status: 'expired', checkedAt: 1 }, { name: 'scratch', status: 'never', checkedAt: 1 }, { name: 'corp', status: 'expired', sso: true, checkedAt: 1 }],
   }))
-  // Unset keys are neutral and expired backup profiles are left out, so neither reads as a failure.
-  assert.deepEqual(l.map(i => [i.name, i.note, i.ok]), [['GEMINI_API_KEY', 'failed test', false], ['ZEP_API_KEY', 'not set', undefined], ['AWS dev', 'expired', false], ['AWS Work (prod)', 'signed-in', true], ['AWS scratch', 'never', undefined]])
+  // Unset keys and signed-out single sign-on profiles are neutral and expired backup profiles are left out, so none reads as a failure.
+  assert.deepEqual(l.map(i => [i.name, i.note, i.ok]), [['GEMINI_API_KEY', 'failed test', false], ['ZEP_API_KEY', 'not set', undefined], ['AWS dev', 'expired', false], ['AWS Work (prod)', 'signed-in', true], ['AWS scratch', 'never', undefined], ['AWS corp', 'expired', undefined]])
   assert.ok(!JSON.stringify(l).includes('abcd'))
 })
 

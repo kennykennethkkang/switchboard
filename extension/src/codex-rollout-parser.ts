@@ -43,6 +43,18 @@ import { estimateTokenCost, estimateTokensFromText } from './token-estimator'
 import { createLogger } from './logger'
 import { isRecord } from './fs-utils'
 
+/** A role run's prompt opens with its agent file's first line; a chat that only quotes that line is not one. */
+export function isCodexRoleRun(lines: string[]): boolean {
+  return lines.some(line => {
+    try {
+      const r = JSON.parse(line)
+      const p = r?.payload
+      const text = p?.type === 'user_message' ? p.message : p?.type === 'message' && p.role === 'user' ? (p.content ?? []).map((c: { text?: string }) => c.text ?? '').join('\n') : ''
+      return typeof text === 'string' && /^\s*You are (?:the engineer|qa)\./.test(text)
+    } catch { return false }
+  })
+}
+
 const log = createLogger('CodexRolloutParser')
 
 // ─── State ─────────────────────────────────────────────────────────────────

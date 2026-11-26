@@ -7,6 +7,7 @@ import { createHash } from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 import { foldPathCase } from '../fs-utils'
+import { displayPath, insidePath } from './windows'
 import { questionBucket, readLearned, RECOMMENDED, smartPick, stripRecommended, type Stats } from './smart-select'
 import type { Ask, AskQuestion, BgJob, Choice, ChatProgress, DailyTrend, Helper, OtherPick, Report, RoleStep, TaskRow, TestRun, ToolCall, TrendValue } from './types'
 
@@ -149,7 +150,7 @@ export function commitTargets(roots: string[], p: { cwd: string; commit?: string
   const out: [string, string][] = []
   const base = (r: string) => path.basename(r).toLowerCase()
   const c = foldPathCase(p.cwd)
-  const home = roots.filter(r => { const root = foldPathCase(r); return c === root || c.startsWith(root + path.sep) }).sort((a, b) => b.length - a.length)[0]
+  const home = roots.filter(r => insidePath(r, p.cwd) || foldPathCase(r) === c).sort((a, b) => b.length - a.length)[0]
   // A block named for the chat's own repo is its plain one, for that repo only, never a namesake elsewhere.
   for (const [name, msg] of Object.entries(p.commits ?? {})) if (!home || name !== base(home)) for (const r of roots) if (base(r) === name) out.push([r, msg])
   const own = p.commit ?? (home ? p.commits?.[base(home)] : undefined)
@@ -288,7 +289,7 @@ export function toolTarget(tool: string, input: Payload): string | undefined {
   else if (tool === 'Agent' || tool === 'Task') t = str(input.subagent_type) ?? str(input.description)
   else if (tool === 'WebSearch') t = str(input.query)
   else if (tool === 'Skill') t = str(input.skill)
-  else t = str(input.pattern) ?? path?.split('/').filter(Boolean).slice(-2).join('/')
+  else t = str(input.pattern) ?? (path ? displayPath(path) : undefined)
   return t ? plainText(t).slice(0, 48).trim() || undefined : undefined
 }
 
@@ -316,7 +317,7 @@ function alwaysLabel(s: Payload | undefined): string | undefined {
     return what && `Yes, and don't ask again for: ${what}`
   }
   if (s?.type === 'addDirectories' && Array.isArray(s.directories)) {
-    const dir = cut(s.directories[0], 120)?.split('/').filter(Boolean).pop()
+    const dir = cut(s.directories[0], 120)?.split(/[\\/]/).filter(Boolean).pop()
     return dir && `Yes, and always allow access to ${dir}/ from this project`
   }
   return undefined
@@ -463,12 +464,22 @@ function seen(p: ChatProgress, id: string, role: string | undefined, now: number
   return { ...p, roles, running: [...(p.running ?? []), id], ...busy }
 }
 
+/** The subagent whose run a call waited for: a foreground Agent, or a SendMessage that resumed one and hands its report
+ * back inline. web-fetch sends no SubagentStart or SubagentStop, so this is its only end (claude 2.1.332). */
+function agentOver(payload: Payload): string | undefined {
+  const tool = str(payload.tool_name), res = payload.tool_response as Payload | undefined
+  if (tool === 'Agent' || tool === 'Task') return res?.status === 'completed' ? str(res.agentId) : undefined
+  return tool === 'SendMessage' && res?.inlineHandback ? str((res.pin as Payload | undefined)?.id) : undefined
+}
+
 /** The next progress for one hook payload; undefined once the chat has ended. */
 export function step(prev: ChatProgress | undefined, payload: Payload, now: number): ChatProgress | undefined {
   const sessionId = str(payload.session_id)
   const event = str(payload.hook_event_name)
   if (!sessionId || !event) return prev
   if (event === 'SessionEnd') return undefined
+  // A score can land after its chat ended; it says nothing runs.
+  if (event === 'SwitchboardCovered' && !prev) return undefined
   // Compact and resume send SessionStart on the same chat; only a new one or /clear starts over.
   const base: ChatProgress = prev && !(event === 'SessionStart' && RESET.has(String(payload.source)))
     ? prev
@@ -512,7 +523,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       const input = (payload.tool_input ?? {}) as Payload
       const target = toolTarget(tool, input)
       const call: ToolCall = { tool, ...(target ? { target } : {}), role: sub ? role ?? 'subagent' : 'lead', at: now }
-      p.tools = [...(p.tools ?? []), call].slice(-TOOLS_MAX)
+      if (tool !== 'Poll') p.tools = [...(p.tools ?? []), call].slice(-TOOLS_MAX)
       const helper = helperCall(tool, input)
       if (helper) p.helpers = helperStart(p, helper, now)
       // A subagent's own TodoWrite is its private list; only the shared task tools reach the chat's list.
@@ -524,8 +535,10 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
         const q = Array.isArray(input.questions) ? str((input.questions[0] as Payload)?.question) : undefined
         return { ...p, state: 'needs-you', question: q ?? 'A question for you' }
       }
-      // The lead moved on, so its own prompts are done; a subagent's still wait.
-      return withAsks({ ...p, waiting: undefined, tasks: tasksFrom(p, tool, input, now) }, pendingAsks(p).filter(a => a.sub))
+      // The lead moved on, so its own prompts are done; a subagent's still wait. In Code Mode calls
+      // made by code (repl_ ids) and polls keep coming while a question is open; its PostToolUse or the next prompt ends it.
+      const inCode = tool === 'Poll' || tool === 'REPL' || str(payload.tool_use_id)?.startsWith('repl_')
+      return withAsks({ ...p, waiting: undefined, tasks: tasksFrom(p, tool, input, now) }, inCode ? pendingAsks(p) : pendingAsks(p).filter(a => a.sub))
     }
     case 'UserPromptSubmit': {
       if (sub) return p
@@ -559,11 +572,12 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
         const jobs = p.jobs.filter(j => j.task !== stopped)
         p.jobs = jobs.length ? jobs : undefined
       }
-      if (stopped && p.running?.includes(stopped)) {
-        const running = p.running.filter(x => x !== stopped)
+      const over = stopped ?? (event === 'PostToolUse' ? agentOver(payload) : undefined)
+      if (over && p.running?.includes(over)) {
+        const running = p.running.filter(x => x !== over)
         p.running = running.length ? running : undefined
-        p.roles = p.roles.map(r => r.id === stopped ? finish(r, now) : r)
-        p.ended = endedAt(p, stopped, now)
+        p.roles = p.roles.map(r => r.id === over ? finish(r, now) : r)
+        p.ended = endedAt(p, over, now)
       }
       // A call ending is the answer to the prompt it raised: same tool_use_id (a question) or same tool and input.
       const asks = pendingAsks(p), id = str(payload.tool_use_id)
@@ -600,7 +614,7 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
       // hub-service.ts reads the ended ones from the transcript; no hook fires when a background shell ends.
       const ended = new Set(Array.isArray(payload.bg_finished) ? payload.bg_finished.map(String) : [])
       const jobs = p.jobs?.filter(j => !ended.has(j.id) && fresh(j.startedAt))
-      const subJobs = p.subJobs?.filter(j => fresh(j.startedAt))
+      const subJobs = p.subJobs?.filter(j => !ended.has(j.id) && fresh(j.startedAt))
       const roles = trim(p.roles.map(r => bg.has(r.id) ? r : finish(r)))
       const q: ChatProgress = { ...p, roles, commit: own ?? self ?? p.commit, commits: Object.keys(named).length ? named : p.commits, report, running: bg.size ? [...bg] : undefined, jobs: jobs?.length ? jobs : undefined, subJobs: subJobs?.length ? subJobs : undefined, finishing, ...NO_ASK }
       // Anything still running keeps the chat working, wrapping up, whatever the message said.
@@ -638,6 +652,13 @@ export function step(prev: ChatProgress | undefined, payload: Payload, now: numb
     case 'SwitchboardCovered':
       // Sent by the window that ran the check (coverage.ts), to itself and every mirror.
       return p.state === 'done' && Array.isArray(payload.scores) ? { ...p, covered: payload.scores.map(s => typeof s === 'number' ? s : null) } : p
+    // true-state.ts made these up from the chat's own status, for a hook this window missed.
+    case 'SwitchboardBusy':
+      return { ...p, state: 'working', ...NO_ASK, waiting: undefined }
+    case 'SwitchboardIdle':
+      return { ...p, state: 'idle', ...NO_ASK, finishing: undefined }
+    case 'SwitchboardWaiting':
+      return { ...p, state: 'needs-you', question: str(payload.message) }
     default:
       return p
   }

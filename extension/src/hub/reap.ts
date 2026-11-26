@@ -5,7 +5,9 @@
  */
 import { createLogger } from '../logger'
 import { hub } from './hub-service'
-import { listServers, run } from './local'
+import { listServers } from './local'
+import { sharedRun } from './shared-run'
+import { sweepTabs } from './tabs'
 import type { Server } from './types'
 
 const log = createLogger('Reap')
@@ -14,7 +16,7 @@ const log = createLogger('Reap')
 export type Proc = { pid: number; ppid: number; command: string; start?: string }
 /** By chat: every descendant pid seen while it was live, with its start and command (see ident). */
 export type Ran = Map<string, Map<number, string>>
-type Chat = { sessionId: string; pid: number; live: boolean }
+type Chat = { sessionId: string; pid: number; live: boolean; ai?: string }
 export type Target = { pid: number; command: string; port?: number }
 
 // Armasu and Switchboard's own app.
@@ -97,24 +99,31 @@ export async function reapChat(p: { sessionId: string; limited?: unknown }, d: D
 }
 
 const ran: Ran = new Map()
-const readPs = async () => parsePs(await run('ps', ['-axo', 'pid=,ppid=,lstart=,command=']))
+export const readProcessTable = async (fresh = false) => parsePs(await sharedRun('ps', ['-axo', 'pid=,ppid=,lstart=,command='], { ttlMs: 12_000, timeoutMs: 5000, fresh, partial: true }))
+/** Whether this chat started one of these servers. */
+export const startedServer = (id: string, servers: Server[]) => servers.some(s => ran.get(id)?.has(s.pid))
 const alive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }
 
 // ponytail: sampled with the chat refresh (15 s), so a server that daemonizes faster than that is missed.
 export async function rememberChats(chats: Chat[]): Promise<void> {
+  if (process.platform === 'darwin') {
+    const s = hub.get()
+    void sweepTabs({ on: s.controls.switchboard.stopServers !== false, chats, progress: s.progress, retrying: hub.retryIds() })
+      .then(ids => { if (ids.length) log.info(`Closed ${ids.length} Chrome tab(s) finished chats opened`) }, err => log.warn('Closing tabs failed:', err))
+  }
   if (process.platform === 'win32' || !chats.some(c => c.live)) return
-  remember(ran, chats, await readPs())
+  remember(ran, chats, await readProcessTable())
 }
 
 /** hub.onEnded: stops what the chat started, when Settings allows. Its servers then show in the stopped list on the next refresh. */
 export async function stopChatServers(p: { sessionId: string; limited?: unknown }): Promise<void> {
   if (process.platform === 'win32' || !ran.has(p.sessionId)) return
   const s = hub.get()
-  const [procs, servers] = await Promise.all([readPs(), listServers()])
+  const [procs, servers] = await Promise.all([readProcessTable(true), listServers(true)])
   const done = await reapChat(p, {
     on: s.controls.switchboard.stopServers !== false, retrying: hub.retryIds(), chats: s.chats, procs, servers, ran,
     kill: (pid, sig) => process.kill(pid, sig), alive, graceMs: 3000,
   })
   for (const t of done) log.info(`Stopped ${t.port ? `the server on ${t.port}` : 'a test browser'} (pid ${t.pid}) that chat ${p.sessionId.slice(0, 8)} started`)
-  if (done.some(t => t.port)) hub.set({ servers: await listServers() })
+  if (done.some(t => t.port)) hub.set({ servers: await listServers(true) })
 }

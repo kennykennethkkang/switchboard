@@ -10,6 +10,7 @@ import * as path from 'path'
 import { readJsonOr } from '../fs-utils'
 import { writeJsonAtomic } from '../hook-entries'
 import { redact } from './brain'
+import { FIND_JXA } from './tabs'
 import type { AwsProfile, AwsStatus, ChromeProfile } from './types'
 
 const HOME = os.homedir()
@@ -129,6 +130,10 @@ export function removeProfile(text: string, name: string): { text: string } | { 
   return { text: [...out, ''].join('\n') }
 }
 
+const isSso = (v: Record<string, string>) => !!(v.sso_session || v.sso_start_url)
+/** Signs in through single sign-on: `aws sso login`, since `aws login` refuses such a profile. */
+export const ssoProfile = (name: string, config = readAwsConfig()) => parseAwsConfig(config).some(s => s.name === name && isSso(s.values))
+
 const SIGNS_IN = ['login_session', 'sso_session', 'sso_start_url', 'role_arn', 'credential_process', 'web_identity_token_file']
 
 /** Signed in when STS answered; expired when it did not but the profile has a way to sign in; else never. */
@@ -184,9 +189,9 @@ export function rowText(map: Record<string, string> | undefined, key: string, te
   return text ? { ...rest, [key]: text } : rest
 }
 
-/** The last lines of a failed aws login, for its row: no colors, keys, tokens or URL queries. */
+/** The last lines of a failed aws login, for its row: no colors, keys, tokens, device codes or URL queries. */
 export function loginError(out: string): string {
-  const lines = out.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(-5)
+  const lines = out.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').split(/\r?\n/).map(l => l.trim()).filter(l => l && !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(l)).slice(-5)
   return redact(lines.join('\n')).replace(/(https?:\/\/[^\s?#]+)[?#]\S*/g, '$1').slice(-600)
 }
 
@@ -214,10 +219,10 @@ export function cacheTimes(sections: Section[]): Record<string, CacheTimes> {
  * Sessions after a status check. The CLI rewrites its cache file in place on every 15 min refresh, so a newer
  * mtime alone is not a new session. A new one is: a file made after the session began (logout, then login), or a
  * write after a check said signed out. One first seen signed in started when its file was made. A live one
- * stays through a check that could not tell.
+ * stays through a check that could not tell. Single sign-on has no 12 h session, so no row here.
  */
-export function trackSessions(s: AwsSessions, rows: { name: string; status: AwsStatus; unsure?: boolean }[], now: number, cache: Record<string, CacheTimes> = {}): AwsSessions {
-  return Object.fromEntries(rows.flatMap(r => {
+export function trackSessions(s: AwsSessions, rows: { name: string; status: AwsStatus; unsure?: boolean; sso?: boolean }[], now: number, cache: Record<string, CacheTimes> = {}): AwsSessions {
+  return Object.fromEntries(rows.filter(r => !r.sso).flatMap(r => {
     const had = s[r.name], c = cache[r.name]
     const live = had && now < had.at + AWS_SESSION_MS
     // Only a check that said signed out marks out; one that could not tell changes nothing.
@@ -299,11 +304,12 @@ export async function refreshIdentity(profile: string): Promise<void> {
 export const readPrefs = (): AwsPrefs => { const j = readJson(PREFS); return { chrome: strings(j.chrome), projects: strings(j.projects), browsers: strings(j.browsers) } }
 export const writePrefs = (p: AwsPrefs) => { fs.mkdirSync(SB, { recursive: true }); writeJsonAtomic(PREFS, p) }
 export const readChrome = (): ChromeProfile[] => { try { return chromeProfiles(fs.readFileSync(chromeState(), 'utf8')) } catch { return [] } }
-export const readSessions = (): AwsSessions => {
-  const j = readJson(SESSIONS)
+/** Without single sign-on profiles, which an older build counted. */
+export const readSessions = (file = SESSIONS, config = readAwsConfig()): AwsSessions => {
+  const j = readJson(file)
   return Object.fromEntries(Object.entries(j).flatMap(([k, v]) => {
     const o = v as { at?: unknown; warned?: unknown; out?: unknown }
-    return o && typeof o.at === 'number' ? [[k, { at: o.at, ...(typeof o.warned === 'number' ? { warned: o.warned } : {}), ...(typeof o.out === 'number' ? { out: o.out } : {}) }]] : []
+    return o && typeof o.at === 'number' && !ssoProfile(k, config) ? [[k, { at: o.at, ...(typeof o.warned === 'number' ? { warned: o.warned } : {}), ...(typeof o.out === 'number' ? { out: o.out } : {}) }]] : []
   }))
 }
 export const writeSessions = (s: AwsSessions) => { fs.mkdirSync(SB, { recursive: true }); writeJsonAtomic(SESSIONS, s) }
@@ -370,7 +376,31 @@ export function renameAwsProfile(from: string, to: string, file = AWS_CONFIG, no
 export function openChromeScript(platform: NodeJS.Platform = process.platform): string | undefined {
   if (platform === 'win32') return undefined
   const [plain, own] = platform === 'darwin' ? ['/usr/bin/open -g -a "Google Chrome"', '/usr/bin/open -gna "Google Chrome" --args'] : ['google-chrome', 'google-chrome']
-  return `#!/bin/sh\nif [ -z "$SWITCHBOARD_CHROME_DIR" ]; then exec ${plain} "$1"; fi\nexec ${own} --profile-directory="$SWITCHBOARD_CHROME_DIR" "$1"\n`
+  const opens = `if [ -z "$SWITCHBOARD_CHROME_DIR" ]; then exec ${plain} "$1"; fi\nexec ${own} --profile-directory="$SWITCHBOARD_CHROME_DIR" "$1"\n`
+  if (platform !== 'darwin') return `#!/bin/sh\n${opens}`
+  // A chat's page: opened the same way, then its tab id goes in TABS for tabs.ts to close. The alarm covers a Mac still asking to let it see Chrome.
+  return `#!/bin/sh
+chat="\${CLAUDE_CODE_SESSION_ID:-$CODEX_THREAD_ID}"
+case "$chat" in *[!A-Za-z0-9_-]*) chat= ;; esac
+if [ -z "$chat$SWITCHBOARD_CHAT" ] || [ -n "$SWITCHBOARD_TAB" ]; then
+${opens}fi
+tabs() { /usr/bin/perl -e 'alarm 20; exec @ARGV' /usr/bin/osascript -l JavaScript - "$@" 2>/dev/null <<'JXA'
+${FIND_JXA}
+JXA
+}
+before=$(tabs)
+SWITCHBOARD_TAB=1 "$0" "$1" || exit
+[ -n "$before" ] || exit 0
+umask 077
+dir="$HOME/.claude/switchboard/tabs"
+mkdir -p "$dir"
+set -C
+# In the back, so whoever opened the page goes on.
+tabs "$before" "$1" | while read -r id origin; do
+  case "$id" in ''|*[!0-9]*) continue ;; esac
+  printf '%s\\t%s\\n' "$chat" "$origin" > "$dir/$id" && break
+done >/dev/null 2>&1 &
+`
 }
 
 /** A terminal's env for the opener script: dir '' or none opens Chrome's last used profile. No script (Windows): nothing. */
@@ -432,7 +462,7 @@ export async function awsProfiles(now = Date.now(), sts: Sts = check, config = r
     return {
       name: s.name, status: awsStatus(r.ok, r.stderr, s.values), checkedAt: now, ...(!r.ok && !signedOut(r.stderr) ? { unsure: true } : {}),
       ...(account ? { account } : {}), ...(label ? { label } : {}), ...(id?.name ? { who: id.name } : {}), ...(id?.email ? { email: id.email } : {}), ...(s.values.region ? { region: s.values.region } : {}),
-      ...(chrome[s.name] !== undefined ? { chrome: chrome[s.name] } : {}), ...(/:root$/.test(s.values.login_session ?? '') ? { root: true } : {}),
+      ...(chrome[s.name] !== undefined ? { chrome: chrome[s.name] } : {}), ...(/:root$/.test(s.values.login_session ?? '') ? { root: true } : {}), ...(isSso(s.values) ? { sso: true } : {}),
     }
   })
 }

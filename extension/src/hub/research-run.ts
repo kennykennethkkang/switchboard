@@ -2,6 +2,7 @@
 // Pure: the web panel imports it (web/lib/research.ts) and the extension folds the same events to save reports.
 // Both sides' AgentEvent types fit this shape.
 type AgentEvent = { time: number; type: string; payload: Record<string, unknown>; sessionId?: string }
+import { stripResearchInstructions } from './research-question'
 
 const LEAD = 'orchestrator'
 
@@ -122,16 +123,17 @@ function step(run: ResearchRun, type: string, p: Record<string, unknown>): Resea
       const role = str(p.role), text = str(p.content).trim()
       if (!text) return run
       if (agent === LEAD && role === 'user') {
+        const shown = stripResearchInstructions(text)
         // A skill's body arrives as a user message; it is not the question.
         if (text.startsWith('Base directory for this skill:')) return run
         // Typed /deep-research: no Skill tool call follows, and the run may use only Bash.
         if (/<command-name>\/deep-research<\/command-name>/.test(text)) {
-          const q = text.match(/<command-args>([\s\S]*?)<\/command-args>/)?.[1].trim()
+          const q = stripResearchInstructions(text.match(/<command-args>([\s\S]*?)<\/command-args>/)?.[1] ?? '')
           return { ...begin({ ...run, lastUser: q || run.lastUser, fresh: run.status === 'done' ? true : run.fresh }), deep: true }
         }
         // The extension posts the question after its replay, so it can land on a started run.
-        if (run.status !== 'waiting' && !run.question) return { ...run, lastUser: text, question: text }
-        return { ...run, lastUser: text, fresh: run.status === 'done' ? true : run.fresh }
+        if (run.status !== 'waiting' && !run.question) return { ...run, lastUser: shown, question: shown }
+        return { ...run, lastUser: shown, fresh: run.status === 'done' ? true : run.fresh }
       }
       if (role === 'user') return patchLane(run, agent, l => (l.brief ? l : { ...l, brief: text.split('\n')[0].slice(0, 240) }))
       if (role !== 'assistant') return run

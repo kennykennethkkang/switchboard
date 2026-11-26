@@ -29,6 +29,8 @@ const WAIT = 'chats_wait'
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 const REDISCOVER_MS = 30_000
 const STATE_MS = 10_000
+// HubState's own fields: the whole state is over 1 MB, and every chat asks every 10 s. An older Switchboard sends it all.
+const FIELDS = 'chats,progress,live,links,archive,todos,unlinks,pause,waits'
 const POLL_S = 5
 // A live target with no progress is a reload for this long from when its progress went missing; past it, ended with nothing to show.
 const GRACE_MS = 10 * 60_000
@@ -182,7 +184,7 @@ async function home($: EngineInterface) {
 async function readState($: EngineInterface): Promise<HubState | undefined> {
   const t = await home($)
   if (!t) return undefined
-  const got = await bounded($, $.http.fetch(`http://127.0.0.1:${t.port}/hub/state`, { headers: { 'X-Switchboard-Token': t.token } }))
+  const got = await bounded($, $.http.fetch(`http://127.0.0.1:${t.port}/hub/state?fields=${FIELDS}`, { headers: { 'X-Switchboard-Token': t.token } }))
   if (!got?.ok) { cache.foundAt = -Infinity; return undefined }
   try { return JSON.parse(got.text) as HubState } catch { return undefined }
 }
@@ -298,7 +300,8 @@ export async function editDenial($: EngineInterface, file: string) {
 export function waitBand(s: HubState, self: string, fromTodo: boolean, now: number, cols: number, project = ''): string | undefined {
   const cut = (line: string) => line.length > cols ? `${line.slice(0, Math.max(cols - 1, 0))}\u2026` : line
   // todos is keyed by folder path; SWITCHBOARD_TODO carries only its base name.
-  const cwd = s.chats.find(c => c.sessionId === self)?.cwd ?? '', keys = Object.keys(s.todos ?? {})
+  const cwd = norm(s.chats.find(c => c.sessionId === self)?.cwd ?? ''), todos = Object.entries(s.todos ?? {}).map(([k, v]) => [norm(k), v] as const)
+  const keys = todos.map(([k]) => k)
   const key = keys.find(k => cwd === k || cwd.startsWith(`${k}/`)) ?? keys.find(k => k.split('/').pop() === project)
   const parts: string[] = []
   for (const l of (s.links ?? []).filter(x => x.from === self)) {
@@ -306,9 +309,9 @@ export function waitBand(s: HubState, self: string, fromTodo: boolean, now: numb
     if (!ids.length) continue
     const names = ids.map(id => s.chats.find(c => c.sessionId === id)?.name ?? id.slice(0, 8)).join(', ')
     const file = l.auto ? s.live.find(x => ids.includes(x.sessionId))?.file : undefined
-    parts.push(file ? `${file.split('/').pop()} in ${names}` : names)
+    parts.push(file ? `${norm(file).split('/').pop()} in ${names}` : names)
   }
-  const hold = fromTodo && key && parts.length ? s.todos?.[key]?.plan?.hold : undefined
+  const hold = fromTodo && key && parts.length ? todos.find(([k]) => k === key)?.[1]?.plan?.hold : undefined
   if (hold?.kind === 'waiting' && typeof hold.text === 'string' && hold.text) return cut(hold.text)
   // The Left lines this chat hands to To-do, one clause after the wait.
   const mine = s.progress.find(p => p.sessionId === self)

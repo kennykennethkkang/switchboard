@@ -19,6 +19,7 @@ export const IND_ASK_RULE = 'Run indefinitely is on: ask every question only the
 export type IndCfg = { onAt: number; maxHours?: number; maxCostUsd?: number; gate?: string }
 export const IND_GATE_MS = 600_000
 export const IND_GATE_LINES = 20
+export const gateShell = (gate: string, windows: boolean) => windows ? ['cmd.exe', '/d', '/s', '/c', gate] : ['/bin/sh', '-c', gate]
 export const posNum = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
 /** This chat's flag as a config: a plain number is just onAt. Missing, broken or already ended means off. */
 export async function indefiniteCfg($: EngineInterface): Promise<IndCfg | undefined> {
@@ -42,7 +43,7 @@ export const tailLines = (text: string) => text.trim().split('\n').slice(-IND_GA
 /** Gate exit 0 passes; anything else, or a gate that cannot run, fails with its output tail. */
 export async function runGate($: EngineInterface, gate: string, cwd?: string): Promise<{ ok: true } | { ok: false; out: string }> {
   try {
-    const r = await $.process.run(['/bin/sh', '-c', gate], { cwd: cwd ?? (await $.session.cwd()), timeoutMs: IND_GATE_MS })
+    const r = await $.process.run(gateShell(gate, (await $.env.get('OS')) === 'Windows_NT'), { cwd: cwd ?? (await $.session.cwd()), timeoutMs: IND_GATE_MS })
     return r.exitCode === 0 ? { ok: true } : { ok: false, out: tailLines(`${r.stdout}\n${r.stderr}`) }
   } catch (err) {
     return { ok: false, out: `gate did not finish: ${err instanceof Error ? err.message : String(err)}` }

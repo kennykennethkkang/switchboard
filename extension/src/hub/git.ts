@@ -3,6 +3,7 @@
  * Only Kenneth's presses run these; chats never commit. Called from hub-panel.ts.
  */
 import { execFile } from 'child_process'
+import { randomBytes } from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -11,6 +12,7 @@ import { excludeWorktrees } from './advanced'
 import { cleanInvisible } from './clean-text'
 import { hold } from './idle'
 import { insideCwd } from './local'
+import { cliCall } from './windows'
 import { dropPending, leftovers, pendingAt } from './progress'
 import type { GitOp, LaneCommit, RepoFile, RepoView } from './types'
 
@@ -28,14 +30,18 @@ const LIT = '--literal-pathspecs'
 const FORCE = /^(--force(-with-lease|-if-includes)?(=.*)?|-[a-zA-Z]*f[a-zA-Z]*|\+.*)$/
 
 type Ran = { ok: boolean; out: string; err: string }
-export type GitCmd = { op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
+type Runner = typeof execFile
+let runner: Runner = execFile
+export const setGitRunner = (next?: Runner) => { runner = next ?? execFile }
+export type GitCmd = { op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean; /** merge-all: just this worktree. */ only?: string }
 export type GitResult = { ok: boolean; text: string; open?: string }
 type Status = { branch?: string; upstream?: string; ahead: number; behind: number; files: RepoFile[] }
 
 /** input: written to stdin (hash-object --stdin, mktree). */
 function exec(file: string, args: string[], timeoutMs: number, cwd?: string, input?: string): Promise<Ran> {
+  const call = cliCall(file, args)
   return new Promise(resolve => {
-    const c = execFile(file, args, { cwd, timeout: timeoutMs, maxBuffer: 8 << 20, windowsHide: true, env: ENV }, (err, out, e) =>
+    const c = runner(call.cmd, call.args, { windowsVerbatimArguments: call.windowsVerbatimArguments, cwd, timeout: timeoutMs, maxBuffer: 8 << 20, windowsHide: true, env: ENV }, (err, out, e) =>
       resolve({ ok: !err, out: String(out), err: err?.killed ? `${path.basename(file)} timed out` : String(e) || err?.message || '' }))
     if (input !== undefined) { c.stdin?.on('error', () => {}); c.stdin?.end(input) }
   })
@@ -115,7 +121,7 @@ export function pickFiles(listed: RepoFile[], asked: string[]): RepoFile[] | str
   return got
 }
 
-const status = async (root: string) => {
+export const status = async (root: string) => {
   const r = await git(root, ['status', '--porcelain=v2', '--branch', '-z', '-uall'])
   if (!r.ok) throw new Error(why(r))
   return parseRepoStatus(r.out)
@@ -405,7 +411,17 @@ export async function readMerge(root: string, branch: string, remote: string, pr
   return merge
 }
 
-export const repoRoot = async (cwd: string) => { const r = await git(cwd, ['rev-parse', '--show-toplevel']); return r.ok ? r.out.trim() : undefined }
+const roots = new Map<string, string>()
+export const repoRoot = async (cwd: string) => {
+  const hit = roots.get(cwd)
+  if (hit && fs.existsSync(path.join(hit, '.git')) && !(cwd !== hit && fs.existsSync(path.join(cwd, '.git')))) return hit
+  roots.delete(cwd)
+  const r = await git(cwd, ['rev-parse', '--show-toplevel'])
+  if (!r.ok) return undefined
+  const root = r.out.trim()
+  roots.set(cwd, root)
+  return root
+}
 
 /** The worktree's folder and its main checkout, or undefined in a plain checkout (git dir equals the common dir). */
 async function worktreeOf(root: string): Promise<{ wt: string; main: string } | undefined> {
@@ -419,7 +435,7 @@ const WT_DIR = /^(.*[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)/
 const WT_IDLE_MS = 10 * 60_000
 const WT_FAST_MS = 2 * 60_000
 const wasLive = new WeakMap<Map<string, number | undefined>, Set<string>>()
-const realOf = (p: string) => { try { return fs.realpathSync.native(p) } catch { return p } }
+export const realOf = (p: string) => { try { return fs.realpathSync.native(p) } catch { return p } }
 
 /**
  * Worktree folders that have had no live chat for 10 minutes straight. seen carries the state between calls:
@@ -458,6 +474,9 @@ export async function addWorktree(repo: string, slug: string): Promise<{ ok: tru
   const dir = path.join(repo, '.claude', 'worktrees', slug)
   const r = await git(repo, ['worktree', 'add', '-q', '-b', `worktree-${slug}`, dir, 'HEAD'], SLOW)
   if (!r.ok) return { ok: false, error: `Could not create the worktree: ${why(r)}` }
+  // Where it starts, for otherFork; the reflog says so too but expires.
+  const start = (await git(dir, ['rev-parse', 'HEAD'])).out.trim()
+  if (start) await git(repo, ['config', `branch.worktree-${slug}.switchboardFork`, start])
   excludeWorktrees(repo)
   return { ok: true, dir }
 }
@@ -486,6 +505,7 @@ async function unlockStale(main: string, wt: string): Promise<boolean> {
 /**
  * Removes a worktree with no changes once its work is merged: its branch is in the main checkout's HEAD, or its PR is merged
  * on GitHub with that very head (a squash never makes an ancestor, so the branch goes with -D). Anything else stays. Never forced.
+ * Its gitignored files are copied to .git/switchboard-merged first; if that fails it stays.
  */
 export async function cleanWorktree(wt: string, pr: (main: string, branch: string, sha: string) => Promise<string | undefined> = prState): Promise<boolean> {
   const w = await worktreeOf(wt)
@@ -496,7 +516,9 @@ export async function cleanWorktree(wt: string, pr: (main: string, branch: strin
   const ancestor = (await git(w.main, ['merge-base', '--is-ancestor', branch, 'HEAD'])).ok
   if (!ancestor && await pr(w.main, branch, (await git(wt, ['rev-parse', 'HEAD'])).out.trim()) !== 'MERGED') return false
   if (!(await unlockStale(w.main, w.wt))) return false
-  if (!(await git(w.main, ['worktree', 'remove', w.wt])).ok) return false
+  const kept = keptDir(w.main, w.wt)
+  try { await saveIgnored(w.wt, path.join(kept, 'ignored')) } catch { fs.rmSync(kept, { recursive: true, force: true }); return false }
+  if (!(await git(w.main, ['worktree', 'remove', w.wt])).ok) { fs.rmSync(kept, { recursive: true, force: true }); return false }
   await git(w.main, ['branch', ancestor ? '-d' : '-D', branch])
   return true
 }
@@ -521,6 +543,19 @@ export function endedMerges(queue: Map<string, string>, live: (wt: string) => bo
   return out
 }
 
+const RETRY_MS = 10 * 60_000
+/** The worktree folder a path is in, if any. */
+export const worktreeFolder = (cwd: string) => WT_DIR.exec(cwd)?.[1]
+/** The checkout a worktree folder hangs off. */
+export const mainOf = (wt: string) => wt.replace(/[\\/]\.claude[\\/]worktrees[\\/][^\\/]+$/, '')
+/** Auto merge: queues a worktree whose chat ended, keyed by its folder. Not while Approve already queued it or any window tried it in the last 10 minutes. */
+export function queueEnded(queue: Map<string, string>, wt: string, on = true, now = Date.now()): void {
+  if (!on || [...queue.values()].some(c => { const q = worktreeFolder(c); return !!q && realOf(q) === realOf(wt) })) return
+  if (!triedLately(wt, now)) queue.set(wt, wt)
+}
+/** Any window tried this worktree in the last 10 minutes. */
+export const triedLately = (wt: string, now = Date.now()) => now - (mergeNote(mainOf(wt))?.tried?.[path.basename(wt)] ?? 0) < RETRY_MS
+
 export type Check = (dir: string) => Promise<{ ok: boolean; text: string }>
 const CHECK_MS = 10 * 60_000
 
@@ -538,10 +573,26 @@ export const repoChecks: Check = async dir => {
   return { ok: true, text: run.length ? `${run.join(' and ')} passed` : 'no checks found' }
 }
 
-/** The worktree's work as one binary patch against where it forked from main's HEAD: its commits plus every uncommitted and new file. */
-async function worktreePatch(main: string, wt: string): Promise<Ran> {
+/** The branch a worktree merges into: whatever the repo's checkout is on. undefined on a detached HEAD. */
+export const checkoutBranch = async (main: string) => (await git(main, ['symbolic-ref', '-q', '--short', 'HEAD'])).out.trim() || undefined
+
+/** Where the worktree's branch was made, when the checkout has since moved to a branch without that commit; else undefined. */
+async function otherFork(main: string, wt: string): Promise<string | undefined> {
+  const branch = (await git(wt, ['symbolic-ref', '-q', 'HEAD'])).out.trim()
+  if (!branch) return undefined
+  // Saved when Switchboard made it; else the reflog's first entry (one cut short by expiry is not the start, so it does not count).
+  const saved = await config(wt, `${branch.replace(/^refs\/heads\//, 'branch.')}.switchboardFork`)
+  const [first, how] = (await git(wt, ['log', '-g', '--format=%H%x09%gs', branch, '--'])).out.trim().split('\n').at(-1)!.split('\t')
+  const sha = saved || (/^branch: Created from/.test(how ?? '') ? first : '')
+  if (!sha) return undefined
+  if ((await git(main, ['merge-base', '--is-ancestor', sha, 'HEAD'])).ok) return undefined
+  return (await git(wt, ['merge-base', '--is-ancestor', sha, 'HEAD'])).ok ? sha : undefined
+}
+
+/** The worktree's work as one binary patch against where it forked from main's HEAD (or started, see otherFork): its commits plus every uncommitted and new file. */
+async function worktreePatch(main: string, wt: string): Promise<Ran & { base?: string }> {
   const head = (await git(wt, ['rev-parse', 'HEAD'])).out.trim()
-  const base = (await git(main, ['merge-base', 'HEAD', head])).out.trim()
+  const base = await otherFork(main, wt) ?? (await git(main, ['merge-base', 'HEAD', head])).out.trim()
   if (!head || !base) return { ok: false, out: '', err: 'no common commit with main' }
   // A throwaway index, so the worktree's own index is never touched.
   const idx = path.join(os.tmpdir(), `sb-merge-${process.pid}-${Date.now()}`)
@@ -551,8 +602,67 @@ async function worktreePatch(main: string, wt: string): Promise<Ran> {
     for (const args of [['read-tree', 'HEAD'], ['add', '-A']]) { const r = await inIdx(args); if (!r.ok) return r }
     const tree = await inIdx(['write-tree'])
     if (!tree.ok) return tree
-    return await git(wt, ['diff', '--binary', base, tree.out.trim()], SLOW)
+    return { ...await git(wt, ['diff', '--binary', base, tree.out.trim()], SLOW), base }
   } finally { fs.rmSync(idx, { force: true }) }
+}
+
+// Buffers, not git(): its utf8 string would mangle any file that is not utf8.
+const gitBuf = (args: string[]) => new Promise<{ code: number; out: Buffer }>(done => execFile('git', args, { encoding: 'buffer', timeout: SLOW, maxBuffer: 64 << 20, windowsHide: true, env: ENV },
+  (err, out) => done({ code: err ? (typeof err.code === 'number' ? err.code : -1) : 0, out })))
+
+/**
+ * For a patch that clashes with main: each file merged three-way from base with git merge-file, all or nothing. Renames, mode changes,
+ * binaries and links are left to a person. Returns how to put main's copies back, or the files that conflict.
+ */
+async function mergeThreeWay(main: string, wt: string, base: string, patch: string, skip: string[]): Promise<{ undo: () => Promise<Ran> } | { clash: string[]; err?: string }> {
+  if (/^(rename from|copy from|old mode|new mode|GIT binary patch)/m.test(patch)) return { clash: [] }
+  const list = await git(main, ['apply', '--numstat', '-z', ...skip.map(f => `--exclude=${f}`)], SLOW, patch)
+  if (!list.ok) return { clash: [] }
+  const files = list.out.split('\0').filter(Boolean).map(r => r.split('\t').slice(2).join('\t'))
+  const read = (p: string) => {
+    let s: fs.Stats
+    try { s = fs.lstatSync(p) } catch { return undefined }
+    return s.isFile() ? { buf: fs.readFileSync(p), mode: s.mode } : 'other' as const
+  }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-merge3-'))
+  const plan: { f: string; was?: { buf: Buffer; mode: number }; next?: { buf: Buffer; mode: number } }[] = [], clash: string[] = []
+  try {
+    for (const f of files) {
+      const mine = read(path.join(main, f)), theirs = read(path.join(wt, f))
+      if (mine === 'other' || theirs === 'other') { clash.push(f); continue }
+      const b = await gitBuf(['-C', main, 'cat-file', 'blob', `${base}:${f}`])
+      const was = b.code ? undefined : b.out
+      if (!theirs) {
+        // Deleted in the worktree: only if main still has base's copy.
+        if (mine && was && mine.buf.equals(was)) plan.push({ f, was: mine })
+        else if (mine) clash.push(f)
+        continue
+      }
+      if (!mine) { if (was) clash.push(f); else plan.push({ f, next: theirs }); continue }
+      // Added on both sides: main's copy is its own work, even when empty.
+      if (!was) { clash.push(f); continue }
+      if (mine.buf.equals(was)) { plan.push({ f, was: mine, next: { buf: theirs.buf, mode: mine.mode } }); continue }
+      const [o, a, t] = ['main', 'base', 'worktree'].map(n => path.join(tmp, n))
+      fs.writeFileSync(o, mine.buf); fs.writeFileSync(a, was); fs.writeFileSync(t, theirs.buf)
+      // Exit code = conflict count.
+      const m = await gitBuf(['merge-file', '-p', o, a, t])
+      if (m.code) clash.push(f)
+      else plan.push({ f, was: mine, next: { buf: m.out, mode: mine.mode } })
+    }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
+  if (clash.length || !plan.length) return { clash }
+  const put = (f: string, v?: { buf: Buffer; mode: number }) => {
+    const p = path.join(main, f)
+    if (!v) { fs.rmSync(p, { force: true }); return }
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+    fs.writeFileSync(p, v.buf)
+    fs.chmodSync(p, v.mode & 0o7777)
+  }
+  const undo = async (): Promise<Ran> => {
+    try { for (const s of plan) put(s.f, s.was); return { ok: true, out: '', err: '' } } catch (err) { return { ok: false, out: '', err: (err as Error).message } }
+  }
+  try { for (const s of plan) put(s.f, s.next) } catch (err) { const back = await undo(); return { clash: [], err: `could not write the merge (${(err as Error).message})${back.ok ? '' : `, and putting main back failed (${back.err}); check main`}` } }
+  return { undo }
 }
 
 /** Gitlinks (nested repos) in the patch that main does not track as one: the patch carries only their commit id, and removing the folder deletes them. */
@@ -629,11 +739,33 @@ const touchLock = (main: string) => { try { const t = new Date(); fs.utimesSync(
 function dropLock(main: string, token: string): void {
   try { if (fs.readFileSync(mergeLock(main), 'utf8') === token) fs.rmSync(mergeLock(main), { force: true }) } catch { /* gone */ }
 }
+/** True while any window merges a worktree into this repo. */
+export const mergeBusy = (main: string) => { try { return Date.now() - fs.statSync(mergeLock(main)).mtimeMs < LOCK_STALE_MS && pidAlive(parseInt(fs.readFileSync(mergeLock(main), 'utf8'), 10)) } catch { return false } }
+const autoOff = (main: string) => path.join(main, '.git', 'switchboard-no-auto-merge')
+/** Worktrees of this repo merge on their own unless turned off on Ship; a file in .git, so every window reads the same. */
+export const autoMergeOn = (main: string) => !fs.existsSync(autoOff(main))
+export function setAutoMerge(main: string, on: boolean): void {
+  if (on) fs.rmSync(autoOff(main), { force: true })
+  else fs.writeFileSync(autoOff(main), '')
+  repoCache.clear()
+}
+const noteFile = (main: string) => path.join(main, '.git', 'switchboard-merge-note')
+export type MergeNote = { text: string; ok: boolean; at: number; /** Worktree name to when it was last tried. */ tried?: Record<string, number> }
+/** The last worktree merge in this repo, by any window. */
+export function mergeNote(main: string): MergeNote | undefined {
+  try { const n = JSON.parse(fs.readFileSync(noteFile(main), 'utf8')) as MergeNote; return typeof n.text === 'string' && typeof n.at === 'number' ? n : undefined } catch { return undefined }
+}
+function noteMerge(main: string, r: GitResult, names: string[], now = Date.now()): void {
+  const old = Object.entries(mergeNote(main)?.tried ?? {}).filter(([, at]) => now - at < RETRY_MS)
+  const tried = Object.fromEntries([...old, ...names.map(n => [n, now] as const)])
+  try { fs.writeFileSync(noteFile(main), JSON.stringify({ text: r.text, ok: r.ok, at: now, tried })) } catch { /* only the note is lost */ }
+}
 /** When any window last finished a merge-all in this repo (0: never). */
 export const lastMergeRun = (main: string) => { try { return fs.statSync(ranFile(main)).mtimeMs } catch { return 0 } }
 
 // Rebuilt by an install, so not worth a copy.
 const REBUILT = new Set(['node_modules', '.next', 'dist', 'build', 'out', '.turbo', 'coverage'])
+const keptDir = (main: string, wt: string) => path.join(main, '.git', 'switchboard-merged', `${path.basename(wt)}-${Date.now()}-${randomBytes(4).toString('hex')}`)
 /** Copies the worktree's gitignored files (env files, local settings, notes) next to its patch, since the patch leaves them out. */
 async function saveIgnored(wt: string, dir: string): Promise<void> {
   const r = await git(wt, ['ls-files', '-o', '-i', '--exclude-standard', '--directory', '-z'])
@@ -644,26 +776,31 @@ async function saveIgnored(wt: string, dir: string): Promise<void> {
   }
 }
 
+/** The repo's Switchboard worktrees on disk, as real paths. */
+export const worktreesOf = async (main: string) => (await git(main, ['worktree', 'list', '--porcelain'])).out.split('\n\n').map(b => b.split('\n')[0].replace(/^worktree /, ''))
+  .filter(w => WT_DIR.test(w) && fs.existsSync(w)).map(realOf)
+
 /**
- * Merge all: every worktree under <main>/.claude/worktrees with no live chat goes into the main checkout as uncommitted changes, so
- * Kenneth commits it like any other work. Checks run on main first, then after each worktree; one that breaks them, does not apply
+ * Merge all: every worktree under <main>/.claude/worktrees with no live chat goes into the branch the main checkout is on, as uncommitted
+ * changes, so Kenneth commits it like any other work. Checks run on main first, then after each worktree; one that breaks them, does not apply
  * cleanly or changes while its checks run is undone and kept. A merged worktree is removed; its patch and gitignored files stay in
  * .git/switchboard-merged. live is asked again before each removal. Never commits, never pushes. only: just that worktree (Merge back).
  */
 export async function mergeWorktrees(root: string, live: (wt: string) => boolean, check: Check = repoChecks, only?: string): Promise<GitResult> {
   const main = (await worktreeOf(root))?.main ?? root
-  const all = (await git(main, ['worktree', 'list', '--porcelain'])).out.split('\n\n').map(b => b.split('\n')[0].replace(/^worktree /, ''))
-    .filter(w => WT_DIR.test(w) && fs.existsSync(w)).map(realOf).filter(w => !only || w === realOf(only))
+  const all = (await worktreesOf(main)).filter(w => !only || w === realOf(only))
   const idle = all.filter(w => !live(w))
   if (!idle.length) return no(all.length ? 'Every worktree still has a chat running in it' : 'No worktrees to merge')
   const token = takeLock(main)
   if (!token) return no('A merge is already running for this repo')
+  const into = await checkoutBranch(main) ?? 'the main checkout'
+  let last: GitResult | undefined
   try {
     const first = await check(main)
-    if (!first.ok) return no(`Checks already fail in the main checkout (${first.text}), so nothing was merged`)
+    if (!first.ok) return last = no(`Checks already fail in the main checkout (${first.text}), so nothing was merged`)
     const merged: string[] = [], kept: string[] = []
-    const undo = async (name: string, patch: string, skip: string[], why1: string) => {
-      const back = await git(main, ['apply', '-R', '--binary', ...skip.map(f => `--exclude=${f}`)], SLOW, patch)
+    const undo = async (name: string, rev: () => Promise<Ran>, why1: string) => {
+      const back = await rev()
       kept.push(back.ok ? `${name}: ${why1}, undone` : `${name}: ${why1}, and undoing it failed (${why(back)}); check main`)
     }
     for (const wt of idle) {
@@ -675,18 +812,23 @@ export async function mergeWorktrees(root: string, live: (wt: string) => boolean
       const nested = await newGitlinks(main, p.out)
       if (nested.length) { kept.push(`${name}: holds a nested git repo (${nested.join(', ')}) that would be lost`); continue }
       const skip = sameInMain(main, wt, p.out)
+      let rev = () => git(main, ['apply', '-R', '--binary', ...skip.map(f => `--exclude=${f}`)], SLOW, p.out)
       if (p.out.trim()) {
         const a = await git(main, ['apply', '--binary', ...skip.map(f => `--exclude=${f}`)], SLOW, p.out)
-        if (!a.ok) { kept.push(`${name}: clashes with main (${why(a)})`); continue }
+        if (!a.ok) {
+          const m: Awaited<ReturnType<typeof mergeThreeWay>> = p.base ? await mergeThreeWay(main, wt, p.base, p.out, skip) : { clash: [] }
+          if ('clash' in m) { kept.push(`${name}: clashes with ${into} (${m.clash.length ? `both changed the same lines in ${m.clash.join(', ')}` : m.err ?? why(a)})`); continue }
+          rev = m.undo
+        }
         const c = await check(main)
         touchLock(main)
-        if (!c.ok) { await undo(name, p.out, skip, c.text); continue }
+        if (!c.ok) { await undo(name, rev, c.text); continue }
       }
       // Anything written there while the checks ran would go with the folder.
       const again = await worktreePatch(main, wt)
       if (live(wt) || !again.ok || again.out !== p.out) {
         const reason = live(wt) ? 'a chat started in it' : 'it changed while merging'
-        if (p.out.trim()) await undo(name, p.out, skip, reason); else kept.push(`${name}: ${reason}`)
+        if (p.out.trim()) await undo(name, rev, reason); else kept.push(`${name}: ${reason}`)
         continue
       }
       const dir = path.join(main, '.git', 'switchboard-merged', `${name}-${Date.now()}`)
@@ -704,11 +846,13 @@ export async function mergeWorktrees(root: string, live: (wt: string) => boolean
       if (rm.ok && branch && branch !== 'HEAD') await git(main, ['branch', '-d', branch])
       merged.push(rm.ok ? name : `${name} (folder stayed: ${why(rm)})`)
     }
-    const text = [merged.length ? `Merged ${merged.join(', ')} into the main checkout as uncommitted changes; ${first.text}` : 'Nothing merged',
+    const text = [merged.length ? `Merged ${merged.join(', ')} into ${into} as uncommitted changes; ${first.text}` : 'Nothing merged',
       kept.length ? `Kept ${kept.join('; ')}` : '', idle.length < all.length ? `${plural(all.length - idle.length, 'worktree')} with a running chat left alone` : '']
-    return { ok: merged.length > 0, text: text.filter(Boolean).join('. ') + '. Nothing was committed or pushed' }
+    return last = { ok: merged.length > 0, text: text.filter(Boolean).join('. ') + '. Nothing was committed or pushed' }
   } finally {
-    try { fs.writeFileSync(ranFile(main), String(Date.now())) } catch { /* next run just repeats */ }
+    if (last) noteMerge(main, last, idle.map(w => path.basename(w)))
+    // One worktree's merge is not the quiet sweep.
+    if (!only) try { fs.writeFileSync(ranFile(main), String(Date.now())) } catch { /* next run just repeats */ }
     dropLock(main, token)
   }
 }
@@ -735,8 +879,49 @@ export function mergeDue(m: MergeClock, chats: { sessionId: string; cwd: string 
   })
 }
 
+type RepoCache = { at: number; key: string; view: Omit<RepoView, 'sessionId' | 'busy' | 'result'>; dirs: string[] }
+// Under a minute, so an idle chat's once-a-minute read is a full one.
+const KEEP_READ_MS = 45_000
+const repoCache = new Map<string, RepoCache>()
+let repoClock = () => Date.now()
+export const setRepoClock = (clock?: () => number) => { repoClock = clock ?? (() => Date.now()) }
+export const repoReadKey = (root: string) => { const hit = repoCache.get(root); return hit ? `${hit.at}\n${hit.key}` : undefined }
+const statKey = (file: string) => { try { const s = fs.lstatSync(file); return `${s.mtimeMs}:${s.size}` } catch { return '' } }
+function cacheKey(root: string, out: string, dirs: string[]): string {
+  const status = parseRepoStatus(out)
+  const files = status.files.flatMap(f => [f.path, ...(f.from ? [f.from] : [])]).map(f => `${f}:${statKey(path.join(root, f))}`)
+  const meta = dirs.flatMap(d => {
+    const refs: string[] = []
+    const walk = (refdir: string) => {
+      try {
+        for (const name of fs.readdirSync(refdir)) {
+          const file = path.join(refdir, name)
+          refs.push(path.relative(d, file))
+          if (fs.lstatSync(file).isDirectory()) walk(file)
+        }
+      } catch { /* no refs */ }
+    }
+    walk(path.join(d, 'refs/remotes'))
+    walk(path.join(d, 'refs/heads'))
+    return ['HEAD', 'index', 'packed-refs', 'logs/HEAD', 'FETCH_HEAD', 'config', 'refs/stash', 'switchboard-no-auto-merge', ...refs].map(f => `${d}/${f}:${statKey(path.join(d, f))}`)
+  })
+  return `${out}\n${files.join('|')}\n${meta.join('|')}`
+}
+const statusHead = (out: string) => { const head = out.split('\0').find(line => line.startsWith('# branch.oid '))?.slice(13); return head && head !== '(initial)' ? head : undefined }
 export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView, 'sessionId' | 'busy' | 'result'>> {
-  const [s, heads, log, stash] = await Promise.all([status(root), branches(root), git(root, ['log', '-15', '--format=%h%x09%s%x09%ar']), git(root, ['stash', 'list', '--format=%gd'])])
+  const check = await git(root, ['status', '--porcelain=v2', '--branch', '-z', '-uall'])
+  if (!check.ok) throw new Error(why(check))
+  let cached = repoCache.get(root)
+  if (!cached) {
+    const dirs = await git(root, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'])
+    cached = { at: 0, key: '', view: undefined as never, dirs: dirs.out.trim().split('\n').filter(Boolean) }
+  }
+  const key = cacheKey(root, check.out, cached.dirs)
+  if (cached.at && repoClock() - cached.at < KEEP_READ_MS && key === cached.key) {
+    const view = { ...cached.view, at: Date.now() }
+    return withPending(root, statusHead(check.out), view)
+  }
+  const [s, heads, log, stash] = await Promise.all([Promise.resolve(parseRepoStatus(check.out)), branches(root), git(root, ['log', '-15', '--format=%h%x09%s%x09%ar']), git(root, ['stash', 'list', '--format=%gd'])])
   const remote = (s.branch && (await config(root, `branch.${s.branch}.remote`))) || 'origin'
   const github = githubRepo((await git(root, ['remote', 'get-url', remote])).out)
   const pr = github && gh && s.branch && s.upstream ? await prFor(root, github, (await pushTarget(root, s)).name, gh) : undefined
@@ -750,15 +935,19 @@ export async function readRepo(root: string, gh?: string): Promise<Omit<RepoView
   const outgoing = sent ? parseNumstat((await git(root, [LIT, 'diff', '--numstat', '-z', `${sent}...HEAD`])).out) : undefined
   const ci = github && gh && s.branch && s.upstream ? await runFor(root, github, (await pushTarget(root, s)).name, gh).catch(() => undefined) : undefined
   const ship = (({ take, kept }) => ({ files: take.map(f => f.path), kept: kept.map(shown) }))(shipFiles(s.files))
-  const p = pendingAt(root, (await git(root, ['rev-parse', '-q', '--verify', 'HEAD'])).out.trim() || undefined)
-  return {
+  const view = {
     merge, ...(lanes ? { lanes } : {}), ...(outgoing ? { outgoing } : {}), ship,
-    ...(p ? { pending: { text: leftovers(p.text, ship.files), last: p.last, at: p.at } } : {}),
-    ...await (async () => { const w = await worktreeOf(root), n = worktreeDirs([], [w?.main ?? root]).length; return { ...(w ? { worktree: true } : {}), ...(n ? { worktrees: n } : {}) } })(),
+    ...await (async () => { const w = await worktreeOf(root), into = w && await checkoutBranch(w.main); return w ? { worktree: true, auto: autoMergeOn(w.main), ...(into ? { into } : {}) } : {} })(),
     name: path.basename(root), branch: s.branch, upstream: s.upstream, ahead: s.ahead, behind: s.behind, files: s.files, branches: heads, sync: syncAction(s),
     log: log.out.split('\n').filter(Boolean).map(l => { const [hash, subject, when] = l.split('\t'); return { hash, subject: subject ?? '', when: when ?? '' } }),
     stashes: stash.out.split('\n').filter(Boolean).length, github, pr, ...(ci ? { ci } : {}), at: Date.now(),
   }
+  repoCache.set(root, { at: repoClock(), key, view, dirs: cached.dirs })
+  return withPending(root, statusHead(check.out), view)
+}
+const withPending = (root: string, head: string | undefined, view: Omit<RepoView, 'sessionId' | 'busy' | 'result'>) => {
+  const p = pendingAt(root, head)
+  return { ...view, ...(p ? { pending: { text: leftovers(p.text, view.ship?.files ?? []), last: p.last, at: p.at } } : {}) }
 }
 
 /** Deletes untracked files one by one, only plain paths whose folder stays inside the repo. */
@@ -803,7 +992,7 @@ async function unparkFiles(moved: Parked[]): Promise<void> {
 /** live: which worktrees a running chat holds, for merge-all and an uncommitted merge-back. */
 export async function gitOp(root: string, c: GitCmd, gh?: string, inUse = false, live: (wt: string) => boolean = () => true): Promise<GitResult> {
   const release = hold()
-  try { return await runOp(root, c, gh, inUse, live) } finally { release() }
+  try { return await runOp(root, c, gh, inUse, live) } finally { repoCache.delete(root); release() }
 }
 
 async function runOp(root: string, c: GitCmd, gh: string | undefined, inUse: boolean, live: (wt: string) => boolean): Promise<GitResult> {
@@ -994,7 +1183,8 @@ async function runOp(root: string, c: GitCmd, gh: string | undefined, inUse: boo
       if (!c.confirmed) return no('Confirm the merge first')
       const w = await worktreeOf(root)
       if (!w) return no('This is not a worktree, so there is nothing to merge back')
-      if (s.files.length) {
+      // A branch made off another one would bring that branch's commits along in a git merge.
+      if (s.files.length || await otherFork(w.main, w.wt)) {
         // Uncommitted work goes the Merge all way (commits ride along in its patch), never while a chat can still write there.
         if (!WT_DIR.test(realOf(w.wt))) return no('Only Switchboard worktrees under .claude/worktrees merge back from here')
         if (inUse || live(realOf(w.wt))) return no('A chat is still running in it; Merge back once it ends')
@@ -1003,22 +1193,29 @@ async function runOp(root: string, c: GitCmd, gh: string | undefined, inUse: boo
       if (!s.branch) return no('The worktree is on a detached HEAD, so nothing was merged')
       const head = (await git(w.main, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
       if (!head || head === 'HEAD') return no('The main checkout is on a detached HEAD, so nothing was merged')
+      const token = takeLock(w.main)
+      if (!token) return no('A merge is already running for this repo')
       const m = await git(w.main, ['merge', '--no-edit', s.branch], SLOW)
+      if (!m.ok) await git(w.main, ['merge', '--abort'])
+      dropLock(w.main, token)
       if (!m.ok) {
         const conflict = /CONFLICT/.test(m.out)
-        await git(w.main, ['merge', '--abort'])
         return no(conflict ? `Merge conflict merging ${s.branch} into ${head}. Nothing was changed; merge ${head} into the worktree branch and fix it there first` : why(m))
       }
       // A chat still running there would lose its cwd, so the worktree and branch stay until it ends.
       if (inUse) return { ok: true, text: `Merged; worktree kept while the chat runs. ${s.branch} went into ${head}, nothing was pushed` }
+      try { await saveIgnored(w.wt, path.join(keptDir(w.main, w.wt), 'ignored')) } catch (err) {
+        return { ok: true, text: `Merged ${s.branch} into ${head}, but the worktree stayed: could not copy its ignored files (${(err as Error).message})` }
+      }
       // Never forced: a worktree git will not remove stays, with the merge already done.
       await unlockStale(w.main, w.wt)
       const rm = await git(w.main, ['worktree', 'remove', w.wt])
       if (!rm.ok) return { ok: true, text: `Merged ${s.branch} into ${head}, but the worktree stayed: ${why(rm)}` }
       await git(w.main, ['branch', '-d', s.branch])
+      noteMerge(w.main, { ok: true, text: `Merged ${s.branch} into ${head}. Nothing was pushed` }, [path.basename(w.wt)])
       return { ok: true, text: `Merged ${s.branch} into ${head} and removed the worktree. Nothing was pushed` }
     }
-    case 'merge-all': return c.confirmed ? mergeWorktrees(root, live) : no('Confirm the merge first')
+    case 'merge-all': return c.confirmed ? mergeWorktrees(root, live, repoChecks, c.only) : no('Confirm the merge first')
     case 'stash': {
       if (!s.files.length) return no('Nothing to stash')
       const r = await git(root, ['stash', 'push', '-u', '-m', `Switchboard ${new Date().toISOString().slice(0, 16)}`])

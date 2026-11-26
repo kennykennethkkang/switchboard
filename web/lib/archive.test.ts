@@ -58,6 +58,9 @@ test('hides done chats quiet longer than the setting, never an idle one, one tha
   assert.deepEqual(hideDone(cards, 15, 'picked', now).map(c => c.chat.sessionId), ['work', 'idle-old', 'idle-new', 'ask', 'nohook-old', 'picked'])
   assert.deepEqual(hideDone(cards, 15, 'done-old', now).map(c => c.chat.sessionId), ['work', 'idle-old', 'idle-new', 'ask', 'done-old', 'nohook-old', 'picked'])
   assert.equal(hideDone(cards, null, undefined, now).length, cards.length)
+  // Still running in its terminal: it stays until it ends.
+  const open = { ...cards[4], chat: { ...cards[4].chat, live: true } }
+  assert.deepEqual(hideDone([open], 15, undefined, now), [open])
 })
 
 test('lists the projects chats run in, most chats first, and filters by the picked ones', () => {

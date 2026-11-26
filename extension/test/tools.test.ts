@@ -15,6 +15,8 @@ const inv: Installed[] = [
   { kind: 'plugin', name: 'marketing-skills@marketingskills', enabled: true },
   { kind: 'plugin', name: 'auth0@claude-plugins-official', enabled: false },
   { kind: 'plugin', name: 'aws-core@claude-plugins-official', enabled: false },
+  { kind: 'plugin', name: 'playwright@claude-plugins-official', enabled: true },
+  { kind: 'mcp', name: 'mcp:scrapling', enabled: true },
   { kind: 'mod', name: 'usage-meter@kenneth-mods', enabled: true },
   { kind: 'skill', name: 'phone', enabled: true, description: 'Call the owner' },
   { kind: 'skill', name: 'taste-design', enabled: true },
@@ -27,9 +29,22 @@ const BY = { ...LB, permissions: { defaultMode: 'bypassPermissions' }, skipDange
 
 test('defaultProfile: every plugin on but the gated bundles, mods and archived skills left out', () => {
   assert.deepEqual(defaultProfile(inv), {
-    plugins: { 'superpowers@superpowers-dev': true, 'bland@bland': false, 'marketing-skills@marketingskills': false, 'auth0@claude-plugins-official': true, 'aws-core@claude-plugins-official': false },
+    plugins: { 'superpowers@superpowers-dev': true, 'bland@bland': false, 'marketing-skills@marketingskills': false, 'auth0@claude-plugins-official': true, 'aws-core@claude-plugins-official': false, 'playwright@claude-plugins-official': false },
     skills: { phone: true, 'taste-design': true },
+    extras: { 'mcp:scrapling': false },
   })
+})
+
+test('gated tools stay off by default and survive a saved on profile', () => {
+  const base = defaultProfile(inv)
+  const saved = cleanProfile({ ...base, plugins: { ...base.plugins, 'playwright@claude-plugins-official': true }, extras: { 'mcp:scrapling': true } }, inv)
+  assert.equal(saved.plugins['playwright@claude-plugins-official'], true)
+  assert.equal(saved.extras?.['mcp:scrapling'], true)
+  const settings = profileSettings(base)
+  assert.deepEqual('deniedMcpServers' in settings ? settings.deniedMcpServers : undefined, [{ serverName: 'scrapling' }])
+  assert.equal(turnOn(base, inv, 'playwright')?.profile.plugins['playwright@claude-plugins-official'], true)
+  assert.equal(turnOn(base, inv, 'playwright')?.next, true)
+  assert.equal(turnOn(base, inv, 'mcp:scrapling')?.profile.extras?.['mcp:scrapling'], true)
 })
 
 test('defaultProfile: everything on but the second security-guidance, whose hooks would run twice', () => {
@@ -263,6 +278,7 @@ test('nameNote: names the user when set, nothing when empty', () => {
   const n = nameNote(' Kenneth ')!
   assert.match(n, /^Address the user as Kenneth\./)
   assert.match(n, /chat replies only, never files, code or commits/)
+  assert.match(n, /ASD-STE100 Simplified Technical English: short sentences, one fact per sentence/)
   assert.doesNotMatch(n, /Jarvis|Iron Man|sir|'/i)
 })
 
@@ -280,6 +296,7 @@ test('resumeSettingsArg: an extra note rides along, with or without a profile', 
 test('routes: the name setting takes a string', async () => {
   const { commandProblem } = await import('../src/hub/routes')
   assert.equal(commandProblem({ type: 'hub-switchboard', key: 'name', value: 'Kenneth' }), undefined)
+  assert.equal(commandProblem({ type: 'hub-switchboard', key: 'codexFirst', value: true }), undefined)
   assert.ok(commandProblem({ type: 'hub-switchboard', key: 'nickname', value: 'Kenneth' }))
 })
 
@@ -323,17 +340,26 @@ test('turnOn: a plugin by id, short name or plugin:skill, or a skill, and the fi
 test('resume: a settings file from before every chat started all on is rewritten all on, assets as saved', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
   const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
-  const old = { plugins: { 'a@b': false, 'security-guidance@claude-code-plugins': false }, skills: { phone: false }, assets: { 'x.md': false, '/l/y.md': true } }
+  const old = { plugins: { 'a@b': false, 'playwright@claude-plugins-official': true, 'security-guidance@claude-code-plugins': false }, skills: { phone: false }, assets: { 'x.md': false, '/l/y.md': true } }
   fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(old))
   fs.writeFileSync(path.join(dir, `${id}.settings.json`), JSON.stringify({ enabledPlugins: old.plugins, skillOverrides: { phone: 'off' } }))
   resumeSettingsArg(id, dir, '', 'posix', path.join(dir, 'lib'))
-  const p = { plugins: { 'a@b': true, 'security-guidance@claude-code-plugins': false }, skills: { phone: true }, assets: old.assets }
+  const p = { plugins: { 'a@b': true, 'playwright@claude-plugins-official': false, 'security-guidance@claude-code-plugins': false }, skills: { phone: true }, assets: old.assets, extras: { 'mcp:scrapling': false } }
   assert.deepEqual(readProfiles([id], dir)[id], p)
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${id}.settings.json`), 'utf8')), profileSettings(p))
   // A hand toggle saved since then stays.
   saveProfile(id, { ...p, skills: { phone: false } }, dir)
   resumeSettingsArg(id, dir, '', 'posix')
   assert.equal(readProfiles([id], dir)[id].skills.phone, false)
+})
+
+test('resume: a current profile keeps a hand-enabled playwright plugin', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-'))
+  const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const p = { plugins: { 'playwright@claude-plugins-official': true }, skills: {} }
+  saveProfile(id, p, dir)
+  resumeSettingsArg(id, dir, '', 'posix')
+  assert.equal(readProfiles([id], dir)[id].plugins['playwright@claude-plugins-official'], true)
 })
 
 test('resume: library copies saved on in an old profile go off and out of the note', () => {
@@ -454,4 +480,61 @@ test('Auto mode: chats start with defaultMode auto and keep the project MCP prom
     assert.deepEqual(profileSettings({ plugins: {}, skills: {} }).permissions, { defaultMode: 'auto' })
     assert.equal('skipDangerousModePermissionPrompt' in profileSettings({ plugins: {}, skills: {} }), false)
   } finally { ask.auto = false }
+})
+
+const extrasInv: Installed[] = [
+  { kind: 'plugin', name: 'cloudflare@cloudflare', enabled: true },
+  { kind: 'builtin', name: 'Artifact', enabled: true }, { kind: 'builtin', name: 'Workflow', enabled: true },
+  { kind: 'mcp', name: 'mcp:posthog', enabled: true }, { kind: 'mcp', name: 'mcp:cloudflare', enabled: true }, { kind: 'mcp', name: 'mcp:claude.ai Claude Docs', enabled: true },
+]
+
+test('extras: built-ins start off and servers on, the settings file turns off what is off', () => {
+  const d = defaultProfile(extrasInv)
+  assert.deepEqual(d.extras, { Artifact: false, Workflow: false, 'mcp:posthog': true, 'mcp:cloudflare': true, 'mcp:claude.ai Claude Docs': true })
+  const s = profileSettings({ ...d, extras: { ...d.extras, 'mcp:posthog': false, 'mcp:claude.ai Claude Docs': false } }) as Record<string, any>
+  assert.deepEqual(s.env, { CLAUDE_CODE_DISABLE_ARTIFACT: '1' })
+  assert.deepEqual(s.permissions.deny, ['Workflow', 'mcp__claude_ai_Claude_Docs'])
+  assert.ok(s.permissions.defaultMode)
+  assert.deepEqual(s.deniedMcpServers, [{ serverName: 'posthog' }])
+  const on = profileSettings({ ...d, extras: { ...d.extras, Artifact: true, Workflow: true } }) as Record<string, any>
+  assert.deepEqual([on.env.CLAUDE_CODE_DISABLE_ARTIFACT, on.permissions.deny, on.deniedMcpServers], ['0', undefined, undefined])
+  // A profile from before extras leaves every one of them alone.
+  const old = profileSettings({ plugins: {}, skills: {} }) as Record<string, any>
+  assert.deepEqual([old.env, old.permissions.deny, old.deniedMcpServers], [undefined, undefined, undefined])
+})
+
+test('extras: cleanProfile keeps the panel\'s picks and drops unknown names', () => {
+  assert.deepEqual(cleanProfile({ plugins: {}, skills: {}, extras: { Artifact: true, 'mcp:posthog': false, 'mcp:gone': true } }, extrasInv).extras,
+    { Artifact: true, Workflow: false, 'mcp:posthog': false, 'mcp:cloudflare': true, 'mcp:claude.ai Claude Docs': true })
+})
+
+test('extras: a settings file whose profile is unreadable keeps its deny rules under the current mode', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tools-')), id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const file = saveProfile(id, defaultProfile(extrasInv), dir)
+  fs.writeFileSync(path.join(dir, `${id}.json`), 'not json')
+  resumeSettingsArg(id, dir)
+  const s = JSON.parse(fs.readFileSync(file, 'utf8'))
+  assert.deepEqual([s.permissions.deny, s.env.CLAUDE_CODE_DISABLE_ARTIFACT], [['Workflow'], '1'])
+})
+
+test('turnOn: extras by name, a plugin of the same name first, and what to do until the next start', () => {
+  const d = defaultProfile(extrasInv)
+  const art = turnOn(d, extrasInv, 'Artifact')!
+  assert.equal(art.profile.extras!.Artifact, true)
+  assert.equal(art.next, true)
+  assert.match(art.use, /^run it headless, env -u CLAUDE_CODE_DISABLE_ARTIFACT CLAUDE_CODE_ARTIFACT=1 claude -p .* --allowedTools 'Artifact'/)
+  assert.equal(turnOn(d, extrasInv, 'Workflow')!.use, 'use Agent subagents')
+  assert.match(turnOn(d, extrasInv, 'posthog')!.use, /--allowedTools 'mcp__posthog'$/)
+  assert.equal(turnOn(d, extrasInv, 'cloudflare')!.next, undefined)
+  assert.equal(turnOn(d, [...extrasInv, { kind: 'plugin', name: 'Artifact@user', enabled: true }], 'Artifact')!.next, undefined)
+  assert.equal(turnOn(d, extrasInv, 'mcp:cloudflare')!.next, true)
+  assert.match(turnOn(d, extrasInv, 'claude.ai Claude Docs')!.use, /'mcp__claude_ai_Claude_Docs'$/)
+})
+
+test('toolsNote: off built-ins are named with their use past the plugin cap', () => {
+  const p = { ...defaultProfile(extrasInv), plugins: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`p${i}@x`, false])) }
+  const n = toolsNote(p)
+  assert.match(n, /Artifact \(publish an HTML page/)
+  assert.match(n, /Workflow \(/)
+  assert.match(n, /and 25 more/)
 })

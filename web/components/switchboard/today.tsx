@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react'
-import { needsLines, todayLine, tokenText, type Today } from '@/lib/today'
+import { needsLines, todayLine, type Today } from '@/lib/today'
 import type { TaskTotals } from '@/lib/progress'
 import type { DailyTrend } from '@/lib/hub-types'
 import { trendText } from '@/lib/budget-ui'
@@ -12,10 +12,9 @@ const KEY = 'hub-today-open'
 /** The Plan page's rail keeps the card open and drops its toggle. */
 export const RailCtx = createContext(false)
 
-/** One card on top: what is next, what got approved today, what runs, and what today cost. tasks: summed over the open chats. next: the project's top hand step and first Up next item. */
+/** One card on top: what is next, what got approved today and what runs; tokens and cost are on Usage. tasks: summed over the open chats. next: the project's top hand step and first Up next item. */
 export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?: TaskTotals; next?: { you?: string; up?: string }; trend?: DailyTrend; /** Unused: the heading counts its own list. switchboard.tsx still passes it. */ needsCount?: number }) {
-  const sum = [today.tokens !== undefined ? `${tokenText(today.tokens)} tokens today` : '', today.openCostUsd !== undefined ? `open chats $${today.openCostUsd.toFixed(2)}` : ''].filter(Boolean).join(' · ')
-  const jev = today.jev, needs = needsLines(today, next?.you)
+  const needs = needsLines(today, next?.you)
   // Collapsed by default: Now already shows the same things. The choice sticks per browser.
   const rail = useContext(RailCtx), [stored, setOpen] = useState(false), open = rail || stored
   useEffect(() => { try { setOpen(localStorage.getItem(KEY) === '1') } catch {} }, [])
@@ -25,7 +24,7 @@ export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?:
     <section aria-label="Today" className="hub-today" style={panel}>
       <h2 style={{ ...head, margin: 0 }}>
         {rail ? <span>Today</span> : <button type="button" aria-expanded={open} className="hub-link" onClick={toggle} style={{ font: 'inherit', color: 'inherit', padding: '4px 0', minHeight: 32 }}>{open ? '▾' : '▸'} Today</button>}
-        <span style={{ font: '400 13px/1.4 var(--hub-sans)', color: 'var(--hub-mute)' }} title="Tokens: today's input, output and cache writes. Open chats: what the chats open now have cost since they started.">{open ? sum : todayLine(today, needs.length)}</span>
+        {!open && <span style={{ font: '400 13px/1.4 var(--hub-sans)', color: 'var(--hub-mute)' }}>{todayLine(today, needs.length)}</span>}
       </h2>
       {open && <>
       {tasks && tasks.total > 0 && <div style={{ display: 'grid', gap: 6, marginBottom: 4 }}>
@@ -45,17 +44,11 @@ export function TodayCard({ today, tasks, next, trend }: { today: Today; tasks?:
         </>}
         <dt style={lab}>Done ({today.done.length})</dt>
         <dd style={{ margin: 0, color: today.done.length ? 'var(--hub-body)' : 'var(--hub-ash)' }}>{today.done.join(' · ') || 'Nothing approved yet'}</dd>
-        {jev && <>
-          <dt style={lab}>Jev</dt>
-          <dd style={{ margin: 0 }} title="Jev, TypeSafe's decision model, run by the claude-x-jev skill; reported by the usage mod">
-            {jev.runs} run{jev.runs === 1 ? '' : 's'}, ${jev.costUsd.toFixed(jev.costUsd < 0.1 ? 4 : 2)}
-          </dd>
-        </>}
         {trend && <>
           <dt style={lab} title="Yesterday, with the change from the day before and the same weekday last week">Yesterday</dt>
           <dd className="hub-num" style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: 6, color: 'var(--hub-body)', fontSize: 13 }}>
-            {([['chats', trend.chats], ['cost', trend.costUsd, true], ['approved', trend.approved], ['sent back', trend.sentBack]] as const).map(([name, v, usd]) =>
-              <span key={name} style={{ maxWidth: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', padding: '1px 8px', border: '1px solid var(--hub-hair)', borderRadius: 6 }}><span style={{ color: 'var(--hub-ash)' }}>{name}</span> {trendText(v, usd)}</span>)}
+            {([['chats', trend.chats], ['approved', trend.approved], ['sent back', trend.sentBack]] as const).map(([name, v]) =>
+              <span key={name} style={{ maxWidth: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', padding: '1px 8px', border: '1px solid var(--hub-hair)', borderRadius: 6 }}><span style={{ color: 'var(--hub-ash)' }}>{name}</span> {trendText(v)}</span>)}
           </dd>
         </>}
         {today.working.length > 0 && <>

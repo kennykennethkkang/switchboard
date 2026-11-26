@@ -43,8 +43,8 @@ export function MemoryNotebook({ isDemo, onClose, top }: ViewProps & { top?: Rea
   return (
     <Shell className="nb" onClose={onClose} findRef={findRef} onEsc={() => { if (reading && matchMedia('(max-width: 760px)').matches) { setReading(false); return true } return false }}>
       {!graph || !d || !d.notes.length ? <Loading problem={problem} empty={!!graph} /> : (
-        <div className="nb-grid" data-reading={reading ? '' : undefined}>
-          <nav className="nb-places" aria-label="Places">
+        <div className="mnb-grid" data-reading={reading ? '' : undefined}>
+          <nav className="mnb-places" aria-label="Places">
             <header><h2>Memory</h2><p>{d.notes.length} notes</p>{top}</header>
             <ul>
               {[{ p: ALL, n: d.notes.length }, ...d.places, { p: ISSUES, n: new Set([...d.flags.keys()].filter(id => d.notes.some(n => n.id === id))).size }].map(({ p, n }) => (
@@ -54,22 +54,22 @@ export function MemoryNotebook({ isDemo, onClose, top }: ViewProps & { top?: Rea
               ))}
             </ul>
           </nav>
-          <div className="nb-list">
+          <div className="mnb-list">
             <Search value={q} onChange={setQ} label="Search notes" inputRef={findRef} onEnter={() => rows[0] && pick(rows[0].id, true)} />
             <ul ref={listRef} aria-label={`${place}, ${rows.length} notes`} onKeyDown={walk}>
               {rows.map(n => (
                 <li key={n.id}><button type="button" aria-current={n.id === node?.id ? 'true' : undefined} data-sup={n.superseded ? '' : undefined} onClick={() => pick(n.id)}>
-                  <span className="nb-row-h"><Dot n={n} /><b>{shortLabel(n)}</b></span>
-                  {n.description && <span className="nb-row-d">{n.description}</span>}
-                  <span className="nb-row-m"><small>{place === ALL || place === ISSUES ? d.home(n) : kindLabel(n)}</small><Flags list={d.flags.get(n.id)} /></span>
+                  <span className="mnb-row-h"><Dot n={n} /><b>{shortLabel(n)}</b></span>
+                  {n.description && <span className="mnb-row-d">{n.description}</span>}
+                  <span className="mnb-row-m"><small>{place === ALL || place === ISSUES ? d.home(n) : kindLabel(n)}</small><Flags list={d.flags.get(n.id)} /></span>
                 </button></li>
               ))}
             </ul>
-            {!rows.length && <p className="nb-none">{q ? `No note has "${q.trim()}" in its name or description.` : 'Nothing here.'}</p>}
+            {!rows.length && <p className="mnb-none">{q ? `No note has "${q.trim()}" in its name or description.` : 'Nothing here.'}</p>}
           </div>
           {node && (
             <NoteReader g={graph} node={node} home={d.home} flags={d.flags} onOpen={id => pick(id, true)} innerRef={readerRef}>
-              <button type="button" className="nb-back" onClick={() => { setReading(false); requestAnimationFrame(() => listRef.current?.querySelector<HTMLButtonElement>('[aria-current]')?.focus()) }}>
+              <button type="button" className="mnb-back" onClick={() => { setReading(false); requestAnimationFrame(() => listRef.current?.querySelector<HTMLButtonElement>('[aria-current]')?.focus()) }}>
                 <svg aria-hidden width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3 5 8l5 5" /></svg>{place}
               </button>
             </NoteReader>

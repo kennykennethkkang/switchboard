@@ -77,7 +77,7 @@ export const BLOCKS: Array<{ label: string; hint: string; to?: 'Accounts' | 'Ins
   { label: 'Set up', to: 'Installed', hint: 'Installs the plugins, mods, MCP servers, rules and roles Switchboard works with.', words: 'set up setup install kit' },
   { label: 'Export kit', to: 'Installed', hint: 'Roles, skills, plugins and mods as one folder to copy to another Mac.', words: 'export kit copy folder another mac' },
   { label: 'Add a plugin or skill', to: 'Installed', hint: 'A GitHub repo, swept before it is added.', words: 'add plugin skill github repo install' },
-  { label: 'Spend limits', to: 'Integrations', hint: 'Monthly caps on paid tools.', words: 'spend limits cap monthly paid dollars budget' },
+  { label: 'Spend limits', to: 'Integrations', hint: 'Monthly caps on paid tools, on the Usage page.', words: 'spend limits cap monthly paid dollars budget' },
   { label: 'Check health', to: 'Chats', hint: 'Hook server, kit version, mods, CLIs, hub port and MCP config.', words: 'check health doctor fix hooks diagnose' },
   { label: 'About and credits', hint: 'At the bottom of every settings page.', words: 'about credits licenses license thanks' },
 ]
@@ -95,7 +95,7 @@ const CHAT_GROUPS: Array<[string, string[]]> = [
   ['Chats', ['Continue at usage limit', 'Pause near the limit', 'Auto-start chats', 'Claude chat permissions', 'Ask before actions (Codex)', 'Your name', 'Hide done chats', 'Fresh branch for new chats', 'Brief for new chats']],
   ['Notices', ['Chat notices', 'Where pop-ups show', 'Push to your phone', 'Notify when a chat needs input']],
   ['Windows and phone', ['Phone mode', 'Phone alerts', 'Keep phone access in Apple Notes', 'Show agent browsers', 'One window', 'Keep Switchboard app running']],
-  ['Advanced', ['Fix stuck items', 'Learn automatically', 'Stop a chat\'s dev servers when it ends', 'Test anti-copy hardening (experimental)']],
+  ['Advanced', ['Fix stuck items', 'Learn automatically', 'Stop dev servers and close tabs when a chat ends', 'Test anti-copy hardening (experimental)']],
 ]
 export function chatGroups<T extends { label: string }>(rows: T[]) {
   const known = (l: string) => CHAT_GROUPS.some(([, ls]) => ls.includes(l))

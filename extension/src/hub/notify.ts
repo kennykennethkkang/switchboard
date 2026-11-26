@@ -1,7 +1,7 @@
 /**
  * What Kenneth sees when a chat finishes or asks something: a VS Code notification,
  * a macOS one with a sound (a toast on Windows), and on Done the commit message in Source Control. Best effort:
- * a failure here never touches the chat. The phone push comes from the chat itself (rules.md), except Codex, which has no push tool: Switchboard sends it on Done. AWS sign-in also goes out as Web Push.
+ * a failure here never touches the chat. Finished chats and AWS sign-in also go out as Web Push.
  */
 import * as vscode from 'vscode'
 import { execFile } from 'child_process'
@@ -12,7 +12,7 @@ import { hub } from './hub-service'
 import { readArchive, trendOf } from './chains'
 import { focusChat } from './actions'
 import { noticeKind, noticeText } from './background'
-import { phoneChange } from './phone'
+import { phoneChange, pushText } from './phone'
 import { sendPush } from './web-push'
 import { desktopNotice, doneText, fillDraftBox, fillRepos, notifyStep, indefiniteText, todayText, trendText, type Box } from './progress'
 import type { ChatProgress, ChatState, DailyTrend, StuckItem } from './types'
@@ -64,11 +64,12 @@ export function notify(change: { from?: ChatState; to: ChatProgress }): void {
   if (!n.show) return
   const title = titleOf(p)
   if (hub.get().controls.switchboard.phone && !(p.limited && hub.get().pause)) phoneChange(p, title)
+  const push = pushText(p, hub.get().archive.find(a => a.sessionId === p.sessionId)?.approvedAt)
+  if (push) void sendPush(title, push)
   if (p.state === 'done') {
     fillBoxes(p)
     const what = doneText(p)
     mac(title, what)
-    if (hub.get().chats.find(c => c.sessionId === p.sessionId)?.ai === 'codex') void sendPush(title, what)
     toast(false, `Switchboard: ${title}: ${what.replace(/[.!?]$/, '')}.`, 'Show', () => focusChat(p.sessionId))
   } else if (p.state === 'needs-you') {
     mac(title, p.question ?? 'Needs you')

@@ -39,7 +39,6 @@ Set up fetches these skills from GitHub into ~/.claude/skills. They are not ship
   last30days (https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
   find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc.
   Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License
-  Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong
   caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0
   untangle-codebase (https://github.com/caldoai/skills) by Maze (caldoai), MIT License
   ui-sdk (https://github.com/vercel-labs/ui) by Vercel Labs, Apache License 2.0
@@ -57,7 +56,6 @@ Set up installs these third-party skills from their own repos; none are bundled:
 - last30days (https://github.com/mvanhorn/last30days-skill) by Matt Van Horn, MIT License.
 - find-skills (https://github.com/vercel-labs/skills) by Vercel, Inc., MIT License.
 - Scrapling (https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause License.
-- Agent Reach (https://github.com/Panniantong/Agent-Reach) by Panniantong, MIT License.
 - caveman (https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache License 2.0.
 - untangle-codebase (https://github.com/caldoai/skills) by Maze (caldoai), MIT License.
 - ui-sdk (https://github.com/vercel-labs/ui) by Vercel Labs, Apache License 2.0.
@@ -76,3 +74,5 @@ Kit skills that ship in claude-mods/kit/skills and are copied with their LICENSE
 - web-design-guidelines names Vercel as its author; claude-x-jev and jev-setup-project name Charles J Dove (Jev, TypeSafe). skill-inspector runs NVIDIA SkillSpector, which is not bundled.
 
 The Screen tab bundles xterm.js (@xterm/headless), https://github.com/xtermjs/xterm.js, MIT License. Copyright (c) 2017-2019, The xterm.js authors; Copyright (c) 2014-2016, SourceLair Private Company; Copyright (c) 2012-2013, Christopher Jeffrey.
+
+extension/src/hub/windows.ts ports the cmd.exe argument escaping of cross-spawn (https://github.com/moxystudio/node-cross-spawn), MIT License, Copyright (c) 2018 Made With MOXY Lda.

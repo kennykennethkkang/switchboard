@@ -467,3 +467,39 @@ describe('chatTranscript for a Codex rollout', () => {
     assert.equal(await chatTranscript('../x', undefined, { home }), null)
   })
 })
+
+describe('Code Mode', () => {
+  // Inner calls (repl_ ids) follow the REPL call with an empty result block; the output sits in toolUseResult.
+  const inner = (id: string, name: string, input: unknown, r: unknown) => [asst(use(id, name, input)), user([result(id, '')], { isVirtual: true, toolUseResult: r })]
+  const lines = [
+    user('check it'),
+    asst(use('toolu_1', 'REPL', { code: 'x' }), use('toolu_2', 'Poll', {})),
+    user([result('toolu_1', '(dispatched #1)')], { toolUseResult: { code: 'x', asyncDispatched: true } }),
+    user([result('toolu_2', '<system>authentic event nonces</system>')], { toolUseResult: { content: 'x', eventCount: 1, remainingWakeCount: 0 } }),
+    ...inner('repl_t', 'Bash', { command: 'npm test' }, { stdout: 'ℹ tests 4\nℹ pass 3\nℹ fail 1\nnot ok 2 - parses dates', stderr: '' }),
+    ...inner('repl_q', 'AskUserQuestion', { questions: [{ question: 'Which?' }] }, { answers: { 'Which?': 'A' } }),
+    ...inner('repl_a', 'Agent', { description: 'Review it', subagent_type: 'qa' }, { isAsync: true, status: 'async_launched', agentId: 'x' }),
+    user('<task-notification>\n<tool-use-id>repl_a</tool-use-id>\n<status>completed</status>\n<result>Status: done</result>\n</task-notification>'),
+    ...inner('repl_r', 'Read', { file_path: '/repo/a.ts' }, { type: 'text', file: { content: 'hello' } }),
+    ...inner('toolu_o', 'Read', { file_path: '/repo/o.ts' }, { file: { content: 'ordinary' } }),
+    ...inner('repl_m', 'mcp__x__y', {}, 'plain text'),
+  ]
+
+  it('outputs take tests, answers and agent reports from the inner calls', async () => {
+    const out = (await chatOutputs(SID, { home: chatHome(lines).home, runs: async () => [] }))!
+    assert.equal(out.tests[0].ok, false)
+    assert.equal(out.tests[0].failed, 1)
+    assert.deepEqual(out.questions, [{ question: 'Which?', answer: 'A' }])
+    assert.deepEqual(out.reports.map(r => r.text), ['Status: done'])
+  })
+
+  it('the transcript shows the inner calls and not the dispatch or the poll', async () => {
+    const t = (await chatTranscript(SID, undefined, { home: chatHome(lines).home }))!
+    const tools = t.messages.filter(m => m.role === 'tool').map(m => m.text)
+    assert.deepEqual(tools.slice(0, 3), ['REPL', 'Bash npm test', 'result: ℹ tests 4'])
+    assert.ok(tools.includes('result: hello') && tools.includes('result: plain text'))
+    assert.ok(tools.includes('result: A'), 'the answer')
+    assert.ok(!tools.includes('result: ordinary'), 'only calls made by code')
+    assert.ok(!tools.some(x => /dispatched|nonces|^Poll/.test(x)))
+  })
+})

@@ -22,7 +22,6 @@ export const CREDITS: Credit[] = [
   { name: 'last30days', by: 'Matt Van Horn', license: 'MIT', url: 'https://github.com/mvanhorn/last30days-skill', what: 'Plugin' },
   { name: 'find-skills', by: 'Vercel', license: 'MIT', url: 'https://github.com/vercel-labs/skills', what: 'Skill' },
   { name: 'Scrapling', by: 'Karim Shoair', license: 'BSD 3-Clause', url: 'https://github.com/D4Vinci/Scrapling', what: 'Tool, skill and MCP' },
-  { name: 'Agent Reach', by: 'Panniantong', license: 'MIT', url: 'https://github.com/Panniantong/Agent-Reach', what: 'Tool and skill' },
   { name: 'archify', by: 'tt-a1i', license: 'Apache 2.0', url: 'https://github.com/tt-a1i/archify', what: 'Skill' },
   { name: 'diagram-design', by: 'Cathryn Lavery', license: 'MIT', url: 'https://github.com/cathrynlavery/diagram-design', what: 'Skill' },
   { name: 'grill-me', by: 'Matt Pocock', license: 'see source', url: 'https://github.com/mattpocock/skills', what: 'Skill' },

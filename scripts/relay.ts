@@ -403,7 +403,9 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
     hookServer.onRaw(({ payload, mirror }) => { hub.hook(payload, Date.now(), mirror) })
 
     writeDiscoveryFile(hookPort, workspace)
+  }
 
+  const watchClaude = () => {
     scanForActiveSessions(workspace)
     scanInterval = setInterval(() => scanForActiveSessions(workspace), SCAN_INTERVAL_MS)
 
@@ -432,7 +434,16 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
     codexWatcher.onSessionLifecycle((lifecycle) => {
       broadcastSessionLifecycle(lifecycle.type, lifecycle.sessionId, lifecycle.label)
     })
-    codexWatcher.start()
+  }
+
+  // Only the event stream reads the transcripts, so nothing is watched until a client asks for it.
+  // shortcut: goes on after the last client leaves, stop it there if a page ever uses the stream.
+  let watching = false
+  const watchTranscripts = () => {
+    if (watching || relayDisposed) return
+    watching = true
+    if (wantClaude) watchClaude()
+    codexWatcher?.start()
   }
 
   let relayDisposed = false
@@ -440,6 +451,7 @@ export async function createRelay(options: RelayOptions): Promise<Relay> {
   return {
     hookPort,
     handleSSE(req: http.IncomingMessage, res: http.ServerResponse) {
+      watchTranscripts()
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

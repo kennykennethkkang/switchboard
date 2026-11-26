@@ -21,7 +21,10 @@ export function UsageDialog({ meters, pause, onClose }: { meters: Meter[]; pause
         ))}
       </ul>
       {pause && <p style={{ margin: '12px 0 0', color: 'var(--hub-yellow)' }}>{pauseLine(pause)}</p>}
-      <button type="button" className="hub-btn" style={{ marginTop: 14 }} onClick={() => dlg.current?.close()}>Close</button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <a href="#usage" className="hub-btn" onClick={() => dlg.current?.close()}>Open Usage</a>
+        <button type="button" className="hub-btn" onClick={() => dlg.current?.close()}>Close</button>
+      </div>
     </dialog>
   )
 }

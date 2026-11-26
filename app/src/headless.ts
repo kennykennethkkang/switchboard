@@ -21,6 +21,7 @@ const tmuxBin = () => ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bi
 
 /** argv that runs command in folder without taking focus: a detached tmux session, else a Terminal window. */
 export function chatSpawn(folder: string, command: string, tmux: string | undefined, name: string): { cmd: string; args: string[] } {
+  if (process.platform === 'win32') return { cmd: 'powershell.exe', args: ['-NoExit', '-Command', `Set-Location -LiteralPath ${shellQuote(folder, 'powershell')}; ${command}`] }
   // -i too: claude and codex are usually put on PATH in .zshrc.
   if (tmux) return { cmd: tmux, args: ['new-session', '-d', '-s', name, '-c', folder, process.env.SHELL || '/bin/zsh', '-lic', command] }
   const as = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -37,7 +38,7 @@ export function newChatHeadless(m: { path: string; text?: string; ai?: string },
   const ai = m.ai ?? 'claude'
   if (ai !== 'claude' && ai !== 'codex') return `Open an editor window to start a ${ai} chat.`
   const name = projectName(m.path)
-  const command = AIS[ai].startCommand({ text: m.text, name }, 'posix')
+  const command = AIS[ai].startCommand({ text: m.text, name }, process.platform === 'win32' ? 'powershell' : 'posix')
   const s = chatSpawn(m.path, command, tmux, `sb-${name.replace(/[^\w-]/g, '-')}-${Date.now().toString(36)}`)
   run(s.cmd, s.args)
   return true

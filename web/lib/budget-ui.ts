@@ -1,5 +1,6 @@
 import type { ChatRow, CheckBack, IndefiniteBudget, TrendValue } from './hub-types'
 import { formatDuration } from './duration'
+import { everyText } from './loop'
 
 const H = 3_600_000
 export const CHECK_BACK_MAX = 12
@@ -17,19 +18,19 @@ export function budgetLine(c: Pick<ChatRow, 'elapsedMs' | 'costUsd' | 'budget'>)
   return [t, m].filter(Boolean).join(' · ')
 }
 
-/** Quiet map badge: "limit 4h / $5, gate", "check back 30m 3/12"; empty with neither. */
+/** Quiet map badge: "limit 4h / $5, gate", "timer every 30 min 3/12"; empty with neither. */
 export function limitText(c: Pick<ChatRow, 'budget' | 'checkBack'>): string {
   const b = c.budget
   const caps = [b?.maxHours ? `${b.maxHours}h` : '', b?.maxCostUsd ? `$${b.maxCostUsd}` : ''].filter(Boolean).join(' / ')
   const limit = [caps, b?.gate ? 'gate' : ''].filter(Boolean).join(', ')
-  return [limit && `limit ${limit}`, c.checkBack && `check back ${c.checkBack.everyMin}m ${checkBackCount(c.checkBack)}`].filter(Boolean).join(' \u00b7 ')
+  return [limit && `limit ${limit}`, c.checkBack && `timer ${everyText(c.checkBack.everyMin)} ${checkBackCount(c.checkBack)}`].filter(Boolean).join(' \u00b7 ')
 }
 
-/** Short form for the map's yard tag, which is narrow: "4h $5 gate · back 3/12". */
+/** Short form for the map's yard tag, which is narrow: "4h $5 gate · timer 3/12". */
 export function limitTag(c: Pick<ChatRow, 'budget' | 'checkBack'>): string {
   const b = c.budget
   const limit = [b?.maxHours ? `${b.maxHours}h` : '', b?.maxCostUsd ? `$${b.maxCostUsd}` : '', b?.gate ? 'gate' : ''].filter(Boolean).join(' ')
-  return [limit, c.checkBack && `back ${checkBackCount(c.checkBack)}`].filter(Boolean).join(' · ')
+  return [limit, c.checkBack && `timer ${checkBackCount(c.checkBack)}`].filter(Boolean).join(' · ')
 }
 
 /** 0..1 toward the nearer cap, or undefined with none set. */
@@ -47,8 +48,6 @@ export function budgetMsg(hours: string, usd: string, gate: string): { maxHours:
 
 export const budgetForm = (b?: IndefiniteBudget) => ({ hours: b?.maxHours ? String(b.maxHours) : '', usd: b?.maxCostUsd ? String(b.maxCostUsd) : '', gate: b?.gate ?? '' })
 
-export const CHECK_BACK_OPTIONS: Array<[string, string]> = [['0', 'Check back: off'], ['10', 'Check back: 10 min'], ['30', 'Check back: 30 min'], ['60', 'Check back: 60 min']]
-export const checkBackValue = (c?: CheckBack) => String(c?.everyMin ?? 0)
 export const checkBackCount = (c?: CheckBack) => c ? `${c.count}/${CHECK_BACK_MAX}` : ''
 
 /** Arrow and size of a delta; undefined with nothing to compare. */

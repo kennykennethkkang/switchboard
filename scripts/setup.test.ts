@@ -5,7 +5,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { spawn } from 'child_process'
 import * as http from 'http'
-import { CODEX_HOOK_EVENTS, getHookScriptContent, configureCodexHooks, configureHooks, isSwitchboardHook, isAlreadySetup } from './setup'
+import { CODEX_HOOK_EVENTS, getHookScriptContent, configureCodexHooks, configureHooks, isSwitchboardHook, isAlreadySetup, raiseHookTimeouts, removeAppHooks } from './setup'
 
 const HOOK_CMD = '"/usr/bin/node" "/home/u/.claude/switchboard-app/hook.js"'
 const OLD_CMD = '"/usr/bin/node" "/home/u/.claude/agent-flow/hook.js"'
@@ -69,8 +69,100 @@ test('configureHooks replaces hooks from before the rename instead of duplicatin
   const { hooks } = read(file)
   assert.deepEqual(hooks.PreToolUse, [
     foreignCommand,
-    { hooks: [{ type: 'command', command: HOOK_CMD, timeout: 2 }] },
+    { hooks: [{ type: 'command', command: HOOK_CMD, timeout: 10 }] },
   ])
+})
+
+test('raiseHookTimeouts raises our old entries only, once', () => {
+  const ext = { hooks: [{ type: 'command', command: '"node" "/home/u/.claude/switchboard/hook.js"', timeout: 2 }] }
+  const other = { hooks: [{ type: 'command', command: 'other-tool notify', timeout: 2 }] }
+  const ours = (timeout: number) => ({ hooks: [{ type: 'command', command: HOOK_CMD, timeout }] })
+  const file = tmpSettings({ model: 'opus', hooks: { Stop: [ext, other, ours(2)], PreToolUse: [ours(30)] } })
+  assert.equal(raiseHookTimeouts(file), true)
+  assert.deepEqual(read(file), { model: 'opus', hooks: { Stop: [ext, other, ours(10)], PreToolUse: [ours(30)] } })
+  assert.equal(raiseHookTimeouts(file), false)
+  const broken = tmpSettings('{oops')
+  assert.equal(raiseHookTimeouts(broken), false)
+  assert.equal(fs.readFileSync(broken, 'utf-8'), '{oops')
+})
+
+test('removeAppHooks keeps user hooks and the matcher inside a mixed entry', () => {
+  const mixed = { matcher: 'Bash', hooks: [
+    { type: 'command', command: HOOK_CMD },
+    { type: 'command', command: 'notify-user' },
+  ] }
+  const file = tmpSettings({ hooks: { PreToolUse: [mixed, foreignCommand] } })
+  assert.equal(removeAppHooks(file), true)
+  assert.deepEqual(read(file).hooks, { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'notify-user' }] }, foreignCommand] })
+  assert.equal(removeAppHooks(file), false)
+})
+
+test('running setup again on an existing install raises its timeout', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-setup-again-'))
+  const file = path.join(home, '.claude', 'settings.json')
+  const script = path.join(home, '.claude', 'switchboard-app', 'hook.js')
+  fs.mkdirSync(path.dirname(script), { recursive: true })
+  fs.writeFileSync(script, '')
+  fs.writeFileSync(file, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: HOOK_CMD, timeout: 2 }] }] } }))
+  try {
+    const child = spawn(process.execPath, [path.join(__dirname, 'setup.js')], { env: { ...process.env, HOME: home, USERPROFILE: home } })
+    await new Promise(resolve => child.on('exit', resolve))
+    assert.equal(read(file).hooks.Stop[0].hooks[0].timeout, 10)
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('setup removes app hooks when an installed v14 extension hook is configured', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-setup-extension-'))
+  const codex = path.join(home, '.codex')
+  const claude = path.join(home, '.claude')
+  const settings = path.join(claude, 'settings.json')
+  const extensionHook = path.join(claude, 'switchboard', 'hook.js')
+  const appHook = path.join(claude, 'switchboard-app', 'hook.js')
+  const appEntry = { hooks: [{ type: 'command', command: HOOK_CMD }] }
+  fs.mkdirSync(path.dirname(extensionHook), { recursive: true })
+  fs.mkdirSync(path.dirname(appHook), { recursive: true })
+  fs.mkdirSync(codex, { recursive: true })
+  fs.writeFileSync(extensionHook, '// Switchboard hook forwarder v14\n')
+  fs.writeFileSync(appHook, 'existing app hook')
+  fs.writeFileSync(settings, JSON.stringify({ hooks: { Stop: [appEntry, { hooks: [{ command: `node "${extensionHook}"` }] }] } }))
+  fs.writeFileSync(path.join(codex, 'hooks.json'), JSON.stringify({ hooks: { Stop: [appEntry], PreToolUse: [{ hooks: [{ command: `node "${extensionHook}"` }] }] } }))
+  try {
+    const child = spawn(process.execPath, [path.join(__dirname, 'setup.js')], { env: { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: codex } })
+    let out = ''
+    child.stdout.on('data', c => { out += c })
+    await new Promise(resolve => child.on('exit', resolve))
+    assert.equal(out, 'Switchboard extension hook already covers the app.\n')
+    assert.deepEqual(read(settings).hooks.Stop, [{ hooks: [{ command: `node "${extensionHook}"` }] }])
+    assert.deepEqual(Object.keys(read(path.join(codex, 'hooks.json')).hooks), ['PreToolUse'])
+    assert.equal(fs.readFileSync(appHook, 'utf8'), 'existing app hook')
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('setup keeps its hook when the extension is absent or below v14', async () => {
+  for (const version of ['', '// Switchboard hook forwarder v13\n']) {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-setup-no-extension-'))
+    const claude = path.join(home, '.claude')
+    const extensionHook = path.join(claude, 'switchboard', 'hook.js')
+    fs.mkdirSync(path.dirname(extensionHook), { recursive: true })
+    fs.writeFileSync(extensionHook, version)
+    fs.writeFileSync(path.join(claude, 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'node ~/.claude/switchboard/hook.js' }] }] } }))
+    try {
+      const child = spawn(process.execPath, [path.join(__dirname, 'setup.js')], { env: { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, '.missing-codex') } })
+      await new Promise(resolve => child.on('exit', resolve))
+      assert.ok(read(path.join(claude, 'settings.json')).hooks.Stop.some(isSwitchboardHook))
+      assert.ok(fs.existsSync(path.join(claude, 'switchboard-app', 'hook.js')))
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true })
+    }
+  }
+})
+
+test('the app forwarder still exits 1.5s after it starts', () => {
+  assert.match(getHookScriptContent(), /setTimeout\(\(\) => process\.exit\(0\), 1500\)/)
 })
 
 test('configureHooks writes through a settings.json symlink and keeps its mode', () => {
@@ -136,7 +228,7 @@ test('isAlreadySetup is false while only pre-rename hooks are there, so setup sw
   fs.writeFileSync(script, '')
   assert.equal(isAlreadySetup(file, script), false)
   quietly(() => configureHooks(file, HOOK_CMD, ['Stop']))
-  assert.deepEqual(read(file).hooks.Stop, [{ hooks: [{ type: 'command', command: HOOK_CMD, timeout: 2 }] }])
+  assert.deepEqual(read(file).hooks.Stop, [{ hooks: [{ type: 'command', command: HOOK_CMD, timeout: 10 }] }])
   assert.equal(isAlreadySetup(file, script), true)
 })
 

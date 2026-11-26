@@ -9,6 +9,7 @@ import { execFile } from 'child_process'
 import * as os from 'os'
 import * as path from 'path'
 import { ask } from './projects'
+import { sharedRun } from './shared-run'
 import type { ChatRow } from './types'
 
 const DIR = path.join(os.homedir(), '.claude', 'sessions')
@@ -32,7 +33,7 @@ export function chatRows(files: Record<string, unknown>[], alive: (pid: number) 
     // sdk-cli without a bridge is a headless `claude -p` (bench runs); with one but nothing said yet, Remote Control's idle standby.
     if (f.entrypoint === 'sdk-cli' && (!str(f.bridgeSessionId) || !started({ sessionId, cwd: str(f.cwd) ?? '' }))) return []
     const updatedAt = typeof f.updatedAt === 'number' ? f.updatedAt : undefined
-    return [{ pid, sessionId, name: str(f.name), cwd: str(f.cwd) ?? '', status: str(f.status), version: str(f.version), kind: str(f.kind), updatedAt, bridgeId: str(f.bridgeSessionId), live: alive(pid) }]
+    return [{ pid, sessionId, name: str(f.name), cwd: str(f.cwd) ?? '', status: str(f.status), statusAt: typeof f.statusUpdatedAt === 'number' ? f.statusUpdatedAt : undefined, waitingFor: str(f.waitingFor), version: str(f.version), kind: str(f.kind), updatedAt, bridgeId: str(f.bridgeSessionId), live: alive(pid) }]
   })
   // A killed chat that was resumed leaves its old file: dead rows drop when the session runs elsewhere, else the newest stays.
   // Several live rows are real (the Claude panel and a terminal), so they all stay.
@@ -72,7 +73,14 @@ export const rcInList = (ps: string, name = RC_NAME) => new RegExp(rcPattern(nam
 const psList = () => new Promise<string>((resolve, reject) =>
   execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', PS_LIST], { windowsHide: true, timeout: 15_000, maxBuffer: 8 << 20 }, (err, out) => (err ? reject(err) : resolve(String(out)))))
 
-const pgrep = () => new Promise<boolean>(resolve => execFile('pgrep', ['-f', rcPattern(RC_NAME)], { timeout: 2000 }, err => resolve(!err)))
+const pgrep = (fresh = false) => sharedRun('pgrep', ['-f', rcPattern(RC_NAME)], {
+  ttlMs: 12_000, timeoutMs: 2000, fresh,
+  run: (file, args, timeoutMs) => new Promise<string>((resolve, reject) => execFile(file, args, { timeout: timeoutMs }, (err, out) => {
+    if (!err) resolve(String(out).trim() ? '1' : '0')
+    else if (String((err as NodeJS.ErrnoException).code) === '1') resolve('0')
+    else reject(err)
+  })),
+}).then(value => value === '1')
 
 let rcSeen = false, listing = false
 /** The Remote Control server running as a process, whoever started it. */
@@ -88,7 +96,7 @@ export function rcRunning(platform: NodeJS.Platform = process.platform): boolean
 
 /** rcRunning from a fresh listing, for the on/off switch. */
 export async function rcRunningNow(platform: NodeJS.Platform = process.platform, list = psList): Promise<boolean> {
-  try { rcSeen = platform === 'win32' ? rcInList(await list()) : await pgrep() } catch { /* keep the last answer */ }
+  try { rcSeen = platform === 'win32' ? rcInList(await list()) : await pgrep(true) } catch { /* keep the last answer */ }
   return rcSeen
 }
 
@@ -104,6 +112,7 @@ export async function readChats(): Promise<ChatRow[]> {
   return chatRows(files, alive, Date.now(), hasTranscript)
 }
 
-const hasTranscript = ({ sessionId, cwd }: { sessionId: string; cwd: string }) => {
-  try { return fs.statSync(path.join(os.homedir(), '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'), `${sessionId}.jsonl`)).size > 0 } catch { return false }
+export const transcriptOf = ({ sessionId, cwd }: { sessionId: string; cwd: string }) => path.join(os.homedir(), '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'), `${sessionId}.jsonl`)
+const hasTranscript = (f: { sessionId: string; cwd: string }) => {
+  try { return fs.statSync(transcriptOf(f)).size > 0 } catch { return false }
 }

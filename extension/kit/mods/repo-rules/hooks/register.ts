@@ -17,6 +17,8 @@ const RULES: { test: RegExp; why: string; short: string; flat?: true }[] = [
   { flat: true, test: /^(?=[\s\S]*\/hub\/command\b)(?=[\s\S]*(\bhub-git\b|\bop\s*:\s*(ship|commit-push|commit|push|sync|undo|discard|stash|pop|switch|create|delete-branch|pr|rerun)\b|\bhub-stuck-stop\b|(^|\s)(-d|--data(-binary|-raw|-urlencode)?|--json|-F|--form)(\s+|=)?@))/, short: 'a hub button', why: HUB },
   { flat: true, test: /^(?=[\s\S]*\b(curl|wget|fetch|https?|node|python3?)\b)(?=[\s\S]*\/hub\/)(?=[\s\S]*((^|\s)(-d|--data(-binary|-raw|-urlencode|-ascii)?|--json|-F|--form|--post-data)(\s+|=)?[$`@]|--post-file)|(?=[\s\S]*(^|[\s;&|(])[A-Za-z_]\w*=[^\s;&|]*\/hub\/)(?=[\s\S]*((^|\s)(-X\s*POST|--request(\s+|=)POST|-d|--data\S*|--json|-F|--form|--post-data)(\s|=|$)|method\s*:\s*POST)))/, short: 'a hub button', why: HUB },
   { test: /\bprettier\b[^|;&]*\s(--write|-w)\b/, short: 'prettier --write', why: 'No formatter here: prettier --write rewraps whole files at 80 columns. Edit by hand.' },
+  { flat: true, test: /\bpkill\b[^|;&\n]*\s(-[a-zA-Z0-9]*f|--full)/, short: 'pkill -f', why: "pkill -f matches other chats' processes too. Stop the one you started by its pid (kill <pid>; lsof -ti :<port> finds a server's)." },
+  { flat: true, test: /^(?=[\s\S]*\bosascript\b)(?=[\s\S]*system\s+events)(?=[\s\S]*\b(keystroke|key\s+code)\b)/i, short: 'System Events keys', why: "Keys sent through System Events land in whatever window the user is typing in. Use the app's own script commands, or list the step under For you." },
 ]
 
 const DASH = 'An em dash in the new text. Use a comma, a colon, or "to".'
@@ -83,6 +85,11 @@ const live = (claims: Claims, now: number) => Object.entries(claims).filter(([, 
 export const heldBy = (claims: Claims, path: string, session: string, now: number) =>
   live(claims, now).find(([p, c]) => p === path && c.session !== session)?.[1]
 
+export const heldDeny = (name: string, other: Claims[string], now: number) => {
+  const left = Math.ceil((other.at + CLAIM_MS - now) / 60_000)
+  return `repo-rules: ${name} is held by chat ${other.session}. The hold lapses in ${left} min, or when that chat ends; a reply from it does not free the file, and another write by it restarts the ${CLAIM_MS / 60_000} min. Find it with ListAgents and SendMessage it if it should make the change itself. Otherwise wait once for ${left} min, not in a retry loop, and run checks meanwhile.`
+}
+
 export const stamp = (claims: Claims, path: string, session: string, now: number): Claims =>
   ({ ...Object.fromEntries(live(claims, now)), [path]: { session, at: now } })
 
@@ -102,12 +109,15 @@ async function repoRoot($: EngineInterface, path: string) {
   return undefined
 }
 
-// Temp file then mv, so a reader never sees half a file.
+// Temp file then rename, so a reader never sees half a file.
 // ponytail: two chats saving at once can drop one stamp (last rename wins); it comes back on that chat's next write.
 async function save($: EngineInterface, file: string, claims: Claims, tag: string) {
   const tmp = `${file}.${tag.replace(/[^A-Za-z0-9-]/g, '')}.tmp`
   await $.fs.write(tmp, JSON.stringify(claims))
-  await $.process.run(['mv', '-f', tmp, file])
+  const argv = ['node', '-e', 'require("node:fs").renameSync(process.argv[1], process.argv[2])', tmp, file]
+  let result = await $.process.run(argv)
+  if (result.exitCode !== 0 && /\b(EPERM|EBUSY)\b/.test(`${result.stdout}\n${result.stderr}`)) result = await $.process.run(argv)
+  if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || 'rename failed')
 }
 
 async function checkClaim($: EngineInterface, path: string | undefined) {
@@ -120,10 +130,9 @@ async function checkClaim($: EngineInterface, path: string | undefined) {
     const key = norm(path)
     const other = heldBy(claims, key, session, now)
     if (other) {
-      const name = key.split('/').pop()
+      const name = key.slice(key.lastIndexOf('/') + 1)
       await report($, `${name} held by chat ${other.session}`).catch(() => undefined)
-      const mins = Math.max(1, Math.round((now - other.at) / 60_000))
-      return { deny: `repo-rules: ${name} is held by chat ${other.session}, which wrote it ${mins} min ago. Find it with ListAgents and SendMessage it to make the change or say when it is done, or wait. The hold lapses after 20 idle minutes or when that chat ends.` }
+      return { deny: heldDeny(name, other, now) }
     }
     await save($, file, stamp(claims, key, session, now), `${session}-${now}`)
   } catch { /* fail open */ }
@@ -139,6 +148,42 @@ async function releaseAll($: EngineInterface, session: string) {
     const left = release(claims, session)
     if (Object.keys(left).length < Object.keys(claims).length) await save($, file, left, `${session}-end`)
   }
+}
+
+// Workbench chats change things outside any repo, so an edit there needs its backup logged first (kit/skills/adjust).
+// shortcut: Edit and Write only; a file changed through Bash is not caught, the skill asks for it. Parse Bash writes if that gets skipped.
+export const WORKBENCH = '/Documents/Research/Workbench'
+const FREE = ['/.claude/projects/', '/.claude/switchboard/', '/Documents/vault/', `${WORKBENCH}/`]
+export const inWorkbench = (cwd: string, home: string) => {
+  const c = norm(cwd).replace(/\/+$/, '').toLowerCase(), root = `${norm(home)}${WORKBENCH}`.toLowerCase()
+  return !!home && (c === root || c.startsWith(`${root}/`))
+}
+/** Whether an edit to this path has to be in an open change first. */
+export const needsLog = (path: string, home: string) => {
+  const p = norm(path)
+  return !FREE.some(f => p.startsWith(`${norm(home)}${f}`)) && !/^(\/private)?\/(tmp|var\/folders)\//.test(p)
+}
+
+export const adjustDir = (home: string) => `${norm(home)}/.claude/switchboard/adjustments`
+/** The 40 newest change ids, newest first; ids start with the date. */
+export const recentIds = (names: string[]) => names.filter(n => /^\d{8}-/.test(n)).sort().slice(-40).reverse()
+/** Whether a record.json's text is an open change naming this path; throws on a broken record. */
+export const logged = (text: string, path: string): boolean => {
+  const r = JSON.parse(text)
+  return r.status === 'open' && r.files.some((f: { path?: unknown; link?: unknown }) => [f.path, f.link].some(x => typeof x === 'string' && norm(x) === norm(path)))
+}
+export const logDeny = (path: string) => `repo-rules: log this change first so it can be undone: node ~/.claude/skills/adjust/scripts/adjust.mjs begin --file "${norm(path)}" --title ... --why ... --area ... --target ...`
+
+async function checkLogged($: EngineInterface, path: string | undefined) {
+  const home = await homeOf($)
+  if (!path || !inWorkbench(await $.session.cwd(), home) || !needsLog(path, home)) return undefined
+  const dir = adjustDir(home)
+  for (const id of recentIds((await $.fs.list(dir).catch(() => [])).filter(e => e.kind !== 'file').map(e => e.name))) {
+    try {
+      if (logged(String(await $.fs.read(`${dir}/${id}/record.json`)), path)) return undefined
+    } catch { /* not a record */ }
+  }
+  return { deny: logDeny(path) }
 }
 
 const WRITES = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
@@ -177,7 +222,8 @@ export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
     if (!WRITES.has(e.tool)) return next(e)
     const f = e as { file_path?: string; notebook_path?: string }
-    return (await checkClaim($, f.file_path ?? f.notebook_path)) ?? next(e)
+    const path = f.file_path ?? f.notebook_path
+    return (await checkLogged($, path)) ?? (await checkClaim($, path)) ?? next(e)
   }).catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {

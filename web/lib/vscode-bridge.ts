@@ -10,9 +10,11 @@ export type { AgentEvent, SessionInfo, ConnectionStatus } from './bridge-types'
 import { demoResearchBody } from './hub-demo'
 import type { AgentEvent, SessionInfo, ConnectionStatus } from './bridge-types'
 import type { AiId, ApiKeyName, ChatProfile, Choice, GitOp, HubState, SettingKey, SwitchboardKey } from './hub-types'
+import { applyDelta } from './hub-share'
 import { sendSlices } from './attach'
 import type { MemoryGraph } from './memory-graph'
 import type { RunDetail } from './runs'
+import type { UsageReport } from './usage'
 import type { FlowMap } from './flow-map'
 import type { ChatAnswer, ChatAsk } from './chat-view'
 
@@ -39,6 +41,18 @@ export type HubCommand =
   /** Marks a saved research run seen, or moves it to the trash. */
   | { type: 'hub-research-seen'; id: string }
   | { type: 'hub-research-delete'; id: string }
+  /** Ask more: a research chat digs into text, and its report is added to this saved run. */
+  | { type: 'hub-research-ask'; id: string; text: string }
+  /** Folders: make, rename, or delete one (its reports go back to unfiled). */
+  | { type: 'hub-research-folder'; op: 'add' | 'rename' | 'delete'; name: string; to?: string }
+  /** Files runs in a folder (made when new), or unfiles them without one. */
+  | { type: 'hub-research-move'; ids: string[]; folder?: string }
+  /** Smart organize: files the unfiled runs (all: every run), undoes its last run, or switches filing new runs on and off. */
+  | { type: 'hub-research-organize'; op: 'run' | 'all' | 'undo' | 'auto-on' | 'auto-off' }
+  /** Workbench: start a chat on these actions of a saved report, undo a logged change, or hide a suggested one. */
+  | { type: 'hub-adjust-apply'; report: string; keys: string[] }
+  | { type: 'hub-adjust-undo'; id: string; force?: boolean }
+  | { type: 'hub-adjust-skip'; report: string; key: string }
   | { type: 'hub-web'; phone: boolean }
   | { type: 'hub-toggle'; kind: 'mod' | 'plugin' | 'skill'; name: string; enabled: boolean }
   | { type: 'hub-setting'; key: SettingKey; value: boolean | number | string | null }
@@ -52,13 +66,13 @@ export type HubCommand =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean; /** With research: start in the Workbench folder with its note. */ workbench?: boolean; /** Claude only: start in a Goal or Timer loop (loop.ts). */ loop?: { mode: 'turn' | 'goal' | 'timer'; doneWhen?: string; everyMin?: 10 | 30 | 60 | 180 | 1440; text?: string } }
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
   | { type: 'hub-chat-tools'; sessionId: string; tools: ChatProfile }
   | { type: 'hub-tool-precedence'; name: string; value: 'always' | 'auto' | 'never' }
-  | { type: 'hub-indefinite'; sessionId: string; on: boolean }
+  | { type: 'hub-loop'; sessionId: string; loop: { mode: 'turn' | 'goal' | 'timer'; doneWhen?: string; everyMin?: 10 | 30 | 60 | 180 | 1440; text?: string } }
   | { type: 'hub-star'; sessionId: string; ai: AiId; on: boolean }
   | { type: 'hub-resume'; sessionId: string; ai: AiId }
   | { type: 'hub-archive'; sessionId: string }
@@ -66,6 +80,7 @@ export type HubCommand =
   | { type: 'hub-approve'; sessionId: string }
   | { type: 'hub-open-note'; sessionId: string }
   | { type: 'hub-focus-chat'; sessionId: string }
+  | { type: 'hub-open-chat'; sessionId: string }
   | { type: 'hub-terminal'; id: number; act: 'show' | 'close' }
   | { type: 'hub-keep'; onFull?: 'compact' | 'fresh'; freshBranch?: boolean }
   | { type: 'hub-aws-login'; profile: string; chrome?: string }
@@ -91,6 +106,9 @@ export type HubCommand =
   | { type: 'hub-key-remove'; name: ApiKeyName }
   | { type: 'hub-env-setup'; folder: string }
   | { type: 'hub-kit-export' }
+  | { type: 'hub-sync-sign-in' }
+  | { type: 'hub-sync-now' }
+  | { type: 'hub-sync-off' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
   | { type: 'hub-role-model'; role: string; model: 'inherit' | 'fable' | 'opus' | 'sonnet' | 'haiku' }
@@ -124,6 +142,7 @@ export type HubCommand =
   | { type: 'hub-jarvis'; q: string; voice?: boolean }
   | { type: 'hub-voice'; on: boolean }
   | { type: 'hub-git'; sessionId: string; op: GitOp; files?: string[]; summary?: string; description?: string; branch?: string; stash?: boolean; confirmed?: boolean }
+  | { type: 'hub-auto-merge'; repo: string; on: boolean }
   | { type: 'hub-harden'; sessionId: string }
   | { type: 'hub-draft-commit'; sessionId: string }
   | { type: 'hub-todo-add'; path: string; text: string }
@@ -142,8 +161,6 @@ export type HubCommand =
   /** The project's autopilot: on runs the next item by itself, paused holds new starts. */
   | { type: 'hub-todo-pilot'; path: string; on?: boolean; paused?: boolean }
   | { type: 'hub-budget'; sessionId: string; maxHours?: number | null; maxCostUsd?: number | null; gate?: string | null }
-  | { type: 'hub-checkback'; sessionId: string; everyMin: 10 | 30 | 60 }
-  | { type: 'hub-checkback-clear'; sessionId: string }
   | { type: 'hub-refine'; sessionId: string }
   | { type: 'hub-snapshots' }
   | { type: 'hub-snapshot-restore'; id: string }
@@ -157,7 +174,7 @@ export type HubCommand =
 const COMMAND_WAIT: Partial<Record<HubCommand['type'], number>> = {
   'hub-git': 8000, 'hub-sweep': 8000, 'hub-sweep-fix': 8000, 'hub-sweep-approve': 8000, 'hub-jarvis': 8000,
   'hub-voice': 8000, 'hub-harden': 8000, 'hub-key-test': 8000, 'hub-aws-check': 8000, 'hub-setup': 8000,
-  'hub-rules-sync': 8000, 'hub-todo-sync': 8000, 'hub-search': 8000, 'hub-changes': 8000, 'hub-kit-export': 8000,
+  'hub-rules-sync': 8000, 'hub-todo-sync': 8000, 'hub-search': 8000, 'hub-changes': 8000, 'hub-kit-export': 8000, 'hub-sync-sign-in': 8000, 'hub-sync-now': 8000, 'hub-sync-off': 8000,
 }
 export const commandWait = (command: HubCommand) => COMMAND_WAIT[command.type] ?? 1200
 
@@ -188,6 +205,7 @@ class VSCodeBridge {
   private researchReads = new Map<string, (m: { body?: string; problem?: string }) => void>()
   private graphs = new Map<string, (m: { graph?: MemoryGraph; problem?: string }) => void>()
   private runLists = new Map<string, (m: { runs?: RunDetail[]; problem?: string }) => void>()
+  private usageReports = new Map<string, (m: { usage?: UsageReport; problem?: string }) => void>()
   private flowMaps = new Map<string, (m: { map?: FlowMap; problem?: string }) => void>()
   private chatReads = new Map<string, (m: ChatAnswer) => void>()
   private splits = new Map<string, (asks: string[]) => void>()
@@ -270,8 +288,10 @@ class VSCodeBridge {
         }
         break
       case 'hub-state':
-        this.lastHub = data.hub
-        for (const cb of this.hubListeners) cb(data.hub)
+        // A delta only fits a state already here; a reloaded page asks for the whole one.
+        if ('delta' in data && !this.lastHub) break
+        this.lastHub = 'delta' in data ? applyDelta(this.lastHub as HubState, data.delta) : data.hub
+        for (const cb of this.hubListeners) cb(this.lastHub as HubState)
         break
       case 'upload-progress':
       case 'upload-done':
@@ -285,6 +305,9 @@ class VSCodeBridge {
         break
       case 'runs':
         this.runLists.get(data.id)?.(data)
+        break
+      case 'usage':
+        this.usageReports.get(data.id)?.(data)
         break
       case 'flowmap':
         this.flowMaps.get(data.id)?.(data)
@@ -300,6 +323,8 @@ class VSCodeBridge {
         break
       case 'hub-visible':
         this.shown = data.visible !== false
+        // globals.css stops every animation in a hidden view.
+        document.documentElement.toggleAttribute('data-away', !this.shown)
         for (const cb of this.shownListeners) cb()
         break
     }
@@ -436,6 +461,13 @@ class VSCodeBridge {
     return result
   }
 
+  usage(): Promise<UsageReport | string> {
+    const id = Math.random().toString(36).slice(2)
+    const result = this.request(this.usageReports, id, 120_000, () => 'The editor did not answer', m => m.usage ?? m.problem ?? 'no usage report')
+    this.postToExtension({ type: 'usage-get', id })
+    return result
+  }
+
   /** A chat's outputs, a transcript page, one screenshot or its terminal screen, for the chat view. */
   chat(sessionId: string, what: 'outputs' | 'transcript' | 'shot' | 'screen', ask: ChatAsk = {}): Promise<ChatAnswer> {
     const id = Math.random().toString(36).slice(2)
@@ -477,3 +509,6 @@ class VSCodeBridge {
 
 // Singleton, safe to import from anywhere
 export const vscodeBridge = typeof window !== 'undefined' ? new VSCodeBridge() : null
+
+/** Someone can see this view: false in a hidden browser tab and in a view VS Code keeps alive but hidden. */
+export const onScreen = () => !document.hidden && vscodeBridge?.shown !== false

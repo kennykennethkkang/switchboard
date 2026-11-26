@@ -6,7 +6,7 @@ import * as path from 'node:path'
 import { HubService } from '../src/hub/hub-service'
 import { handleHub } from '../src/hub/routes'
 import { waitQuestion } from '../src/hub/questions'
-import { forgetRung, phoneChange, pickOf, ring, setDial, type Call } from '../src/hub/phone'
+import { forgetRung, phoneChange, pickOf, pushText, ring, setDial, type Call } from '../src/hub/phone'
 import type { ChatProgress } from '../src/hub/types'
 
 const calls: Call[] = []
@@ -56,6 +56,36 @@ describe('phone line', () => {
     phoneChange(q('pc4', 'Approve this chat as finished?'), 'Shop')
     await tick()
     assert.deepEqual(calls.map(c => c.text), ['Shop needs you: Approve this chat as finished?'])
+  })
+})
+
+describe('pushText', () => {
+  const chat = (sessionId: string, state: string, question?: string) => ({ sessionId, cwd: '/w', state, tasks: [], question, ...(question ? { ask: { id: 'q', kind: 'question', tool: 'AskUserQuestion', options: [], questions: [{ question, options: ['Approve', 'Send back'] }] } } : {}) }) as unknown as ChatProgress
+  const APPROVE = 'Approve this chat as finished?'
+
+  it('pushes at the closing question, not again at the Done its Approve leads to', () => {
+    assert.equal(pushText(chat('pt1', 'needs-you', APPROVE), undefined, 100), 'done, waiting for your Approve')
+    assert.equal(pushText(chat('pt1', 'done'), 150, 160), undefined)
+  })
+
+  it('pushes a Done with no closing question, or one that was never approved', () => {
+    assert.equal(pushText(chat('pt2', 'done')), 'finished')
+    pushText(chat('pt3', 'needs-you', APPROVE), undefined, 100)
+    assert.equal(pushText(chat('pt3', 'done'), undefined, 160), 'finished')
+    // An approval from before this closing question, then a Send back.
+    pushText(chat('pt4', 'needs-you', APPROVE), 50, 100)
+    assert.equal(pushText(chat('pt4', 'done'), 50, 160), 'finished')
+  })
+
+  it('pushes a resumed chat that finishes again without asking', () => {
+    pushText(chat('pt5', 'needs-you', APPROVE), undefined, 100)
+    pushText(chat('pt5', 'done'), 150, 160)
+    assert.equal(pushText(chat('pt5', 'done'), 150, 900), 'finished')
+  })
+
+  it('pushes nothing for other questions or states', () => {
+    assert.equal(pushText(chat('pt6', 'needs-you', 'Which layout?')), undefined)
+    assert.equal(pushText(chat('pt6', 'working')), undefined)
   })
 })
 

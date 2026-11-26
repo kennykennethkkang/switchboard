@@ -5,13 +5,15 @@
  */
 import * as fs from 'fs'
 import * as path from 'path'
+import { askedText, RUN_PROMPT } from './progress'
 import { isResearch, researchProject, RESEARCH_ROOT } from './research'
-import { saveResearch, type ResearchItem } from './research-library'
+import { addToResearch, saveResearch, type ResearchItem } from './research-library'
+import { researchTarget, stripResearchInstructions } from './research-question'
 
 type Payload = Record<string, unknown>
-export type Captured = { sessionId: string; question: string; answer: string; cwd?: string }
+export type Captured = { sessionId: string; question: string; answer: string; cwd?: string; addsTo?: string }
 // The turn's state: real once its own research starts, titled by its own prompt.
-type Run = { real: boolean; prompt?: string; args?: string }
+type Run = { real: boolean; prompt?: string; args?: string; addsTo?: string }
 
 // Same rule as web/lib/research.ts (ANSWER_DONE and looksLikeAnswer): keep them in step.
 const ANSWER_DONE = /\*\*Answer:?\*\*|^#+\s*Sources\b/im
@@ -47,21 +49,30 @@ export function transcriptReply(file: unknown): string {
 /** Per-session research state, folded from every hook payload Switchboard sees. */
 export class ResearchCapture {
   private runs = new Map<string, Run>()
+  private addsTo = new Map<string, string>()
 
   /** The finished report this payload ends, or undefined. */
   hook(p: Payload, reply: (file: unknown) => string = transcriptReply): Captured | undefined {
     const id = typeof p.session_id === 'string' ? p.session_id : undefined
     if (!id) return undefined
     const event = p.hook_event_name
-    if (event === 'SessionEnd') { this.runs.delete(id); return undefined }
+    if (event === 'SessionEnd') {
+      this.runs.delete(id)
+      this.addsTo.delete(id)
+      return undefined
+    }
     if (event === 'UserPromptSubmit') {
+      const prompt = String(p.prompt ?? '').replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim()
+      // A background researcher's return and a usage limit resume arrive as prompts too: the same run goes on.
+      if (prompt && !askedText(prompt) && !prompt.startsWith(RUN_PROMPT)) return undefined
       // A new turn starts clean: only its own research makes it real.
-      const turn: Run = { real: false }
-      const prompt = String(p.prompt ?? '').trim()
+      const turn: Run = { real: false, addsTo: this.addsTo.get(id) }
       if (prompt) {
-        turn.prompt = prompt
+        turn.addsTo = researchTarget(prompt) ?? turn.addsTo
+        if (turn.addsTo) this.addsTo.set(id, turn.addsTo)
+        turn.prompt = stripResearchInstructions(prompt)
         const slash = prompt.match(/^\/(?:[\w-]+:)?deep-research\b\s*([\s\S]*)$/)
-        if (slash) { turn.real = true; turn.args = slash[1].trim() || undefined }
+        if (slash) { turn.real = true; turn.args = stripResearchInstructions(slash[1]) || undefined }
       }
       this.runs.set(id, turn)
       return undefined
@@ -71,7 +82,7 @@ export class ResearchCapture {
       const input = (p.tool_input ?? {}) as Record<string, unknown>
       if (p.tool_name === 'Skill' && String(input.skill ?? '').split(':').pop() === 'deep-research') {
         run.real = true
-        if (typeof input.args === 'string' && input.args.trim()) run.args = input.args.trim()
+        if (typeof input.args === 'string' && input.args.trim()) { run.addsTo ??= researchTarget(input.args); run.args = stripResearchInstructions(input.args) }
       }
       // A web call in a Research-space chat is research too (same rule as ResearchTrigger in research-window.ts).
       if (WEB.has(String(p.tool_name)) && isResearch(p.cwd)) run.real = true
@@ -82,7 +93,7 @@ export class ResearchCapture {
       const last = typeof p.last_assistant_message === 'string' ? p.last_assistant_message : reply(p.transcript_path)
       if (!looksLikeAnswer(last)) { this.runs.set(id, run); return undefined }
       this.runs.delete(id)
-      return { sessionId: id, question: run.args ?? run.prompt ?? 'Research run', answer: last, cwd: typeof p.cwd === 'string' ? p.cwd : undefined }
+      return { sessionId: id, question: run.args ?? run.prompt ?? 'Research run', answer: last, cwd: typeof p.cwd === 'string' ? p.cwd : undefined, ...(run.addsTo ? { addsTo: run.addsTo } : {}) }
     }
     this.runs.set(id, run)
     return undefined
@@ -97,5 +108,7 @@ export function captureSaved(c: Captured, d: CaptureDeps): { item?: ResearchItem
   // en-CA prints the local day as YYYY-MM-DD
   const date = new Date(d.now ?? Date.now()).toLocaleDateString('en-CA')
   const project = c.cwd ? researchProject(c.cwd, d.projects, RESEARCH_ROOT) : undefined
-  return saveResearch(d.root, { question: c.question, answer: c.answer, chat: d.chat, sessionId: c.sessionId, project, date, at: d.now ?? Date.now() }, scrub)
+  const run = { question: c.question, answer: c.answer, chat: d.chat, sessionId: c.sessionId, project, date, at: d.now ?? Date.now() }
+  if (c.addsTo) { try { return addToResearch(d.root, c.addsTo, run, scrub) } catch { /* stale or trashed id: keep it as a new report */ } }
+  return saveResearch(d.root, run, scrub)
 }

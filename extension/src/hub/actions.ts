@@ -15,13 +15,15 @@ import { autoOn, autoPick, fiveHour, keywordRole, labelTask, pickRun, scoreTask,
 import { logPick, readPick, type PickRow } from './picks'
 import { logDrafts, readLearned, smartRun, type SmartDraft } from './smart-select'
 import { ensureResearchRoot } from './research'
+import { stripResearchInstructions } from './research-question'
+import { ensureWorkbench, WORKBENCH_NOTE } from './adjustments'
 import { presetFor } from './jev-project'
 import { AIS, chatTerminal, cliPath, codexFirst, codexPaste, codexReady, saveCodexOwn, shareKitWithHermes } from './ais'
 import { quickAsk, withBrief } from './brain'
 import { rulesState, withPointer } from './rules'
 import { accountsNote, readLinks, readLogins } from './logins'
 import { CLI_APPS, cliBinary, cliBusy, deviceUrl, endCli, startCli } from './cli-logins'
-import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
+import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, loginError, moveProfile, readAwsConfig, refreshIdentity, rowText, browserFor, profileFor, readPrefs, readSessions, sameLogin, ssoProfile, validProfileName, writeOpenChrome, writePrefs, writeSessions } from './aws'
 import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, repoTop, stillRunning, ultracodeFlags } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { addWorktree } from './git'
@@ -36,6 +38,7 @@ import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
 import { FLAGGED, chatSettings, cleanProfile, clearIndefinite, defaultProfile, handoffSettings, indefiniteOn, nameNote, saveProfile, savedProfile, startProfile, syncIndefinite, toolsNote, uiSdkNote } from './tools'
 import { jevStart, readPrecedence, saveSmartStart, withGoal } from './smart-tools'
 import { tuiEnv } from './controls'
+import { EVERY, goalLine, type Every, type LoopPick } from './loop'
 import { editor } from '../editor'
 import { kitDir } from '../constants'
 
@@ -88,7 +91,7 @@ const typed = (command: string) => {
   return scriptLine(file, SHELL)
 }
 /** A research chat's system note (research mode skips the finishing steps). */
-const RESEARCH_NOTE = 'Research chat: look things up and answer with sources; save findings to memory; no aar, standup, Commit message or Approve question.'
+const RESEARCH_NOTE = 'Research chat: look things up and answer with sources; save findings to memory; no aar, standup, Commit message or Approve question unless you made a change with the adjust skill. End the report with an ## Actions section (deep-research skill, Report) when the findings make a change worth making; asked to make a change here, use the adjust skill and its End steps.'
 const rowName = (first: string) => first.replace(/\s+/g, ' ').trim().slice(0, 60)
 const waitForCodex = (terminal: vscode.Terminal, cwd: string, name: string | undefined, group?: string, title?: string, waitOn?: string[], pick?: PickRow) => {
   if (name) codexStarts.push({ key: Math.random().toString(36).slice(2), cwd, name, at: Date.now(), terminal, group, title, waitOn, pick })
@@ -143,7 +146,7 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
 const worktreeName = (title: string) => `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '') || 'chat'}-${crypto.randomUUID().slice(0, 4)}`
 
 /** The run's own picks from the command (hub-new-chat, hub-todo-run); unset fields are filled by the auto pick unless auto is false; no auto follows the gear's Auto pick per task. */
-export type RunOpts = { model?: string; effort?: Effort; ultracode?: boolean; auto?: boolean; research?: boolean }
+export type RunOpts = { model?: string; effort?: Effort; ultracode?: boolean; auto?: boolean; research?: boolean; workbench?: boolean }
 export type Run = { ai: AiId; model?: string; effort?: string; ultracode: boolean; ultrathink: boolean; reason?: string; row?: Omit<PickRow, 'at' | 'session' | 'project'>; /** Smart select's model and effort picks, logged once the chat has an id. */ smart?: SmartDraft[] }
 
 /**
@@ -192,7 +195,7 @@ export async function resolveRun(want: NewChatAi, text: string | undefined, fold
  * group: a split's group id (split.ts), saved once the session id is known.
  * worktree: Claude only, starts in repo/.claude/worktrees/<slug> on branch worktree-<slug>.
  * run: the run's own model, effort and ultracode, auto false, research (resolveRun). A To-do run counts as unattended.
- * research: starts in the research folder instead, with a note that skips the finishing steps.
+ * research: starts in the research folder instead, with a note that skips the finishing steps; workbench: in its Workbench folder, to change things.
  */
 export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[], worktree = false, run?: RunOpts): Promise<string | undefined> {
   const project = hub.get().projects.find(p => p.path === folder)
@@ -202,9 +205,9 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   if (reason) void vscode.window.showInformationMessage(`${reason}`)
   let where = folder
   if (run?.research) {
-    try { where = ensureResearchRoot() } catch (err) { return `could not make the research folder (${(err as Error).message})` }
+    try { where = run.workbench ? ensureWorkbench() : ensureResearchRoot() } catch (err) { return `could not make the research folder (${(err as Error).message})` }
   }
-  const goal = text?.trim()
+  const goal = text ? stripResearchInstructions(text) : undefined
   const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(where) : []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
   const named = goal ? await titleFor(goal, quickAsk) : project.name
@@ -218,7 +221,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   const about = Object.fromEntries(inv.filter(i => i.description).map(i => [i.name, i.description!]))
   // Codex has no hook to read the brief from, so it rides in front of the first message.
   // Codex has no --append-system-prompt: Claude's system notes ride in the brief's block, which the row name skips (ais.ts withoutBrief).
-  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
+  const notes = ai === 'codex' ? [profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? (run.workbench ? WORKBENCH_NOTE : RESEARCH_NOTE) : ''].filter(Boolean).join(' ').replace(/\s*\n\s*/g, ' ') : ''
   const lead = [withBrief(hub.get(), where, undefined), notes && `Switchboard notes: ${notes}`].filter(Boolean).join('\n')
   const first = withPointer(ai === 'claude' ? '' : [lead, text].filter(Boolean).join('\n\n'), rulesState.ready[ai], rulesState.kit)
   if (ai === 'codex') {
@@ -226,7 +229,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
     if (typeof t === 'string') return t
     t.show(true)
     // The row is tied by the message, never the brief in front of it (ais.ts); the title is what it then shows.
-    waitForCodex(t, where, rowName(text ?? '') || undefined, group, title, waitOn, picked.row && { ...picked.row, at: Date.now(), project: project.name })
+    waitForCodex(t, where, rowName(goal ?? '') || undefined, group, title, waitOn, picked.row && { ...picked.row, at: Date.now(), project: project.name })
     return undefined
   }
   if (ai === 'hermes') {
@@ -252,7 +255,7 @@ export async function newChat(folder: string, text: string | undefined, remote: 
     if (sessionId && jev) saveSmartStart(sessionId, jev.why)
     const fx = ultracodeFlags({ effort: picked.effort, ultracode: picked.ultracode, settings })
     const message = picked.ultrathink ? withUltrathink(text ?? '') : text ?? ''
-    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings: fx.settings, model: picked.model, effort: fx.effort, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? RESEARCH_NOTE : ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings: fx.settings, model: picked.model, effort: fx.effort, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? (run.workbench ? WORKBENCH_NOTE : RESEARCH_NOTE) : ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
@@ -375,12 +378,26 @@ export async function setBudget(sessionId: string, b: { maxHours?: number | null
   commit(sessionId, Object.keys(next).length ? { ...rest, budget: next } : rest)
 }
 
-/** Check-back on at everyMin (the count starts over) or off. */
-export async function setCheckBack(sessionId: string, everyMin: 10 | 30 | 60 | null): Promise<void> {
+/** Check-back on at everyMin (the count starts over), with the Timer's own prompt when given, or off. */
+export async function setCheckBack(sessionId: string, everyMin: Every | null, text?: string): Promise<void> {
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error('Not a chat id')
-  if (everyMin !== null && ![10, 30, 60].includes(everyMin)) throw new Error('Check back is every 10, 30 or 60 minutes')
+  if (everyMin !== null && !EVERY.includes(everyMin)) throw new Error('Not a timer interval')
   const { checkBack: _, ...rest } = await baseProfile(sessionId)
-  commit(sessionId, everyMin ? { ...rest, checkBack: { everyMin, count: 0 } } : rest)
+  const prompt = text?.trim().slice(0, 500)
+  commit(sessionId, everyMin ? { ...rest, checkBack: { everyMin, count: 0, ...(prompt ? { text: prompt } : {}) } } : rest)
+}
+
+/** What a Goal loop tells the chat: the Run indefinitely note when it just went on, and the goal when one was given. */
+export const loopPrompt = (fresh: boolean, doneWhen?: string) => [fresh ? INDEFINITE_TEXT : '', doneWhen?.trim() ? goalLine(doneWhen) : ''].filter(Boolean).join('\n\n') || undefined
+
+/** One loop for a chat, the others off; answers the text to send it, if any. */
+export async function setLoop(sessionId: string, loop: LoopPick): Promise<string | undefined> {
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error('Not a chat id')
+  if (loop.mode !== 'goal') await setIndefinite(sessionId, false)
+  // Only a set check-back is cleared, so a plain chat does not get a saved profile out of it.
+  if (loop.mode === 'timer') await setCheckBack(sessionId, loop.everyMin ?? null, loop.text)
+  else if (savedProfile(sessionId)?.checkBack) await setCheckBack(sessionId, null)
+  return loop.mode === 'goal' ? loopPrompt(await setIndefinite(sessionId, true), loop.doneWhen) : undefined
 }
 
 /** One check-back went out (step 1), or its send failed (step -1: count back, lastAt kept so it waits a full interval). */
@@ -669,7 +686,7 @@ function goneNote(gone: string[], dir: string): string | undefined {
 }
 
 /**
- * `aws login --profile <p>` with no stdin, opened in Chrome: the profile's own pick (chrome, else the saved one),
+ * `aws login --profile <p>` (`aws sso login` for single sign-on) with no stdin, opened in Chrome: the profile's own pick (chrome, else the saved one),
  * else the project's browser, else Chrome's last used profile; a pick Chrome no longer lists is skipped, with a note.
  * Python's webbrowser runs BROWSER, a fixed script; the Chrome folder rides in the env. The own pick is kept per
  * profile, a deleted one dropped. done: called when it ends, signed in or not.
@@ -687,7 +704,8 @@ export function awsLogin(profile: string, chrome: string | undefined, done: () =
   // A script that fails (no Chrome) makes webbrowser fall back to the default browser.
   const script = writeOpenChrome()
   if (script) { env.BROWSER = script; env.SWITCHBOARD_CHROME_DIR = dir }
-  const child = spawn(awsBinary(), ['login', '--profile', profile], { stdio: ['ignore', 'pipe', 'pipe'], env, windowsHide: true })
+  const sso = ssoProfile(profile), args = [...(sso ? ['sso'] : []), 'login'], cmd = `aws ${args.join(' ')}`
+  const child = spawn(awsBinary(), [...args, '--profile', profile], { stdio: ['ignore', 'pipe', 'pipe'], env, windowsHide: true })
   let out = ''
   const keep = (b: Buffer) => { out = (out + b.toString()).slice(-4000) }
   child.stdout.on('data', keep); child.stderr.on('data', keep)
@@ -695,7 +713,7 @@ export function awsLogin(profile: string, chrome: string | undefined, done: () =
   let ended = false
   child.on('error', err => {
     if (ended) return
-    ended = true; clearTimeout(timer); signInError(key, `aws login could not start: ${err.message}`); done()
+    ended = true; clearTimeout(timer); signInError(key, `${cmd} could not start: ${err.message}`); done()
   })
   child.on('close', code => {
     if (ended) return
@@ -710,16 +728,16 @@ export function awsLogin(profile: string, chrome: string | undefined, done: () =
         if (twin && !deleteAwsProfile(profile)) kept = twin
         if (kept !== profile) writePrefs(moveProfile(readPrefs(), profile, kept))
         const { [profile]: _gone, ...sessions } = readSessions()
-        writeSessions({ ...(kept === profile ? readSessions() : sessions), [kept]: { at: Date.now() } })
+        if (!sso) writeSessions({ ...(kept === profile ? readSessions() : sessions), [kept]: { at: Date.now() } })
       } catch (err) { signInNote(key, `Signed in, but Switchboard could not update its own files: ${(err as Error).message}`) }
       void vscode.window.showInformationMessage(kept === profile ? `Signed in to AWS as ${profile}.` : `Signed in to AWS as ${kept}; ${profile} was the same login, so it was folded into ${kept}.`)
       // The row's name and email follow whoever just signed in.
       void refreshIdentity(kept).catch(() => undefined).finally(done)
       return
     } else {
-      const why = code === null ? `No sign-in within ${LOGIN_MS / 60_000} minutes, so aws login was stopped.` : loginError(out) || `aws login exited with code ${code}.`
+      const why = code === null ? `No sign-in within ${LOGIN_MS / 60_000} minutes, so ${cmd} was stopped.` : loginError(out) || `${cmd} exited with code ${code}.`
       signInError(key, why)
-      void vscode.window.showWarningMessage(`aws login --profile ${profile} did not finish: ${why.split('\n').pop()}`)
+      void vscode.window.showWarningMessage(`${cmd} --profile ${profile} did not finish: ${why.split('\n').pop()}`)
     }
     done()
   })

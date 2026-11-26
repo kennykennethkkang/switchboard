@@ -75,7 +75,15 @@ export function clisOf(cmd: string, appIds: string[]): string[] {
 }
 
 function resolve(p: string, cwd: string, home: string) {
-  const abs = p === '~' || p.startsWith('~/') ? home + p.slice(1) : p.startsWith('/') ? p : `${cwd}/${p}`
+  p = p.replace(/\\/g, '/')
+  cwd = cwd.replace(/\\/g, '/'); home = home.replace(/\\/g, '/')
+  const abs = p === '~' || p.startsWith('~/') ? home + p.slice(1) : p.startsWith('/') || /^[a-z]:\//i.test(p) ? p : `${cwd}/${p}`
+  const drive = /^([a-z]:)(?:\/|$)/i.exec(abs)?.[1]
+  if (drive) {
+    const out: string[] = []
+    for (const s of abs.slice(drive.length).split('/')) { if (s === '..') out.pop(); else if (s && s !== '.') out.push(s) }
+    return `${drive}/${out.join('/')}`
+  }
   const out: string[] = []
   for (const s of abs.split('/')) {
     if (s === '..') out.pop()
@@ -96,8 +104,8 @@ export const targetOf = (cmd: string, cwd: string, home: string) => cdsOf(cmd, c
 export function foldersOf(cmd: string, cwd: string, home: string): string[] {
   const text = pieces(cmd).join('\n')
   const paths = [
-    ...[...text.matchAll(/(?:^|[\s=])(["'])((?:~|\/)[^"']*)\1/g)].map(m => m[2]),
-    ...[...text.matchAll(/(?:^|[\s=])((?:~|\/)[^\s'";|&)<>]*)/g)].map(m => m[1]),
+    ...[...text.matchAll(/(?:^|[\s=])(["'])((?:~|\/|[a-z]:[\\/])[^"']*)\1/gi)].map(m => m[2]),
+    ...[...text.matchAll(/(?:^|[\s=])((?:~|\/|[a-z]:[\\/])[^\s'";|&)<>]*)/gi)].map(m => m[1]),
   ].map(p => resolve(p, cwd, home))
   return [...new Set([resolve(cwd, '/', home), ...cdsOf(cmd, cwd, home), ...paths])]
 }
@@ -240,7 +248,7 @@ async function repoTop($: EngineInterface, folder: string, home: string) {
 
 export const register: Register = on => {
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const home = ((await $.env.get('HOME')) ?? '').replace(/\/+$/, '')
+    const home = ((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '').replace(/[\\/]+$/, '')
     const dir = (await $.env.get('ACCOUNT_GUARD_DIR')) || `${home}/.claude/switchboard`
     const logins = await json($, `${dir}/logins.json`)
     const apps: App[] = Array.isArray(logins.apps) ? logins.apps.filter((a: unknown) => isObj(a) && typeof a.id === 'string') : []

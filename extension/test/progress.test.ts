@@ -870,6 +870,43 @@ test('roles: the lead stopping a subagent with TaskStop ends it', () => {
   assert.deepEqual(q.running, ['e1'])
 })
 
+// Recorded from claude 2.1.332: web-fetch sends no SubagentStart or SubagentStop, only its own calls and the Agent result.
+const FETCH = ev('PreToolUse', { tool_name: 'WebFetch', agent_id: 'w1', agent_type: 'web-fetch' })
+const FETCHED = { tool_name: 'Agent', tool_input: { subagent_type: 'web-fetch' }, tool_response: { status: 'completed', agentId: 'w1', agentType: 'web-fetch' } }
+test('roles: a foreground agent ends when its call returns, with no SubagentStop', () => {
+  const start = run([ev('SessionStart'), ev('SubagentStart', { agent_type: 'qa', agent_id: 'q1' }), FETCH])!
+  assert.deepEqual(start.running, ['q1', 'w1'])
+  const p = step(start, ev('PostToolUse', FETCHED), 2000)!
+  assert.deepEqual(p.running, ['q1'])
+  assert.deepEqual(p.roles.map(r => [r.id, r.state, r.at]), [['q1', 'active', undefined], ['w1', 'done', 2000]])
+  // Spawned by a subagent, the result arrives as that subagent's call.
+  assert.deepEqual(step(start, ev('PostToolUse', { ...FETCHED, agent_id: 'q1', agent_type: 'qa' }), 2000)!.running, ['q1'])
+  // The old name of the tool.
+  assert.deepEqual(step(start, ev('PostToolUse', { ...FETCHED, tool_name: 'Task' }), 2000)!.running, ['q1'])
+  // A background launch or a failed call says nothing about its end, and another tool's result is no agent's.
+  for (const e of [ev('PostToolUse', { ...FETCHED, tool_response: { status: 'async_launched', agentId: 'w1' } }), ev('PostToolUseFailure', FETCHED), ev('PostToolUse', { ...FETCHED, tool_name: 'mcp__x__run' }), ev('PostToolUse', { ...FETCHED, tool_response: 'done' })])
+    assert.deepEqual(step(start, e, 2000)!.running, ['q1', 'w1'])
+})
+
+test('finish: a chat whose only agent was a foreground web-fetch settles at its Stop', () => {
+  const p = run([ev('SessionStart'), FETCH, ev('PostToolUse', FETCHED), ev('Stop', COMMIT)])!
+  assert.deepEqual([p.state, p.running, p.waiting], ['done', undefined, undefined])
+})
+
+test('roles: a resumed agent runs again, until a SendMessage that waited for it hands its report back', () => {
+  const ended = run([ev('SessionStart'), FETCH, ev('PostToolUse', FETCHED)])!
+  // Its own late hook does not bring it back.
+  assert.equal(step(ended, FETCH, 3000)!.running, undefined)
+  const back = step(ended, FETCH, 9000)!
+  assert.deepEqual([back.running, back.roles[0].state], [['w1'], 'active'])
+  const send = { tool_name: 'SendMessage', tool_input: { to: 'fetcher' }, tool_response: { success: true, inlineHandback: { content: [] }, pin: { id: 'w1', name: 'fetcher' } } }
+  const over = step(back, ev('PostToolUse', send), 10000)!
+  assert.deepEqual([over.running, over.roles[0].state], [undefined, 'done'])
+  // A background resume answers at once and runs on; its SubagentStart already came.
+  const bg = step(ended, ev('SubagentStart', { agent_type: 'qa', agent_id: 'w1' }), 9000)
+  assert.deepEqual(step(bg, ev('PostToolUse', { ...send, tool_response: { success: true, resumedAgentId: 'w1', pin: { id: 'w1' } } }), 9100)!.running, ['w1'])
+})
+
 // Recorded from claude 2.1.312: TaskStop names a shell by its backgroundTaskId, and a stopped shell writes no notification.
 test('jobs: the lead stopping a background Bash with TaskStop ends it', () => {
   const stop = { tool_name: 'TaskStop', tool_input: { task_id: 'bo727da6e' }, tool_response: { message: 'Successfully stopped task: bo727da6e (until ...)', task_id: 'bo727da6e', task_type: 'local_bash' } }
@@ -890,6 +927,9 @@ test('subJobs: a subagent\'s background Bash is kept apart, never holding the ch
   // Its own TaskStop ends it too.
   const stopped = step(p, ev('PostToolUse', { tool_name: 'TaskStop', agent_id: 'e1', tool_input: { task_id: 'bo727da6e' }, tool_response: {} }), 5000)!
   assert.equal(stopped.subJobs, undefined)
+  // So does the lead's Stop when its transcript says it ended.
+  const led = step(p, ev('Stop', { ...COMMIT, bg_finished: ['toolu_01AoVrFSc66BD5YHtMHRjmbx'] }), 5000)!
+  assert.equal(led.subJobs, undefined)
 })
 
 test('hub.hook reads finished subagent jobs from the agent transcript on SubagentStop', async () => {
@@ -902,6 +942,21 @@ test('hub.hook reads finished subagent jobs from the agent transcript on Subagen
   h.hook(ev('PostToolUse', { ...BG_POST, agent_id: 'e1', agent_type: 'engineer' }), 3)
   h.hook(ev('SubagentStop', { agent_type: 'engineer', agent_id: 'e1', agent_transcript_path: file }), 4)
   assert.equal(h.get().progress[0].subJobs, undefined)
+})
+
+test('hub.hook reads the lead transcript on a Stop with only subagent jobs pending', async () => {
+  const fs = await import('fs'), os = await import('os'), path = await import('path')
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-')), 'lead.jsonl')
+  fs.writeFileSync(file, NOTE + '\n')
+  const h = new HubService()
+  h.hook(ev('SessionStart'), 1)
+  h.hook(ev('SubagentStart', { agent_type: 'engineer', agent_id: 'e1' }), 2)
+  h.hook(ev('PostToolUse', { ...BG_POST, agent_id: 'e1', agent_type: 'engineer' }), 3)
+  h.hook(ev('SubagentStop', { agent_type: 'engineer', agent_id: 'e1' }), 4)
+  assert.equal(h.get().progress[0].subJobs?.length, 1)
+  h.hook(ev('Stop', { ...COMMIT, transcript_path: file }), 5)
+  assert.equal(h.get().progress[0].subJobs, undefined)
+  fs.rmSync(path.dirname(file), { recursive: true, force: true })
 })
 
 const LIMIT = { error: 'rate_limit', error_details: '429 Too Many Requests', last_assistant_message: 'API Error: Rate limit reached' }
@@ -1241,4 +1296,18 @@ test('a pipeline seed line after a person\'s prompt is cut off and the prompt st
   assert.equal(askedText(`Fix the login bug\n\n${seed}`), 'Fix the login bug')
   assert.equal(workText(`Fix the login bug ${seed}`, true), 'Fix the login bug')
   assert.equal(askedText(seed), undefined)
+})
+
+test('Code Mode: code and polls behind an open question leave it open until it is answered', () => {
+  const q = { tool_name: 'AskUserQuestion', tool_use_id: 'repl_q', tool_input: ASK_INPUT }
+  const p = run([ev('SessionStart'), ev('PreToolUse', { tool_name: 'REPL', tool_use_id: 'toolu_r' }), ev('PreToolUse', q), ev('PermissionRequest', { tool_name: 'AskUserQuestion', tool_input: ASK_INPUT }),
+    ev('PreToolUse', { tool_name: 'Poll', tool_use_id: 'toolu_p' }), ev('PreToolUse', { tool_name: 'REPL', tool_use_id: 'toolu_r2' }), ev('PreToolUse', { tool_name: 'Bash', tool_use_id: 'repl_b', tool_input: { command: 'ls' } }),
+    ev('PostToolUse', { tool_name: 'Bash', tool_use_id: 'repl_b', tool_input: { command: 'ls' }, tool_response: {} }), ev('PostToolUse', { tool_name: 'REPL', tool_use_id: 'toolu_r2' })])!
+  assert.equal(p.state, 'needs-you')
+  assert.equal(p.ask?.id, 'repl_q')
+  assert.deepEqual(p.tools?.map(t => t.tool), ['REPL', 'AskUserQuestion', 'REPL', 'Bash'], 'polls are not listed')
+  const done = step(p, ev('PostToolUse', { ...q, tool_response: {} }), 2000)!
+  assert.equal(done.ask, undefined)
+  assert.equal(done.state, 'working')
+  assert.equal(step(p, ev('PreToolUse', { tool_name: 'Read', tool_use_id: 'toolu_x' }), 2000)?.ask, undefined, 'a direct call still means it moved on')
 })

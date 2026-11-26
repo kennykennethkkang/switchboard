@@ -13,7 +13,6 @@
 /* Phone: the actions get their own rows (switch, then buttons) and no label is cut. */
 @container (max-width: 560px) {
   .cp-head > .cp-acts { width: 100%; flex-wrap: wrap; }
-  .cp-acts > .cp-loop { flex: 1 0 100%; }
   .cp-head .cp-acts > .hub-btn { flex: none; overflow: visible; }
 }
 @media (max-width: 760px) {

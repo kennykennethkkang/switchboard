@@ -16,6 +16,9 @@ import { freshRun } from '@/lib/budget-ui'
 import { relatedChat } from '@/lib/related-chat'
 import { ModelEffort } from './model-effort'
 import { fiveHourUse, runFields, startPicks, type RunPicks } from '@/lib/model-effort'
+import { scheduleText, type Every, type LoopMode, type LoopPick } from '@/lib/loop'
+import { EVERY_OPTIONS, LoopSeg, PROACTIVE_NOTE } from './chat-loop'
+import { Pick } from './gear'
 
 /** Asks the editor to split one message into separate asks; resolves [text] on failure. */
 export type SplitAsks = (path: string, text: string) => Promise<string[]>
@@ -49,7 +52,9 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
   const [research, setResearch] = useState(false)
   // New GitHub repo or Clone: the folder is made on Start, so Tools waits and files go under the open project.
   const making = path === NEW_REPO || path === CLONE_REPO
-  const toResearch = (on: boolean) => { setResearch(on); if (on && making) setPath(open?.path ?? '') }
+  // Workbench: the same folder's chat that changes things outside projects instead of looking them up.
+  const [workbench, setWorkbench] = useState(false)
+  const toResearch = (on: boolean, bench = false) => { setResearch(on); setWorkbench(on && bench); if (on && making) setPath(open?.path ?? '') }
   const [repoInput, setRepoInput] = useState('')
   const [priv, setPriv] = useState(true)
   const repo = repoAsk(path, repoInput, priv)
@@ -69,6 +74,13 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
   const [toolsFor, setToolsFor] = useState('')
   const [edited, setEdited] = useState<ChatProfile>()
   const goal = text.trim()
+  // Loop: Claude chats in a project only; Goal and Timer need the id the extension picks for a Claude chat.
+  const [loop, setLoop] = useState<LoopMode>('turn')
+  const [doneWhen, setDoneWhen] = useState('')
+  const [every, setEvery] = useState('30')
+  const [repeat, setRepeat] = useState('')
+  const loops = ai === 'claude' && !research && !simple
+  const mode: LoopMode = loops ? loop : 'turn'
   const project = making ? '' : hub.projects.find(p => p.path === path)?.name ?? ''
   // What each chat is on, for the related match: its running task, else its first.
   const texts = useMemo(() => Object.fromEntries(hub.progress.map(p => [p.sessionId, (p.tasks.find(t => t.status === 'in_progress') ?? p.tasks[0])?.subject ?? ''])), [hub.progress])
@@ -97,15 +109,19 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
   const [asks, setAsks] = useState<string[]>()
   const req = useRef(0)
   const splitGot = useRef<string[]>([])
+  // Timer repeats its own prompt, else the first message.
+  const loopPick: LoopPick | undefined = mode === 'goal' ? { mode, ...(doneWhen.trim() ? { doneWhen: doneWhen.trim() } : {}) }
+    : mode === 'timer' ? { mode, everyMin: Number(every) as Every, text: (repeat.trim() || goal).slice(0, 500) } : undefined
   const startOne = (text: string, group?: string) => {
     // Seeded first: the extension adds the run to this chat's first prompt.
     if (slug && !group) send({ type: 'hub-pipeline-seed', slug, path, run: freshRun(slug) })
-    send({ type: 'hub-new-chat', path: repo ? '' : path, text, ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}), ...(waitOn.length ? { waitOn } : {}), ...(group ? { group } : {}), ...(busyProject && own ? { worktree: true } : {}), ...runFields(picks, ai), ...(research ? { research: true } : {}) })
+    if (mode === 'proactive') text = scheduleText(text)
+    send({ type: 'hub-new-chat', path: repo ? '' : path, text, ...(loopPick ? { loop: loopPick } : {}), ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}), ...(waitOn.length ? { waitOn } : {}), ...(group ? { group } : {}), ...(busyProject && own ? { worktree: true } : {}), ...runFields(picks, ai), ...(research ? { research: true } : {}), ...(workbench ? { workbench: true } : {}) })
   }
   const finish = () => { clearText(); files.clear(); onDone() }
   const start = () => {
     if (!ready || asks) return
-    if (!split || making || !looksMulti(goal)) { startOne(msg); finish(); return }
+    if (!split || making || mode !== 'turn' || !looksMulti(goal)) { startOne(msg); finish(); return }
     const n = ++req.current
     setAsks([])
     split(path, text).then(got => {
@@ -162,10 +178,21 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
       <AttachChips items={files.items} onRemove={files.remove} />
       {!making && goal && <Related text={text} chats={hub.chats} project={project} texts={texts} onSend={id => sendTo(id, msg)} />}
       {restored && over <= 0 && !files.busy && <p role="status" style={{ ...caps, textTransform: 'none' }}>Draft restored</p>}
+      {loops && <div style={{ display: 'grid', gap: 8 }}>
+        <LoopSeg value={loop} onPick={setLoop} label="Loop" />
+        {loop === 'goal' && <input aria-label="Done when (optional)" value={doneWhen} maxLength={2000} placeholder="Done when (optional): all tests pass and Lighthouse scores 90 or more" onChange={e => setDoneWhen(e.target.value)} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />}
+        {loop === 'timer' && <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <Pick label="How often" options={EVERY_OPTIONS} value={every} onChange={setEvery} />
+          <input aria-label="Prompt to repeat" value={repeat} maxLength={500} placeholder="Prompt to repeat (default: the message above)" onChange={e => setRepeat(e.target.value)} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, flex: '1 1 220px', minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />
+        </span>}
+        {loop === 'proactive' && <p style={{ margin: 0, fontSize: 13, color: 'var(--hub-mute)' }}>{PROACTIVE_NOTE} Say what it does and when above.</p>}
+      </div>}
       {(over > 0 || files.busy) && <p role="status" style={{ ...caps, textTransform: 'none', color: over > 0 ? 'var(--hub-red)' : undefined }}>{over > 0 ? `${over} characters over the ${MAX_MESSAGE} limit with the file paths` : 'Uploading, Start waits for it'}</p>}
       <div className="nc-foot" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        <button type="button" role="switch" className="hub-switch" aria-checked={research} onClick={() => toResearch(!research)}
+        <button type="button" role="switch" className="hub-switch" aria-checked={research && !workbench} onClick={() => toResearch(!research || workbench)}
           title="For questions that belong to no project. Runs in its own Research window, a tab beside your project windows, where its sources and answer show as it works. Research inside a project chat shows on that chat's page instead."><span aria-hidden />Research</button>
+        <button type="button" role="switch" className="hub-switch" aria-checked={workbench} onClick={() => toResearch(!workbench, true)}
+          title="For changes outside your projects: this Mac's settings and apps, developer setup, the Claude kit, other repos. Each change is logged on the Workbench page with Undo."><span aria-hidden />Workbench</button>
         {research
           ? <span style={{ color: 'var(--hub-mute)', fontSize: 13 }}>Opens in the <b style={{ color: 'var(--hub-ink)', fontWeight: 500 }}>Research window</b>, a tab beside your projects</span>
           : <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>

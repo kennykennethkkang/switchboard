@@ -16,6 +16,7 @@ import { foldPathCase } from '../fs-utils'
 import { createLogger } from '../logger'
 import { hub } from './hub-service'
 import { quickAsk } from './brain'
+import { readArchive } from './chains'
 import type { ChatProgress, TickedItem, TodoDoc, TodoItem, TodoPilot, TodoSync, TodoWhy } from './types'
 
 export const TODO_REF = 'refs/switchboard/todo'
@@ -152,10 +153,12 @@ export function restoreTicked(d: TodoDoc, id: string, now = Date.now(), newId = 
 
 /** Same text as an open item, ignoring case and spacing. */
 export const sameText = (a: string, b: string) => clean(a).toLowerCase() === clean(b).toLowerCase()
+/** The local midnight of the date the text opens with. Only at the start: a date elsewhere may be a quote or a source. */
+const dateOf = (t: string) => { const m = /^(?:on or after|not before) (\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/i.exec(t); return m ? new Date(+m[1], +m[2] - 1, +m[3]).getTime() : undefined }
 /** Every add path (panel, accept, put back, todo_add) comes here, so an open item is never on the list twice. */
 export function addTodo(d: TodoDoc, text: string, now = Date.now(), id = ID(), more: Partial<TodoItem> = {}): TodoDoc {
   const t = clean(text), short = more.short ?? shortOf(t)
-  return t && !d.todo.some(x => sameText(x.text, t)) ? { ...d, todo: [...d.todo, { id, text: t, at: now, ...more, ...(short ? { short } : {}) }] } : d
+  return t && !d.todo.some(x => sameText(x.text, t)) ? { ...d, todo: [...d.todo, { id, text: t, at: now, ...more, ...(more.notBefore === undefined && (dateOf(t) ?? 0) > now ? { notBefore: dateOf(t) } : {}), ...(short ? { short } : {}) }] } : d
 }
 export function editTodo(d: TodoDoc, id: string, text: string, now = Date.now()): TodoDoc {
   const t = clean(text), short = shortOf(t)
@@ -375,18 +378,34 @@ export type ShippedSources = { commits: Array<{ sha: string; subject: string; at
 const STOP = new Set('the and for with that this from into when then than have has not are was were its their about after before under over each only also more most some such what which while will would should could there here your you our out all any can but via per use used using'.split(' '))
 const keys = (t: string) => [...new Set(words(t).split(' ').filter(w => w.length > 3 && !STOP.has(w)).map(w => w.slice(0, 5)))]
 /** Strong overlap on distinctive words: 3 or more shared and 75% of the longer side. */
-const shippedBy = (text: string, subject: string) => {
-  const a = keys(text), b = new Set(keys(subject)), n = a.filter(w => b.has(w)).length
+const shippedBy = (a: string[], b: ReadonlySet<string>) => {
+  const n = a.filter(w => b.has(w)).length
   return n >= 3 && n / Math.max(a.length, b.size) >= 0.75
+}
+// Keyed and matched once per read of the sources: thousands of lines against every open item, on every to-do refresh.
+type Shipped = { sha: string; subject: string }
+const srcKeys = new WeakMap<ShippedSources, { commits: Set<string>[]; changelog: Set<string>[]; found: Map<string, Shipped | undefined> }>()
+const keysOf = (src: ShippedSources) => {
+  let k = srcKeys.get(src)
+  if (!k) srcKeys.set(src, k = { commits: src.commits.map(c => new Set(keys(c.subject))), changelog: src.changelog.map(l => new Set(keys(l))), found: new Map() })
+  return k
+}
+function shippedIn(src: ShippedSources, text: string, at: number): Shipped | undefined {
+  const k = keysOf(src), id = `${at} ${text}`
+  if (k.found.has(id)) return k.found.get(id)
+  const a = keys(text)
+  const c = a.length < 3 ? undefined : src.commits.find((x, i) => x.at >= at && shippedBy(a, k.commits[i]))
+  const line = c || a.length < 3 ? undefined : src.changelog.find((_, i) => shippedBy(a, k.changelog[i]))
+  const got = c ? { sha: c.sha, subject: c.subject } : line ? { sha: 'CHANGELOG', subject: line } : undefined
+  k.found.set(id, got)
+  return got
 }
 /** Open items and suggestions that a later commit subject or a CHANGELOG line already says, ticked with the match. */
 export function tickShipped(d: TodoDoc, src: ShippedSources, now = Date.now()): TodoDoc {
   let out = d
   for (const t of [...d.todo.filter(x => !x.chat), ...d.suggested ?? []]) {
     if (handStep(t) || (t as TodoItem).kept) continue
-    const c = src.commits.find(x => x.at >= t.at && shippedBy(t.text, x.subject))
-    const line = c ? undefined : src.changelog.find(l => shippedBy(t.text, l))
-    const shipped = c ? { sha: c.sha, subject: c.subject } : line ? { sha: 'CHANGELOG', subject: line } : undefined
+    const shipped = shippedIn(src, t.text, t.at)
     if (!shipped) continue
     out = tickWith(out, t.id, shipped, now)
   }
@@ -508,10 +527,9 @@ export function approvedMissed(d: TodoDoc, sessionId: string, now = Date.now()):
   return (d.suggested ?? []).filter(x => x.from === sessionId && x.why === 'missed').reduce((o, x) => dismissSuggestion(o, x.id, now), d)
 }
 
-/** hub-panel.ts calls this on Approve; no write when the chat left no missed rows. */
+/** hub-panel.ts calls this on Approve. Always reads the list: this window may not have loaded it. No write when the chat left no missed rows. */
 export async function chatApproved(sessionId: string, cwd: string): Promise<void> {
-  const folder = projectOf(cwd)
-  if (hub.get().todos?.[folder]?.suggested?.some(x => x.from === sessionId && x.why === 'missed')) await changeTodo(folder, d => approvedMissed(d, sessionId))
+  await changeTodo(projectOf(cwd), d => approvedMissed(d, sessionId))
 }
 
 /** Accept: into the to-do keeping where it came from and why; the suggestion stays tombstoned. The new id comes from the old one, so two devices accepting it make one item. */
@@ -582,8 +600,9 @@ export function runOrder(todo: TodoItem[], ids: string[]): TodoItem[] {
  * resumed after a usage limit. A claim or a resume still in its grace counts as busy: that chat is not live yet.
  * failedAt: the last auto claim origin did not confirm (offline, rejected); nothing for SYNC_MS after it.
  */
-export function autoStartPlan(s: { on: boolean; pilot?: TodoPilot; folder?: string; todo: TodoItem[]; busy: boolean; live?: Set<string>; limited: boolean; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): { folder: string; items: TodoItem[] } | undefined {
+export function autoStartPlan(s: { on: boolean; pilot?: TodoPilot; folder?: string; todo: TodoItem[]; busy: boolean; live?: Set<string>; limited: boolean; memory?: { level: number; chats: number }; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): { folder: string; items: TodoItem[] } | undefined {
   if (!(s.pilot?.on ?? s.on) || s.pilot?.paused || !s.folder || s.busy || s.limited) return undefined
+  if (s.memory && ((s.memory.level === 2 && s.memory.chats >= 8) || (s.memory.level === 4 && s.memory.chats >= 4))) return undefined
   if (s.live && s.todo.some(x => x.chat && s.live!.has(x.chat))) return undefined
   if (s.resumed !== undefined && s.now - s.resumed <= START_GRACE_MS) return undefined
   if (s.failedAt !== undefined && s.now - s.failedAt < SYNC_MS) return undefined
@@ -592,12 +611,12 @@ export function autoStartPlan(s: { on: boolean; pilot?: TodoPilot; folder?: stri
   return items && { folder: s.folder, items }
 }
 
-export type TodoHold = { kind: 'waiting' | 'running' | 'limit' | 'sync' | 'paused'; text: string }
+export type TodoHold = { kind: 'waiting' | 'running' | 'limit' | 'sync' | 'paused' | 'memory'; text: string }
 /**
  * Why autoStartPlan holds the next item, as the to-do list says it: the same gates in the same order. label names a
  * chat or file a live chat waits on; resetAt: when the usage limit resets (epoch ms).
  */
-export function holdReason(s: { on: boolean; pilot?: TodoPilot; folder?: string; todo: TodoItem[]; limited: boolean; resetAt?: number; live?: Set<string>; links?: Array<{ from: string; to: string[] }>; label?: (id: string) => string; open?: (id: string) => string | undefined; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): TodoHold | undefined {
+export function holdReason(s: { on: boolean; pilot?: TodoPilot; folder?: string; todo: TodoItem[]; limited: boolean; memory?: { level: number; chats: number }; resetAt?: number; live?: Set<string>; links?: Array<{ from: string; to: string[] }>; label?: (id: string) => string; open?: (id: string) => string | undefined; tried: Set<string>; now: number; resumed?: number; failedAt?: number }): TodoHold | undefined {
   if (!(s.pilot?.on ?? s.on) || !s.folder || !nextRun(s.todo, t => startable(t, s.now) && !s.tried.has(t.id))) return undefined
   if (s.pilot?.paused) return { kind: 'paused', text: 'Next to-do waits: autopilot is paused' }
   if (s.limited) {
@@ -605,6 +624,7 @@ export function holdReason(s: { on: boolean; pilot?: TodoPilot; folder?: string;
     const d = new Date(s.resetAt), h = d.getHours()
     return { kind: 'limit', text: `Next to-do waits for the usage limit to reset at ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}` }
   }
+  if (s.memory && ((s.memory.level === 2 && s.memory.chats >= 8) || (s.memory.level === 4 && s.memory.chats >= 4))) return { kind: 'memory', text: `Next to-do waits: memory is low and ${s.memory.chats} chats are open` }
   const live = s.todo.find(x => x.chat && s.live?.has(x.chat))
   if (live) {
     // open: the chat a wait lands on now (after a handoff), undefined once it finished; none left open reads as running.
@@ -754,14 +774,49 @@ export async function storeFor(folder: string, dir = path.join(os.homedir(), '.c
   return root ? { root } : { file: path.join(dir, `${crypto.createHash('sha1').update(folder).digest('hex')}.json`) }
 }
 
-const revParse = async (root: string, ref: string) => { const r = await git(root, ['rev-parse', '--verify', '-q', `${ref}^{commit}`]); return r.ok ? r.out.trim() : undefined }
+export function todoRefFromFiles(root: string, ref = TODO_REF): string | undefined | null {
+  try {
+    const dot = path.join(root, '.git')
+    let dir = fs.statSync(dot).isDirectory() ? dot : path.resolve(root, fs.readFileSync(dot, 'utf8').trim().replace(/^gitdir: /, ''))
+    const commonFile = path.join(dir, 'commondir')
+    const common = fs.existsSync(commonFile) ? path.resolve(dir, fs.readFileSync(commonFile, 'utf8').trim()) : dir
+    const dirs = [...new Set([dir, common])]
+    if (dirs.some(base => fs.existsSync(path.join(base, 'reftable')))) return null
+    for (const base of dirs) {
+      const loose = path.join(base, ref)
+      if (fs.existsSync(loose)) {
+        const value = fs.readFileSync(loose, 'utf8').trim()
+        return /^[0-9a-f]{40,64}$/i.test(value) ? value : null
+      }
+    }
+    for (const base of dirs) {
+      const packed = path.join(base, 'packed-refs')
+      if (!fs.existsSync(packed)) continue
+      const row = fs.readFileSync(packed, 'utf8').split('\n').find(line => line.endsWith(` ${ref}`))
+      if (row) return row.split(' ')[0]
+    }
+    return dirs.some(base => fs.existsSync(path.join(base, 'refs')) || fs.existsSync(path.join(base, 'packed-refs'))) ? undefined : null
+  } catch { return null }
+}
+const revParse = async (root: string, ref: string) => {
+  if (ref === TODO_REF) {
+    const file = todoRefFromFiles(root, ref)
+    if (file !== null) return file
+  }
+  const r = await git(root, ['rev-parse', '--verify', '-q', `${ref}^{commit}`]); return r.ok ? r.out.trim() : undefined
+}
 /** No ref yet is an empty list; a ref that cannot be read throws, so no write replaces it with an empty one. */
 const docAt = async (root: string, commit: string | undefined) => {
   if (!commit) return emptyDoc()
+  const hit = blobs.get(root)
+  if (hit?.commit === commit) return parseDoc(hit.text)
   const r = await git(root, ['cat-file', 'blob', `${commit}:${FILE}`])
   if (!r.ok) throw new Error(`could not read the to-do list (${r.err.trim().split('\n')[0]})`)
+  blobs.set(root, { commit, text: r.out })
   return parseDoc(r.out)
 }
+// A commit's blob never changes, and every refresh reads each repo's list again.
+const blobs = new Map<string, { commit: string; text: string }>()
 
 const size = (d: TodoDoc) => JSON.stringify(d).length
 const tooBig = (d: TodoDoc) => d.todo.length > MAX_ITEMS || size(d) > MAX_BYTES
@@ -1141,6 +1196,9 @@ export function backInChat(d: TodoDoc, sessionId: string, now = Date.now()): Tod
 // The hub side: lists by project folder in hub.todos, synced at most every SYNC_MS and a few seconds after a change.
 const SYNC_MS = 5 * 60_000
 const PUSH_WAIT_MS = 3000
+// The shipped check spawns git three times per folder; new commits and release notes can wait a minute.
+const SHIPPED_MS = 60_000
+const shippedAt = new Map<string, number>()
 const stores = new Map<string, Promise<TodoStore>>()
 const syncedAt = new Map<string, number>()
 const syncState = new Map<string, TodoSync>()
@@ -1226,7 +1284,7 @@ export async function loadTodos(folders: string[], force = false): Promise<void>
       const tidy = (x: TodoDoc) => { const p = prune(x); return src ? tickShipped(p, src) : p }
       if (tidy(d) === d) show(folder, d)
       else await changeTodo(folder, tidy).catch(() => show(folder, d))
-      tickLater(folder, s)
+      if (force || Date.now() - (shippedAt.get(folder) ?? 0) >= SHIPPED_MS) { shippedAt.set(folder, Date.now()); tickLater(folder, s) }
     } catch (err) {
       syncState.set(folder, { ...syncState.get(folder), state: 'failing', why: (err as Error).message.slice(0, 120) })
       show(folder)
@@ -1262,11 +1320,11 @@ export async function chatEnded(p: ChatProgress): Promise<void> {
   laterSync(folder, s)
 }
 
-/** claude-runtime.ts calls this once Jev scored a Done chat's requests. */
-export async function chatMissed(p: ChatProgress): Promise<void> {
-  const folder = projectOf(p.cwd)
+/** claude-runtime.ts calls this once Jev scored a Done chat's requests. An approved chat files none: the score can land after Approve. The file, not the hub: another window may have approved it. */
+export async function chatMissed(p: ChatProgress, archive?: string): Promise<void> {
+  const folder = projectOf(p.cwd), approved = () => readArchive(archive).some(a => a.sessionId === p.sessionId && a.approvedAt)
   // Nothing missed and nothing of this chat's to clear: no write.
-  if (missed(p).length || hub.get().todos?.[folder]?.suggested?.some(x => x.from === p.sessionId && x.why === 'missed')) await changeTodo(folder, d => addMissed(d, p))
+  if (missed(p).length || approved() || hub.get().todos?.[folder]?.suggested?.some(x => x.from === p.sessionId && x.why === 'missed')) await changeTodo(folder, d => approved() ? approvedMissed(d, p.sessionId) : addMissed(d, p))
 }
 
 /** claude-runtime.ts calls this when a chat this window owns leaves Done. */

@@ -324,6 +324,7 @@ html { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
   display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; color: var(--hub-body);
   font: 500 13px/1 var(--hub-sans); cursor: pointer; padding: 6px 2px; transition: transform 160ms var(--hub-ease-out);
 }
+.hub-switch:disabled { opacity: .5; cursor: default; }
 /* Off: a ring at 3:1 so the track reads on any card. */
 .hub-switch > span { flex: none; width: 30px; height: 18px; border-radius: 99px; background: var(--hub-hair-strong); box-shadow: inset 0 0 0 1px var(--hub-field, var(--hub-hair-strong)); position: relative; transition: background-color 160ms ease, box-shadow 160ms ease; }
 .hub-switch > span::after {
@@ -956,3 +957,5 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub-feed-new { animation: hub-feed-in 240ms var(--hub-ease-out, ease-out); }
 @keyframes hub-feed-in { from { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .hub-feed-new { animation: none; } }
+/* A view VS Code keeps alive but hidden: nothing in it moves. */
+html[data-away] *, html[data-away] *::before, html[data-away] *::after { animation-play-state: paused !important; }

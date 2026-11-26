@@ -2,10 +2,13 @@
 import * as vscode from 'vscode'
 import { hub } from './hub-service'
 import { chatTerminal } from './ais'
+import { execFile } from 'child_process'
+import { readProcessTable } from './reap'
 import { ANSI, restoredOurs, TerminalTags, type TermMemo } from './terminal-tags'
 import type { ChatRow } from './types'
 import { editor } from '../editor'
 import { watchScreens } from './screen-watch'
+import { postWindow, readWindows } from './dev'
 
 const ICON = 'radio-tower'
 export const tags = new TerminalTags<vscode.Terminal>()
@@ -60,9 +63,32 @@ export function watchTerminals(state?: vscode.Memento): vscode.Disposable {
   return vscode.Disposable.from(
     vscode.window.onDidOpenTerminal(t => { void see(t).then(post) }),
     vscode.window.onDidCloseTerminal(t => { tags.gone(t); post() }),
-    vscode.window.onDidChangeActiveTerminal(t => { void renameActive(t).then(post) }),
+    vscode.window.onDidChangeActiveTerminal(t => { noteActive(); void renameActive(t).then(post) }),
+    hub.onOpened(showChat),
     watchScreens(id => tags.of(id)),
   )
+}
+
+/** The chat open here, told to every window; show: the one holding its terminal brings it up, focus stays where it is. */
+export function openChat(sessionId: string, show: boolean): void {
+  const at = Date.now(), news = hub.open(sessionId, at)
+  if (show) showChat(sessionId)
+  else if (!news) return
+  for (const w of readWindows()) if (w.pid !== process.pid) void postWindow(w, { kind: 'open-chat', sessionId, show, at })
+}
+
+function showChat(sessionId: string): void {
+  const t = tags.of(sessionId)
+  if (t && t !== vscode.window.activeTerminal) t.show(true)
+}
+
+// The focused window's active terminal, when it holds a chat and is not the one seen last.
+let activeChat: string | undefined
+function noteActive(): void {
+  const t = vscode.window.activeTerminal, id = t && tags.chatOf(t)
+  if (!vscode.window.state.focused || id === activeChat) return
+  activeChat = id
+  if (id) openChat(id, false)
 }
 
 // The API cannot rename a terminal and the command renames the active one, so only that one, never shown for it.
@@ -76,13 +102,24 @@ async function renameActive(t: vscode.Terminal | undefined, chats: ChatRow[] = h
 
 /** With each fresh chat list: tie live chats to terminals by pid, follow renames, post the rows. */
 export async function syncTerminals(chats: ChatRow[]): Promise<void> {
-  // ponytail: a ps per unbound live chat per refresh; cache misses if it ever shows up.
   await Promise.all(vscode.window.terminals.filter(t => tags.ownerOf(t) === 'user' && ours(t)).map(async t => {
     const pid = await t.processId
     tags.claim(t, pid ? restored[pid] : undefined)
   }))
-  await tags.bindLive(chats, pid => chatTerminal(pid, vscode.window.terminals))
+  const procs = new Map((await readProcessTable()).map(p => [p.pid, p]))
+  const parent = (pid: number) => {
+    const row = procs.get(pid)
+    if (row?.start) {
+      try { process.kill(pid, 0); return Promise.resolve(row.ppid) } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EPERM') return Promise.resolve(row.ppid)
+        return Promise.resolve(0)
+      }
+    }
+    return new Promise<number>(resolve => execFile('ps', ['-o', 'ppid=', '-p', String(pid)], (err, out) => resolve(err ? 0 : Number(String(out).trim()) || 0)))
+  }
+  await tags.bindLive(chats, pid => chatTerminal(pid, vscode.window.terminals, parent))
   tags.closeEnded(chats, new Map(hub.get().archive.flatMap(a => a.approvedAt ? [[a.sessionId, a.approvedAt] as const] : [])))
+  noteActive()
   await renameActive(vscode.window.activeTerminal, chats)
   post()
   await saveMemo().catch(() => {})

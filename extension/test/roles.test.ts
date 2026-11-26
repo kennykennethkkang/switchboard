@@ -56,7 +56,7 @@ describe('hub-role-model command', () => {
 })
 
 const KIT_QA = fs.readFileSync(path.join(__dirname, '..', 'kit', 'agents', 'qa-codex.md'), 'utf8')
-const CX = '---\nname: engineer-codex\nmodel: sonnet\n---\nSWITCHBOARD_ROLE_RUN=engineer-codex codex exec --ephemeral --skip-git-repo-check -o "$d/last" - < "$d/prompt"\n'
+const CX = '---\nname: engineer-codex\nmodel: sonnet\n---\nSWITCHBOARD_ROLE_RUN=engineer-codex codex exec --skip-git-repo-check -o "$d/last" - < "$d/prompt"\n'
 
 describe('codexOf and withCodex', () => {
   it('read none when the line has no flags', () => {
@@ -65,7 +65,7 @@ describe('codexOf and withCodex', () => {
   })
   it('add both flags right after codex exec, and read them back', () => {
     const next = withCodex(CX, 'gpt-6-luna', 'high') ?? ''
-    assert.match(next, /codex exec -m gpt-6-luna -c model_reasoning_effort=high --ephemeral /)
+    assert.match(next, /codex exec -m gpt-6-luna -c model_reasoning_effort=high --skip-git-repo-check /)
     assert.deepEqual(codexOf(next), { model: 'gpt-6-luna', effort: 'high' })
   })
   it('replace existing flags and drop them for default', () => {
@@ -76,6 +76,8 @@ describe('codexOf and withCodex', () => {
   })
   it('read and rewrite the command line of the real kit file, not its description', () => {
     assert.deepEqual(codexOf(KIT_QA), { model: 'gpt-5.6-luna', effort: 'high' })
+    assert.doesNotMatch(KIT_QA, /codex exec[^\n]*--ephemeral/)
+    assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'kit', 'agents', 'engineer-codex.md'), 'utf8'), /codex exec[^\n]*--ephemeral/)
     const next = withCodex(KIT_QA, 'gpt-5.6-terra', 'default') ?? ''
     assert.deepEqual(codexOf(next), { model: 'gpt-5.6-terra', effort: undefined })
     assert.equal(next.split('\n')[2], KIT_QA.split('\n')[2])

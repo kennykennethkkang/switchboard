@@ -1,8 +1,6 @@
 import type { ChatProfile, IndefiniteBudget } from './hub-types'
 import { formatDuration } from './duration'
 
-export const INDEFINITE_LABEL = 'Run indefinitely'
-
 /** Whether Run indefinitely is on for a chat, from its saved profile. */
 export const indefiniteOn = (p?: ChatProfile): boolean => !!p?.indefinite
 

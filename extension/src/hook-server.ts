@@ -168,8 +168,8 @@ export class HookServer implements vscode.Disposable {
                   const p = parsed as HookPayload
                   if (!mirror) reply = this.guard(p)
                   if (p.hook_event_name === 'PostToolUse') for (const f of editedFiles(p)) noteEdit(this.edits, editor(p), p.cwd!, f)
-                  // A role run is a subagent of a chat, not a chat.
-                  if (!(parsed as HookPayload).role_run) this.handleHook(parsed as HookPayload, mirror)
+                  // A role run is a subagent of a chat, not a chat. A refused closing question never opens, so it must not notify.
+                  if (!(parsed as HookPayload).role_run && !(reply && p.tool_name === 'AskUserQuestion')) this.handleHook(parsed as HookPayload, mirror)
                 }
               } catch (e) {
                 log.error('Failed to parse payload:', e)

@@ -1,6 +1,8 @@
 /** Approve: the done-check read, the chat's own Approve answer, temp folders and which terminals close. */
+import './temp-home'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -117,6 +119,78 @@ describe('HubService temp filter', () => {
     hub.hook({ ...base, hook_event_name: 'PostToolUse', tool_response: { answers: { [Q]: 'Approve' } } })
     assert.deepEqual(got, ['r1'])
     assert.equal(fs.existsSync(log), false)
+  })
+  it('takes an Approve whose question hook was lost, so the hub never saw it open', () => {
+    const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
+    const hub = new HubService()
+    hub.approveLog = log
+    const got: string[] = []
+    hub.onApproved(id => got.push(id))
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const base = { session_id: 'l1', cwd: '/Users/k/proj' }
+    hub.hook({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+    hub.hook({ ...base, hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_input: input, tool_use_id: 'q1', tool_response: { answers: { [Q]: 'Approve' } } })
+    assert.deepEqual(got, ['l1'])
+    assert.equal(fs.existsSync(log), false)
+  })
+  it('takes an Approve through the Switchboard ask tool, which never marks the chat needs-you by hook', () => {
+    const hub = new HubService()
+    const got: string[] = []
+    hub.onApproved(id => got.push(id))
+    const Q = 'Approve this chat as finished?'
+    const base = { session_id: 'l2', cwd: '/Users/k/proj', tool_name: 'mcp__switchboard__ask', tool_use_id: 'repl_1', tool_input: { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] } }
+    hub.hook({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+    hub.hook({ ...base, hook_event_name: 'PreToolUse' })
+    hub.hook({ ...base, hook_event_name: 'PostToolUse', tool_response: [{ type: 'text', text: `"${Q}": Approve` }] })
+    assert.deepEqual(got, ['l2'])
+  })
+  it('still refuses a lost question with an open task, a running subagent, or a subagent answering', () => {
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const cwd = '/Users/k/proj'
+    const refused = (before: Record<string, unknown> | undefined, extra: Record<string, unknown>) => {
+      const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
+      const hub = new HubService()
+      hub.approveLog = log
+      const got: string[] = []
+      hub.onApproved(id => got.push(id))
+      hub.hook({ hook_event_name: 'UserPromptSubmit', session_id: 'l3', cwd, prompt: 'go' })
+      if (before) hub.hook({ session_id: 'l3', cwd, ...before })
+      hub.hook({ hook_event_name: 'PostToolUse', session_id: 'l3', cwd, tool_name: 'AskUserQuestion', tool_input: input, tool_use_id: 'q1', tool_response: { answers: { [Q]: 'Approve' } }, ...extra }, Date.now())
+      assert.deepEqual(got, [])
+      return (JSON.parse(fs.readFileSync(log, 'utf8').trim()) as { why: string }).why
+    }
+    assert.equal(refused({ hook_event_name: 'PreToolUse', tool_name: 'TodoWrite', tool_use_id: 't1', tool_input: { todos: [{ content: 'a', status: 'pending' }] } }, {}), '1 open task')
+    assert.equal(refused({ hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'engineer' }, {}), 'subagents still running: a1')
+    assert.equal(refused(undefined, { agent_id: 'a1', agent_type: 'engineer' }), 'a subagent asked it')
+  })
+  it('never takes a subagent\'s answer as the chat\'s own, whatever state the chat is in', () => {
+    const Q = 'Approve this chat as finished?'
+    const input = { questions: [{ question: Q, options: [{ label: 'Approve' }, { label: 'Send back' }] }] }
+    const sentBack = path.join(os.homedir(), '.claude', 'switchboard', 'sent-back.json')
+    const run = (before: Record<string, unknown>[], pick: string, extra: Record<string, unknown> = {}) => {
+      const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'approve-log-')), 'approve.log')
+      const hub = new HubService()
+      hub.approveLog = log
+      const got: string[] = []
+      hub.onApproved(id => got.push(id))
+      const base = { session_id: randomUUID(), cwd: '/Users/k/proj', tool_name: 'AskUserQuestion', tool_input: input, tool_use_id: 'q1' }
+      for (const b of before) hub.hook({ ...base, ...b })
+      hub.hook({ ...base, agent_id: 'a1', agent_type: 'engineer', hook_event_name: 'PostToolUse', tool_response: { answers: { [Q]: pick } }, ...extra })
+      hub.hook({ hook_event_name: 'Stop', session_id: base.session_id, cwd: base.cwd, last_assistant_message: 'done' })
+      const why = fs.existsSync(log) ? (JSON.parse(fs.readFileSync(log, 'utf8').trim()) as { why: string }).why : undefined
+      const sent = fs.existsSync(sentBack) && base.session_id in JSON.parse(fs.readFileSync(sentBack, 'utf8'))
+      return { got, why, sent }
+    }
+    const go = { hook_event_name: 'UserPromptSubmit', prompt: 'go' }
+    const refused = { got: [], why: 'a subagent asked it', sent: false }
+    const ask = { tool_name: 'mcp__switchboard__ask', tool_response: [{ type: 'text', text: `"${Q}": Approve` }] }
+    for (const before of [[], [go], [go, { hook_event_name: 'PreToolUse' }], [go, { hook_event_name: 'Stop', last_assistant_message: 'done' }]]) {
+      assert.deepEqual(run(before, 'Approve'), refused)
+      assert.deepEqual(run(before, 'Approve', ask), refused)
+      assert.deepEqual(run(before, 'Send back'), { got: [], why: undefined, sent: false })
+    }
   })
   it('still refuses a working chat whose Approve carries no tool_use_id and was never tapped', () => {
     const hub = new HubService()

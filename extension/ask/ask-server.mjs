@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { checkInput, toSchema, fromContent, fromChoice, pickWindow } from './ask-core.mjs'
 import { checkText, waitStep, NO_HUB } from './chats.mjs'
 
@@ -59,7 +60,12 @@ const TODO_TOOLS = [
 
 const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n')
 const reply = (id, text, isError) => out({ id, result: { content: [{ type: 'text', text }], ...(isError ? { isError: true } : {}) } })
-const alive = pid => { try { process.kill(pid, 0); return true } catch (e) { return e.code === 'EPERM' } }
+const alive = pid => {
+  if (process.platform === 'win32') {
+    try { return Number.isSafeInteger(pid) && pid > 0 && execFileSync('powershell.exe', ['-NoProfile', '-Command', `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Id`], { encoding: 'utf8', windowsHide: true }).trim() === String(pid) } catch { return false }
+  }
+  try { process.kill(pid, 0); return true } catch (e) { return e.code === 'EPERM' }
+}
 
 /** workspace: only that folder's window, for a retry; the reload may change its pid and port, never its folder. */
 function findWindow(workspace) {
@@ -69,7 +75,7 @@ function findWindow(workspace) {
   const files = []
   try {
     for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.json') || f === 'workspaces.json') continue
+      if (!/-\d+\.json$/.test(f)) continue
       try { files.push(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) } catch { /* broken file */ }
     }
   } catch { return undefined }

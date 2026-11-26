@@ -6,6 +6,7 @@ import { execFile } from 'child_process'
 import { hub } from './hub-service'
 import { createLogger } from '../logger'
 import { claudeBinary, claudeCall } from './setup'
+import { cliCall } from './windows'
 import { newChat } from './actions'
 import { addRepo, confirmApprove, fixBrief, held, line, needsApprove, readSweep, rescan, sweepAll } from './sweep'
 import type { WebviewToExtensionMessage } from '../protocol'
@@ -19,7 +20,7 @@ export function sweepPanel(refresh: () => void, workspace: () => string | undefi
   const sweepState = (note?: string) => ({ busy: sweeping, tools: readSweep(), note: note ?? hub.get().sweep?.note })
   const runClaude = (args: string[]) => new Promise<boolean>(resolve => {
     const c = claudeCall(args)
-    execFile(c.cmd, c.args, { timeout: 180_000, shell: c.shell, windowsHide: true }, err => resolve(!err))
+    execFile(c.cmd, c.args, { timeout: 180_000, shell: c.shell, windowsHide: true, windowsVerbatimArguments: c.windowsVerbatimArguments }, err => resolve(!err))
   })
 
   /** One sweep job at a time: a rescan, Sweep all or an add; the panel shows busy until it ends, then its note. */
@@ -73,7 +74,8 @@ export function sweepPanel(refresh: () => void, workspace: () => string | undefi
       } catch (err) { void vscode.window.showWarningMessage(`Could not move ${name} (${(err as Error).message}).`) }
     } else {
       if (!/^[\w.@-]+$/.test(name)) return
-      await new Promise<void>(resolve => execFile(claudeBinary(), ['plugin', enabled ? 'enable' : 'disable', name], { timeout: 30000 }, err => {
+      const call = cliCall(claudeBinary(), ['plugin', enabled ? 'enable' : 'disable', name])
+      await new Promise<void>(resolve => execFile(call.cmd, call.args, { windowsVerbatimArguments: call.windowsVerbatimArguments, timeout: 30000, windowsHide: true }, err => {
         if (err) void vscode.window.showWarningMessage(`claude plugin ${enabled ? 'enable' : 'disable'} ${name} failed.`)
         resolve()
       }))

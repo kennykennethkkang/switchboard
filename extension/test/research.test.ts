@@ -120,6 +120,14 @@ describe('/hub/research-offer', () => {
     assert.ok(commandProblem({ type: 'hub-research-dismiss' }))
     assert.ok(commandProblem({ type: 'hub-research-dismiss', sessionId: 4 }))
   })
+
+  it('validates saved research commands', () => {
+    assert.equal(commandProblem({ type: 'hub-research-ask', id: 'p/q.md', text: 'new angle' }), undefined)
+    assert.ok(commandProblem({ type: 'hub-research-ask', id: 'p/q.md', text: ' '.repeat(3) }))
+    assert.equal(commandProblem({ type: 'hub-research-folder', op: 'rename', name: 'Old', to: 'New' }), undefined)
+    assert.equal(commandProblem({ type: 'hub-research-move', ids: ['p/q.md'], folder: 'New' }), undefined)
+    assert.equal(commandProblem({ type: 'hub-research-organize', op: 'undo' }), undefined)
+  })
 })
 
 describe('recall scope', () => {

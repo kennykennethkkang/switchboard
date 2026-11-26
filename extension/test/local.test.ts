@@ -78,6 +78,9 @@ describe('installed', () => {
     const by = (kind: string) => out.filter(i => i.kind === kind).map(i => [i.name, i.enabled]).sort()
     assert.deepEqual(out.filter(i => i.kind === 'skill').map(i => [i.name, i.source]).sort(), [['drei', 'user'], ['e2e-testing', 'ECC (Affaan Mustafa)'], ['phone', 'switchboard']])
     assert.equal((await installed(claude, { phone: 'a/b' })).find(i => i.name === 'phone')?.source, 'a/b')
+    fs.writeFileSync(`${claude}.json`, JSON.stringify({ mcpServers: { switchboard: {}, posthog: {} }, claudeAiMcpEverConnected: ['claude.ai Claude Docs', 3] }))
+    assert.deepEqual((await installed(claude)).filter(i => i.kind === 'mcp').map(i => i.name), ['mcp:posthog', 'mcp:claude.ai Claude Docs'])
+    assert.ok((await installed(claude)).some(i => i.kind === 'builtin' && i.name === 'Artifact'))
     assert.deepEqual(by('plugin'), [['gh@m', false], ['off@m', false], ['p@m', true]])
     assert.deepEqual(out.find(i => i.name === 'p@m')?.skills?.sort(), ['alpha-named', 'beta', 'delta', 'linked', 'solo'])
     assert.deepEqual(by('mod'), [['meter@kenneth-mods', true]])
@@ -104,7 +107,7 @@ describe('installed', () => {
       'map@o': { '.claude-plugin/plugin.json': JSON.stringify({ commands: { hello: { source: './x.md' } } }), 'x.md': '' },
       'one@o': { '.claude-plugin/plugin.json': JSON.stringify({ commands: './only.md' }), 'only.md': '' },
     }, { 'code-review@o': true, 'arr@o': true, 'map@o': true, 'one@o': true })
-    const skills = Object.fromEntries((await installed(claude)).map(i => [i.name.split('@')[0], i.skills?.sort()]))
+    const skills = Object.fromEntries((await installed(claude)).filter(i => i.kind === 'plugin').map(i => [i.name.split('@')[0], i.skills?.sort()]))
     assert.deepEqual(skills, { 'code-review': ['code-review'], arr: ['a', 'b'], map: ['hello'], one: ['only'] })
     fs.rmSync(claude, { recursive: true, force: true })
   })

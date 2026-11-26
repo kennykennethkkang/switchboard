@@ -31,6 +31,10 @@ function isSwitchboardHookDef(h: ClaudeHookDef): boolean {
     isLegacyHookUrl(h.url)
 }
 
+function isAppHook(h: ClaudeHookDef): boolean {
+  return !!h?.command?.replace(/\\/g, '/').includes('switchboard-app/hook.js')
+}
+
 /** Check whether a single hook entry belongs to Switchboard */
 export function isSwitchboardHook(entry: ClaudeHookEntry): boolean {
   return !!entry?.hooks?.some(isSwitchboardHookDef)
@@ -112,6 +116,30 @@ export function removeSwitchboardHooks(settings: Record<string, unknown>): Recor
   return settings
 }
 
+/** Remove only the standalone app's forwarder entries. Returns true when changed. */
+export function removeAppHooks(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks
+  if (!hooks || typeof hooks !== 'object') { return false }
+  const byEvent = hooks as Record<string, unknown>
+  let changed = false
+  for (const [event, entries] of Object.entries(byEvent)) {
+    if (!Array.isArray(entries)) { continue }
+    let eventChanged = false
+    const kept = (entries as ClaudeHookEntry[]).flatMap(entry => {
+      if (!Array.isArray(entry?.hooks)) { return [entry] }
+      const remaining = entry.hooks.filter(h => !isAppHook(h))
+      if (remaining.length === entry.hooks.length) { return [entry] }
+      eventChanged = true
+      return remaining.length ? [{ ...entry, hooks: remaining }] : []
+    })
+    if (!eventChanged) { continue }
+    changed = true
+    if (kept.length) { byEvent[event] = kept } else { delete byEvent[event] }
+  }
+  if (Object.keys(byEvent).length === 0) { delete settings.hooks }
+  return changed
+}
+
 /** True if any event in `settings` has an Switchboard hook. */
 export function hasSwitchboardHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks
@@ -125,6 +153,27 @@ export function hasSwitchboardHook(settings: Record<string, unknown>): boolean {
 export function missingHookEvents(settings: Record<string, unknown>, events: readonly string[]): string[] {
   const hooks = (settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {}) as Record<string, unknown>
   return events.filter(e => !(Array.isArray(hooks[e]) && (hooks[e] as ClaudeHookEntry[]).some(isSwitchboardHook)))
+}
+
+/**
+ * Raise our own hooks to `timeoutS` in place; a longer timeout and other tools' hooks stay.
+ * Returns true if anything changed.
+ */
+export function raiseHookTimeouts(settings: Record<string, unknown>, timeoutS: number): boolean {
+  const hooks = settings.hooks
+  if (!hooks || typeof hooks !== 'object') { return false }
+  let changed = false
+  for (const entries of Object.values(hooks)) {
+    if (!Array.isArray(entries)) { continue }
+    for (const entry of entries as ClaudeHookEntry[]) {
+      for (const h of entry?.hooks ?? []) {
+        if (!isSwitchboardHookDef(h) || h.timeout === undefined || h.timeout >= timeoutS) { continue }
+        h.timeout = timeoutS
+        changed = true
+      }
+    }
+  }
+  return changed
 }
 
 /**

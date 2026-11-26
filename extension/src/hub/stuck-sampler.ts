@@ -57,16 +57,29 @@ function endedIn(file: string): Set<string> {
   return t.ids
 }
 
+/** Claude Code ends a background shell's output file with "[exited with code N]"; a subagent gone by then has no notice to read. */
+export function exited(file: string): boolean {
+  try {
+    const fd = fs.openSync(file, 'r')
+    try {
+      const size = fs.fstatSync(fd).size, buf = Buffer.alloc(Math.min(size, 256))
+      fs.readSync(fd, buf, 0, buf.length, size - buf.length)
+      return /\[exited with code -?\d+\]\s*$/.test(buf.toString('utf8'))
+    } finally { fs.closeSync(fd) }
+  } catch { return false }
+}
+
 function jobFacts(all: ChatProgress[], now: number) {
   const outAt = new Map<string, number | undefined>(), finished = new Set<string>()
   for (const p of all) for (const j of [...(p.jobs ?? []), ...(p.subJobs ?? [])]) {
     // Only jobs old enough to count; the rest cost nothing.
     if (now - j.startedAt < STUCK.jobQuietMs) continue
     const tmp = j.task ? sessionDir(TMP, p.cwd, p.sessionId, path.join(p.sessionId, 'tasks')) : undefined
-    try { outAt.set(j.id, tmp ? fs.statSync(path.join(tmp, p.sessionId, 'tasks', `${j.task}.output`)).mtimeMs : undefined) } catch { outAt.set(j.id, undefined) }
+    const out = tmp && path.join(tmp, p.sessionId, 'tasks', `${j.task}.output`)
+    try { outAt.set(j.id, out ? fs.statSync(out).mtimeMs : undefined) } catch { outAt.set(j.id, undefined) }
     const proj = sessionDir(PROJECTS, p.cwd, p.sessionId, `${p.sessionId}.jsonl`)
     const file = proj && (j.agent ? path.join(proj, p.sessionId, 'subagents', `agent-${j.agent}.jsonl`) : path.join(proj, `${p.sessionId}.jsonl`))
-    if (file && endedIn(file).has(j.id)) finished.add(j.id)
+    if ((file && endedIn(file).has(j.id)) || (out && exited(out))) finished.add(j.id)
   }
   return { outAt, finished }
 }
@@ -95,7 +108,7 @@ export async function stopStuck(sessionId: string, id: string): Promise<string |
   const chats = await readChats().catch(() => [])
   const chat = chats.find(c => c.sessionId === sessionId && c.live)
   if (!chat) return 'that chat is not running'
-  const [procs, servers] = await Promise.all([ps(Date.now()), listServers().catch(() => [])])
+  const [procs, servers] = await Promise.all([ps(Date.now()), listServers(true).catch(() => [])])
   const guard = new Set([process.pid, process.ppid, ...chats.map(c => c.pid), ...servers.filter(s => s.port === 3000).map(s => s.pid), ...procs.filter(p => EDITOR.test(p.command)).map(p => p.pid)])
   const r = await stopTree({ pid: item.pid, start: item.started }, chat.pid, guard, {
     list: () => ps(Date.now()),

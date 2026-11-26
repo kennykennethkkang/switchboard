@@ -162,7 +162,7 @@ function NextTicket({ row, n, held, hold, start, onPlan }: { row: NextRow; n?: n
     <li className="nb-ticket nb-next" data-you={you || undefined} data-kind={kind}>
       <span className="nb-tag" data-kind={kind}>{tag}</span>
       <p className="nb-text">{t.short ?? t.text}</p>
-      {hold && <span className="nb-hold">{hold.text}</span>}
+      {hold && <span className="nb-hold" data-kind={hold.kind}>{hold.text}</span>}
       <span className="nb-acts">
         {you ? <button type="button" className="hub-btn sm" onClick={onPlan}>Open Plan</button>
           : start && <button type="button" className="hub-btn sm" onClick={start} aria-label={`${again}: ${t.text}`}>{again}</button>}

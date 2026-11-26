@@ -67,3 +67,4 @@
 /* A hold: a dot and its words, so the state never rests on colour alone. */
 .hub-hold { display: inline-flex; align-items: center; gap: 6px; margin: 0; font: 400 12.5px/1.45 var(--hub-sans); color: var(--hub-body); }
 .hub-hold::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--hub-yellow); }
+.hub-hold[data-kind='memory']::before { background: var(--hub-red); }

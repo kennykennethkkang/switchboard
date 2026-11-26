@@ -26,6 +26,18 @@ export type SessionLive = {
   at: number
 }
 
+/** A change a research report suggests, from its Actions section (adjust-actions.ts). ask: it cannot be undone. */
+export type ReportAction = { key: string; area: 'mac' | 'dev' | 'kit' | 'other' | 'project'; ask: boolean; title: string; detail: string; undo?: string; cites: number[] }
+export type SuggestedChanges = { report: string; question: string; project?: string; at: number; actions: (ReportAction & { state: 'new' | 'open' | 'applied' | 'failed' | 'undone' })[] }
+/** One logged change from ~/.claude/switchboard/adjustments (kit/skills/adjust). before null: the file was new. */
+export type Change = {
+  id: string; title: string; why: string; area: 'mac' | 'dev' | 'kit' | 'other'; target: string; device: string
+  status: 'open' | 'applied' | 'failed' | 'undone' | 'undo-failed'
+  at: number; doneAt?: number; undoneAt?: number; sessionId?: string; chat?: string; report?: string; action?: string
+  files: { path: string; link?: string; backup: string | null; before: string | null; after?: string | null; mode?: number }[]
+  undo?: string; noUndo?: string; check?: { cmd: string; ok: boolean; out: string }; problem?: string
+}
+
 /** A chat's prompt cache as the cache-keeper mod last posted it; warmUntil is when it goes cold unless pinged. */
 export type CacheKeep = { sessionId: string; state: 'warm' | 'cold' | 'off'; warmUntil: number; tokens: number; pings: number; at: number }
 
@@ -39,7 +51,7 @@ export type DevProject = { folder: string; project: string; /** projectName(fold
 export type GitState = { branch?: string; ahead?: number; behind?: number; changed: number; staged: number; untracked: number }
 export type AwsStatus = 'signed-in' | 'expired' | 'never'
 /** One ~/.aws/config profile; its name is the user's nickname. label: the email set by hand (aws-labels.json, by account). who, email: what AWS said at the last sign-in (aws-identity.json, by account). chrome: the Chrome profile folder its sign-in opens in ('' = system browser). */
-export type AwsProfile = { name: string; label?: string; who?: string; email?: string; account?: string; region?: string; status: AwsStatus; chrome?: string; checkedAt: number; /** Signs in as the account root (aws login): AWS sets the session length, no way to extend it. */ root?: boolean; /** When the aws login session ends at the latest (sign-in + 12 h). */ expiresAt?: number; /** The last check could not tell (timeout, network), so status may be stale. */ unsure?: boolean }
+export type AwsProfile = { name: string; label?: string; who?: string; email?: string; account?: string; region?: string; status: AwsStatus; chrome?: string; checkedAt: number; /** Signs in as the account root (aws login): AWS sets the session length, no way to extend it. */ root?: boolean; /** When the aws login session ends at the latest (sign-in + 12 h). */ expiresAt?: number; /** The last check could not tell (timeout, network), so status may be stale. */ unsure?: boolean; /** Signs in through single sign-on (aws sso login). */ sso?: boolean }
 export type ChromeProfile = { dir: string; name: string; email?: string }
 /** Chrome profiles to sign in with, the AWS profile picked per project folder, and this window's folder. */
 /** A saved web login: only where to sign in and in which Chrome profile, never a password or token. */
@@ -81,16 +93,16 @@ export type SpendMode = 'provider' | 'cap' | 'ask'
 /** usd: estimated, from paid-guard's per call table. */
 export type SpendRow = { key: string; label: string; mode: SpendMode; monthlyUsd: number; calls: number; usd: number }
 /** held: the sweep holds it until approved (kit/sweep.mjs needsApproval); no chat may turn it on. */
-export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' | 'asset'; name: string; enabled: boolean; held?: boolean; tokens?: number; source?: string; skills?: string[]; model?: string; codex?: boolean; codexModel?: string; codexEffort?: string; description?: string; path?: string }
+export type Installed = { kind: 'mod' | 'plugin' | 'skill' | 'role' | 'preset' | 'asset' | 'builtin' | 'mcp'; name: string; enabled: boolean; held?: boolean; tokens?: number; source?: string; skills?: string[]; model?: string; codex?: boolean; codexModel?: string; codexEffort?: string; description?: string; path?: string }
 /** One chat's plugins (by id) and user skills (by name), on or off; tools.ts turns it into the chat's --settings file. */
 /** assets: design references by project-relative path, named to the chat in its system note. indefinite: Run indefinitely is on since this epoch ms. */
-export type ChatProfile = { plugins: Record<string, boolean>; skills: Record<string, boolean>; assets?: Record<string, boolean>; indefinite?: number; /** Limits and a gate for Run indefinitely; dropped when it ends. */ budget?: IndefiniteBudget; /** Check-back setting; stays after Run indefinitely ends. */ checkBack?: CheckBack }
+export type ChatProfile = { plugins: Record<string, boolean>; skills: Record<string, boolean>; assets?: Record<string, boolean>; /** Built-in tools by name and MCP servers as mcp:<server>, on or off. */ extras?: Record<string, boolean>; indefinite?: number; /** Limits and a gate for Run indefinitely; dropped when it ends. */ budget?: IndefiniteBudget; /** Check-back setting; stays after Run indefinitely ends. */ checkBack?: CheckBack }
 /** maxHours, maxCostUsd: stop at the nearer limit (not a success). gate: shell command run in the project folder; exit 0 lets the chat stop. All off when absent. */
 export type IndefiniteBudget = { maxHours?: number; maxCostUsd?: number; gate?: string }
 /** One indefinite.json value: a bare number is onAt alone (older hubs), an object adds the budget. */
 export type IndefiniteEntry = number | ({ onAt: number } & IndefiniteBudget)
-/** Idle chats get a check-back text every everyMin minutes while work is open, up to 12 times. count: sent so far; lastAt: the latest, epoch ms. */
-export type CheckBack = { everyMin: 10 | 30 | 60; count: number; lastAt?: number }
+/** Idle chats get a check-back every everyMin minutes, up to 12 times: text (the Timer loop's prompt) always, the default text only while work is open. count: sent so far; lastAt: the latest, epoch ms. */
+export type CheckBack = { everyMin: 10 | 30 | 60 | 180 | 1440; count: number; lastAt?: number; text?: string }
 /** flagged: duplicates kept off unless turned on by hand. pick: the last hub-pick-tools answer (the all-on set), for its goal. chats: saved profiles by session id. */
 /** Smart toggle per chat (smart-tools.ts): why: rule per pick; on: what it switched on itself; refused: held picks; library: design library paths it picked; pending: waits for the next start or resume. */
 export type SmartRecord = { why: Record<string, string>; on: Record<string, string>; refused: string[]; library: string[]; pending: boolean; at: number }
@@ -127,6 +139,10 @@ export type HubState = {
   limitsKept?: KeptLimits
   /** Last Codex 5h and week windows, account-wide, kept past the chat that fed them; meter only, never a pause input. */
   codexKept?: Limit[]
+  /** Latest Codex account daily token buckets, last 30 days. */
+  codexDaily?: { day: string; tokens: number }[]
+  /** Codex account's available reset credits. */
+  codexResets?: number
   /** Chats paused near the limit, resumed in order at resumeAt (epoch ms). */
   pause?: LimitPause
   history: DayUsage[]
@@ -198,6 +214,8 @@ export type HubState = {
   trend?: DailyTrend
   /** The SkillSpector sweep (kit/sweep.mjs): one result per plugin or skill name; busy while a sweep or an add runs; note: the last add's or sweep's outcome; progress: Sweep all's count so far. An older extension sends none. */
   sweep?: { busy: boolean; tools: Record<string, SweepRecord>; note?: string; progress?: { done: number; total: number } }
+  /** GitHub sync of memory, the vault and prefs (sync.ts): on after Sign in until Turn off; login and last sync time (ms); busy while a run goes; note: the last problem. */
+  sync?: { on: boolean; login?: string; last?: number; busy: boolean; note?: string }
   /** Spend limits per paid tool (spend.ts): mode, cap and this month's count; an older extension sends none. */
   spend?: SpendRow[]
   /** Projects with a dev script; an older extension sends none. */
@@ -216,10 +234,14 @@ export type HubState = {
   thisWindow?: string
   /** The window focused last, from any window; the browser app's Plan page follows it. */
   lastWindow?: string
+  /** The chat opened last, in a terminal or on a Switchboard page of this Mac, from any window; the other pages follow it. */
+  openChat?: { sessionId: string; at: number }
   /** mac: native tabs can work here; live: nativeTabs was on when this window started, so the tab commands do something. */
   windowTabs?: { mac: boolean; live: boolean }
-  /** The Git panel's repo: the one holding the chat hub-changes asked for. */
+  /** The Git panel's repo: the one holding the chat (or the Ship repo) hub-changes asked for; sessionId is that chat's id or that repo's path. */
   repo?: RepoView | null
+  /** Every known repo and its worktrees (ship.ts); an older extension sends none. */
+  ship?: ShipRepo[]
   /** The to-do list by project folder (todo.ts); an older extension sends none. */
   todos?: Record<string, TodoList>
   /** Jev per project folder (jev-project.ts); an older extension sends none. */
@@ -234,7 +256,11 @@ export type HubState = {
   /** Chats the usage meter thinks are worth a research run: a score from 0 to 1 and a one-line reason, newest last; an older extension sends none. */
   researchOffers?: { sessionId: string; score: number; reason: string; at: number }[]
   /** Finished research runs, newest first, from ~/.claude/switchboard/research (research-library.ts); summary is the report's Answer line. */
-  research?: { id: string; question: string; project?: string; chat: string; sessionId: string; at: number; sources: number; summary: string; seen: boolean }[]
+  research?: { id: string; question: string; project?: string; chat: string; sessionId: string; at: number; sources: number; summary: string; seen: boolean; /** The folder it is filed in; unfiled without one. */ folder?: string; /** When Ask more last added to it, and how many times. */ added?: { at: number; n: number }; /** Ask more questions still being researched; sessionId once its chat has started. */ asks?: { question: string; at: number; sessionId?: string }[] }[]
+  /** Research folders in the order shown; auto files each new report by itself. busy while Smart organize thinks; undo is what its last run moved; problem says why it failed. */
+  researchFolders?: { names: string[]; auto: boolean; busy?: boolean; undo?: { moved: number; at: number }; problem?: string }
+  /** Workbench: this device in one line, the changes made outside projects, newest first, what reports suggest, and why the last Undo was refused. An older extension sends none. */
+  adjust?: { device: string; changes: Change[]; suggestions: SuggestedChanges[]; said?: { id: string; text: string } }
   /** First-run checklist, each step done or not; dismissed hides the card. An older extension sends none. */
   firstRun?: { github: boolean; claude: boolean; project: boolean; chat: boolean; approved: boolean; dismissed?: boolean }
   /** source-check runs, newest first: each source with its band, score 0 to 100 and reasons; report: the HTML report path. An older extension sends none. */
@@ -253,6 +279,11 @@ export type WindowInfo = { workspace: string; name: string; color: WindowColor }
 export type ChangedFile = { path: string; added: number; removed: number; status: 'modified' | 'added' | 'deleted' | 'untracked'; diff?: string; note?: string }
 /** problem: why the files could not be read (no folder, folder gone, git failed); files is empty then. */
 export type Changes = { sessionId: string; cwd: string; files: ChangedFile[]; at: number; problem?: string }
+/** A worktree Ship lists under its repo. commits: ones the checkout's HEAD lacks; live: a chat runs in it. */
+export type ShipTree = { id: string; name: string; branch?: string; files: number; commits: number; live: boolean; /** Merges once its chat ends. */ queued?: boolean }
+/** A repo Ship lists, chat or no chat. id: its path, which hub-changes and hub-git take in place of a chat's sessionId. auto: worktrees merge on their own.
+ * merging: a merge runs now, in any window; merge: the last one's outcome. */
+export type ShipRepo = { id: string; name: string; branch?: string; files: number; ahead: number; behind: number; auto: boolean; trees: ShipTree[]; merging?: boolean; merge?: { text: string; ok: boolean; at: number } }
 /** One file git status lists, relative to the repo root. from: a rename's old path. */
 export type RepoFile = { path: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict'; from?: string }
 export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'undo' | 'discard' | 'pr' | 'stash' | 'pop' | 'delete-branch' | 'rerun' | 'ship' | 'push' | 'merge-back' | 'merge-all'
@@ -260,10 +291,10 @@ export type GitOp = 'sync' | 'commit' | 'commit-push' | 'switch' | 'create' | 'u
 export const MAC_ONLY_GIT: ReadonlySet<GitOp> = new Set<GitOp>(['sync', 'commit-push', 'pr', 'ship', 'discard', 'delete-branch', 'merge-back', 'merge-all'])
 /** sync: the one sync button (Publish branch, Pull N, Push N or Fetch). github: the repo's page, from the branch's remote (origin by default). pr: the branch's open PR when gh can tell. busy: the op running now; result: the last one's outcome. */
 export type RepoView = {
-  /** A Claude worktree (own-worktree chat): Merge back merges its branch into the main checkout. */
+  /** A Claude worktree (own-worktree chat): Merge back puts its work in the branch the main checkout is on. */
   worktree?: boolean
-  /** Folders under the main checkout's .claude/worktrees: Merge all worktrees shows when there are any. */
-  worktrees?: number
+  /** For a worktree: the branch the main checkout is on, and whether it merges on its own (Ship's switch). */
+  into?: string; auto?: boolean
   sessionId: string; name: string; branch?: string; upstream?: string; ahead: number; behind: number; files: RepoFile[]; branches: string[]
   sync: { kind: 'publish' | 'pull' | 'push' | 'fetch'; label: string }
   log: { hash: string; subject: string; when: string }[]; stashes: number; github?: string
@@ -295,7 +326,7 @@ export type KeepSetting = 'autoCompactEnabled' | 'autoCompactWindow' | 'autoCont
 export type SettingKey = KeepSetting | 'remoteControlAtStartup' | 'agentPushNotifEnabled' | 'inputNeededNotifEnabled' | 'model' | 'effortLevel' | 'tui' | 'statusLine'
 export type ClaudeControls = { model?: 'fable' | 'opus' | 'sonnet' | 'haiku'; effortLevel?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; tui: 'default' | 'fullscreen'; statusLine: boolean; push: boolean; needInput: boolean }
 /** Switchboard's own switches, kept in VS Code's globalState. idleMinutes null: never hide. */
-export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; /** Claude chat permissions: bypass (default), ask or auto; unset reads askClaude. */ claudeMode?: 'bypass' | 'ask' | 'auto'; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. Read only when notices is unset. */ toasts?: boolean; /** Where agent notices go: the Mac or Windows notification center (unset), a VS Code pop-up, or the status bar. */ notices?: 'system' | 'toast' | 'status'; /** Where VS Code toasts show (workbench.notifications.position); unset is top right. */ noticeSpot?: 'top-right' | 'bottom-left' | 'bottom-right'; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string; /** Coder view: every page and control; off is the Simple view, unset too, and unset also shows the first-run choice. Global, saved in company.json by hub-coder-view. */ coderView?: boolean; /** Auto pick per task: new chats and Start runs get their model and effort picked from the task; off only when false. */ autoPick?: boolean; /** Merge every idle worktree into main after 15 minutes with no new chat in the repo; off only when false. */ autoMerge?: boolean }
+export type SwitchboardControls = { hooks: boolean; statusBar: boolean; idleMinutes: number | null; brief: boolean; askBrain: boolean; syncRules: boolean; accessNote: boolean; autoStart: boolean; autoFix: boolean; name: string; /** Stop a chat's dev servers and test browsers when it ends; off only when false. */ stopServers?: boolean; askClaude?: boolean; /** Claude chat permissions: bypass (default), ask or auto; unset reads askClaude. */ claudeMode?: 'bypass' | 'ask' | 'auto'; askCodex?: boolean; keepApp?: boolean; hardenBuild?: boolean; pauseAt?: number | null; learn?: boolean; /** Every window as a native macOS tab (window.nativeTabs); takes a quit and reopen. */ oneWindow?: boolean; /** Agent browsers in a window; off runs Playwright MCP headless. */ showBrowsers?: boolean; /** VS Code toasts for agent notices; off uses the status bar. Read only when notices is unset. */ toasts?: boolean; /** Where agent notices go: the Mac or Windows notification center (unset), a VS Code pop-up, or the status bar. */ notices?: 'system' | 'toast' | 'status'; /** Where VS Code toasts show (workbench.notifications.position); unset is top right. */ noticeSpot?: 'top-right' | 'bottom-left' | 'bottom-right'; /** Phone mode: questions, needs-you, done and usage pauses ring Kenneth through the phone skill. */ phone?: boolean; /** Roles move up a model when a cheap one misses; off only when false. */ smartModelSwitch?: boolean; /** Route new engineer and code review jobs to Codex when it has room. */ codexFirst?: boolean; /** Advanced mode (stage folders) per project path, set with hub-advanced; off unless true. */ advancedMode?: Record<string, boolean>; /** Model for new and resumed Codex chats (-m); unset leaves it to config.toml. */ codexModel?: string; /** Reasoning effort for Codex chats (-c model_reasoning_effort=); unset leaves it to config.toml. */ codexEffort?: string; /** Coder view: every page and control; off is the Simple view, unset too, and unset also shows the first-run choice. Global, saved in company.json by hub-coder-view. */ coderView?: boolean; /** Auto pick per task: new chats and Start runs get their model and effort picked from the task; off only when false. */ autoPick?: boolean; /** Merge every idle worktree into main after 15 minutes with no new chat in the repo; off only when false. */ autoMerge?: boolean }
 export type SwitchboardKey = keyof SwitchboardControls
 /** rulesNote: what the last rules and roles sync did, one line. */
 export type Controls = { claude: ClaudeControls; switchboard: SwitchboardControls; statusLineReady: boolean; rulesNote?: string }
@@ -311,7 +342,7 @@ export type StageRun = { run: string; sessionId?: string; at: number; stages: St
 /** A role smart model switch moved to another model, from model-learn.json. resolvedBy: who settled it. */
 export type Escalation = { project: string; role: string; files: string[]; from: string; to: string; reason: string; at: number; resolvedBy?: string }
 /** One running chat, and why it may be missing from the Claude app. fill: a Codex chat's context, 0..1. chain: the handoff chain it is in. takes: the message box reaches it. */
-export type ChatRow = { pid: number; sessionId: string; name?: string; cwd: string; status?: string; version?: string; kind?: string; updatedAt?: number; bridgeId?: string; link: string; live: boolean; why: string[]; ai?: AiId; fill?: number; chain?: string; takes?: boolean; /** The repo's name (projectName), so a chat in switchboard/extension reads switchboard. */ project?: string; /** Chats started from one split message share it. */ group?: string; /** Goal budget card: ms since the chat started, its cost so far (usage feed) and its Run indefinitely limits. */ elapsedMs?: number; costUsd?: number; budget?: IndefiniteBudget; checkBack?: CheckBack }
+export type ChatRow = { pid: number; sessionId: string; name?: string; cwd: string; status?: string; /** When Claude Code last changed status (busy, waiting, idle, shell), and what a waiting one waits for. */ statusAt?: number; waitingFor?: string; version?: string; kind?: string; updatedAt?: number; bridgeId?: string; link: string; live: boolean; why: string[]; ai?: AiId; fill?: number; chain?: string; takes?: boolean; /** The repo's name (projectName), so a chat in switchboard/extension reads switchboard. */ project?: string; /** Chats started from one split message share it. */ group?: string; /** Goal budget card: ms since the chat started, its cost so far (usage feed) and its Run indefinitely limits. */ elapsedMs?: number; costUsd?: number; budget?: IndefiniteBudget; checkBack?: CheckBack }
 
 /** A terminal in this window: who opened it, the chat in it and how that chat is doing. id: per window, until reload. */
 export type TerminalRow = { id: number; owner: 'switchboard' | 'user'; name: string; state: 'running' | 'ended' | 'exited'; sessionId?: string; chat?: string }
@@ -365,7 +396,7 @@ export type TodoItem = { id: string; text: string; at: number; chat?: string; /*
 export type TodoSync = { state: 'synced' | 'local' | 'failing'; why?: string; canSync?: boolean; optIn?: boolean; remote?: string }
 /** A finished item (by: the chat that finished it, none when the user did), kept so the user can put it back. */
 export type TickedItem = Pick<TodoItem, 'id' | 'text' | 'at' | 'from' | 'before' | 'name' | 'why' | 'run' | 'auto' | 'short'> & { by?: string; /** Ticked because this commit (sha) or CHANGELOG line (sha CHANGELOG) already says it; Put back undoes it. */ shipped?: { sha: string; subject: string } }
-export type TodoList = { todo: TodoItem[]; sync?: TodoSync; /** Newest first, at most 10. */ ticked?: TickedItem[]; /** Left by finished chats, waiting for Accept or Dismiss; an older extension sends none. */ suggested?: TodoItem[]; /** How many the last prune cleared (repeats, stale suggestions); their text is gone. */ cleared?: number; pilot?: TodoPilot; /** The last run number. */ seq?: number; /** The first run number of the current chain; none once the queue went empty. */ streak?: number; /** What auto-start runs next (todo.ts upcoming); an older extension sends none. */ plan?: { runs: Array<{ n: number; ids: string[] }>; held: Array<{ id: string; why: 'blocked' | 'you' | 'stopped' | 'ok' | 'date' }>; /** Why auto-start holds the next item (todo.ts holdReason); absent when it does not. */ hold?: { kind: 'waiting' | 'running' | 'limit' | 'sync' | 'paused'; text: string } } }
+export type TodoList = { todo: TodoItem[]; sync?: TodoSync; /** Newest first, at most 10. */ ticked?: TickedItem[]; /** Left by finished chats, waiting for Accept or Dismiss; an older extension sends none. */ suggested?: TodoItem[]; /** How many the last prune cleared (repeats, stale suggestions); their text is gone. */ cleared?: number; pilot?: TodoPilot; /** The last run number. */ seq?: number; /** The first run number of the current chain; none once the queue went empty. */ streak?: number; /** What auto-start runs next (todo.ts upcoming); an older extension sends none. */ plan?: { runs: Array<{ n: number; ids: string[] }>; held: Array<{ id: string; why: 'blocked' | 'you' | 'stopped' | 'ok' | 'date' }>; /** Why auto-start holds the next item (todo.ts holdReason); absent when it does not. */ hold?: { kind: 'waiting' | 'running' | 'limit' | 'sync' | 'paused' | 'memory'; text: string } } }
 /** The project's autopilot: on unset follows the global Auto-start; paused holds new starts, running chats go on. The newest at wins a merge. */
 export type TodoPilot = { on?: boolean; paused?: boolean; at: number }
 /** todo.json on refs/switchboard/todo; removed: tombstones by id (`<id>.back` for a ticked item put back), kept so a merge never brings one back. */

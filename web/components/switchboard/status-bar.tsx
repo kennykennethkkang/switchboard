@@ -20,13 +20,13 @@ export function StatusBar({ meters, dev, onDev, awake, onAwake, calls, onCalls, 
   const on = dev.some(d => d.running > 0)
   return (
     <footer className="sb" data-narrow={narrow || undefined} aria-label="Status">
-      <span className="sb-meters">
+      <a href="#usage" className="sb-meters" title="Plan limits: open Usage">
         {meters.map(m => <span key={m.kind} className="hub-limit" data-level={m.level} data-codex={m.kind.startsWith('codex_') || undefined} title={m.reset || undefined}>
           <i aria-hidden><b style={{ transform: `scaleX(${Math.min(100, m.percent ?? 0) / 100})` }} /></i>
           {m.label} {m.level === 'out' ? 'out' : m.percent === undefined ? 'no data' : `${m.percent}%`}
           {m.reset && <span className="sr-only">, {m.reset}</span>}
         </span>)}
-      </span>
+      </a>
       <button type="button" className="sb-btn sb-dev" data-on={on || undefined} onClick={onDev} title="Dev servers: open Ship">
         <i aria-hidden />{devText(dev)}
       </button>
