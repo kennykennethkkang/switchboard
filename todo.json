@@ -46,6 +46,19 @@
    "id": "d4113673",
    "text": "Release workflow: pnpm 12 install fails on every OS with ERR_PNPM_IGNORED_BUILDS (esbuild); allow esbuild builds in pnpm-workspace.yaml",
    "at": 1795682289924,
+   "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "host": "62903adf5e340f87",
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "before": "afbea17f",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "short": "Release workflow:",
+   "run": 174,
+   "auto": true
+  },
+  {
+   "id": "1b8c9eda",
+   "text": "Release and CI: 3 extension tests fail on ubuntu-latest (dev.test keep awake spawns caffeinate; setup.test 21st key store and dry-run)",
+   "at": 1795682290094,
    "before": "afbea17f",
    "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
    "host": "62903adf5e340f87",
@@ -53,7 +66,7 @@
    "auto": true,
    "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
    "name": "To-do 174: Switchboard Windows release gate",
-   "short": "Release workflow:"
+   "short": "Release and CI:"
   }
  ],
  "removed": {
