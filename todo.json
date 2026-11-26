@@ -15,8 +15,12 @@
   {
    "id": "a2c22dcd",
    "text": "https://www.instagram.com/reel/DgG3rhkNUzU/?cnvx=NTc4MTIwNjQ2YQ== take a look at this video and implement these functionalities into switchboard but make sure the components work properly. Also take into account the functionalities already added to the site. Make sure they tie in with them or adjust them and clean up the whole site.",
-   "at": 1795643200108,
-   "short": "https://www.instagram.com/reel/DgG3rhkNUzU/?cnvx=NTc4MTIw..."
+   "at": 1795659553805,
+   "short": "https://www.instagram.com/reel/DgG3rhkNUzU/?cnvx=NTc4MTIw...",
+   "chat": "af41c8ed-16ca-442b-b04c-95897b2cdcb8",
+   "host": "62903adf5e340f87",
+   "run": 168,
+   "auto": true
   },
   {
    "id": "ffd87216",
@@ -609,17 +613,17 @@
   "7ececa69": 1795658727520,
   "6f6c8b95": 1795659552952
  },
- "seq": 167,
+ "seq": 168,
  "streak": 130,
  "ticked": [
   {
    "id": "6f6c8b95",
    "text": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIwNjQ2YQ== help with work tree merge and merge in general",
+   "at": 1795659552952,
+   "by": "df34e174-ef84-475b-8ddb-742afcb79e97",
    "short": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIw...",
    "run": 167,
-   "auto": true,
-   "at": 1795659552952,
-   "by": "df34e174-ef84-475b-8ddb-742afcb79e97"
+   "auto": true
   },
   {
    "id": "2bd847d7",
