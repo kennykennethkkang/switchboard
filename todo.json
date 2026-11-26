@@ -41,6 +41,19 @@
    "text": "Do a full UI/UX overhaul, using mirofish ab testing and all tools avaliable adjust components so they make sense to users but also have no problems when running the program. This also includes smart updating (Which should be added directly into switchboard as a button which grabs from the repo and updates. Login functionality, user can login and access saved data/information. Also make sure that there is no user issues. Image if you were a brand new user, moderate user, and senior engineer. Make the site make sense for all roles and make sure coder view is targeted towards senior engineers or people who have coding background. This check also means all the small components and minor details need to be cleaned up and adjusted. This includes rules, information, or even commands that the system should understand.",
    "at": 1795682224441,
    "short": "Do a full UI/UX overhaul, using mirofish ab testing and..."
+  },
+  {
+   "id": "d4113673",
+   "text": "Release workflow: pnpm 12 install fails on every OS with ERR_PNPM_IGNORED_BUILDS (esbuild); allow esbuild builds in pnpm-workspace.yaml",
+   "at": 1795682289924,
+   "before": "afbea17f",
+   "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "host": "62903adf5e340f87",
+   "run": 174,
+   "auto": true,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "short": "Release workflow:"
   }
  ],
  "removed": {
