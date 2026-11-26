@@ -35,6 +35,12 @@
    "text": "Make sure the site is crash free, bug free, and has zero issues with latency and lag. I want to reduce the lag caused by opening multiple chats to the absolute lowest amount. The lowest recorded possible should be even lower. Keep testing because I know that you can keep testing to get it even faster, more efficient, and well adjusted. Make sure program is still usable and implement everything with tests, ab testing, checks, and adjustments.",
    "at": 1795682055208,
    "short": "Make sure the site is crash free, bug free, and has zero..."
+  },
+  {
+   "id": "52659460",
+   "text": "Do a full UI/UX overhaul, using mirofish ab testing and all tools avaliable adjust components so they make sense to users but also have no problems when running the program. This also includes smart updating (Which should be added directly into switchboard as a button which grabs from the repo and updates. Login functionality, user can login and access saved data/information. Also make sure that there is no user issues. Image if you were a brand new user, moderate user, and senior engineer. Make the site make sense for all roles and make sure coder view is targeted towards senior engineers or people who have coding background. This check also means all the small components and minor details need to be cleaned up and adjusted. This includes rules, information, or even commands that the system should understand.",
+   "at": 1795682224441,
+   "short": "Do a full UI/UX overhaul, using mirofish ab testing and..."
   }
  ],
  "removed": {
