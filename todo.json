@@ -115,6 +115,14 @@
    "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
    "name": "To-do 175: Gbrain memory research",
    "short": "Added-claim check on Learn rewrites:"
+  },
+  {
+   "id": "3dbfd2be",
+   "text": "Write a one-line reason beside each memory backup (memory-backups, snapshot.mjs) so a bad Learn or memory-fix rewrite can be traced. See vault wiki/graph-engineering-memory.md 'GBrain deep pass' item 4. From chat f1a7ccac.",
+   "at": 1795717089591,
+   "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
+   "name": "To-do 175: Gbrain memory research",
+   "short": "Write a one-line reason beside each memory backup..."
   }
  ],
  "removed": {
