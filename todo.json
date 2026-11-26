@@ -26,8 +26,12 @@
   {
    "id": "52659460",
    "text": "Do a full UI/UX overhaul, using mirofish ab testing and all tools avaliable adjust components so they make sense to users but also have no problems when running the program. This also includes smart updating (Which should be added directly into switchboard as a button which grabs from the repo and updates. Login functionality, user can login and access saved data/information. Also make sure that there is no user issues. Image if you were a brand new user, moderate user, and senior engineer. Make the site make sense for all roles and make sure coder view is targeted towards senior engineers or people who have coding background. This check also means all the small components and minor details need to be cleaned up and adjusted. This includes rules, information, or even commands that the system should understand.",
-   "at": 1795682224441,
-   "short": "Do a full UI/UX overhaul, using mirofish ab testing and..."
+   "at": 1795717501467,
+   "short": "Do a full UI/UX overhaul, using mirofish ab testing and...",
+   "chat": "3c51ac24-4775-4470-8876-feb3cf330e43",
+   "host": "62903adf5e340f87",
+   "run": 180,
+   "auto": true
   },
   {
    "id": "1b8c9eda",
@@ -684,68 +688,17 @@
   ],
   "at": 1795682858753
  },
- "seq": 179,
+ "seq": 180,
  "streak": 130,
- "suggested": [
-  {
-   "id": "c06aa56b",
-   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
-   "at": 1795700225625,
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "why": "later",
-   "short": "Check CI and Release runs and fix remaining Windows failures"
-  },
-  {
-   "id": "50322515",
-   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
-   "at": 1795700225625,
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "why": "later"
-  },
-  {
-   "id": "6c2e7914",
-   "text": "Each open page pulls the full state, about 2% of a core per page.",
-   "at": 1795706568481,
-   "from": "cbe983e1-022f-48e9-b336-d57e57464250",
-   "name": "To-do 176: Reduce Switchboard chat lag",
-   "why": "later",
-   "short": "Reduce CPU cost of each open page pulling full state"
-  },
-  {
-   "id": "012572f6",
-   "text": "Each hook event starts a node process, about 31 ms each.",
-   "at": 1795706568481,
-   "from": "cbe983e1-022f-48e9-b336-d57e57464250",
-   "name": "To-do 176: Reduce Switchboard chat lag",
-   "why": "later"
-  },
-  {
-   "id": "eb6ee708",
-   "text": "worktree by default for code chats (asks you first)",
-   "at": 1795717236046,
-   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
-   "why": "later"
-  },
-  {
-   "id": "8d9ab41e",
-   "text": "Instagram scroll in a chat with Code Mode off, because this chat could not use your signed-in Chrome",
-   "at": 1795717236046,
-   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
-   "why": "later",
-   "short": "Scroll Instagram in a chat with Code Mode off"
-  }
- ],
  "ticked": [
   {
    "id": "6f525d61",
    "text": "Please make sure lint rules and information for how switchboard should run and any information related to that is properly setup, doesn't have any contradictions, and runs properly. Feel free to ask me questions if there are any issues that come up with rule contradictions or issues in general.",
+   "at": 1795717498190,
+   "by": "e3d8159c-d4e9-4896-ba4b-014764025025",
    "short": "Please make sure lint rules and information for how...",
    "run": 179,
-   "auto": true,
-   "at": 1795717498190,
-   "by": "e3d8159c-d4e9-4896-ba4b-014764025025"
+   "auto": true
   },
   {
    "id": "64add4d3",
@@ -833,6 +786,57 @@
    "short": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIw...",
    "run": 170,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "c06aa56b",
+   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later",
+   "short": "Check CI and Release runs and fix remaining Windows failures"
+  },
+  {
+   "id": "50322515",
+   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later"
+  },
+  {
+   "id": "6c2e7914",
+   "text": "Each open page pulls the full state, about 2% of a core per page.",
+   "at": 1795706568481,
+   "from": "cbe983e1-022f-48e9-b336-d57e57464250",
+   "name": "To-do 176: Reduce Switchboard chat lag",
+   "why": "later",
+   "short": "Reduce CPU cost of each open page pulling full state"
+  },
+  {
+   "id": "012572f6",
+   "text": "Each hook event starts a node process, about 31 ms each.",
+   "at": 1795706568481,
+   "from": "cbe983e1-022f-48e9-b336-d57e57464250",
+   "name": "To-do 176: Reduce Switchboard chat lag",
+   "why": "later"
+  },
+  {
+   "id": "eb6ee708",
+   "text": "worktree by default for code chats (asks you first)",
+   "at": 1795717236046,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "why": "later"
+  },
+  {
+   "id": "8d9ab41e",
+   "text": "Instagram scroll in a chat with Code Mode off, because this chat could not use your signed-in Chrome",
+   "at": 1795717236046,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "why": "later",
+   "short": "Scroll Instagram in a chat with Code Mode off"
   }
  ]
 }
