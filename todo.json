@@ -26,8 +26,12 @@
   {
    "id": "64add4d3",
    "text": "Make sure the site is crash free, bug free, and has zero issues with latency and lag. I want to reduce the lag caused by opening multiple chats to the absolute lowest amount. The lowest recorded possible should be even lower. Keep testing because I know that you can keep testing to get it even faster, more efficient, and well adjusted. Make sure program is still usable and implement everything with tests, ab testing, checks, and adjustments.",
-   "at": 1795682055208,
-   "short": "Make sure the site is crash free, bug free, and has zero..."
+   "at": 1795700495275,
+   "short": "Make sure the site is crash free, bug free, and has zero...",
+   "chat": "cbe983e1-022f-48e9-b336-d57e57464250",
+   "host": "62903adf5e340f87",
+   "run": 176,
+   "auto": true
   },
   {
    "id": "6ed638cf",
@@ -638,36 +642,17 @@
   ],
   "at": 1795682858753
  },
- "seq": 175,
+ "seq": 176,
  "streak": 130,
- "suggested": [
-  {
-   "id": "c06aa56b",
-   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
-   "at": 1795700225625,
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "why": "later",
-   "short": "Check CI and Release runs and fix remaining Windows failures"
-  },
-  {
-   "id": "50322515",
-   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
-   "at": 1795700225625,
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "why": "later"
-  }
- ],
  "ticked": [
   {
    "id": "0759d06b",
    "text": "Check online for Gbrain (open github repository for ai memory). See if my memory is similar to gbrain and if it has any components that would help improve memory overall. Do deep research and see what can really help switchboard as a program and all memory related aspects with switchboard.",
+   "at": 1795700483567,
+   "by": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
    "short": "Check online for Gbrain (open github repository for ai...",
    "run": 175,
-   "auto": true,
-   "at": 1795700483567,
-   "by": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f"
+   "auto": true
   },
   {
    "id": "d4113673",
@@ -755,6 +740,25 @@
    "short": "Correct a stale memory line (Learn review of 1b9b30b2,...",
    "run": 166,
    "auto": true
+  }
+ ],
+ "suggested": [
+  {
+   "id": "c06aa56b",
+   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later",
+   "short": "Check CI and Release runs and fix remaining Windows failures"
+  },
+  {
+   "id": "50322515",
+   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later"
   }
  ]
 }
