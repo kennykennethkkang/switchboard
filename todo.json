@@ -24,16 +24,6 @@
    "stopped": true
   },
   {
-   "id": "6f525d61",
-   "text": "Please make sure lint rules and information for how switchboard should run and any information related to that is properly setup, doesn't have any contradictions, and runs properly. Feel free to ask me questions if there are any issues that come up with rule contradictions or issues in general.",
-   "at": 1795714977601,
-   "chat": "e3d8159c-d4e9-4896-ba4b-014764025025",
-   "host": "62903adf5e340f87",
-   "short": "Please make sure lint rules and information for how...",
-   "run": 179,
-   "auto": true
-  },
-  {
    "id": "52659460",
    "text": "Do a full UI/UX overhaul, using mirofish ab testing and all tools avaliable adjust components so they make sense to users but also have no problems when running the program. This also includes smart updating (Which should be added directly into switchboard as a button which grabs from the repo and updates. Login functionality, user can login and access saved data/information. Also make sure that there is no user issues. Image if you were a brand new user, moderate user, and senior engineer. Make the site make sense for all roles and make sure coder view is targeted towards senior engineers or people who have coding background. This check also means all the small components and minor details need to be cleaned up and adjusted. This includes rules, information, or even commands that the system should understand.",
    "at": 1795682224441,
@@ -678,7 +668,8 @@
   "569b63cb": 1795714977066,
   "9c78900d": 1795717175950,
   "fe3e5e59": 1795717175950,
-  "64add4d3": 1795717388308
+  "64add4d3": 1795717388308,
+  "6f525d61": 1795717498190
  },
  "order": {
   "ids": [
@@ -748,14 +739,23 @@
  ],
  "ticked": [
   {
+   "id": "6f525d61",
+   "text": "Please make sure lint rules and information for how switchboard should run and any information related to that is properly setup, doesn't have any contradictions, and runs properly. Feel free to ask me questions if there are any issues that come up with rule contradictions or issues in general.",
+   "short": "Please make sure lint rules and information for how...",
+   "run": 179,
+   "auto": true,
+   "at": 1795717498190,
+   "by": "e3d8159c-d4e9-4896-ba4b-014764025025"
+  },
+  {
    "id": "64add4d3",
    "text": "Make sure the site is crash free, bug free, and has zero issues with latency and lag. I want to reduce the lag caused by opening multiple chats to the absolute lowest amount. The lowest recorded possible should be even lower. Keep testing because I know that you can keep testing to get it even faster, more efficient, and well adjusted. Make sure program is still usable and implement everything with tests, ab testing, checks, and adjustments.",
+   "at": 1795717388308,
+   "by": "cbe983e1-022f-48e9-b336-d57e57464250",
    "short": "Make sure the site is crash free, bug free, and has zero...",
    "run": 176,
    "auto": true,
-   "stopped": true,
-   "at": 1795717388308,
-   "by": "cbe983e1-022f-48e9-b336-d57e57464250"
+   "stopped": true
   },
   {
    "id": "569b63cb",
@@ -832,15 +832,6 @@
    "by": "359f1afc-dd08-40d5-9c3f-bea6936418ef",
    "short": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIw...",
    "run": 170,
-   "auto": true
-  },
-  {
-   "id": "ffd87216",
-   "text": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIwNjQ2YQ== format Claude and important info. Watch video add what could help to the program or add to it if something exists don’t double add and check over anything that has issues.",
-   "at": 1795662622302,
-   "by": "88478473-3357-47fc-b0ea-9fa6f7dedaa6",
-   "short": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIw...",
-   "run": 169,
    "auto": true
   }
  ]
