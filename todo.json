@@ -79,6 +79,14 @@
    "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
    "name": "To-do 177: Switchboard ADE harness setup",
    "short": "Review queue first:"
+  },
+  {
+   "id": "2f2252cb",
+   "text": "Ask Kenneth, then build: worktree by default for new code chats (engineer, lead) even when the project is idle, like Cursor and Conductor (from ADE chat 66dcf5d4)",
+   "at": 1795714271434,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "name": "To-do 177: Switchboard ADE harness setup",
+   "short": "Ask Kenneth, then build:"
   }
  ],
  "removed": {
