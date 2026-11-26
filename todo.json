@@ -79,6 +79,12 @@
    "short": "Release and CI:",
    "run": 174,
    "auto": true
+  },
+  {
+   "id": "6f525d61",
+   "text": "Please make sure lint rules and information for how switchboard should run and any information related to that is properly setup, doesn't have any contradictions, and runs properly. Feel free to ask me questions if there are any issues that come up with rule contradictions or issues in general.",
+   "at": 1795682853591,
+   "short": "Please make sure lint rules and information for how..."
   }
  ],
  "removed": {
