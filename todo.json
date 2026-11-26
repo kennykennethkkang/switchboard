@@ -15,14 +15,13 @@
   {
    "id": "afbea17f",
    "text": "After the first push of Switchboard 0.21.179 (chat 4da7282f, Windows transfer): read the Release workflow's windows-latest test job in GitHub Actions (gh run list -R kennykennethkkang/switchboard), fix what fails on Windows, then remove continue-on-error from .github/workflows/release.yml so Windows blocks releases. Also confirm the release v0.21.179 has the VSIX and .sha256 assets.",
-   "at": 1795680401396,
-   "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "host": "62903adf5e340f87",
+   "at": 1795700225625,
    "from": "4da7282f-e369-4baf-8e5b-99b061a42257",
    "name": "To-do 165: Switchboard Desktop Transfer Setup",
    "short": "After the first push of Switchboard 0.21.179 (chat...",
    "run": 174,
-   "auto": true
+   "auto": true,
+   "stopped": true
   },
   {
    "id": "0759d06b",
@@ -63,15 +62,14 @@
   {
    "id": "1b8c9eda",
    "text": "Release and CI: 3 extension tests fail on ubuntu-latest (dev.test keep awake spawns caffeinate; setup.test 21st key store and dry-run)",
-   "at": 1795682290094,
-   "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "host": "62903adf5e340f87",
+   "at": 1795700225625,
    "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
    "before": "afbea17f",
    "name": "To-do 174: Switchboard Windows release gate",
    "short": "Release and CI:",
    "run": 174,
-   "auto": true
+   "auto": true,
+   "stopped": true
   }
  ],
  "removed": {
@@ -629,7 +627,8 @@
   "b12d727a": 1795664282983,
   "66fc2f92": 1795678808996,
   "fc1e48ca": 1795680401152,
-  "d4113673": 1795692986699
+  "d4113673": 1795692986699,
+  "5ad7ece7": 1795700225625
  },
  "order": {
   "ids": [
@@ -650,14 +649,14 @@
   {
    "id": "d4113673",
    "text": "Release workflow: pnpm 12 install fails on every OS with ERR_PNPM_IGNORED_BUILDS (esbuild); allow esbuild builds in pnpm-workspace.yaml",
+   "at": 1795692986699,
+   "by": "4b248073-e953-4013-92b2-7cf1ad827e67",
    "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
    "before": "afbea17f",
    "name": "To-do 174: Switchboard Windows release gate",
    "short": "Release workflow:",
    "run": 174,
-   "auto": true,
-   "at": 1795692986699,
-   "by": "4b248073-e953-4013-92b2-7cf1ad827e67"
+   "auto": true
   },
   {
    "id": "fc1e48ca",
@@ -743,5 +742,25 @@
    "run": 165,
    "auto": true
   }
- ]
+ ],
+ "suggested": [
+  {
+   "id": "c06aa56b",
+   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later",
+   "short": "Check CI and Release runs and fix remaining Windows failures"
+  },
+  {
+   "id": "50322515",
+   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later"
+  }
+ ],
+ "cleared": 1
 }
