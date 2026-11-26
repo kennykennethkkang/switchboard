@@ -834,7 +834,21 @@
    "from": "cbe983e1-022f-48e9-b336-d57e57464250",
    "name": "To-do 176: Reduce Switchboard chat lag",
    "why": "later"
+  },
+  {
+   "id": "eb6ee708",
+   "text": "worktree by default for code chats (asks you first)",
+   "at": 1795717236046,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "why": "later"
+  },
+  {
+   "id": "8d9ab41e",
+   "text": "Instagram scroll in a chat with Code Mode off, because this chat could not use your signed-in Chrome",
+   "at": 1795717236046,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "why": "later",
+   "short": "Scroll Instagram in a chat with Code Mode off"
   }
- ],
- "cleared": 2
+ ]
 }
