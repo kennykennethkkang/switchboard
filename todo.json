@@ -24,16 +24,6 @@
    "stopped": true
   },
   {
-   "id": "0759d06b",
-   "text": "Check online for Gbrain (open github repository for ai memory). See if my memory is similar to gbrain and if it has any components that would help improve memory overall. Do deep research and see what can really help switchboard as a program and all memory related aspects with switchboard.",
-   "at": 1795700240287,
-   "short": "Check online for Gbrain (open github repository for ai...",
-   "chat": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
-   "host": "62903adf5e340f87",
-   "run": 175,
-   "auto": true
-  },
-  {
    "id": "64add4d3",
    "text": "Make sure the site is crash free, bug free, and has zero issues with latency and lag. I want to reduce the lag caused by opening multiple chats to the absolute lowest amount. The lowest recorded possible should be even lower. Keep testing because I know that you can keep testing to get it even faster, more efficient, and well adjusted. Make sure program is still usable and implement everything with tests, ab testing, checks, and adjustments.",
    "at": 1795682055208,
@@ -632,7 +622,8 @@
   "66fc2f92": 1795678808996,
   "fc1e48ca": 1795680401152,
   "d4113673": 1795692986699,
-  "5ad7ece7": 1795700225625
+  "5ad7ece7": 1795700225625,
+  "0759d06b": 1795700483567
  },
  "order": {
   "ids": [
@@ -649,7 +640,35 @@
  },
  "seq": 175,
  "streak": 130,
+ "suggested": [
+  {
+   "id": "c06aa56b",
+   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later",
+   "short": "Check CI and Release runs and fix remaining Windows failures"
+  },
+  {
+   "id": "50322515",
+   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
+   "at": 1795700225625,
+   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "name": "To-do 174: Switchboard Windows release gate",
+   "why": "later"
+  }
+ ],
  "ticked": [
+  {
+   "id": "0759d06b",
+   "text": "Check online for Gbrain (open github repository for ai memory). See if my memory is similar to gbrain and if it has any components that would help improve memory overall. Do deep research and see what can really help switchboard as a program and all memory related aspects with switchboard.",
+   "short": "Check online for Gbrain (open github repository for ai...",
+   "run": 175,
+   "auto": true,
+   "at": 1795700483567,
+   "by": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f"
+  },
   {
    "id": "d4113673",
    "text": "Release workflow: pnpm 12 install fails on every OS with ERR_PNPM_IGNORED_BUILDS (esbuild); allow esbuild builds in pnpm-workspace.yaml",
@@ -736,34 +755,6 @@
    "short": "Correct a stale memory line (Learn review of 1b9b30b2,...",
    "run": 166,
    "auto": true
-  },
-  {
-   "id": "68ca7984",
-   "text": "Make sure switchboard and claude-mods are good for transfer over to my desktop (windows device). Maybe we can setup a login system and update system where I can update the application and it will show up. Do deep research check if there is a possibility to make it an updatable app that also all other users can use and access information across different devices or set it up just for now me. Please research as much as possible. I also want to check and make sure formatting, functions, information, and material is completely setup correctly and functioning. Make sure that there are no issues with how everything harnesses together and when on another device material is the same or at least memory data that is important. Please do a full setup and look for free options before anything else.",
-   "at": 1795658119380,
-   "by": "4da7282f-e369-4baf-8e5b-99b061a42257",
-   "short": "Make sure switchboard and claude-mods are good for...",
-   "run": 165,
-   "auto": true
-  }
- ],
- "suggested": [
-  {
-   "id": "c06aa56b",
-   "text": "Read the CI and Release runs from that push. Fix anything still failing on Windows.",
-   "at": 1795700225625,
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "why": "later",
-   "short": "Check CI and Release runs and fix remaining Windows failures"
-  },
-  {
-   "id": "50322515",
-   "text": "Confirm that v0.21.186 has the VSIX and `.sha256` files.",
-   "at": 1795700225625,
-   "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
-   "name": "To-do 174: Switchboard Windows release gate",
-   "why": "later"
   }
  ]
 }
