@@ -95,6 +95,14 @@
    "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
    "name": "To-do 177: Switchboard ADE harness setup",
    "short": "Devcontainer per chat:"
+  },
+  {
+   "id": "aaaac3c2",
+   "text": "Scroll Kenneth's Instagram (Chrome profile kennethkang0715) for coding, agent and UI/UX reels and map ideas to Switchboard; needs a chat started with CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=0 claude --chrome (from ADE chat 66dcf5d4)",
+   "at": 1795714271732,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "name": "To-do 177: Switchboard ADE harness setup",
+   "short": "Scroll Kenneth's Instagram (Chrome profile..."
   }
  ],
  "removed": {
