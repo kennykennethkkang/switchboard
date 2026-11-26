@@ -13,16 +13,6 @@
    "auto": true
   },
   {
-   "id": "b12d727a",
-   "text": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIwNjQ2YQ== do an extensive check on the ai rules that are on switchboard and check that all rules are set and made sure",
-   "at": 1795662901404,
-   "short": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIw...",
-   "chat": "f98635dc-bb0c-4195-9ad8-2579c22c763c",
-   "host": "62903adf5e340f87",
-   "run": 171,
-   "auto": true
-  },
-  {
    "id": "66fc2f92",
    "text": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK): in claude-mods/kit/rules.md, after line 34 (the Code Mode \"hasn't started\" bullet), add: \"- In Code Mode an MCP tool whose server name has a hyphen keeps it: `tools[\"mcp__usage-meter__hub_recall\"]`, never `tools.mcp__usage_meter__hub_recall` (it throws and ends the script).\" Proof: three chats threw on it (b4113c39, 47c17bf2, 5b2f2681 on 2026-11-25 threw twice on its first hub_recall). The claude-code-mode memory note already says it, but its MEMORY.md hook does not, so chats miss it.",
    "at": 1795648278236,
@@ -596,11 +586,21 @@
   "6f6c8b95": 1795659552952,
   "a2c22dcd": 1795661566043,
   "ffd87216": 1795662622302,
-  "12c0e0ed": 1795662900406
+  "12c0e0ed": 1795662900406,
+  "b12d727a": 1795664282983
  },
  "seq": 171,
  "streak": 130,
  "ticked": [
+  {
+   "id": "b12d727a",
+   "text": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIwNjQ2YQ== do an extensive check on the ai rules that are on switchboard and check that all rules are set and made sure",
+   "short": "https://www.instagram.com/reel/DgJ1pSxx6m1/?hvrq=NTc4MTIw...",
+   "run": 171,
+   "auto": true,
+   "at": 1795664282983,
+   "by": "f98635dc-bb0c-4195-9ad8-2579c22c763c"
+  },
   {
    "id": "12c0e0ed",
    "text": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIwNjQ2YQ== even more enhanced memory see if this is useful or if any components are useful to implement into switchboard.",
@@ -687,18 +687,6 @@
    "why": "later",
    "short": "Measure Switchboard window on 0.21.173 and under busy chats",
    "run": 162,
-   "auto": true
-  },
-  {
-   "id": "86133a00-ok",
-   "text": "Choose from the ideas in vault `switchboard-lag`: native HTTP hooks, one leader window, usage-meter polling only in the owning window, no transcript scan in the app while windows are live, a 30 fps cap on the shown map board, only the two newest builds kept at release.",
-   "at": 1795641728153,
-   "by": "7a48b9b8-4855-420f-81cd-a28c384bee98",
-   "from": "a2ae8789-0d20-406f-892b-de691cc03a13",
-   "name": "To-do 155: Switchboard CPU memory optimization",
-   "why": "later",
-   "short": "Choose which switchboard-lag performance ideas to pursue",
-   "run": 161,
    "auto": true
   }
  ]
