@@ -16,9 +16,9 @@
    "id": "6f6c8b95",
    "text": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIwNjQ2YQ== help with work tree merge and merge in general",
    "at": 1795658170973,
-   "short": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIw...",
    "chat": "df34e174-ef84-475b-8ddb-742afcb79e97",
    "host": "62903adf5e340f87",
+   "short": "https://www.instagram.com/reel/Df7ks98EiQ4/?fqnt=NTc4MTIw...",
    "run": 167,
    "auto": true
   },
@@ -59,6 +59,14 @@
    "at": 1795655122763,
    "from": "e4ab441e-3a61-45e2-99d8-83bc4dcb7202",
    "short": "Stuck notice for a finished Codex job (seen in 2 chats:"
+  },
+  {
+   "id": "afbea17f",
+   "text": "After the first push of Switchboard 0.21.179 (chat 4da7282f, Windows transfer): read the Release workflow's windows-latest test job in GitHub Actions (gh run list -R kennykennethkkang/switchboard), fix what fails on Windows, then remove continue-on-error from .github/workflows/release.yml so Windows blocks releases. Also confirm the release v0.21.179 has the VSIX and .sha256 assets.",
+   "at": 1795658610327,
+   "from": "4da7282f-e369-4baf-8e5b-99b061a42257",
+   "name": "To-do 165: Switchboard Desktop Transfer Setup",
+   "short": "After the first push of Switchboard 0.21.179 (chat..."
   }
  ],
  "removed": {
