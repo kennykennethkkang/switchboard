@@ -59,14 +59,20 @@
    "id": "1b8c9eda",
    "text": "Release and CI: 3 extension tests fail on ubuntu-latest (dev.test keep awake spawns caffeinate; setup.test 21st key store and dry-run)",
    "at": 1795682290094,
-   "before": "afbea17f",
    "chat": "4b248073-e953-4013-92b2-7cf1ad827e67",
    "host": "62903adf5e340f87",
-   "run": 174,
-   "auto": true,
    "from": "4b248073-e953-4013-92b2-7cf1ad827e67",
+   "before": "afbea17f",
    "name": "To-do 174: Switchboard Windows release gate",
-   "short": "Release and CI:"
+   "short": "Release and CI:",
+   "run": 174,
+   "auto": true
+  },
+  {
+   "id": "6ed638cf",
+   "text": "Make switchboard be a harness that makes vs code go from and ide to an ade and make sure that this is correct. Please check online for more information on ade and feel free to doomscroll on my personal gmail account kennethkang0715@gmail.com on instagram. Only view videos related to code, code work, agents, agent systems, and anything related with coding including UI/UX to see if there is anything else that will be super useful in switchboard to add. Run indefinitely",
+   "at": 1795682605238,
+   "short": "Make switchboard be a harness that makes vs code go from..."
   }
  ],
  "removed": {
