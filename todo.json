@@ -87,6 +87,14 @@
    "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
    "name": "To-do 177: Switchboard ADE harness setup",
    "short": "Ask Kenneth, then build:"
+  },
+  {
+   "id": "c71bd2de",
+   "text": "Devcontainer per chat: a New chat option to run a Claude chat inside the repo's devcontainer, the main ADE safety gap (from ADE chat 66dcf5d4, see wiki/ade-vs-switchboard.md)",
+   "at": 1795714271575,
+   "from": "66dcf5d4-4863-40c3-889c-61f94f6fb067",
+   "name": "To-do 177: Switchboard ADE harness setup",
+   "short": "Devcontainer per chat:"
   }
  ],
  "removed": {
