@@ -27,9 +27,9 @@
    "id": "52659460",
    "text": "Do a full UI/UX overhaul, using mirofish ab testing and all tools avaliable adjust components so they make sense to users but also have no problems when running the program. This also includes smart updating (Which should be added directly into switchboard as a button which grabs from the repo and updates. Login functionality, user can login and access saved data/information. Also make sure that there is no user issues. Image if you were a brand new user, moderate user, and senior engineer. Make the site make sense for all roles and make sure coder view is targeted towards senior engineers or people who have coding background. This check also means all the small components and minor details need to be cleaned up and adjusted. This includes rules, information, or even commands that the system should understand.",
    "at": 1795717501467,
-   "short": "Do a full UI/UX overhaul, using mirofish ab testing and...",
    "chat": "3c51ac24-4775-4470-8876-feb3cf330e43",
    "host": "62903adf5e340f87",
+   "short": "Do a full UI/UX overhaul, using mirofish ab testing and...",
    "run": 180,
    "auto": true
   },
@@ -108,6 +108,12 @@
    "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
    "name": "To-do 175: Gbrain memory research",
    "short": "Write a one-line reason beside each memory backup..."
+  },
+  {
+   "id": "108009a3",
+   "text": "Learn proposal for kit/skills/aar/SKILL.md, not applied (27 approved results, need 30). Diff: /Users/kennykennethkkang/.claude/self-improve/runs/2026-11-26T18-31-49-792Z/candidate.diff",
+   "at": 1795718074697,
+   "short": "Learn proposal for kit/skills/aar/SKILL.md, not applied..."
   }
  ],
  "removed": {
