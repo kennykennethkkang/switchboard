@@ -13,17 +13,6 @@
    "auto": true
   },
   {
-   "id": "fc1e48ca",
-   "text": "Stuck notice for a finished Codex job (seen in 2 chats: claude-mods c1140395, Zellizard bc0f865c). A \"Subagent background job: no new output for 30 min\" notice is made while an engineer-codex job runs quietly (output goes to $d/log), then reaches the chat up to 2 h later, after the job has ended with exit 0. Fix in extension/src/hub (stuck.ts fixDue/fixText and whatever queues the note): recheck the item right before delivery, and drop it if the job id is in the transcript's ended list or its output file shows \"[exited with code\". Also check progress.ts at the lead Stop: subJobs are filtered only by age, not by the ended list, and hub-service.ts withEnded skips the transcript read when only subJobs are pending. Add a stuck.test.ts case: job ends between detect and delivery, so no note.",
-   "at": 1795678811068,
-   "chat": "ccd17482-d612-437f-820f-bf3b9b9a371c",
-   "host": "62903adf5e340f87",
-   "from": "e4ab441e-3a61-45e2-99d8-83bc4dcb7202",
-   "short": "Stuck notice for a finished Codex job (seen in 2 chats:",
-   "run": 173,
-   "auto": true
-  },
-  {
    "id": "afbea17f",
    "text": "After the first push of Switchboard 0.21.179 (chat 4da7282f, Windows transfer): read the Release workflow's windows-latest test job in GitHub Actions (gh run list -R kennykennethkkang/switchboard), fix what fails on Windows, then remove continue-on-error from .github/workflows/release.yml so Windows blocks releases. Also confirm the release v0.21.179 has the VSIX and .sha256 assets.",
    "at": 1795658610327,
@@ -591,11 +580,22 @@
   "ffd87216": 1795662622302,
   "12c0e0ed": 1795662900406,
   "b12d727a": 1795664282983,
-  "66fc2f92": 1795678808996
+  "66fc2f92": 1795678808996,
+  "fc1e48ca": 1795680401152
  },
  "seq": 173,
  "streak": 130,
  "ticked": [
+  {
+   "id": "fc1e48ca",
+   "text": "Stuck notice for a finished Codex job (seen in 2 chats: claude-mods c1140395, Zellizard bc0f865c). A \"Subagent background job: no new output for 30 min\" notice is made while an engineer-codex job runs quietly (output goes to $d/log), then reaches the chat up to 2 h later, after the job has ended with exit 0. Fix in extension/src/hub (stuck.ts fixDue/fixText and whatever queues the note): recheck the item right before delivery, and drop it if the job id is in the transcript's ended list or its output file shows \"[exited with code\". Also check progress.ts at the lead Stop: subJobs are filtered only by age, not by the ended list, and hub-service.ts withEnded skips the transcript read when only subJobs are pending. Add a stuck.test.ts case: job ends between detect and delivery, so no note.",
+   "from": "e4ab441e-3a61-45e2-99d8-83bc4dcb7202",
+   "short": "Stuck notice for a finished Codex job (seen in 2 chats:",
+   "run": 173,
+   "auto": true,
+   "at": 1795680401152,
+   "by": "ccd17482-d612-437f-820f-bf3b9b9a371c"
+  },
   {
    "id": "66fc2f92",
    "text": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK): in claude-mods/kit/rules.md, after line 34 (the Code Mode \"hasn't started\" bullet), add: \"- In Code Mode an MCP tool whose server name has a hyphen keeps it: `tools[\"mcp__usage-meter__hub_recall\"]`, never `tools.mcp__usage_meter__hub_recall` (it throws and ends the script).\" Proof: three chats threw on it (b4113c39, 47c17bf2, 5b2f2681 on 2026-11-25 threw twice on its first hub_recall). The claude-code-mode memory note already says it, but its MEMORY.md hook does not, so chats miss it.",
@@ -678,17 +678,6 @@
    "from": "598a2060-ba2b-40e1-be60-a3213dc68f81",
    "short": "Proposed fix from Learn (To-do 155, a2ae8789), ask...",
    "run": 164,
-   "auto": true
-  },
-  {
-   "id": "4c9dfe12",
-   "text": "Send Switchboard's own web push when a Claude chat is done, not only Codex (extension/src/hub/notify.ts:71, sendPush in web-push.ts). Approved by Kenneth in claude-mods To-do 17 (316c28f8). Since 2026-11-16 the PushNotification tool returned pushSent false with no_transport in 72 Switchboard, 20 Armasu and 12 claude-mods pushes. Where the tool push works the phone would get two, so decide on one: drop the push sentence from claude-mods/kit/rules.md (line 73) once Switchboard sends it for every chat, as the Codex tool map already says to skip it.",
-   "at": 1795643596895,
-   "by": "5b2f2681-f0ec-4390-ac71-9e2f835dc83f",
-   "from": "316c28f8-38ec-42a3-af16-741db0df7a04",
-   "name": "To-do 17: Rule proposal push notification fix",
-   "short": "Send Switchboard's own web push when a Claude chat is...",
-   "run": 163,
    "auto": true
   }
  ]
