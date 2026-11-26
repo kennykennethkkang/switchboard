@@ -65,6 +65,13 @@
    "at": 1795648278236,
    "from": "1833026e-b67b-4f65-85d3-ad2ab1b6dad6",
    "short": "Proposed rule (aar of 5b2f2681, needs Kenneth's OK):"
+  },
+  {
+   "id": "fc1e48ca",
+   "text": "Stuck notice for a finished Codex job (seen in 2 chats: claude-mods c1140395, Zellizard bc0f865c). A \"Subagent background job: no new output for 30 min\" notice is made while an engineer-codex job runs quietly (output goes to $d/log), then reaches the chat up to 2 h later, after the job has ended with exit 0. Fix in extension/src/hub (stuck.ts fixDue/fixText and whatever queues the note): recheck the item right before delivery, and drop it if the job id is in the transcript's ended list or its output file shows \"[exited with code\". Also check progress.ts at the lead Stop: subJobs are filtered only by age, not by the ended list, and hub-service.ts withEnded skips the transcript read when only subJobs are pending. Add a stuck.test.ts case: job ends between detect and delivery, so no note.",
+   "at": 1795655122763,
+   "from": "e4ab441e-3a61-45e2-99d8-83bc4dcb7202",
+   "short": "Stuck notice for a finished Codex job (seen in 2 chats:"
   }
  ],
  "removed": {
