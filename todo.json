@@ -107,6 +107,14 @@
    "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
    "name": "To-do 175: Gbrain memory research",
    "short": "Unmarked contradiction probe in the Learn run:"
+  },
+  {
+   "id": "a142ebd6",
+   "text": "Added-claim check on Learn rewrites: new lines in a rewritten note that match no line in the old note or its source transcript get status: unproven. See vault wiki/graph-engineering-memory.md 'GBrain deep pass' item 3. From chat f1a7ccac.",
+   "at": 1795717089177,
+   "from": "f1a7ccac-e039-43b5-ba9e-d6472470bf7f",
+   "name": "To-do 175: Gbrain memory research",
+   "short": "Added-claim check on Learn rewrites:"
   }
  ],
  "removed": {
