@@ -13,16 +13,6 @@
    "auto": true
   },
   {
-   "id": "ffd87216",
-   "text": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIwNjQ2YQ== format Claude and important info. Watch video add what could help to the program or add to it if something exists don’t double add and check over anything that has issues.",
-   "at": 1795661578294,
-   "short": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIw...",
-   "chat": "88478473-3357-47fc-b0ea-9fa6f7dedaa6",
-   "host": "62903adf5e340f87",
-   "run": 169,
-   "auto": true
-  },
-  {
    "id": "12c0e0ed",
    "text": "https://www.instagram.com/reel/DY8p2eGTTck/?lqvp=NTc4MTIwNjQ2YQ== even more enhanced memory see if this is useful or if any components are useful to implement into switchboard.",
    "at": 1795643238297,
@@ -606,11 +596,21 @@
   "2bd847d7": 1795658169101,
   "7ececa69": 1795658727520,
   "6f6c8b95": 1795659552952,
-  "a2c22dcd": 1795661566043
+  "a2c22dcd": 1795661566043,
+  "ffd87216": 1795662622302
  },
  "seq": 169,
  "streak": 130,
  "ticked": [
+  {
+   "id": "ffd87216",
+   "text": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIwNjQ2YQ== format Claude and important info. Watch video add what could help to the program or add to it if something exists don’t double add and check over anything that has issues.",
+   "short": "https://www.instagram.com/reel/DeZwNTwCCsj/?bqrl=NTc4MTIw...",
+   "run": 169,
+   "auto": true,
+   "at": 1795662622302,
+   "by": "88478473-3357-47fc-b0ea-9fa6f7dedaa6"
+  },
   {
    "id": "a2c22dcd",
    "text": "https://www.instagram.com/reel/DgG3rhkNUzU/?cnvx=NTc4MTIwNjQ2YQ== take a look at this video and implement these functionalities into switchboard but make sure the components work properly. Also take into account the functionalities already added to the site. Make sure they tie in with them or adjust them and clean up the whole site.",
@@ -702,17 +702,6 @@
    "name": "To-do 15: Sync Codex skill copies",
    "short": "Codex skill copies refresh only at Set up:",
    "run": 160,
-   "auto": true
-  },
-  {
-   "id": "15a7edca",
-   "text": "Memory page, Notebook view: the top 44 px is blank, where Map view shows its Back / Agents / Code / Memory bar (web/components/switchboard/memory-kit.tsx Shell dialog \"hub mem mk nb\" sits at top 44; .mem in web/app/globals.css:622; map view is .mem.mk.mm in memory-maps.css). Repro: #map-memory in Coder view, press Notebook, 1280 px dark; same in 0.21.172, older than the mnb- rename. Likely the modal backdrop covers the bar (not proven). Found by UI qa in the Now board class names chat (claude-mods, bc20da00, To-do 13), 2026-11-25.",
-   "at": 1795639128036,
-   "by": "d14e538e-0e26-48da-b37d-97103fff5507",
-   "from": "bc20da00-2825-4374-b668-09b95256db9f",
-   "name": "To-do 13: Sync Now board class names",
-   "short": "Memory page, Notebook view:",
-   "run": 159,
    "auto": true
   }
  ]
