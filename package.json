@@ -12,7 +12,9 @@
     "build:webview": "pnpm --filter switchboard-web run build:webview",
     "build:all": "pnpm run build:webview && pnpm run build:extension",
     "build:app": "node app/build.js",
-    "test": "node --import tsx --test \"scripts/**/*.test.ts\" \"app/src/**/*.test.ts\" \"web/hooks/**/*.test.ts\" \"web/lib/**/*.test.ts\""
+    "typecheck": "pnpm --dir extension run lint && pnpm --dir extension run lint:test && pnpm --dir web exec tsc --noEmit",
+    "test": "pnpm run test:root && pnpm --dir extension test",
+    "test:root": "node --import tsx --test \"scripts/**/*.test.ts\" \"app/src/**/*.test.ts\" \"web/hooks/**/*.test.ts\" \"web/lib/**/*.test.ts\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

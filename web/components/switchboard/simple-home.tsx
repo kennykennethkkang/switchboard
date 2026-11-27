@@ -130,8 +130,8 @@ export function SimpleHome({ hub, send, run, onStep, onHide, onProject, asking, 
       {!asking && <AskBox hub={hub} send={send} onProject={onProject} />}
       {!guided && card}
       <div className="now-lanes">
-        <Lane id="sh-needs" tone="red" title="Needs you" hint="Waiting on you: a question to answer or finished work to OK." count={needsCount} empty="Nothing needs you. Questions and finished work show up here.">{needs}</Lane>
-        <Lane id="sh-working" tone="blue" title="Working" hint="Running on their own. Nothing to do until one moves to Needs you." count={working.length} empty="No chat is working. Describe a task above to start one.">
+        <Lane id="sh-needs" tone="red" title="Needs you" hint="A question to answer, or finished work to check." count={needsCount} empty="Nothing needs you. Questions and finished work show up here.">{needs}</Lane>
+        <Lane id="sh-working" tone="blue" title="Working" hint="Busy on their own. Nothing to do yet." count={working.length} empty="No chat is working. Describe a task above to start one.">
           <ul className="now-rows">{working.map(c => { const r = laneRow(c); return (
             <li key={r.id}><button type="button" className="now-row" onClick={() => onOpen(r.id)} title={`Open ${r.name}`}>
               <strong>{r.name}</strong>
@@ -139,7 +139,7 @@ export function SimpleHome({ hub, send, run, onStep, onHide, onProject, asking, 
                 {r.total > 0 && <span className="now-bar" aria-hidden><b style={{ transform: `scaleX(${r.done / r.total})` }} /></span>}</span>
             </button></li>) })}</ul>
         </Lane>
-        <Lane id="sh-done" tone="green" title="Done today" hint="Approved today." count={done.length} empty="Nothing approved yet today. Approve a finished chat and it lands here.">
+        <Lane id="sh-done" tone="green" title="Done today" hint="Approved today." count={done.length} empty="Nothing approved yet today.">
           <ul className="now-rows">{done.map(a => { const when = ago(a.approvedAt!, now); return (
             <li key={a.sessionId}><button type="button" className="now-row" onClick={() => onDone(a)} title={`Show ${a.name} in Chats`}>
               <strong>{a.name}</strong>

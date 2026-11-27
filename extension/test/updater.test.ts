@@ -1,6 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { compareVersions, pickReleaseAssets, shouldPull } from '../src/hub/updater-pure'
+import { commandProblem } from '../src/hub/routes'
+
+test('hub update commands need no payload', () => {
+  assert.equal(commandProblem({ type: 'hub-update-check' }), undefined)
+  assert.equal(commandProblem({ type: 'hub-update-reload' }), undefined)
+})
 
 test('compareVersions compares numeric version parts', () => {
   assert.equal(compareVersions('0.21.10', '0.21.9'), 1)

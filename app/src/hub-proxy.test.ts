@@ -233,7 +233,7 @@ describe('phoneSecret', () => {
     const first = phoneSecret(file)
     assert.match(first, /^[0-9a-f]{64}$/)
     assert.equal(phoneSecret(file), first)
-    assert.equal(fs.statSync(file).mode & 0o777, 0o600)
+    if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600)
     fs.writeFileSync(file, 'short')
     assert.notEqual(phoneSecret(file), 'short')
   })

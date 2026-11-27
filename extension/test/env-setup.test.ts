@@ -15,7 +15,7 @@ const store = (v: Partial<Record<ApiKeyName, string>>): KeyStore => ({ get: n =>
 const env = (dir: string) => fs.readFileSync(path.join(dir, '.env'), 'utf8')
 
 describe('env setup', () => {
-  it('an unreadable template is a refusal, not a throw', () => {
+  it('an unreadable template is a refusal, not a throw', { skip: process.platform === 'win32' && 'Windows does not enforce POSIX mode bits' }, () => {
     const dir = project('plain')
     const t = path.join(dir, '.env.example')
     fs.writeFileSync(t, 'X=1\n')
@@ -25,7 +25,7 @@ describe('env setup', () => {
       assert.ok('error' in r && /could not read the template/.test(r.error))
     } finally { fs.chmodSync(t, 0o600) }
   })
-  it('an unreadable .env is a refusal, never overwritten', () => {
+  it('an unreadable .env is a refusal, never overwritten', { skip: process.platform === 'win32' && 'Windows does not enforce POSIX mode bits' }, () => {
     const dir = project('MiroFish')
     const f = path.join(dir, '.env')
     fs.writeFileSync(f, 'LLM_API_KEY=keepme\nOTHER=x\n')
@@ -42,13 +42,13 @@ describe('env setup', () => {
     const r = envSetup(dir, store({ OPENROUTER_API_KEY: OR, ZEP_API_KEY: ZEP }))
     assert.ok(!('error' in r))
     const text = env(dir)
-    assert.match(text, new RegExp(`^LLM_API_KEY=${OR}$`, 'm'))
-    assert.match(text, /^LLM_BASE_URL=https:\/\/openrouter\.ai\/api\/v1$/m)
-    assert.match(text, /^LLM_MODEL_NAME=qwen\/qwen-plus$/m)
+    assert.match(text, /^LLM_API_KEY=ollama$/m)
+    assert.match(text, /^LLM_BASE_URL=http:\/\/localhost:11434\/v1$/m)
+    assert.match(text, /^LLM_MODEL_NAME=gemma3-mirofish$/m)
     assert.match(text, /^OASIS_DEFAULT_MAX_ROUNDS=10$/m)
     assert.ok(text.includes(`ZEP_API_KEY=${ZEP}`))
     assert.ok(!text.includes('LLM_BOOST'), 'the recipe leaves optional boost keys out')
-    assert.equal(fs.statSync(path.join(dir, '.env')).mode & 0o777, 0o600)
+    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, '.env')).mode & 0o777, 0o600)
     assert.deepEqual(r.missing, [])
     assert.deepEqual(r.filled.sort(), ['LLM_API_KEY', 'LLM_BASE_URL', 'LLM_MODEL_NAME', 'OASIS_DEFAULT_MAX_ROUNDS', 'ZEP_API_KEY'])
   })
@@ -62,12 +62,12 @@ describe('env setup', () => {
     assert.match(text, /^# mine$/m)
     assert.match(text, /^LLM_API_KEY=my-own-key$/m)
     assert.match(text, /^EXTRA=1$/m)
-    assert.match(text, /^LLM_MODEL_NAME=qwen\/qwen-plus$/m)
+    assert.match(text, /^LLM_MODEL_NAME=gemma3-mirofish$/m)
     assert.match(text, /^ZEP_API_KEY=$/m)
     assert.ok(!text.includes(OR))
     assert.deepEqual(r.kept, ['LLM_API_KEY'])
     assert.deepEqual(r.missing, [{ name: 'ZEP_API_KEY', key: 'ZEP_API_KEY' }])
-    assert.equal(fs.statSync(path.join(dir, '.env')).mode & 0o777, 0o600)
+    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, '.env')).mode & 0o777, 0o600)
     assert.equal(fs.readdirSync(dir).filter(f => f.includes('.tmp')).length, 0)
   })
 
@@ -97,9 +97,9 @@ describe('env setup', () => {
 
   it('a write error comes back redacted', () => {
     const dir = project('MiroFish')
-    const r = envSetup(dir, store({ OPENROUTER_API_KEY: OR }), { write: () => { throw new Error(`boom ${OR}`) } })
+    const r = envSetup(dir, store({ ZEP_API_KEY: ZEP }), { write: () => { throw new Error(`boom ${ZEP}`) } })
     assert.ok('error' in r)
-    assert.ok(!r.error.includes(OR))
+    assert.ok(!r.error.includes(ZEP))
   })
 })
 
@@ -123,15 +123,16 @@ describe('ZEP_API_KEY', () => {
     assert.ok(seen?.url.startsWith('https://api.getzep.com/'))
     assert.equal(seen?.auth, `Api-Key ${ZEP}`)
   })
-  it('a saved OpenRouter or Zep key fills listed recipe projects only, keeping set values', () => {
+  it('a saved Zep key fills listed recipe projects only, keeping set values', () => {
     const miro = project('MiroFish'), other = project('other')
     fs.writeFileSync(path.join(other, '.env.example'), 'OPENROUTER_API_KEY=\n')
     fs.writeFileSync(path.join(miro, '.env'), 'ZEP_API_KEY=mine\n')
-    const r = fillRecipes([miro, other, miro], 'OPENROUTER_API_KEY', store({ OPENROUTER_API_KEY: OR, ZEP_API_KEY: ZEP }))
+    const r = fillRecipes([miro, other, miro], 'ZEP_API_KEY', store({ OPENROUTER_API_KEY: OR, ZEP_API_KEY: ZEP }))
     assert.equal(r.length, 1)
     assert.ok(!('error' in r[0]) && r[0].folder === miro && r[0].kept.includes('ZEP_API_KEY'))
-    assert.match(env(miro), new RegExp(`^LLM_API_KEY=${OR}$`, 'm'))
+    assert.match(env(miro), /^LLM_API_KEY=ollama$/m)
     assert.match(env(miro), /^ZEP_API_KEY=mine$/m)
+    assert.deepEqual(fillRecipes([miro], 'OPENROUTER_API_KEY', store({ OPENROUTER_API_KEY: OR })), [], 'MiroFish no longer takes the OpenRouter key')
     assert.ok(!fs.existsSync(path.join(other, '.env')), 'a template project is left for the button')
     assert.deepEqual(fillRecipes([miro], 'GEMINI_API_KEY', store({})), [])
   })

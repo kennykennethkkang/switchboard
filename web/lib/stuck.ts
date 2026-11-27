@@ -19,6 +19,9 @@ export function diagnosis(i: StuckItem, chat: string, now = Date.now()): string 
   ].filter(Boolean).join('\n')
 }
 
+/** Simple view: why it looks stuck, without pids or commands. */
+export const plainStuck = (i: StuckItem, now = Date.now()) => `No progress for ${forHow(i, now)}`
+
 /** red: something in the chat eats CPU or memory; yellow: something only went quiet. */
 export function stuckTone(stuck: StuckItem[] | undefined, sessionId: string): 'red' | 'yellow' | undefined {
   const mine = (stuck ?? []).filter(i => i.sessionId === sessionId)

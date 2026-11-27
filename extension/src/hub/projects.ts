@@ -156,9 +156,9 @@ export function ultracodeFlags(o: { effort?: string; ultracode?: boolean; settin
  * textFile, when given, carries the message instead: a line typed into a starting shell
  * is cut at 1024 bytes on macOS, which left long messages at a `quote>` prompt.
  */
-export function newChatCommand(o: { text?: string; textFile?: string; remote?: string; branch?: string; name?: string; sessionId?: string; settings?: string; system?: string; model?: string; effort?: string }, shell: Shell): string {
+export function newChatCommand(o: { text?: string; textFile?: string; remote?: string; branch?: string; name?: string; sessionId?: string; settings?: string; system?: string; model?: string; effort?: string; advisor?: string; /** Runs claude through it (devcontainer.ts containerPrefix). */ prefix?: string }, shell: Shell): string {
   const quote = (s: string) => shellQuote(s, shell)
-  let claude = 'claude'
+  let claude = `${o.prefix ?? ''}claude`
   if (o.name) claude += ` --name ${quote(o.name)}`
   if (o.sessionId !== undefined) {
     if (!/^[0-9a-f-]{36}$/i.test(o.sessionId)) throw new Error('Not a session id')
@@ -171,6 +171,10 @@ export function newChatCommand(o: { text?: string; textFile?: string; remote?: s
   if (o.effort !== undefined) {
     if (!EFFORT_ARGS.has(o.effort)) throw new Error('Not an effort level')
     claude += ` --effort ${quote(o.effort)}`
+  }
+  if (o.advisor !== undefined) {
+    if (!MODEL.test(o.advisor)) throw new Error('Not a model')
+    claude += ` --advisor ${quote(o.advisor)}`
   }
   if (o.settings) claude += ` --settings ${quote(o.settings)}`
   if (o.system) claude += ` --append-system-prompt ${quote(o.system)}`

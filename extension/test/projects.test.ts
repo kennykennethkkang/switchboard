@@ -49,8 +49,9 @@ describe('projects', () => {
       // Only a case-insensitive disk sees both spellings as one folder.
       if (!fs.existsSync(lower)) return
       const list = mergeProjects([real], [lower])
-      assert.deepEqual(list.map(p => p.path), [real])
-      assert.deepEqual(mergeProjects([], [lower]).map(p => [p.name, p.path]), [['Switchboard', real]])
+      const canonical = fs.realpathSync.native(real)
+      assert.deepEqual(list.map(p => p.path), [canonical])
+      assert.deepEqual(mergeProjects([], [lower]).map(p => [p.name, p.path]), [['Switchboard', canonical]])
       // A window opened under the other spelling keeps it for its own row.
       assert.deepEqual(mergeProjects([real], [lower], lower).map(p => [p.path, p.isOpen]), [[lower, true]])
     } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
@@ -91,6 +92,8 @@ describe('projects', () => {
     assert.equal(newChatCommand({ model: 'opus[1m]', name: 'Go' }, 'posix'), "claude --name 'Go' --model 'opus[1m]'")
     assert.equal(newChatCommand({ effort: 'ultracode' }, 'powershell'), "claude --effort 'ultracode'")
     assert.equal(newChatCommand({ text: 'go' }, 'posix'), "claude 'go'")
+    assert.equal(newChatCommand({ model: 'sonnet', advisor: 'opus', text: 'go' }, 'posix'), "claude --model 'sonnet' --advisor 'opus' 'go'")
+    assert.throws(() => newChatCommand({ advisor: 'opus; rm -rf ~' }, 'posix'))
     for (const bad of ['x; echo hi', '', 'a b', '$(id)']) assert.throws(() => newChatCommand({ model: bad }, 'posix'), /model/)
     for (const bad of ['huge', 'High', '']) assert.throws(() => newChatCommand({ effort: bad }, 'posix'), /effort/)
   })

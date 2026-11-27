@@ -3,7 +3,7 @@ import type { AiId, HubState } from './hub-types'
 import { limitMeters } from './limits'
 
 /** auto: the extension fills what is unset from the task (picker.ts pickRun). */
-export type RunPicks = { model?: string; effort?: string; ultracode?: boolean; auto: boolean }
+export type RunPicks = { model?: string; effort?: string; ultracode?: boolean; advisor?: string; auto: boolean }
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export const EFFORTS: Array<[Effort, string]> = [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]
@@ -12,14 +12,21 @@ export const MODELS: Partial<Record<AiId, Array<[string, string]>>> = {
   claude: [['fable', 'Fable'], ['opus', 'Opus'], ['sonnet', 'Sonnet'], ['haiku', 'Haiku']],
   codex: [['gpt-6-luna', 'gpt-6-luna'], ['gpt-5.6-terra', 'gpt-5.6-terra'], ['gpt-5.6-luna', 'gpt-5.6-luna']],
 }
+// Claude's --advisor: it must rank at or above the chat's model, or Claude Code leaves it off.
+const ADVISORS: Array<[string, string]> = [['fable', 'Fable'], ['opus', 'Opus'], ['sonnet', 'Sonnet']]
+const RANK = ['haiku', 'sonnet', 'opus', 'fable']
+/** The advisors that can serve this model; all of them while the model is unset or a full id. */
+export const advisorsFor = (model?: string) => ADVISORS.filter(([a]) => RANK.indexOf(a) >= RANK.indexOf(model ?? ''))
+
 // Same as picker.ts GATE: from here the auto pick holds the costly levels back.
 const GATE = 60
 
 /** The fields a hub-new-chat or hub-todo-run carries. */
-export function runFields(v: RunPicks, ai: AiId): { auto?: boolean; model?: string; effort?: Effort; ultracode?: boolean } {
+export function runFields(v: RunPicks, ai: AiId): { auto?: boolean; model?: string; effort?: Effort; ultracode?: boolean; advisor?: string } {
   if (!MODELS[ai]) return {}
   const effort = EFFORTS.find(([e]) => e === v.effort)?.[0]
-  return { auto: v.auto, ...(v.model ? { model: v.model } : {}), ...(effort ? { effort } : {}), ...(v.ultracode && ai === 'claude' ? { ultracode: true } : {}) }
+  return { auto: v.auto, ...(v.model ? { model: v.model } : {}), ...(effort ? { effort } : {}), ...(v.ultracode && ai === 'claude' ? { ultracode: true } : {}),
+    ...(ai === 'claude' && advisorsFor(v.model).some(([a]) => a === v.advisor) ? { advisor: v.advisor } : {}) }
 }
 
 /** Shown under Auto once the 5h window passes the gate; a hand pick is never held. */

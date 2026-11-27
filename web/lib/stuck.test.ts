@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { diagnosis, stuckTone, usage } from './stuck'
+import { diagnosis, plainStuck, stuckTone, usage } from './stuck'
 import type { StuckItem } from './hub-types'
 
 const MIN = 60_000, NOW = 1_000_000_000
@@ -27,4 +27,10 @@ test('tone: red when a process eats CPU or memory, yellow when something only we
   assert.equal(stuckTone([{ ...item, kind: 'process', cpu: 3, rss: 3 * 1024 ** 3 }], 's'), 'red')
   assert.equal(stuckTone([item], 'other'), undefined)
   assert.equal(stuckTone(undefined, 's'), undefined)
+})
+
+test('plain stuck line has no pid or command', () => {
+  const i = { id: 'a', sessionId: 's', kind: 'process', what: 'npm test', since: 0, pid: 42, command: 'npm test' } as unknown as Parameters<typeof plainStuck>[0]
+  assert.match(plainStuck(i, 5 * 60e3), /^No progress for /)
+  assert.doesNotMatch(plainStuck(i, 5 * 60e3), /42|npm/)
 })

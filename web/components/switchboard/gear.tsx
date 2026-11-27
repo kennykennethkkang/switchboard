@@ -12,6 +12,7 @@ import { editorName } from '@/lib/editor'
 import { chatGroups, benchPrompt, blockHits, gearRows, pauseValue, sweepBadge, sweptNow } from '@/lib/gear-rows'
 import type { HubCommand } from '@/lib/vscode-bridge'
 import { SignIns } from './sign-ins'
+import { UpdateButton, updateLine, updateOf, versionLabel } from './account'
 import { Credits } from './credits'
 import { Health } from './health'
 import { ToolPrecedence } from './tool-precedence'
@@ -54,7 +55,9 @@ const SECTIONS = ['Chats', 'Models', 'Accounts', 'Integrations', 'Installed'] as
 export type Section = typeof SECTIONS[number]
 // Simple view: these sections and rows only; Coder view shows them all.
 const SIMPLE_SECTIONS: readonly Section[] = ['Chats', 'Accounts']
-const SIMPLE_ROWS = ['Your name', 'Continue at usage limit', 'Pause near the limit', 'Phone mode']
+const SIMPLE_ROWS = ['Your name', 'Continue at usage limit', 'Pause near the limit', 'Phone mode', 'Updates']
+// Simple view names; Coder view keeps the section names.
+const SIMPLE_NAMES: Partial<Record<Section, string>> = { Chats: 'General', Accounts: 'Sign-ins', Installed: 'About' }
 // group: rows the panel sets apart under their own heading.
 // group: advanced rows sit under their own heading; roles and tail split the Models pane.
 type Row = { label: string; control: ReactNode; hint?: string; section: Section; group?: 'advanced' | 'roles' | 'tail' }
@@ -153,6 +156,9 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
   const coder = sb.coderView === true
   const sections: readonly Section[] = coder ? SECTIONS : SIMPLE_SECTIONS
   const pane = sections.includes(at) ? at : 'Chats'
+  const nameOf = (s: Section) => (coder ? s : SIMPLE_NAMES[s] ?? s)
+  const updRow: Row = { section: 'Installed', label: 'Updates', hint: `${versionLabel(hub)}. ${updateLine(updateOf(hub)).text} Checks GitHub for a newer release and installs it; Reload starts it.`,
+    control: <UpdateButton hub={hub} send={send} /> }
   const coderRow: Row = { section: 'Chats', label: 'Coder view', hint: 'On adds Live, Ship, Map, terminals, models, integrations and every setting. Off keeps Home, Chats, Plan and the basic settings in plain words.',
     control: <Switch label="Coder view" on={coder} onChange={on => send({ type: 'hub-coder-view', on })} /> }
   const adv = advancedRows(hub, folder)
@@ -163,6 +169,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
     : adv.map(r => ({ section: 'Chats' as const, group: 'advanced' as const, label: r.name, control: advSwitch(r) }))
 
   const rows: Row[] = [
+    updRow,
     { section: 'Chats', label: 'Your name', hint: 'Chats call you by this name. Leave it empty to skip it.',
       // Keyed by the saved name, so a save from another window shows here.
       control: <input key={sb.name} className="hub-select" aria-label="Your name" placeholder="Name" maxLength={40} defaultValue={sb.name} style={{ cursor: 'text' }}
@@ -190,6 +197,8 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
       control: <Switch label="Stop dev servers and close tabs when a chat ends" on={sb.stopServers !== false} onChange={next => own('stopServers', next)} /> },
     { section: 'Chats', label: 'Merge worktrees automatically', hint: 'About 2 minutes after a worktree\'s chat ends, its work goes into the branch that repo is on, as uncommitted changes. The repo\'s checks run after each one, and one that breaks them is undone and kept. One missed by that (a reload, a failed check) is tried again after 15 minutes with no new chat. Never commits or pushes. Ship has the same switch per repo.',
       control: <Switch label="Merge worktrees automatically" on={sb.autoMerge !== false} onChange={next => own('autoMerge', next)} /> },
+    { section: 'Chats', label: 'Code chats in their own worktree', hint: 'A new Claude chat whose task reads as code work (fix, build, add, a UI change) starts in .claude/worktrees on its own branch, even when nothing else runs in the project. To-do runs do too. Off: only a second chat in a busy project gets one. New chat can untick it per chat under More options.',
+      control: <Switch label="Code chats in their own worktree" on={sb.codeWorktrees !== false} onChange={next => own('codeWorktrees', next)} /> },
     { section: 'Chats', label: 'Show agent browsers', hint: 'Browsers agents drive through Playwright open in a window you can see. Off runs them headless, so nothing lands on your screen. Applies to chats started after the change.',
       control: <Switch label="Show agent browsers" on={sb.showBrowsers === true} onChange={next => own('showBrowsers', next)} /> },
     { section: 'Chats', label: 'Chat notices', hint: `Done, question, stuck and AWS sign-in notices. System sends them to the Mac or Windows notification center only, where they fade on their own. ${ed} pop-up adds one with a Show button, gone after about 10 seconds once ${ed} has focus. Status bar adds a line there for 20 seconds. The Needs you strip always shows them.`,
@@ -307,9 +316,10 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
   )
 
   const body = (s: Section) => {
-    if (s === 'Accounts') return <SignIns hub={hub} send={send} problem={problem} />
+    if (s === 'Accounts') return <SignIns hub={hub} send={send} problem={problem} simple={!coder} />
     if (s === 'Installed') return (
       <>
+        <Line row={updRow} />
         <Line row={{ section: 'Installed', label: 'Set up', hint: 'Installs the plugins, mods, MCP servers, rules and roles Switchboard works with. Skips what you have.',
           control: <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-setup' })}>Set up</button> }} />
         <Line row={{ section: 'Installed', label: 'Export kit', hint: 'Roles, skills, plugins and mods as one folder you can copy to another Mac.',
@@ -319,7 +329,7 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
           : 'Sign in with GitHub to keep memory, the vault and settings the same on every computer.',
           control: hub.sync?.on
             ? <><button type="button" className="hub-btn" disabled={hub.sync.busy} onClick={() => send({ type: 'hub-sync-now' })}>{hub.sync.busy ? 'Syncing' : 'Sync now'}</button> <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-sync-off' })}>Turn off</button></>
-            : <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-sync-sign-in' })}>Sign in</button> }} />
+            : <button type="button" className="hub-btn" onClick={() => send({ type: 'hub-sync-sign-in' })}>Sign in with GitHub</button> }} />
         <Sweep hub={hub} send={send} />
         <ToolPrecedence hub={hub} send={send} />
         <h4 style={sub}>Installed</h4>
@@ -364,18 +374,18 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
         <input type="search" className="hub-search" aria-label="Find a setting" placeholder="Find a setting" value={q} onChange={e => setQ(e.target.value)} />
         <div>
           {sections.map(s => (
-            <button key={s} type="button" aria-current={!query && pane === s ? 'page' : undefined} onClick={() => { setAt(s); setQ('') }}>{s}</button>
+            <button key={s} type="button" aria-current={!query && pane === s ? 'page' : undefined} onClick={() => { setAt(s); setQ('') }}>{nameOf(s)}</button>
           ))}
         </div>
       </nav>
-      <div role="region" aria-label={query ? 'Search results' : pane} className="hub-set-panel" style={{ minWidth: 0 }}>
+      <div role="region" aria-label={query ? 'Search results' : nameOf(pane)} className="hub-set-panel" style={{ minWidth: 0 }}>
         {query
           ? <>
-              {hits.map(r => <Line key={r.label} row={r} pane={r.section} />)}
+              {hits.map(r => <Line key={r.label} row={r} pane={nameOf(r.section)} />)}
               {blocks.map(b => <Line key={b.label} row={{ section: b.to ?? 'Chats', label: b.label, hint: b.hint,
                 control: b.to ? <button type="button" className="hub-btn" onClick={() => { setAt(b.to!); setQ('') }}>Open</button> : null }} />)}
               {listHits.length > 0 && <><h4 style={sub}>Installed</h4>{installed(listHits)}</>}
-              {!hits.length && !blocks.length && !listHits.length && <p style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>Nothing matches.</p>}
+              {!hits.length && !blocks.length && !listHits.length && <p role="status" style={{ color: 'var(--hub-ash)', margin: '8px 0' }}>No setting matches "{q.trim()}". Find looks through chats and commands.</p>}
             </>
           : body(pane)}
         {!query && pane === 'Integrations' && !!hub.spend?.length && <p style={{ color: 'var(--hub-ash)', margin: '16px 0 0', fontSize: 13 }}>Spend limits for paid tools are on <a href="#usage" className="hub-link">Usage</a>.</p>}
@@ -386,7 +396,10 @@ export function Gear({ hub, send, problem, start = 'Chats', folder }: { hub: Hub
             <b aria-hidden>›</b>
             <span style={{ flex: 1, minWidth: 0, color: 'var(--hub-ink)' }}>About and credits</span>
           </summary>
-          <div style={{ margin: '0 0 10px 22px' }}><Credits /></div>
+          <div style={{ margin: '0 0 10px 22px' }}>
+            <p style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, margin: '0 0 12px' }}><span style={{ color: 'var(--hub-ink)' }}>{versionLabel(hub)}</span><span style={{ color: 'var(--hub-ash)', fontSize: 12 }}>{updateLine(updateOf(hub)).text}</span><UpdateButton hub={hub} send={send} sm /></p>
+            <Credits />
+          </div>
         </details>
       </div>
     </section>

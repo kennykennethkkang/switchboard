@@ -184,7 +184,7 @@ describe('the Ship list', () => {
     commit(main, 'b.txt'); fs.writeFileSync(path.join(main, 'c.txt'), 'c\n')
     const wt = add('tree'); fs.writeFileSync(path.join(wt, 'n.txt'), 'n\n')
     const other = path.join(tmp, 'plain'); fs.mkdirSync(other)
-    const [r, ...rest] = await readShip([main, other, main], w => w === wt)
+    const [r, ...rest] = await readShip([main, other, main], w => w === fs.realpathSync.native(wt))
     assert.equal(rest.length, 0)
     assert.deepEqual({ ...r, trees: [] }, { id: main, name: 'repo', branch: 'main', files: 1, ahead: 1, behind: 0, auto: true, trees: [] })
     assert.deepEqual(r.trees, [{ id: wt, name: 'tree', branch: 'worktree-tree', files: 1, commits: 0, live: true }])

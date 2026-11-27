@@ -321,6 +321,7 @@ function baseHub(now: number): HubState {
   }
   return {
     ...emptyHub(),
+    update: { current: '0.21.190', state: 'idle' },
     controls: {
       claude: { model: 'opus', tui: 'fullscreen', statusLine: false, push: true, needInput: true },
       switchboard: { hooks: true, statusBar: true, idleMinutes: 15, brief: true, askBrain: true, syncRules: true, accessNote: true, autoStart: true, autoFix: true, name: '', advancedMode: { '/Users/k/Documents/GitHub/Armasu': true }, ...demoView(typeof location === 'undefined' ? '' : location.search) },

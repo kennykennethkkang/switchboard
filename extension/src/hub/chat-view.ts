@@ -31,7 +31,7 @@ const AGENTS = new Set(['Agent', 'Task'])
 // One line past this is skipped (outputs) or shown as a placeholder (transcript), so a giant line cannot spike the host.
 const LINE_MAX = 16 * 1024 * 1024
 export const SKIPPED = '{"type":"skipped"}'
-const IMAGE = /(?:~|\.{0,2})?\/?(?:[\w.@+-]+\/)*[\w.@+-]+\.(?:png|jpe?g|gif|webp)\b/gi
+const IMAGE = /(?:~|\.{0,2})?(?:[A-Za-z]:)?[\\/]?(?:[\w.@+-]+[\\/])*[\w.@+-]+\.(?:png|jpe?g|gif|webp)\b/gi
 
 /** Calls onLine for each complete line from byte from; a partial last line is left for next time, a line over max is skipped. Returns the offset after the last complete line. */
 export async function scanLines(file: string, from: number, onLine: (line: string) => void, chunk = CHUNK, max = LINE_MAX): Promise<number> {

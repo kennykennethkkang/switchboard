@@ -58,8 +58,10 @@ describe('key store', () => {
     const s = keyStore({ platform: 'linux', dir })
     s.set('OPENROUTER_API_KEY', 'sk-or-v1-fakefakefakefake')
     const file = path.join(dir, 'OPENROUTER_API_KEY')
-    assert.equal(fs.statSync(file).mode & 0o777, 0o600)
-    assert.equal(fs.statSync(dir).mode & 0o777, 0o700)
+    if (process.platform !== 'win32') {
+      assert.equal(fs.statSync(file).mode & 0o777, 0o600)
+      assert.equal(fs.statSync(dir).mode & 0o777, 0o700)
+    }
     assert.equal(s.get('OPENROUTER_API_KEY'), 'sk-or-v1-fakefakefakefake')
     s.remove('OPENROUTER_API_KEY')
     assert.equal(s.get('OPENROUTER_API_KEY'), undefined)

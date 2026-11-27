@@ -66,7 +66,7 @@ export function targets(id: string, ran: Ran, chats: Chat[], procs: Proc[], serv
   if (!mine) return []
   const now = new Map(procs.map(p => [p.pid, p]))
   const others = new Set<number>()
-  for (const c of chats) if (c.live && c.sessionId !== id) for (const pid of under(procs, c.pid)) others.add(pid)
+  for (const c of chats) if (c.live && c.pid && c.sessionId !== id) for (const pid of under(procs, c.pid)) others.add(pid)
   for (const [sid, pids] of ran) if (sid !== id && chats.some(c => c.live && c.sessionId === sid)) for (const pid of pids.keys()) others.add(pid)
   const out: Target[] = []
   for (const [pid, command] of mine) {

@@ -15,7 +15,7 @@ const META = { agentType: 'engineer', description: 'Fix a.ts', model: 'opus', fi
 const at = (s: number) => Date.parse('2026-10-31T10:00:00.000Z') + s * 1000
 
 describe('parseRun', () => {
-  const r = parseRun(FIXTURE, META, 'a1', '/x/agent-a1.jsonl')
+  const r = parseRun(FIXTURE, META, 'a1', '/x/agent-a1.jsonl', path.join(path.parse(process.cwd()).root, 'w'))
 
   it('reads the brief, title, model and clock', () => {
     assert.equal(r.id, 'a1')
@@ -68,16 +68,19 @@ describe('parseRun', () => {
   })
 
   it('makes every path relative to the repo root, whatever folder each call ran in', () => {
+    const root = path.join(path.parse(process.cwd()).root, 'r')
+    const web = path.join(root, 'web')
+    const elsewhere = path.join(path.parse(process.cwd()).root, 'elsewhere', 'w.ts')
     const ev = (cwd: string, id: string, p: string) => [
       JSON.stringify({ type: 'assistant', cwd, timestamp: '2026-10-31T00:00:00Z', message: { content: [{ type: 'tool_use', id, name: 'Write', input: { file_path: p, content: 'a\nb' } }] } }),
       JSON.stringify({ type: 'user', cwd, timestamp: '2026-10-31T00:00:01Z', message: { content: [{ type: 'tool_result', tool_use_id: id }] } }),
     ]
-    const raw = [JSON.stringify({ type: 'user', cwd: '/r/web', timestamp: '2026-10-31T00:00:00Z', message: { content: 'brief' } }),
-      ...ev('/r/web', '1', '/r/web/x.ts'), ...ev('/r', '2', '/r/ext/y.ts'), ...ev('/r/web', '3', 'rel/z.ts'), ...ev('/r', '4', '/elsewhere/w.ts')].join('\n')
+    const raw = [JSON.stringify({ type: 'user', cwd: web, timestamp: '2026-10-31T00:00:00Z', message: { content: 'brief' } }),
+      ...ev(web, '1', path.join(web, 'x.ts')), ...ev(root, '2', path.join(root, 'ext', 'y.ts')), ...ev(web, '3', path.join('rel', 'z.ts')), ...ev(root, '4', elsewhere)].join('\n')
     const paths = (root?: string) => parseRun(raw, {}, 'x', '', root).files.map(f => f.path)
-    assert.deepEqual(paths('/r'), ['web/x.ts', 'ext/y.ts', 'web/rel/z.ts', '/elsewhere/w.ts'])
+    assert.deepEqual(paths(root), ['web/x.ts', 'ext/y.ts', 'web/rel/z.ts', elsewhere])
     // No repo: the folder every call ran under.
-    assert.deepEqual(paths(), ['web/x.ts', 'ext/y.ts', 'web/rel/z.ts', '/elsewhere/w.ts'])
+    assert.deepEqual(paths(), ['web/x.ts', 'ext/y.ts', 'web/rel/z.ts', elsewhere])
   })
 
   it('cuts the brief and keeps only the newest 200 calls', () => {

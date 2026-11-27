@@ -15,7 +15,7 @@ describe('withSelf', () => {
   })
 })
 
-describe('chatSpawn', () => {
+describe('chatSpawn', { skip: process.platform === 'win32' && 'Windows starts chats in PowerShell' }, () => {
   it('starts a detached tmux session in the folder when tmux is there', () => {
     const s = chatSpawn('/u/my proj', 'claude --name x', '/opt/homebrew/bin/tmux', 'sb-my-proj')
     assert.equal(s.cmd, '/opt/homebrew/bin/tmux')
@@ -41,8 +41,8 @@ describe('newChatHeadless', () => {
     assert.match(String(newChatHeadless({ path: '/etc' }, run, undefined)), /not in the project list/)
     assert.equal(newChatHeadless({ path: '/u/p', text: 'fix it' }, run, '/t/tmux'), true)
     assert.equal(newChatHeadless({ path: '/u/p', ai: 'codex' }, run, '/t/tmux'), true)
-    assert.match(runs[0].args.at(-1)!, /^claude .*'fix it'$/)
-    assert.equal(runs[1].args.at(-1), 'codex')
+    assert.match(runs[0].args.at(-1)!, /(^|; )claude .*'fix it'$/)
+    assert.match(runs[1].args.at(-1)!, /(^|; )codex$/)
     assert.match(String(newChatHeadless({ path: '/u/p', ai: 'hermes' }, run, '/t/tmux')), /editor/)
   })
 })

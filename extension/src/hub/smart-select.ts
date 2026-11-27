@@ -9,21 +9,22 @@ import * as path from 'path'
 import { readJsonOr, writeJsonAtomic } from '../fs-utils'
 import { EFFORTS, pickRun, roleBounds, type PickInput, type RunPick } from './pick-run'
 import type { SmartState } from './types'
+import { smartPick, taskLabel, type Stats } from './smart-pick'
+import { LOOP_MODES, type SmartLoop } from './loop'
+
+export { smartPick, taskLabel, type Stats } from './smart-pick'
 
 const DIR = path.join(os.homedir(), '.claude', 'switchboard')
 export const SMART_PICKS = path.join(DIR, 'smart-picks.jsonl')
 export const SMART_LEARNED = path.join(DIR, 'smart-learned.json')
 const ROW_CAP = 5000
 const TAIL = 8 << 20
-const MIN_N = 5
-const LEAD = 0.15
 const SHOWN = 50
 
-export type Kind = 'ponytail' | 'model' | 'effort' | 'role' | 'question'
+export type Kind = 'ponytail' | 'model' | 'effort' | 'role' | 'question' | 'loop'
 export type SmartRow =
   | { t: 'pick'; at: number; session: string; cwd?: string; kind: Kind; task: string; pick: string; why: string; options?: string[]; key: string }
   | { t: 'final'; at: number; session: string; kind: Kind; key: string; final: string }
-export type Stats = Record<string, Record<string, Record<string, { n: number; useful: number }>>>
 /** What the chat's end says about its picks. */
 export type Outcome = { approvedAt?: number; sentBack?: number; doneMissing?: boolean; escalated?: boolean }
 
@@ -76,18 +77,6 @@ export function readSmartRows(file = SMART_PICKS, cap = ROW_CAP, now = Date.now(
   return rows.sort((x, y) => x.at - y.at).slice(-cap)
 }
 
-const WORDS: Array<[string, RegExp]> = [
-  ['audit', /\b(audit|security review|vulnerab)/i],
-  ['review', /\b(review|qa|check the diff)\b/i],
-  ['research', /\b(research|investigate|find out|compare|look into|survey)\b/i],
-  ['fix', /\b(fix|bug|broken|crash|error|regression|fails?|failing)\b/i],
-  ['ui', /\b(ui|screen|button|page|layout|css|style|design|modal|view|panel|mobile)\b/i],
-  ['tiny', /\b(typo|rename|one.?liner|tweak|bump|small)\b/i],
-  ['feature', /\b(add|build|implement|create|new|support|feature)\b/i],
-]
-/** The contract's task label for a goal; question rows use their header instead. */
-export const taskLabel = (text: string): string => WORDS.find(([, re]) => re.test(text))?.[0] ?? 'other'
-
 export const QUESTION_BUCKETS = ['finish', 'design', 'scope', 'approach', 'setup', 'naming', 'priority', 'other'] as const
 // First match wins. Question rows use the bucket as their task so rates pool across free-text headers.
 const BUCKETS: Array<[string, RegExp]> = [
@@ -132,22 +121,6 @@ export function computeStats(rows: SmartRow[], outcome: (session: string, pickAt
     if (v === 'useful') c.useful++
   }
   return { stats, verdicts, finals }
-}
-
-const rate = (c?: { n: number; useful: number }) => ((c?.useful ?? 0) + 1) / ((c?.n ?? 0) + 2)
-
-/** The rule pick, unless another offered option for the same kind and task has n >= 5 and a Laplace rate 0.15 higher. */
-export function smartPick(kind: string, task: string, rulePick: string, options: string[], stats: Stats): { pick: string; why?: string } {
-  const row = stats[kind]?.[task] ?? {}
-  let best: string | undefined, top = rate(row[rulePick]) + LEAD
-  for (const o of options) {
-    const c = row[o]
-    if (o === rulePick || !c || c.n < MIN_N) continue
-    if (rate(c) >= top) { best = o; top = rate(c) }
-  }
-  if (!best) return { pick: rulePick }
-  const c = row[best]
-  return { pick: best, why: `learned: ${best} kept ${Math.round(100 * c.useful / c.n)}% of ${c.n}` }
 }
 
 /** The table as the scorer reads it, from the learned file; empty when missing. */
@@ -225,4 +198,13 @@ export function logDrafts(drafts: SmartDraft[] | undefined, session: string | un
     logSmart(row, file)
     if (d.final !== undefined && row.t === 'pick') logSmart({ t: 'final', at, session, kind: d.kind, key: row.key, final: d.final }, file)
   }
+}
+
+/** New chat's loop: Auto's pick, plus Kenneth's own when he chose another (the final), each judged by how the chat ends. */
+export function logLoop(session: string, cwd: string, s: SmartLoop, at = Date.now(), file = SMART_PICKS): void {
+  const row = pickRow('loop', session, cwd, s.task, s.pick, s.why, LOOP_MODES, at)
+  logSmart(row, file)
+  if (s.final === undefined || s.final === s.pick) return
+  logSmart({ t: 'final', at, session, kind: 'loop', key: row.key, final: s.final }, file)
+  logSmart(pickRow('loop', session, cwd, s.task, s.final, 'picked by hand', LOOP_MODES, at + 1), file)
 }

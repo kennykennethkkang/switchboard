@@ -50,11 +50,13 @@ describe('saveUpload', () => {
     const root = path.join(ROOT, 'private')
     const file = await saveUpload({ cwd: path.join(ROOT, 'proj', 'priv'), name: 'k.txt', root, now }, bytes('s'))
     const mode = (p: string) => fs.statSync(p).mode & 0o777
-    assert.equal(mode(path.dirname(file)), 0o700)
-    assert.equal(mode(path.join(root, 'priv')), 0o700)
-    assert.equal(mode(file), 0o600)
-    assert.equal(mode(path.join(root, 'README.md')), 0o600)
-    assert.equal(mode(path.join(root, 'priv', 'INDEX.md')), 0o600)
+    if (process.platform !== 'win32') {
+      assert.equal(mode(path.dirname(file)), 0o700)
+      assert.equal(mode(path.join(root, 'priv')), 0o700)
+      assert.equal(mode(file), 0o600)
+      assert.equal(mode(path.join(root, 'README.md')), 0o600)
+      assert.equal(mode(path.join(root, 'priv', 'INDEX.md')), 0o600)
+    }
   })
 
   it('keeps a chat label with newlines or pipes to one INDEX.md line', async () => {

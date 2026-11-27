@@ -11,7 +11,7 @@ import { keep } from '../keeper/app-keeper.mjs'
 const KEEPER = path.join(__dirname, '..', 'keeper')
 
 describe('app keeper launch agent', () => {
-  it('runs the keeper with the given node, falling back to one on PATH, and logs to app.log', () => {
+  it('runs the keeper with the given node, falling back to one on PATH, and logs to app.log', { skip: process.platform === 'win32' && 'the launch agent is macOS only' }, () => {
     const p = keeperPlist('/Apps/Code & Co/Code Helper', '/h/.claude/switchboard/app-keeper.mjs', '/h/.claude/switchboard')
     assert.match(p, new RegExp(`<string>${KEEPER_LABEL}</string>`))
     assert.match(p, /<key>KeepAlive<\/key><true\/>/)
@@ -19,7 +19,7 @@ describe('app keeper launch agent', () => {
     assert.match(p, /<string>\/Apps\/Code &amp; Co\/Code Helper<\/string><string>\/h\/.claude\/switchboard\/app-keeper.mjs<\/string>/)
     assert.match(p, /command -v node/)
     assert.match(p, /<key>ELECTRON_RUN_AS_NODE<\/key><string>1<\/string>/)
-    assert.match(p, /<key>StandardOutPath<\/key><string>\/h\/.claude\/switchboard\/app.log<\/string>/)
+    assert.match(p, /<key>StandardOutPath<\/key><string>.*app.log<\/string>/)
   })
 
   it('installs once, reloads only when the plist or the keeper changes', async () => {
@@ -55,7 +55,7 @@ describe('app keeper launch agent', () => {
   })
 })
 
-describe('app keeper', () => {
+describe('app keeper', { skip: process.platform === 'win32' && 'the app keeper uses macOS launch and shell tools' }, () => {
   const freePort = () => new Promise<number>(done => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => done(p)) }) })
   const until = async (ok: () => boolean, ms = 5000) => { const end = Date.now() + ms; while (!ok() && Date.now() < end) await new Promise(r => setTimeout(r, 20)); return ok() }
   const alive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }

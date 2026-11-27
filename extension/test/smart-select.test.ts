@@ -5,7 +5,8 @@ import * as os from 'os'
 import * as path from 'path'
 import { pickRun, roleBounds } from '../src/hub/pick-run'
 import { questionAsk } from '../src/hub/progress'
-import { buildSmart, computeStats, logDrafts, logSmart, questionBucket, smartRun, readSmartRows, smartPick, taskLabel, verdictOf, type SmartRow, type Stats } from '../src/hub/smart-select'
+import { codeTask } from '../src/hub/smart-pick'
+import { buildSmart, computeStats, logDrafts, logLoop, logSmart, questionBucket, smartRun, readSmartRows, smartPick, taskLabel, verdictOf, type SmartRow, type Stats } from '../src/hub/smart-select'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sb-smart-'))
 type PickRow = Extract<SmartRow, { t: 'pick' }>
@@ -61,6 +62,10 @@ describe('taskLabel', () => {
     assert.equal(taskLabel('research how X works'), 'research')
     assert.equal(taskLabel('rename a typo'), 'tiny')
     assert.equal(taskLabel('hello'), 'other')
+  })
+  it('codeTask: fix, ui, tiny and feature are code work', () => {
+    for (const t of ['fix the crash in login', 'add a button to the settings screen', 'rename a typo', 'build a parser']) assert.equal(codeTask(t), true, t)
+    for (const t of ['review the diff', 'audit the auth flow', 'research how X works', 'hello']) assert.equal(codeTask(t), false, t)
   })
 })
 
@@ -118,6 +123,18 @@ describe('smartRun', () => {
     try {
       logDrafts([{ kind: 'model', task: 'fix', pick: 'opus', why: 'w', options: ['opus'], final: 'haiku' }], 's9', '/x', 7, file)
       assert.deepEqual(readSmartRows(file).map(r => r.t), ['pick', 'final'])
+    } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+  })
+  it('logLoop: one row for Auto; a hand pick also marks Auto switched and gets its own row', () => {
+    const dir = tmp(), file = path.join(dir, 'l.jsonl')
+    try {
+      logLoop('a1', '/x', { task: 'fix', pick: 'goal', why: 'w' }, 10, file)
+      logLoop('a2', '/x', { task: 'fix', pick: 'turn', why: 'w', final: 'goal' }, 20, file)
+      logLoop('a3', '/x', { task: 'fix', pick: 'turn', why: 'w', final: 'turn' }, 30, file)
+      const rows = readSmartRows(file)
+      assert.deepEqual(rows.map(r => [r.session, r.t, r.t === 'pick' ? r.pick : r.final]), [['a1', 'pick', 'goal'], ['a2', 'pick', 'turn'], ['a2', 'final', 'goal'], ['a2', 'pick', 'goal'], ['a3', 'pick', 'turn']])
+      const { stats } = computeStats(rows, () => ({ approvedAt: 99 }))
+      assert.deepEqual(stats.loop.fix, { goal: { n: 2, useful: 2 }, turn: { n: 2, useful: 1 } })
     } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   })
 })

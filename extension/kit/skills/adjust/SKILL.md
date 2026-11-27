@@ -13,6 +13,7 @@ A finding is not the end: change the thing, prove it worked, and leave a way bac
 1. `node ~/.claude/skills/adjust/scripts/adjust.mjs facts`, and read the current value of whatever may change. Advice that does not fit this device, or is already done, is dropped.
 2. Research only what is missing. deep-research when it takes more than a lookup.
 3. A change the whole Mac or network shares (brew upgrade or cleanup, Wi-Fi, DNS, power, shared caches, a window reload), made or put to the user: call ListAgents and SendMessage each busy chat what moves and when, and wait for its answer before `begin` or the advice. No answer in 10 minutes: ask the user, naming the chat. Brewed tools can fail until the run exits.
+4. Reading a router, modem or device admin page with a script: keep list only. Pipe the page text through `node ~/.claude/skills/adjust/scripts/page-keep.mjs RSRP SINR 'Software Version'` (`agent-browser eval` output works as it is): it prints only those exact labels, each with the value from the same or next line, and refuses labels that name a secret. Never print a whole page or filter with a drop regex, and run it on one page before the rest.
 
 ## Each change
 

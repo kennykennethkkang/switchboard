@@ -5,8 +5,8 @@ import type { ChatProgress, ChatRow, IndefiniteBudget } from './types'
 
 /** The line that ends Run indefinitely; the usage-meter mod's IND_DONE for Claude chats. */
 export const INDEFINITE_DONE = /^Run indefinitely: done\s*$/m
-/** UI rounds: a Safe and an Explore version, crowd-ab and MiroFish pick; the mod's IND_DESIGN. */
-export const DESIGN_ROUND = 'If the round changes UI or UX, build two versions on localhost behind a toggle: Safe (proven patterns from the project and the design library) and Explore (a bolder take from ~/.claude/switchboard/design-md/SOURCES.md); have a qa agent that built neither run crowd-ab and a MiroFish sim on both, keep the winner, log both results in .switchboard/design-rounds.md, and start the next UI round from the winner with a fresh Safe and Explore pair.'
+/** UI rounds: a Safe and an Explore version, crowd-ab picks; the mod's IND_DESIGN. */
+export const DESIGN_ROUND = 'If the round changes UI or UX, build two versions on localhost behind a toggle: Safe (proven patterns from the project and the design library) and Explore (a bolder take from ~/.claude/switchboard/design-md/SOURCES.md); have a qa agent that built neither run crowd-ab on both, keep the winner, log its result in .switchboard/design-rounds.md, and start the next UI round from the winner with a fresh Safe and Explore pair.'
 /** The next-round prompt, as the usage-meter mod's IND_ROUND sends it to a Claude chat. */
 export const INDEFINITE_ROUND = `Run indefinitely is on. Do another round: audit the project for bugs, errors, user problems and hard-to-use parts; fix them; add components that would help this project; run the checks; dispatch role subagents as needed. ${DESIGN_ROUND} Decide everything yourself and note decisions. Never commit. When nothing is left you can improve, end with the line \`Run indefinitely: done\`.`
 

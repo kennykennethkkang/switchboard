@@ -183,6 +183,7 @@ export function plan(graph, home) {
   for (const id of h.orphans) left.push(`orphan ${P(id)}: add a typed relation or [[link]] to a genuinely related note, else leave`)
   for (const k of h.duplicates) left.push(`duplicate "${k}": compare description and type; merge with supersedes, or rename`)
   for (const [a, b] of h.contradictions) left.push(`contradiction ${P(a)} vs ${P(b)}: supersedes only with same subject and newer evidence, else ask the user`)
+  for (const [a, b] of h.probed ?? []) left.push(`possible contradiction ${P(a)} vs ${P(b)} (probe): read both; resolve or mark contradicts, else add related so the probe skips the pair`)
   for (const id of h.invalid) left.push(`invalid ${P(id)}: add a description (draft from the body) and metadata.type user|feedback|project|reference`)
   for (const id of h.stale) left.push(`stale ${P(id)}: check against code and git; update, supersede, or report`)
   for (const id of h.unproven ?? []) left.push(`unproven ${P(id)}: over 14 days; prove it and drop the status line, or move it to archive/`)

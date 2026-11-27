@@ -1,6 +1,7 @@
 // The user's standing rules, enforced on the tool call instead of carried in memory.
 // Each refusal is also reported to the Switchboard window for this folder.
 import type { EngineInterface, Register } from 'claude-code'
+import AIDetector from './vendor/avoid-ai-writing/patterns.js'
 
 // Built from its code point so this file holds no em dash itself.
 export const EM = String.fromCharCode(0x2014)
@@ -38,12 +39,36 @@ export const norm = (p: string) => p.replace(/\\/g, '/')
 export const rootsFor = (home: string) => [`${norm(home)}/Documents/GitHub/`, `${norm(home)}/.claude/projects/`, `${norm(home)}/Documents/Research/`]
 export const isUnder = (path: string, roots: string[]) => roots.some(root => norm(path).startsWith(root))
 
+const PROSE = ['.md', '.mdx', '.txt']
+
+// Adds the tells as context for the model after a prose write. The result passes through unchanged otherwise.
+async function nudge<R extends { deny?: string; context?: readonly string[] }>($: EngineInterface, file: string, text: unknown, r: R): Promise<R> {
+  if (typeof text !== 'string' || r.deny || !isProse(file, await roots($))) return r
+  const note = proseNote(text)
+  return note ? ({ ...r, context: [...(r.context ?? []), note] } as R) : r
+}
+export const isProse = (path: string, roots: string[]) => PROSE.some(ext => path.toLowerCase().endsWith(ext)) && isUnder(path, roots)
+
+// The write has already gone through when this runs, so the note only asks for a fix. Any failure means no note.
+export const proseNote = (text: string) => {
+  try {
+    const r = AIDetector.analyzeText(text)
+    const tells = r.issues.filter(i => i.severity === 'high' || i.severity === 'critical').slice(0, 6)
+    if (!tells.length) return undefined
+    const lines = tells.map(i => `- ${i.type}: "${i.text}". ${i.suggestion ?? ''}`.trimEnd())
+    return `repo-rules: this prose reads as AI-written (${r.label}, score ${r.score}). Fix these tells in the text just written, then reread it. For a bigger rewrite, use the humanizer skill.\n${lines.join('\n')}`
+  } catch { return undefined }
+}
+
 // The home folder, read once; HOME on macOS and Linux, USERPROFILE on Windows.
 const cache: { roots?: string[] } = {}
 
 async function roots($: EngineInterface) {
-  cache.roots ??= rootsFor((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '')
-  return cache.roots
+  if (cache.roots) return cache.roots
+  const home = (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? ''
+  // A failed lookup is not cached, or the prose and em dash checks stay off for the session.
+  if (home) cache.roots = rootsFor(home)
+  return rootsFor(home)
 }
 
 /** Tells the Switchboard window for this folder; silent when there is none. */
@@ -225,6 +250,12 @@ export const register: Register = on => {
     const path = f.file_path ?? f.notebook_path
     return (await checkLogged($, path)) ?? (await checkClaim($, path)) ?? next(e)
   }).catch(($, e, next) => next(e))
+
+  // Last, so a write reaches it only once the guards above let it through. It never holds a write.
+  on('tool.call', { tool: 'Write' }, async ($, e, next) => nudge($, e.file_path, e.content, await next(e)))
+    .catch(($, e, next) => next(e))
+  on('tool.call', { tool: 'Edit' }, async ($, e, next) => nudge($, e.file_path, e.new_string, await next(e)))
+    .catch(($, e, next) => next(e))
 
   on('session.end', async ($, e, next) => {
     await releaseAll($, e.sessionId).catch(() => undefined)

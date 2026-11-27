@@ -159,7 +159,7 @@ test('the open chat: newest wins, another window posts it', () => {
 })
 
 describe('an Approve whose PostToolUse hook was lost', () => {
-  const Q = 'Approve this chat as finished?', CWD = '/u/Armasu', home = process.env.HOME
+  const Q = 'Approve this chat as finished?', CWD = '/u/Armasu', home = process.env.HOME, userProfile = process.env.USERPROFILE
   const ask = { questions: [{ question: Q, header: 'Approve', options: [{ label: 'Approve', description: 'a' }, { label: 'Send back', description: 'b' }], multiSelect: false }] }
   const at = (ms: number) => new Date(ms).toISOString()
   /** 1007fb31, 2026-11-25 05:41 UTC: the pair Code Mode writes for a call made by code. */
@@ -189,8 +189,13 @@ describe('an Approve whose PostToolUse hook was lost', () => {
     fs.mkdirSync(p, { recursive: true })
     fs.writeFileSync(path.join(p, 's.jsonl'), lines.map(l => JSON.stringify(l)).join('\n') + '\n')
     process.env.HOME = dir
+    process.env.USERPROFILE = dir
   }
-  afterEach(() => { process.env.HOME = home })
+  afterEach(() => {
+    process.env.HOME = home
+    if (userProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = userProfile
+  })
 
   it('is taken from the transcript once the turn is over', () => {
     transcript(typed('go', NOW - 300_000), ...answered('Approve'), said)

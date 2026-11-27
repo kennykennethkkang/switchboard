@@ -31,7 +31,7 @@ describe('installGuard', () => {
   it('refuses a commit from a chat, allows one without the markers', async () => {
     const dir = repo()
     try {
-      assert.equal(fs.realpathSync(await installGuard(dir) ?? ''), fs.realpathSync(path.join(dir, '.git', 'hooks')))
+      assert.equal(fs.realpathSync.native(await installGuard(dir) ?? ''), fs.realpathSync.native(path.join(dir, '.git', 'hooks')))
       for (const k of ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'SWITCHBOARD_CHAT']) {
         const r = commit(dir, { [k]: '1' })
         assert.notEqual(r.status, 0, k)
@@ -83,7 +83,7 @@ describe('installGuard', () => {
     try {
       assert.equal(commit(dir).status, 0)
       git(dir, ['worktree', 'add', '-q', wt])
-      assert.equal(fs.realpathSync(await installGuard(wt) ?? ''), fs.realpathSync(path.join(dir, '.git', 'hooks')))
+      assert.equal(fs.realpathSync.native(await installGuard(wt) ?? ''), fs.realpathSync.native(path.join(dir, '.git', 'hooks')))
       assert.notEqual(commit(wt, { CLAUDECODE: '1' }).status, 0)
     } finally { for (const d of [dir, wt]) fs.rmSync(d, { recursive: true, force: true }) }
   })

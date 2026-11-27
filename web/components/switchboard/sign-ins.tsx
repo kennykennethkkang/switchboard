@@ -13,6 +13,7 @@ import { projectName } from '@/lib/archive'
 import { focusBack } from '@/lib/focus-back'
 import { baseName } from '@/lib/path'
 import { Pick } from './gear'
+import { updateCmd } from './account'
 import './sign-ins.css'
 
 type Send = (c: HubCommand) => void
@@ -502,7 +503,7 @@ function Apps({ hub, send }: { hub: HubState; send: Send }) {
       <header><h3 id="si-apps">Web apps</h3></header>
       <p className="si-help">Saved logins per app, like a work and a personal tenant. Each project picks the one it uses, or none.</p>
       {!apps
-        ? <p className="si-empty">Update the Switchboard extension to save web logins.</p>
+        ? <p className="si-empty">Saving web logins needs a newer Switchboard. <NewerLink send={send} /></p>
         : <>
             {apps.length === 0 && <p className="si-empty">No web apps yet. Add one, like Vercel or Auth0, then save a login for each account.</p>}
             {apps.map(a => <App key={a.id} app={a} hub={hub} send={send} />)}
@@ -581,7 +582,7 @@ function Keys({ hub, send }: { hub: HubState; send: Send }) {
     <section aria-labelledby="si-keys" className="si-sec">
       <header><h3 id="si-keys">API keys</h3></header>
       <p className="si-help">Kept in the macOS Keychain. The gemini and Jev skills read them from there; a key in the shell env still wins. MiroFish needs OpenRouter and Zep: saving either fills its .env.</p>
-      {keys ? <ul role="list" className="si-list">{keys.map(k => <KeyRow key={k.name} k={k} send={send} />)}</ul> : <p className="si-empty">Update the Switchboard extension to save API keys.</p>}
+      {keys ? <ul role="list" className="si-list">{keys.map(k => <KeyRow key={k.name} k={k} send={send} />)}</ul> : <p className="si-empty">Saving API keys needs a newer Switchboard. <NewerLink send={send} /></p>}
       {keys && <EnvSetupRow hub={hub} send={send} />}
     </section>
   )
@@ -645,8 +646,16 @@ function Ais({ hub, send }: { hub: HubState; send: Send }) {
   )
 }
 
-/** Accounts, inside Settings. problem: the standalone app's last refused command. */
-export function SignIns({ hub, send, problem = null }: { hub: HubState; send: Send; problem?: Problem }) {
+const NewerLink = ({ send }: { send: Send }) => <button type="button" className="hub-link" onClick={() => send(updateCmd('hub-update-check'))}>Check for updates</button>
+
+/** Accounts, inside Settings. problem: the standalone app's last refused command. simple: the AI sign-ins only. */
+export function SignIns({ hub, send, problem = null, simple }: { hub: HubState; send: Send; problem?: Problem; simple?: boolean }) {
+  if (simple) return (
+    <div className="si">
+      <Ais hub={hub} send={send} />
+      <p className="si-help">Turn on Coder view for AWS, web app logins and API keys.</p>
+    </div>
+  )
   return (
     <div className="si">
       <ThisProject hub={hub} send={send} />

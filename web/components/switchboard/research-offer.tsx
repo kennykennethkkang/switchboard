@@ -21,7 +21,7 @@ export function ResearchOffers({ hub, send }: { hub: HubState; send: (c: HubComm
               <i aria-hidden />
               <span className="hub-stuck-text">
                 <span className="hub-stuck-who"><b>{name(o.sessionId)}</b></span>
-                <span className="hub-stuck-q">This chat looks like research. Move it to Research?</span>
+                <span className="hub-stuck-q">This chat looks like research (reading the web and writing up sources). Move it to Research?</span>
                 {o.reason && <span className="hub-stuck-meta">{o.reason}</span>}
               </span>
               <span className="hub-stuck-acts">

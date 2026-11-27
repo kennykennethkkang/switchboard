@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom'
 import { isMap, type Page } from '@/lib/route'
 import { useResearchUnseen } from './research-library'
 import { pending, useWorkbench } from '@/lib/workbench-store'
+import { Account } from './account'
+import { Help } from './help'
 import './nav.css'
 
 const Ic = ({ d }: { d: string }) => <svg className="hub-ic" aria-hidden width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
@@ -18,6 +20,7 @@ const ICON = {
   ship: 'M8 10.5V2.5M4.5 6 8 2.5 11.5 6M3 13.5h10',
   map: 'M8 2v3M8 5 4 9M8 5l4 4M4 9v2.5M12 9v2.5M2.5 13.5h3M10.5 13.5h3',
   usage: 'M2.5 13.5h11M4.5 11V8M8 11V3M11.5 11V6',
+  help: 'M8 14.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM6.3 6.2a1.8 1.8 0 0 1 3.5.6c0 1.2-1.8 1.5-1.8 2.7M8 11.5h.01',
   settings: 'M6.84 3.34L7.08 1.46L8.92 1.46L9.16 3.34A4.8 4.8 0 0 1 11.45 4.67L13.2 3.94L14.12 5.53L12.61 6.68A4.8 4.8 0 0 1 12.61 9.32L14.12 10.47L13.2 12.06L11.45 11.33A4.8 4.8 0 0 1 9.16 12.66L8.92 14.54L7.08 14.54L6.84 12.66A4.8 4.8 0 0 1 4.55 11.33L2.8 12.06L1.88 10.47L3.39 9.32A4.8 4.8 0 0 1 3.39 6.68L1.88 5.53L2.8 3.94L4.55 4.67A4.8 4.8 0 0 1 6.84 3.34ZM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
 }
 
@@ -28,6 +31,13 @@ type Counts = { needs: number; chats: number; plan: number; live?: number; ship:
 export function Nav({ page, go, counts, onFind, findKey, simple, onCoder }: { page: Page; go: (p: Page) => void; counts: Counts; onFind: () => void; findKey: string; simple?: boolean; onCoder?: (on: boolean) => void }) {
   const unseen = useResearchUnseen()
   const wbN = pending(useWorkbench()).length
+  const [help, setHelp] = useState(false)
+  // ?acct=b puts the account menu in the page header; a: the rail footer. Phones always use the header.
+  const [place, setPlace] = useState<'a' | 'b'>('a')
+  const [top, setTop] = useState<HTMLElement | null>(null)
+  useEffect(() => { setPlace(new URLSearchParams(location.search).get('acct') === 'b' ? 'b' : 'a') }, [])
+  useEffect(() => { setTop(document.querySelector<HTMLElement>('.hub-top-acts')) }, [page])
+  const acct = (where: 'rail' | 'top') => <Account where={where} onHelp={() => setHelp(true)} simple={simple} onCoder={onCoder} />
   const all: [Page, string, keyof typeof ICON, number?, boolean?][] = [
     ['now', simple ? 'Home' : 'Now', 'now', counts.needs, true],
     ['chats', 'Chats', 'chats', counts.chats],
@@ -52,15 +62,21 @@ export function Nav({ page, go, counts, onFind, findKey, simple, onCoder }: { pa
           const on = p === page || (p === 'map-board' && isMap(page))
           return <li key={p} data-page={p}>
             <a href={`#${p}`} className="nav-item" aria-current={on ? 'page' : undefined} onClick={e => { e.preventDefault(); go(p) }}>
-              <Ic d={ICON[icon]} /><span>{p === 'research' || p === 'workbench' ? <><span className="nav-full">{label}</span><span className="nav-tight">{p === 'research' ? 'Reports' : 'Bench'}</span></> : label}</span>
+              <Ic d={ICON[icon]} /><span>{label}</span>
               {!!n && <span className="nav-n" data-hot={hot || undefined}>{n}<span className="sr-only"> {hot ? 'need you' : 'open'}</span></span>}
             </a>
           </li>
         })}
       </ul>
-      {onCoder && <button type="button" role="switch" aria-checked={!simple} className="nav-coder" onClick={() => onCoder(!!simple)} title="Every page and setting: Live, Ship, Map, models and more">
-        <span>Coder view</span><i aria-hidden />
-      </button>}
+      <div className="nav-foot">
+        <button type="button" className="nav-item" aria-haspopup="dialog" onClick={() => setHelp(true)}><Ic d={ICON.help} /><span>Help</span></button>
+        {onCoder && <button type="button" role="switch" aria-checked={!simple} className="nav-coder" onClick={() => onCoder(!!simple)} title="Every page and setting: Live, Ship, Map, models and more">
+          <span>Coder view</span><i aria-hidden />
+        </button>}
+        {place === 'a' && acct('rail')}
+      </div>
+      {top && createPortal(<span className="acct-top" data-place={place}>{acct('top')}</span>, top)}
+      {help && <Help findKey={findKey} onClose={() => setHelp(false)} />}
     </nav>
   )
 }

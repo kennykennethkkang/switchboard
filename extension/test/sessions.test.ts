@@ -40,6 +40,13 @@ describe('chatRows', () => {
     assert.equal(a.link, 'https://claude.ai/code')
   })
 
+  it('gives a container chat pid 0 and asks alive with its file', () => {
+    const seen: unknown[] = []
+    const [box, mac] = chatRows([{ ...base, pid: 119, sessionId: 'c1', container: true }, { ...base, pid: 119 }], (pid, f) => { seen.push([pid, f.container ?? false]); return f.container === true }, NOW)
+    assert.deepEqual([box.pid, box.container, box.live], [0, true, true])
+    assert.deepEqual([mac.pid, mac.container, mac.live], [119, undefined, false])
+    assert.deepEqual(seen, [[119, true], [119, false]])
+  })
   it('drops rows without a pid or session id', () => {
     assert.equal(chatRows([{ cwd: '/x' }, { pid: 'x', sessionId: 's' }], () => true, NOW).length, 0)
   })

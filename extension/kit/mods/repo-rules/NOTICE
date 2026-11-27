@@ -1,0 +1,4 @@
+repo-rules bundles avoid-ai-writing-detector 3.39.1 (MIT License, Copyright (c) 2026 Conor Bronsdon).
+Source: https://github.com/conorbronsdon/avoid-ai-writing (npm: avoid-ai-writing-detector).
+Bundled file: hooks/vendor/avoid-ai-writing/patterns.js, unchanged apart from the header comment and the export at its end (an ESM default export).
+The license text is in hooks/vendor/avoid-ai-writing/LICENSE.

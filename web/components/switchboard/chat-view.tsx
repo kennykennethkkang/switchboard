@@ -14,7 +14,7 @@ import { demoScreen, demoType, NO_TYPING } from '@/lib/screen-demo'
 import { vscodeBridge } from '@/lib/vscode-bridge'
 import './chat-view.css'
 
-type Props = { sessionId: string; name: string; demo?: HubState; onClose: () => void; onCopy: (text: string) => Promise<boolean> }
+type Props = { sessionId: string; name: string; cwd?: string; model?: string; costUsd?: number; demo?: HubState; onClose: () => void; onCopy: (text: string) => Promise<boolean> }
 type Tab = 'outputs' | 'transcript' | 'screen'
 // xterm only loads once a Screen tab opens.
 const ScreenXterm = lazy(() => import('./screen-xterm'))
@@ -306,7 +306,7 @@ function ScreenTab({ sessionId, demo, copy }: { sessionId: string; demo?: HubSta
   )
 }
 
-export function ChatView({ sessionId, name, demo: demoNow, onClose, onCopy }: Props) {
+export function ChatView({ sessionId, name, cwd, model, costUsd, demo: demoNow, onClose, onCopy }: Props) {
   // The demo hub changes every tick; the view reads the one it opened with.
   const [demo] = useState(demoNow)
   const box = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null)
@@ -321,6 +321,7 @@ export function ChatView({ sessionId, name, demo: demoNow, onClose, onCopy }: Pr
     return () => { stop = true }
   }, [sessionId, demo])
   const copy = async (what: string, text: string) => setSaid(await onCopy(text) ? `${what} copied` : 'The clipboard is not available here')
+  const meta = `${sessionId} · ${cwd || 'cwd unavailable'} · ${model || 'model unavailable'} · ${costUsd === undefined ? 'cost unavailable' : `$${costUsd.toFixed(2)}`}`
   // Screen comes first; the app opens on it, the VS Code panel (next to the real terminal) on Outputs.
   const tabs: Array<[Tab, string]> = [['screen', 'Screen'], ['outputs', 'Outputs'], ['transcript', 'Transcript']]
   const arrow = (e: React.KeyboardEvent) => {
@@ -340,6 +341,7 @@ export function ChatView({ sessionId, name, demo: demoNow, onClose, onCopy }: Pr
           <div><h2 id="cv-title" tabIndex={-1}>{name}</h2>{(tab !== 'screen' || vscodeBridge?.isVSCode) && <small>Read only</small>}</div>
           <button type="button" className="cv-icon cv-x" aria-label={`Close ${name}`} onClick={onClose}><Ic d={CLOSE} /></button>
         </div>
+        <button type="button" className="cv-meta" aria-label="Copy session details" title="Click to copy session details" onClick={() => void copy('Session details', meta)}>{meta}</button>
         <div role="tablist" aria-label="Chat view" className="cv-tabs" onKeyDown={arrow}>
           {tabs.map(([k, label]) => (
             <button key={k} type="button" role="tab" id={`cv-tab-${k}`} aria-selected={tab === k} aria-controls="cv-panel" tabIndex={tab === k ? 0 : -1} onClick={() => setTab(k)}>{label}</button>

@@ -45,7 +45,7 @@ describe('web push store', () => {
     const a = vapidKeys(dir), b = vapidKeys(dir)
     assert.equal(a.publicKey, b.publicKey)
     assert.equal(b64(a.publicKey).length, 65)
-    assert.equal(fs.statSync(path.join(dir, 'vapid.json')).mode & 0o777, 0o600)
+    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, 'vapid.json')).mode & 0o777, 0o600)
   })
   it('dedupes by endpoint and refuses junk', () => {
     const dir = tmp()

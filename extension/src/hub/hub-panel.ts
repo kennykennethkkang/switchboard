@@ -25,9 +25,9 @@ import { signInsPanel } from './hub-panel-signins'
 import { syncHandle } from './sync'
 import { codexPanel } from './hub-panel-codex'
 import { devPanel } from './hub-panel-dev'
-import { awsLogin, answerInTerminal, openLogin, stopDev, closeCodexChat, codexTied, sendToCodex, continueInFreshChat, exportKit, runSetup, focusChat, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, indefiniteDone, REFINE_TEXT, setBudget, setLoop, loopPrompt, type RunOpts } from './actions'
+import { awsLogin, answerInTerminal, openLogin, stopDev, closeCodexChat, codexTied, sendToCodex, sendToContainer, continueInFreshChat, exportKit, runSetup, focusChat, newChat, openDiff, openNote, pickTools, rcServer, rcServers, resumeChat, saveChatTools, indefiniteDone, REFINE_TEXT, setBudget, setLoop, loopPrompt, type RunOpts } from './actions'
 import { dropEffortGuard, keepEffortDefault } from './picks'
-import { buildSmart } from './smart-select'
+import { buildSmart, logLoop } from './smart-select'
 import { approvedFields, closeApprovedRetry, idleResearch, staysOpenOnApprove } from './approve'
 import { openChat, tags, terminalAction, watchTerminals } from './terminals'
 import { signInTerminal } from './codex-login'
@@ -470,7 +470,7 @@ export function startHub(context: vscode.ExtensionContext): void {
   context.subscriptions.push(hub.onCloseFailed(async id => {
     const known = hub.get().chats.find(c => c.sessionId === id)
     const chat = (await readChats().catch(() => [])).find(c => c.sessionId === id)
-    if (!known || !chat?.live || chat.status !== 'idle' || chat.pid !== known.pid) return
+    if (!known || !chat?.live || !chat.pid || chat.status !== 'idle' || chat.pid !== known.pid) return
     try { process.kill(chat.pid, 'SIGTERM') } catch { /* already gone */ }
     setTimeout(refreshHub, 800)
   }))
@@ -1075,6 +1075,7 @@ function sendToChat(sessionId: string, message: string): true | string | Promise
   if (!text || !chat) return refuse(text ? 'that chat is not running' : 'the message is empty')
   if (!chat.live) return refuse('that chat is not running')
   if (chat.ai === 'codex') return sendToCodex(chat, text).then(problem => (problem ? refuse(problem) : true))
+  if (chat.container) { const problem = sendToContainer(chat, text); return problem ? refuse(problem) : true }
   if (!hub.takes(chat, false)) return refuse('that chat is not collecting messages (it is not running, or has no usage-meter mod); type in its terminal')
   hub.queue(chat.sessionId, { kind: 'prompt', text })
   return true
@@ -1085,17 +1086,18 @@ const CARD_LINK = 'Kenneth linked these in Switchboard'
 // New chats from New chat that wait on others: sent once the chat runs and takes messages, which waitFor needs.
 const pendingWaits = new Map<string, { on: string[]; at: number }>()
 /** The run's own picks a hub-new-chat or hub-todo-run carries. */
-const runOpts = (m: { model?: string; effort?: RunOpts['effort']; ultracode?: boolean; auto?: boolean; research?: boolean; workbench?: boolean }): RunOpts => ({ model: m.model, effort: m.effort, ultracode: m.ultracode, auto: m.auto, research: m.research, workbench: m.workbench })
+const runOpts = (m: { model?: string; effort?: RunOpts['effort']; ultracode?: boolean; advisor?: string; auto?: boolean; research?: boolean; workbench?: boolean; container?: boolean }): RunOpts => ({ model: m.model, effort: m.effort, ultracode: m.ultracode, advisor: m.advisor, auto: m.auto, research: m.research, workbench: m.workbench, container: m.container })
 /** newChat for a hub-new-chat: a Claude chat's id is picked here so its waits and group can find it; a new Codex chat's id is only known once it runs, so it cannot wait yet. */
 async function startChat(folder: string, m: Extract<WebviewToExtensionMessage, { type: 'hub-new-chat' }>): Promise<string | undefined> {
   const claude = (m.ai ?? 'claude') === 'claude', waits = m.waitOn ?? []
-  // A loop needs the id up front too; New chat offers it to Claude chats only.
+  // A loop needs the id up front too, and so does the loop pick's ledger row; New chat offers loops to Claude chats only.
   const loop = claude && m.loop?.mode !== 'turn' ? m.loop : undefined
-  const id = claude && (waits.length || m.group || loop) ? randomUUID() : undefined
+  const id = claude && (waits.length || m.group || loop || m.smartLoop) ? randomUUID() : undefined
   // A Codex chat has no id yet: its waits are applied once bindCodexTerminals ties it.
   const text = [m.text, takeSeeded(folder), loop?.mode === 'goal' ? loopPrompt(true, loop.doneWhen) : ''].filter(Boolean).join('\n\n') || m.text
   const problem = await newChat(folder, text, m.remote, m.branch, m.ai, m.tools, id, false, undefined, m.group, claude ? undefined : waits, claude && m.worktree === true, runOpts(m))
   if (!problem && id && waits.length) pendingWaits.set(id, { on: waits, at: Date.now() })
+  if (!problem && id && m.smartLoop) logLoop(id, folder, m.smartLoop)
   // The goal text rode in the first prompt, so setLoop's own text is not sent.
   if (!problem && id && loop) void setLoop(id, loop).catch(err => log.warn(`Loop not set for ${id.slice(0, 8)}: ${(err as Error).message}`))
   return problem
@@ -1173,6 +1175,13 @@ export function handleHubMessage(m: WebviewToExtensionMessage): boolean | string
     }
     case 'hub-open-url':
       openPage(m.url)
+      return true
+    case 'hub-update-check':
+      void vscode.commands.executeCommand('agentVisualizer.checkForUpdates', true)
+      return true
+    case 'hub-update-reload':
+      if (hub.get().update?.state !== 'installed') return refuse('Check for and install an update before reloading.')
+      void vscode.commands.executeCommand('workbench.action.reloadWindow')
       return true
     case 'hub-mirofish-report': {
       // A saved report opens as a Markdown preview; the id names a file in the reports folder only.

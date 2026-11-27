@@ -17,13 +17,14 @@ export type GraphNode = { id: string; kind: 'memory' | 'wiki' | 'raw' | 'project
 export type GraphEdge = { source: string; target: string; kind: 'link' | 'in' | 'todo' | 'from' | Pred }
 /** Lint: duplicates are names or aliases two notes claim, contradictions id pairs, the rest node ids.
  * invalid: a memory note with no description or no valid type; stale: a project note not modified in 90 days;
- * loops: groups of live notes whose supersedes edges run in a circle; unproven: a note still `status: unproven` after 14 days. */
-export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][]; unproven: string[] }
+ * loops: groups of live notes whose supersedes edges run in a circle; unproven: a note still `status: unproven` after 14 days.
+ * probed: unmarked pairs the Learn run's contradiction probe judged in conflict (readGraph only). */
+export type GraphHealth = { dangling: string[]; orphans: string[]; duplicates: string[]; contradictions: [string, string][]; superseded: string[]; invalid: string[]; stale: string[]; loops: string[][]; unproven: string[]; probed?: [string, string][] }
 export type MemoryGraph = { nodes: GraphNode[]; edges: GraphEdge[]; health: GraphHealth }
 /** mtime: when modified is not in the frontmatter, stale goes by it. archived: from memory/archive/, a superseded note kept as history. */
 export type MemoryFile = { dir: string; file: string; text: string; mtime?: number; archived?: boolean }
 /** A vault note: wiki/ topic page or raw/ source, file relative to that folder. */
-export type VaultFile = { kind: 'wiki' | 'raw'; file: string; text: string }
+export type VaultFile = { kind: 'wiki' | 'raw'; file: string; text: string; mtime?: number }
 /** label: the path as shown, ~ for the home folder. */
 export type RuleFile = { path: string; text: string; label?: string }
 
@@ -150,6 +151,7 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
   for (const { f, m, id } of parsed) {
     add({ id, kind: 'memory', label: redact(m.name), type: m.type, ...fields(m) })
     bodies.set(nodes.get(id)!, redact(m.body))
+    dated(nodes.get(id)!, m.modified, f.mtime)
     const home = bySlug.get(f.dir.toLowerCase())
     const pid = home ? projectFor(home) : add({ id: `project:dir:${f.dir}`, kind: 'project', label: decodeProjectDir(f.dir) })
     edges.push({ source: id, target: pid, kind: 'in' })
@@ -165,6 +167,7 @@ export function buildGraph(state: HubState, memories: MemoryFile[], rules: RuleF
     claim(m, id, 'vault')
     add({ id, kind: f.kind, label: redact(m.name), ...fields(m) })
     bodies.set(nodes.get(id)!, redact(m.body))
+    dated(nodes.get(id)!, m.modified, f.mtime)
     return { f: undefined, m, id }
   })
   const all = [...parsed, ...notes]
@@ -253,6 +256,13 @@ const STOP = new Set('a an and are as at be by can do does for from has have how
 const kin = (t: string, w: string) => Math.min(t.length, w.length) > 3 && Math.abs(t.length - w.length) < 5 && (w.startsWith(t) || t.startsWith(w))
 // A node's whole text, redacted: node.text stops at TEXT_MAX, and a merged note's later sections must be found too.
 const bodies = new WeakMap<GraphNode, string>()
+// Day a note was last changed, for recall's seed lines: modified as written, else the file mtime in local time.
+const dates = new WeakMap<GraphNode, string>()
+function dated(n: GraphNode, modified?: string, mtime?: number) {
+  if (/^\d{4}-\d{2}-\d{2}/.test(modified ?? '')) return void dates.set(n, modified!.slice(0, 10))
+  const t = Number.isFinite(Date.parse(modified ?? '')) ? Date.parse(modified!) : mtime
+  if (t !== undefined && Number.isFinite(t)) dates.set(n, new Date(t - new Date(t).getTimezoneOffset() * 60_000).toISOString().slice(0, 10))
+}
 /** How well the words hold t: 1 whole, 0.6 as a kin form, 0 not. */
 const holds = (ws: Set<string>, t: string) => (ws.has(t) ? 1 : [...ws].some(w => kin(t, w)) ? 0.6 : 0)
 type Indexed = { n: GraphNode; fields: [Set<string>, number][] }
@@ -273,23 +283,9 @@ function indexOf(graph: MemoryGraph): Indexed[] {
  * rank lower and say so. near: the chat's project id, first on a tied score.
  * scope research: only the notes in the research folder's memory. Plain text, redacted, about 1500 characters. */
 export function recall(graph: MemoryGraph, query: string, hops = 2, near?: string, scope?: 'research'): string {
-  const low = (x: string) => x.normalize('NFC').toLowerCase()
-  const q = low(query.trim())
-  const terms = [...new Set(words(q))].filter(t => !STOP.has(t))
-  const byId = new Map(graph.nodes.map(n => [n.id, n]))
-  const index = indexOf(graph)
-  const hits = new Map(index.map(({ n, fields }) => [n, terms.map(t => Math.max(0, ...fields.map(([ws, w]) => w * holds(ws, t))))]))
-  const rarity = terms.map((_, i) => { const df = [...hits.values()].filter(h => h[i]).length; return Math.sqrt(Math.log(1 + (index.length - df + 0.5) / (df + 0.5))) })
-  const score = (n: GraphNode) => (hits.get(n) ?? []).reduce((s, w, i) => s + w * rarity[i], low(n.label) === q ? 1000 : 0) * (n.unproven ? 0.7 : 1)
-  const inScope = (id: string) => scope !== 'research' || id.startsWith(`memory:${slugOf(RESEARCH_ROOT)}/`)
-  const home = new Set(near ? graph.edges.filter(e => e.kind === 'in' && e.target === near).map(e => e.source) : [])
-  // A superseded note only when asked for by name or alias.
-  const named = (n: GraphNode) => low(n.label) === q || !!n.aliases?.some(a => low(a) === q)
-  const seeds = graph.nodes.filter(n => (n.kind === 'memory' || n.kind === 'wiki' || n.kind === 'raw') && (!n.superseded || named(n)) && inScope(n.id))
-    .map(n => ({ n, s: score(n) })).filter(x => x.s > 0)
-    .sort((a, b) => b.s - a.s || Number(!home.has(a.n.id)) - Number(!home.has(b.n.id)) || a.n.label.length - b.n.label.length)
-    .slice(0, 3).map(x => x.n)
+  const { seeds, terms, rarity, inScope } = rank(graph, query, near, scope)
   if (!seeds.length) return redact(`Nothing in memory matches "${query.trim().slice(0, 100)}".`)
+  const byId = new Map(graph.nodes.map(n => [n.id, n]))
   const seen = new Set(seeds.map(n => n.id))
   const ok = (id: string) => seen.has(id) || !byId.get(id)?.superseded
   const tag = (id: string) => { const n = byId.get(id)!; return `(${n.label}${n.superseded ? ', superseded' : ''})` }
@@ -310,7 +306,7 @@ export function recall(graph: MemoryGraph, query: string, hops = 2, near?: strin
     front = next
   }
   const old = new Set(graph.health.stale)
-  const mark = (n: GraphNode) => [n.superseded && 'superseded', n.unproven && 'unproven, check it first', old.has(n.id) && 'not updated in 90 days'].filter(Boolean).join(', ')
+  const mark = (n: GraphNode) => [dates.get(n), n.superseded && 'superseded', n.unproven && 'unproven, check it first', old.has(n.id) && 'not updated in 90 days'].filter(Boolean).join(', ')
   const head = seeds.map(n => {
     // The three lines that say most about the query: a merged note's section may sit far down.
     const ls = (bodies.get(n) ?? n.text ?? '').split('\n').map(l => l.trim()).filter(Boolean)
@@ -324,6 +320,50 @@ export function recall(graph: MemoryGraph, query: string, hops = 2, near?: strin
   if (rel.length && out.length + 2 < RECALL_MAX) out += '\n'
   for (const l of rel) { if (out.length + l.length + 1 > RECALL_MAX) break; out += `\n${l}` }
   return out
+}
+
+/** The top 3 notes recall would start from for query. */
+export const seedsOf = (graph: MemoryGraph, query: string) => rank(graph, query).seeds
+
+/** The Learn run's contradiction verdicts (probe.ts), keyed by probeKey. Not in the switchboard root: mods parse every .json there. */
+export const probeFile = (home = os.homedir()) => path.join(home, '.claude', 'switchboard', 'probe', 'verdicts.json')
+export const PROBE_MODEL = 'typesafe/jev-1.13'
+// Bump when the question changes: old verdicts stop counting.
+export const PROBE_V = 1
+export const PROBE_AT = 0.7
+export type ProbeVerdict = { a: string; b: string; p: number }
+const hashes = new WeakMap<GraphNode, string>()
+const noteHash = (n: GraphNode) => { let h = hashes.get(n); if (!h) hashes.set(n, h = createHash('sha256').update(`${n.description ?? ''}\n${bodies.get(n) ?? n.text ?? ''}`).digest('hex')); return h }
+/** One verdict per pair of notes and their texts, either order: an edit to either note asks again. Ids too, so two copies of one text stay apart. */
+export const probeKey = (a: GraphNode, b: GraphNode) => createHash('sha256').update([PROBE_MODEL, PROBE_V, ...[`${a.id}\n${noteHash(a)}`, `${b.id}\n${noteHash(b)}`].sort()].join('\n')).digest('hex').slice(0, 32)
+/** Note pairs joined by a typed relation, ids sorted and newline-joined: someone already looked at both. */
+export const typedPairs = (graph: MemoryGraph) => new Set(graph.edges.filter(e => (PREDS as string[]).includes(e.kind)).map(e => [e.source, e.target].sort().join('\n')))
+/** Pairs the probe judged in conflict whose texts are unchanged since, both live, with no typed relation yet. */
+export function probedPairs(graph: MemoryGraph, verdicts: Record<string, ProbeVerdict>): [string, string][] {
+  const byId = new Map(graph.nodes.map(n => [n.id, n])), typed = typedPairs(graph)
+  return Object.entries(verdicts).flatMap(([k, v]) => {
+    const a = byId.get(v.a), b = byId.get(v.b), p = [v.a, v.b].sort() as [string, string]
+    return a && b && !a.superseded && !b.superseded && v.p >= PROBE_AT && probeKey(a, b) === k && !typed.has(p.join('\n')) ? [p] : []
+  })
+}
+
+function rank(graph: MemoryGraph, query: string, near?: string, scope?: 'research') {
+  const low = (x: string) => x.normalize('NFC').toLowerCase()
+  const q = low(query.trim())
+  const terms = [...new Set(words(q))].filter(t => !STOP.has(t))
+  const index = indexOf(graph)
+  const hits = new Map(index.map(({ n, fields }) => [n, terms.map(t => Math.max(0, ...fields.map(([ws, w]) => w * holds(ws, t))))]))
+  const rarity = terms.map((_, i) => { const df = [...hits.values()].filter(h => h[i]).length; return Math.sqrt(Math.log(1 + (index.length - df + 0.5) / (df + 0.5))) })
+  const score = (n: GraphNode) => (hits.get(n) ?? []).reduce((s, w, i) => s + w * rarity[i], low(n.label) === q ? 1000 : 0) * (n.unproven ? 0.7 : 1)
+  const inScope = (id: string) => scope !== 'research' || id.startsWith(`memory:${slugOf(RESEARCH_ROOT)}/`)
+  const home = new Set(near ? graph.edges.filter(e => e.kind === 'in' && e.target === near).map(e => e.source) : [])
+  // A superseded note only when asked for by name or alias.
+  const named = (n: GraphNode) => low(n.label) === q || !!n.aliases?.some(a => low(a) === q)
+  const seeds = graph.nodes.filter(n => (n.kind === 'memory' || n.kind === 'wiki' || n.kind === 'raw') && (!n.superseded || named(n)) && inScope(n.id))
+    .map(n => ({ n, s: score(n) })).filter(x => x.s > 0)
+    .sort((a, b) => b.s - a.s || Number(!home.has(a.n.id)) - Number(!home.has(b.n.id)) || a.n.label.length - b.n.label.length)
+    .slice(0, 3).map(x => x.n)
+  return { seeds, terms, rarity, inScope }
 }
 
 // /hub/recall's graph: one read per 30 s per reader, shared by calls that land together. Memory only, never saved.
@@ -388,15 +428,19 @@ export async function readGraph(state: HubState, home = os.homedir()): Promise<M
   const rules: RuleFile[] = []
   for (const p of [path.join(home, '.claude', 'CLAUDE.md'), ...state.projects.map(x => path.join(x.path, 'CLAUDE.md'))]) {
     const text = (await readText(p, true))?.text
-    if (text !== undefined) rules.push({ path: p, text, label: p.startsWith(home) ? `~${p.slice(home.length)}` : p })
+    if (text !== undefined) rules.push({ path: p, text, label: norm(p).startsWith(norm(home) + '/') ? `~${norm(p).slice(norm(home).length)}` : p })
   }
   const vault: VaultFile[] = []
   for (const kind of ['wiki', 'raw'] as const) {
     const dir = path.join(home, 'Documents', 'vault', kind)
     for (const file of await vaultNotes(dir)) {
-      const text = (await readText(path.join(dir, file)))?.text
-      if (text !== undefined) vault.push({ kind, file, text })
+      const got = await readText(path.join(dir, file))
+      if (got) vault.push({ kind, file, ...got })
     }
   }
-  return buildGraph(state, memories, rules, vault)
+  const graph = buildGraph(state, memories, rules, vault)
+  let verdicts: Record<string, ProbeVerdict> = {}
+  try { verdicts = (JSON.parse((await readText(probeFile(home)))?.text ?? '{}') as { pairs?: Record<string, ProbeVerdict> }).pairs ?? {} } catch { /* none yet, or broken */ }
+  graph.health.probed = probedPairs(graph, verdicts)
+  return graph
 }

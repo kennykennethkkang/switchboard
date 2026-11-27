@@ -213,7 +213,7 @@ describe('edit guard', () => {
 
   it('stops the first edit of a file another open chat in the project edited lately', () => {
     const why = editGuard(st(), edited(), new Map(), 'me', '/w/Armasu', '/w/Armasu/src/x.ts', NOW)
-    assert.equal(why, 'Another open chat (Bag fix) edited src/x.ts 3 min ago. Re-read the file before changing it, keep your edit from clobbering theirs, or use a worktree. Retry this edit to go ahead.')
+    assert.equal(why, `Another open chat (Bag fix) edited ${process.platform === 'win32' ? 'x.ts' : 'src/x.ts'} 3 min ago. Re-read the file before changing it, keep your edit from clobbering theirs, or use a worktree. Retry this edit to go ahead.`)
   })
 
   it('lets a retry through within two minutes, and stops it again after', () => {

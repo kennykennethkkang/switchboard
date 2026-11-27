@@ -1,3 +1,7 @@
 packages:
   - extension
   - web
+
+# pnpm 11+ refuses install when a dependency's build script is not allowed
+allowBuilds:
+  esbuild: true

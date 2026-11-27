@@ -5,7 +5,7 @@ import { useHub } from '@/hooks/use-hub'
 import { chatProjects, hideDone, inProjects, liveChats, projectName } from '@/lib/archive'
 import { editorName } from '@/lib/editor'
 import { ApproveBar } from './approve'
-import { approveBlock } from '@/lib/approve'
+import { approveBlock, reviewQueue } from '@/lib/approve'
 import { defaultCommands, switcherItems, type SwitchItem } from '@/lib/switcher'
 import { chatShown, isBusy } from '@/lib/chat-state'
 import { CODER_PAGES, isMap, pageOf, pageTitle, pageBlurb, type Page } from '@/lib/route'
@@ -63,6 +63,7 @@ import { ResearchOffers, ResearchTracker } from './research-offer'
 import { ResearchPanel } from './research-panel'
 import { ResearchPage, ResearchSignal } from './research-library'
 import { Workbench, WorkbenchSignal } from './workbench'
+import { useShortcuts } from '@/hooks/use-shortcuts'
 // Its own chunk with three in it, loaded on the first open.
 const MemoryView = lazy(() => import('./memory').then(m => ({ default: m.MemoryView })))
 const FlowMapView = lazy(() => import('./flow-map').then(m => ({ default: m.FlowMapView })))
@@ -118,13 +119,14 @@ export function Switchboard() {
   // The hash keeps the page, so turning Coder view back on returns to it.
   const view: Page = !coder && CODER_PAGES.includes(page) ? 'now' : page
   const go = (p: Page) => { if (location.hash !== `#${p}`) location.hash = p; setPage(p); if (!isMap(p)) window.scrollTo({ top: 0 }) }
+  const shortcuts = useShortcuts({ go, enabled: coder, onNew: () => { setPanel('new'); window.scrollTo({ top: 0 }) } })
   const [gearAt, setGearAt] = useState<{ at: Section; n: number }>({ at: 'Chats', n: 0 })
   const [finding, setFinding] = useState(false)
   const [phone, setPhone] = useState(false)
   const phoneWrap = useRef<HTMLSpanElement>(null)
   useDismiss(phone, phoneWrap, () => setPhone(false))
   const [reveal, setReveal] = useState<{ chain: string; at: number }>()
-  const [reading, setReading] = useState<{ id: string; name: string }>()
+  const [reading, setReading] = useState<{ id: string; name: string; cwd?: string; model?: string; costUsd?: number }>()
   // The project filter is this device's own, like the tool-calls toggle.
   const [projects, setProjects] = useState<string[]>([])
   useEffect(() => { try { const v = JSON.parse(readStore(PROJECTS_KEY) ?? '[]'); if (Array.isArray(v)) setProjects(v.filter(p => typeof p === 'string')) } catch { /* no storage: show all */ } }, [])
@@ -202,7 +204,15 @@ export function Switchboard() {
     if (id.startsWith('go:')) return go(pageOf(id.slice(3)))
     if (id.startsWith('do:approve:')) return send({ type: 'hub-approve', sessionId: id.slice(11) })
     if (id === 'do:new') { setPanel('new'); window.scrollTo({ top: 0 }) }
-    else if (id === 'do:commit-draft' && ready) { send({ type: 'hub-draft-commit', sessionId: ready.sessionId }); toGit() }
+    else if (id === 'do:check-updates') send({ type: 'hub-update-check' })
+    else if (id === 'do:sign-in') send({ type: 'hub-sync-sign-in' })
+    else if (id === 'do:commit' && ready) { send({ type: 'hub-draft-commit', sessionId: ready.sessionId }); toGit() }
+    else if (id === 'do:push' && ready) toGit()
+    else if (id === 'do:open-diff' && ready) {
+      const file = hub.changes?.sessionId === ready.sessionId ? hub.changes.files[0]?.path : ready.files[0]?.path
+      if (file) send({ type: 'hub-open-diff', sessionId: ready.sessionId, file })
+      else { send({ type: 'hub-changes', sessionId: ready.sessionId }); toGit() }
+    }
     else if (id === 'do:awake') send({ type: 'hub-awake', on: !hub.awake })
     else if (id === 'do:calls') send({ type: 'hub-switchboard', key: 'phone', value: !phoneOn })
     else if (id === 'do:phone') { send({ type: 'hub-web', phone: true }); setPhone(true) }
@@ -247,7 +257,10 @@ export function Switchboard() {
   // A project's window: the window holding any chat of that project.
   const projectTint = (name: string) => placeOf(cards.find(c => projectName(c.chat) === name)?.chat.cwd, windows)?.color
   const itemTint = (item: SwitchItem) => item.kind === 'command' ? undefined : placeOf(item.kind === 'live' ? cards.find(c => c.chat.sessionId === item.id)?.chat.cwd : item.chain.split('\n')[0], windows)?.color
-  const read = (chat: Card['chat']) => () => setReading({ id: chat.sessionId, name: chat.name || projectName(chat) })
+  const read = (chat: Card['chat']) => () => {
+    const live = hub.live.find(s => s.sessionId === chat.sessionId)
+    setReading({ id: chat.sessionId, name: chat.name || projectName(chat), cwd: chat.cwd, model: live?.model, costUsd: live?.costUsd ?? chat.costUsd })
+  }
   const waitProps = (chat: Card['chat']) => ({ targets: waitTargets(hub.chats, chat, hub.links), problem, onWait: (to: string) => send({ type: 'hub-wait-for', from: chat.sessionId, to }) })
   const chipsOf = (id: string) => linkChips(hub.links, hub.chats, id)
   const held = hub.pause?.chats.map(c => c.sessionId)
@@ -321,10 +334,10 @@ export function Switchboard() {
   const pickedStuck = picked(hub.stuck ?? [], cards, projects)
   const asking = shown.filter(c => c.progress?.state === 'needs-you').map(c => ({ sessionId: c.chat.sessionId, question: c.progress?.question, ask: c.chat.ai === 'codex' ? undefined : c.progress?.ask, check: hub.doneChecks?.[c.chat.sessionId], block: approveBlock(c.progress) }))
   const approvals = shown.filter(c => c.progress?.state === 'done').map(c => c.chat.sessionId)
-  const approveBar = (id: string, small?: boolean, noLabel?: boolean) => <ApproveBar sessionId={id} check={hub.doneChecks?.[id]} block={approveBlock(hub.progress.find(p => p.sessionId === id))} send={send} small={small} noLabel={noLabel} />
-  const stuck = <StuckStrip stuck={pickedStuck} learning={hub.learnReady} needs={asking} fails={fails} approvals={approvals} approve={id => approveBar(id, true, true)} name={chatName} send={send} onCopy={copy} onJump={jump} bare simple={!coder}
+  const approveBar = (id: string, small?: boolean, noLabel?: boolean) => <ApproveBar sessionId={id} check={hub.doneChecks?.[id]} block={approveBlock(hub.progress.find(p => p.sessionId === id))} send={send} small={small} noLabel={noLabel} simple={!coder} />
+  const stuck = <StuckStrip stuck={pickedStuck} learning={hub.learnReady} needs={asking} fails={fails} approvals={approvals} review={reviewQueue(shown.flatMap(c => c.progress ? [c.progress] : []))} approve={id => approveBar(id, true, true)} name={chatName} send={send} onCopy={copy} onJump={jump} bare simple={!coder}
     tint={id => placeOf(cards.find(c => c.chat.sessionId === id)?.chat.cwd, windows)?.color}
-    diff={id => { const c = cards.find(x => x.chat.sessionId === id); return c && <ChangesPanel key={id} editor={editorName(hub)} changes={hub.changes} sessionId={id} cwd={c.chat.cwd} commit={c.progress?.commit} onCopy={copy} onOpen={file => send({ type: 'hub-open-diff', sessionId: id, file })} /> }}
+    diff={id => { const c = cards.find(x => x.chat.sessionId === id); return c && <ChangesPanel key={id} editor={editorName(hub)} changes={hub.changes} sessionId={id} cwd={c.chat.cwd} commit={c.progress?.commit} onCopy={copy} onOpen={file => send({ type: 'hub-open-diff', sessionId: id, file })} onNote={text => send({ type: 'hub-send', sessionId: id, text })} /> }}
     onDiff={id => { const to = id ?? currentId; if (to) send({ type: 'hub-changes', sessionId: to }) }}
     onAnswer={(sessionId, askId, choice) => send({ type: 'hub-answer', sessionId, askId, choice })} />
   // Split check: the editor answers, from VS Code or the phone; the demo fakes one.
@@ -333,7 +346,7 @@ export function Switchboard() {
   const gear = <Gear key={gearAt.n} hub={hub} send={send} start={gearAt.at} problem={problem} folder={todoAt} />
   const filter = (projectChips.length > 1 || projects.length > 0) && <ProjectFilter projects={projectChips} picked={projects} tint={projectTint} busy={name => cards.filter(c => isBusy(chatShown(c.progress, hub.stuck, c.chat.sessionId)) && projectName(c.chat) === name).length} onChange={pickProjects} />
   const dev = <DevRows dev={(hub.dev ?? []).filter(d => inProjects({ cwd: d.folder, project: d.repo }, projects))} tailscale={hub.tailscale} isVSCode={isVSCode} send={send} />
-  const chatCards = <ChatCards looping={Object.entries(hub.tools?.chats ?? {}).filter(([, p]) => p.indefinite).map(([id]) => id)} editor={editorName(hub)} cards={rail} all={hub.progress} stuck={hub.stuck} cache={hub.cache} waits={hub.waits} todoChips={id => todoChips(hub.todos ?? {}, id)} held={held} links={chipsOf} onUnlink={(from, to) => send({ type: 'hub-unlink', from, to })} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
+  const chatCards = <ChatCards simple={!coder} looping={Object.entries(hub.tools?.chats ?? {}).filter(([, p]) => p.indefinite).map(([id]) => id)} editor={editorName(hub)} cards={rail} all={hub.progress} stuck={hub.stuck} cache={hub.cache} waits={hub.waits} todoChips={id => todoChips(hub.todos ?? {}, id)} held={held} links={chipsOf} onUnlink={(from, to) => send({ type: 'hub-unlink', from, to })} selected={currentId} windows={windows} here={hub.thisWindow} onSelect={select} starred={starred} menu={menu}
     top={c => coder && <CardStages hub={hub} sessionId={c.chat.sessionId} send={send} />}
     extra={c => c.progress?.state === 'done' && approveBar(c.chat.sessionId, true)}
     summaries={hub.summaries} onSummary={(sessionId, refresh) => send({ type: 'hub-summary', sessionId, ...(refresh ? { refresh } : {}) })} onCopy={copy}
@@ -351,7 +364,7 @@ export function Switchboard() {
   const place = placeOf(current?.chat.cwd, windows)
   const message = current && ((tools: ReactNode) => <MessageBox key={current.chat.sessionId} chat={current.chat} send={send} upload={upload} problem={problem} tools={tools} />)
   const picture = current
-    ? <ChatPicture chat={current.chat} progress={current.progress} stuckItems={hub.stuck} all={hub.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models} demo={isDemo} repo={hub.repo} links={chipsOf(current.chat.sessionId)}
+    ? <ChatPicture simple={!coder} chat={current.chat} progress={current.progress} stuckItems={hub.stuck} all={hub.progress} live={hub.live.find(l => l.sessionId === current.chat.sessionId)} instant={pick.key} models={models} demo={isDemo} repo={hub.repo} links={chipsOf(current.chat.sessionId)}
         profile={hub.tools?.chats[current.chat.sessionId]} flagged={hub.tools?.flagged} smart={hub.tools?.smart?.[current.chat.sessionId]} globalOff={hub.tools?.globalOff} onProfile={tools => send({ type: 'hub-chat-tools', sessionId: current.chat.sessionId, tools })} onCommand={send}
         place={place} message={message} menu={<><button type="button" className="hub-btn" onClick={read(current.chat)} title="Live screen, what this chat produced, and its transcript">{vscodeBridge?.isVSCode ? 'Outputs' : 'Screen and outputs'}</button><ChatMenu chat={current.chat} starred={starred.includes(current.chat.sessionId)} send={send} onMac={isVSCode} inPicture {...waitProps(current.chat)} /></>}
         installed={hub.installed} connections={hub.connections} onInstalled={() => openGear('Installed')}
@@ -371,7 +384,7 @@ export function Switchboard() {
   const ship = shipId && !shipping.tree && shipper?.progress && <ShipCard key={`ship-${shipId}`} repo={hub.repo} progress={shipper.progress} sessionId={shipId} send={send} onCopy={copy} phone={onPhone} harden={!!hub.controls.switchboard.hardenBuild} />
   const git = shipId && <>{ship}<GitPanel key={`git-${shipId}`} repo={hub.repo} sessionId={shipId} cwd={shipId} chat={shipper?.chat} commit={shipper?.progress?.commit} isVSCode={isVSCode} send={send} shipping={!!ship} phone={onPhone} merging={shipping.repo.merging && !shipping.tree} /></>
   const switcher = finding && <Switcher items={items} tint={itemTint} onPick={choose} onClose={() => setFinding(false)} />
-  const chatView = reading && <ChatView key={reading.id} sessionId={reading.id} name={reading.name} demo={isDemo ? hub : undefined} onCopy={copy} onClose={() => setReading(undefined)} />
+  const chatView = reading && <ChatView key={reading.id} sessionId={reading.id} name={reading.name} cwd={reading.cwd} model={reading.model} costUsd={reading.costUsd} demo={isDemo ? hub : undefined} onCopy={copy} onClose={() => setReading(undefined)} />
   const mapView = !coder ? null : page === 'map-memory' ? <Suspense fallback={null}><MemoryView isDemo={isDemo} onClose={() => go(back.current)} /></Suspense>
     : page === 'map-flow' ? <Suspense fallback={null}><FlowMapView isDemo={isDemo} cwds={hub.projects.map(p => p.path)} here={projectOf(hub.projects.map(p => p.path), hub.thisWindow)} cwd={projectOf(hub.projects.map(p => p.path), current?.chat.cwd)} hub={hub} onClose={() => go(back.current)} /></Suspense>
     : page === 'map-board' && <Suspense fallback={null}><BoardView hub={hub} isDemo={isDemo} send={send} onClose={() => go(back.current)}
@@ -419,6 +432,7 @@ export function Switchboard() {
 
   return (
     <div className="hub hub-shell" data-page={view} data-map={isMap(view) || undefined} style={{ background: 'var(--hub-surface)', color: 'var(--hub-body)', font: '400 14px/1.6 var(--hub-sans)' }}>
+      {shortcuts}
       <Nav page={view} go={go} onFind={() => setFinding(true)} findKey={isMac() ? '⌘K' : 'Ctrl K'} simple={!coder} onCoder={on => send({ type: 'hub-coder-view', on })}
         counts={{ needs: needsAll, chats: cards.length, plan: todoCount, live: liveCount(hub), ship: shipCount(hub.ship) }} />
       <div className="hub-col">
@@ -427,8 +441,8 @@ export function Switchboard() {
         {pauseBanner}
         {devices}
         {panel !== 'none' && <div style={{ padding: 16, borderBottom: '1px solid var(--hub-hair)' }}>{newChat}</div>}
-        <main className="hub-page" aria-label={view}>{isMap(view) ? null : pages[view as keyof typeof pages]}</main>
-        <StatusBar meters={meters} dev={coder ? (hub.dev ?? []).map(d => ({ running: d.port ? 1 : 0, label: `${d.repo} :${d.port}` })) : []} onDev={() => go('ship')}
+        <main className="hub-page" id="hub-main" tabIndex={-1} aria-label={view}>{isMap(view) ? null : pages[view as keyof typeof pages]}</main>
+        <StatusBar simple={!coder} meters={meters} dev={coder ? (hub.dev ?? []).map(d => ({ running: d.port ? 1 : 0, label: `${d.repo} :${d.port}` })) : []} onDev={() => go('ship')}
           awake={hub.awake} onAwake={on => send({ type: 'hub-awake', on })} calls={phoneOn} onCalls={on => send({ type: 'hub-switchboard', key: 'phone', value: on })}
           phone={phoneButton} ship={coder && shipChip} />
       </div>

@@ -173,7 +173,7 @@ test('configureHooks writes through a settings.json symlink and keeps its mode',
   fs.symlinkSync(real, link)
   quietly(() => configureHooks(link, HOOK_CMD))
   assert.ok(fs.lstatSync(link).isSymbolicLink())
-  assert.equal(fs.statSync(real).mode & 0o777, 0o600)
+  if (process.platform !== 'win32') assert.equal(fs.statSync(real).mode & 0o777, 0o600)
   assert.ok(read(real).hooks)
 })
 

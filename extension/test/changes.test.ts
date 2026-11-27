@@ -85,7 +85,7 @@ describe('changes: links and odd paths', () => {
     fs.writeFileSync(path.join(repo, 'ok.txt'), 'fine\n')
     fs.symlinkSync(path.join(root, 'secret.txt'), path.join(repo, 'leak.txt'))
     fs.symlinkSync(root, path.join(repo, 'sub', 'up'))
-    assert.equal(await safeFile(repo, 'ok.txt'), path.join(repo, 'ok.txt'))
+    assert.equal(await safeFile(repo, 'ok.txt'), fs.realpathSync.native(path.join(repo, 'ok.txt')))
     assert.equal(await safeFile(repo, 'leak.txt'), undefined)
     assert.equal(await safeFile(repo, 'sub/up/secret.txt'), undefined)
     assert.equal(await safeFile(repo, '../secret.txt'), undefined)
@@ -141,7 +141,7 @@ describe('browser link', () => {
     let starts = 0
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-web-'))
     const r = await ensureWeb(root, false, { find: async () => null, start: () => { starts++ }, pidFile: pidFile() })
-    assert.match((r as { problem: string }).problem, /app\/dist\/app\.js/)
+    assert.match((r as { problem: string }).problem, /app(?:\/|\\)dist(?:\/|\\)app\.js/)
     assert.equal(starts, 0)
   })
   it('runs the bundled app first, the checkout only when the bundle is missing', async () => {

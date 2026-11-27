@@ -218,13 +218,10 @@ function normPath(p) {
   return IS_WIN ? r.toLowerCase() : r;
 }
 
-/** Checks PIDs without relying on Windows' unreliable process.kill(pid, 0). */
+/** Checks whether a process still exists. */
 function isAlive(pid) {
   if (!Number.isSafeInteger(Number(pid)) || Number(pid) <= 0) return false;
-  if (IS_WIN) {
-    try { return require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-Command', '(Get-Process -Id ' + Number(pid) + ' -ErrorAction SilentlyContinue).Id'], { encoding: 'utf8', timeout: 1500, windowsHide: true }).trim() === String(pid); } catch { return false; }
-  }
-  try { process.kill(pid, 0); return true; } catch { return false; }
+  try { process.kill(Number(pid), 0); return true; } catch (e) { return e.code === 'EPERM'; }
 }
 
 let input = '';

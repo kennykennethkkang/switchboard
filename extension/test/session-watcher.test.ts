@@ -7,6 +7,7 @@ import * as path from 'node:path'
 // CLAUDE_DIR comes from the home folder at import, and the watcher needs vscode's EventEmitter.
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-sw-'))
 process.env.HOME = home
+process.env.USERPROFILE = home
 class Emitter<T> {
   private fns: ((v: T) => void)[] = []
   event = (fn: (v: T) => void) => { this.fns.push(fn); return { dispose() {} } }
@@ -166,7 +167,7 @@ it('ignores appends for watched sessions and finds an ended session on its next 
   try {
     w.workspacePath = '-watch'
     w.watchDirForJsonl(dir)
-    const session = { filePath: busy }
+    const session = { filePath: busy, subagentWatchers: new Map() }
     w.sessions.set('busy', session)
     let scans = 0
     const scan = w.scanForActiveSessions.bind(w)

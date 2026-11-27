@@ -198,6 +198,10 @@ export function GitPanel({ repo, sessionId, cwd, chat, commit, isVSCode, send, s
       </div>}
       </div>
 
+      <p style={{ margin: '-2px 0 0', color: 'var(--hub-ash)', font: '400 11px/1.5 var(--hub-mono)', overflowWrap: 'anywhere' }}>
+        <code>git status --short</code> · <code>git commit -m &quot;summary&quot;</code> · <code>git push {t.remote} HEAD</code>
+      </p>
+
       {r.merge
         ? <PrCard repo={r} create={createPr} busy={busy} onOpen={open} onResolve={resolve} />
         : <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 12 }}>

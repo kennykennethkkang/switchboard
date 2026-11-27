@@ -47,7 +47,7 @@ describe('build stamp', () => {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-stamp-'))
     const want = ['dist/extension.js', 'dist/app/app.js', 'dist/webview/index.js', 'kit/rules.md', 'ask/ask-server.mjs', 'voice/voice.sh', 'media/icon.png', 'keeper/app-keeper.mjs', 'package.json']
     for (const f of want) { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), f) }
-    assert.deepEqual(stampFiles(d).map((f: string) => path.relative(d, f)).sort(), [...want].sort())
+    assert.deepEqual(stampFiles(d).map((f: string) => path.relative(d, f).replace(/\\/g, '/')).sort(), [...want].sort())
   })
 })
 

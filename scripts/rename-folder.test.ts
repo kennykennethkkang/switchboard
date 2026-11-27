@@ -7,6 +7,7 @@ import { execFileSync, spawnSync } from 'child_process'
 
 const SCRIPT = path.join(__dirname, 'rename-folder.sh')
 const key = (p: string) => p.replace(/[/.]/g, '-')
+const bash = { skip: process.platform === 'win32' && 'rename-folder.sh is a bash script for the Mac checkout' }
 
 function fakeHome() {
   const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-rename-')))
@@ -39,7 +40,7 @@ function run(h: ReturnType<typeof fakeHome>, args: string[], env: Record<string,
   return spawnSync('bash', [SCRIPT, ...args], { env: e, encoding: 'utf8', cwd: h.home })
 }
 
-test('dry run changes nothing and prints the gh command', () => {
+test('dry run changes nothing and prints the gh command', bash, () => {
   const h = fakeHome()
   const r = run(h, [])
   assert.equal(r.status, 0, r.stderr)
@@ -50,7 +51,7 @@ test('dry run changes nothing and prints the gh command', () => {
   fs.rmSync(h.home, { recursive: true, force: true })
 })
 
-test('refuses while VS Code has a cwd inside the folder', () => {
+test('refuses while VS Code has a cwd inside the folder', bash, () => {
   const h = fakeHome()
   const r = run(h, ['--apply'], { BUSY: path.join(h.src, 'web') })
   assert.equal(r.status, 1)
@@ -60,7 +61,7 @@ test('refuses while VS Code has a cwd inside the folder', () => {
 })
 
 // the native claude binary shows up in lsof under its version, not "claude"
-test('refuses while a Claude chat named by its version runs inside', () => {
+test('refuses while a Claude chat named by its version runs inside', bash, () => {
   const h = fakeHome()
   const r = run(h, ['--apply'], { BUSY: h.src, CMD: '2.1.321' })
   assert.equal(r.status, 1)
@@ -69,7 +70,7 @@ test('refuses while a Claude chat named by its version runs inside', () => {
   fs.rmSync(h.home, { recursive: true, force: true })
 })
 
-test('--apply moves the folder and its data, and a second run is a no-op', () => {
+test('--apply moves the folder and its data, and a second run is a no-op', bash, () => {
   const h = fakeHome()
   for (let i = 0; i < 2; i++) { const r = run(h, ['--apply']); assert.equal(r.status, 0, r.stderr + r.stdout) }
   const read = (p: string) => fs.readFileSync(p, 'utf8')

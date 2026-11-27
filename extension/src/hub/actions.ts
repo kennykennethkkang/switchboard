@@ -27,6 +27,7 @@ import { awsBinary, browserEnv, chromeCall, chromeChoice, deleteAwsProfile, logi
 import { SHELL, ask, shellQuote, chainBase, codexArgs, scriptBody, scriptLine, chainVersion, freshPrompt, inWorkspace, labelNote, newChatCommand, nextChainName, projectName, repoTop, stillRunning, ultracodeFlags } from './projects'
 import { insideCwd, libraryInventory, projectInventory, safeFile } from './local'
 import { addWorktree } from './git'
+import { CONTAINER_SETTINGS, containerPrefix, defaultConfigFile, hasOwnConfig, riskyKeys } from './devcontainer'
 import { saveGroup } from './split'
 import { matchCodexStarts, recordArchive, recordChain, type CodexStart } from './chains'
 import { RC_NAME, rcRunning, rcRunningNow, rcServerCommand } from './sessions'
@@ -37,6 +38,7 @@ import { openChatTerminal, tags } from './terminals'
 import { KEY_ENV, setupState, setupSteps, type SetupKit } from './setup'
 import { FLAGGED, chatSettings, cleanProfile, clearIndefinite, defaultProfile, handoffSettings, indefiniteOn, nameNote, saveProfile, savedProfile, startProfile, syncIndefinite, toolsNote, uiSdkNote } from './tools'
 import { jevStart, readPrecedence, saveSmartStart, withGoal } from './smart-tools'
+import { newChatInputs } from './new-chat-inputs'
 import { tuiEnv } from './controls'
 import { EVERY, goalLine, type Every, type LoopPick } from './loop'
 import { editor } from '../editor'
@@ -146,7 +148,7 @@ function freshTerminal(name: string, cwd: string): vscode.Terminal {
 const worktreeName = (title: string) => `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '') || 'chat'}-${crypto.randomUUID().slice(0, 4)}`
 
 /** The run's own picks from the command (hub-new-chat, hub-todo-run); unset fields are filled by the auto pick unless auto is false; no auto follows the gear's Auto pick per task. */
-export type RunOpts = { model?: string; effort?: Effort; ultracode?: boolean; auto?: boolean; research?: boolean; workbench?: boolean }
+export type RunOpts = { model?: string; effort?: Effort; ultracode?: boolean; advisor?: string; auto?: boolean; research?: boolean; workbench?: boolean; /** Claude only: run in the repo's devcontainer (devcontainer.ts). */ container?: boolean }
 export type Run = { ai: AiId; model?: string; effort?: string; ultracode: boolean; ultrathink: boolean; reason?: string; row?: Omit<PickRow, 'at' | 'session' | 'project'>; /** Smart select's model and effort picks, logged once the chat has an id. */ smart?: SmartDraft[] }
 
 /**
@@ -194,29 +196,38 @@ export async function resolveRun(want: NewChatAi, text: string | undefined, fold
  * todo: a To-do run's label (runLabel): the chat is named `To-do N: <title>` and gets it as SWITCHBOARD_TODO.
  * group: a split's group id (split.ts), saved once the session id is known.
  * worktree: Claude only, starts in repo/.claude/worktrees/<slug> on branch worktree-<slug>.
+ * container: Claude only, runs in the repo's devcontainer, else Switchboard's default one, at the same path.
  * run: the run's own model, effort and ultracode, auto false, research (resolveRun). A To-do run counts as unattended.
  * research: starts in the research folder instead, with a note that skips the finishing steps; workbench: in its Workbench folder, to change things.
  */
 export async function newChat(folder: string, text: string | undefined, remote: boolean, branch: string | undefined, want: NewChatAi = 'claude', tools?: ChatProfile, id?: string, noRemote = false, todo?: RunLabel, group?: string, waitOn?: string[], worktree = false, run?: RunOpts): Promise<string | undefined> {
   const project = hub.get().projects.find(p => p.path === folder)
   if (!project) return `${folder} is not in the project list yet; open Switchboard once and try again`
-  const picked = await resolveRun(want, text, folder, run, !!todo)
-  const { ai, reason } = picked
-  if (reason) void vscode.window.showInformationMessage(`${reason}`)
+  const goal = text ? stripResearchInstructions(text) : undefined
   let where = folder
   if (run?.research) {
     try { where = run.workbench ? ensureWorkbench() : ensureResearchRoot() } catch (err) { return `could not make the research folder (${(err as Error).message})` }
   }
-  const goal = text ? stripResearchInstructions(text) : undefined
-  const inv = ai === 'claude' && hub.get().installed.length ? await chatInventory(where) : []
+  const inputs = newChatInputs(want, () => resolveRun(want, text, folder, run, !!todo), () => goal ? titleFor(goal, quickAsk) : Promise.resolve(project.name))
+  const setup = inputs.toolPick(async () => {
+    const inv = hub.get().installed.length ? await chatInventory(where) : []
+    const start = startProfile(inv, tools)
+    const jev = start && !tools ? await jevStart(start, text ?? '', inv, readPrecedence()) : undefined
+    return { inv, start, jev }
+  })
+  void setup.catch(() => undefined)
+  const picked = await inputs.picked
+  const { ai, reason } = picked
+  if (reason) void vscode.window.showInformationMessage(`${reason}`)
+  const prepared = await setup
+  const inv = prepared?.inv ?? []
   // Every Claude chat gets its own tool set, never the user's settings.json. Codex keeps its own.
-  const named = goal ? await titleFor(goal, quickAsk) : project.name
+  const named = await inputs.title
   // Prefix, not suffix: a handoff's version number has to stay at the end (projects.ts CHAIN).
   const title = todo ? `To-do ${todo.n}: ${named}` : named
   // A profile the panel sent is Kenneth's pick; the default one takes what the first message names.
-  const start = startProfile(inv, tools)
-  // Claude only: Codex has no tools profile and no hook to record why.
-  const jev = start && !tools && ai === 'claude' ? await jevStart(start, text ?? '', inv, readPrecedence()) : undefined
+  const start = prepared?.start ?? startProfile(inv, tools)
+  const jev = prepared?.jev
   const profile = jev?.profile ?? (start && !tools ? withGoal(start, text ?? '', inv) : start)
   const about = Object.fromEntries(inv.filter(i => i.description).map(i => [i.name, i.description!]))
   // Codex has no hook to read the brief from, so it rides in front of the first message.
@@ -242,20 +253,31 @@ export async function newChat(folder: string, text: string | undefined, remote: 
   // Own worktree: made here, then a plain claude starts in it (claude --worktree makes Claude Code's guard refuse compound Bash).
   let cwd = where
   const top = worktree ? repoTop(where) : undefined
+  if (run?.container) {
+    if (SHELL !== 'posix') return 'Container chats need macOS or Linux for now'
+    if (!await cliPath('docker')) return 'Docker is not installed. Install and start Colima or OrbStack, then try again'
+  }
   if (top) {
     const made = await addWorktree(top, worktreeName(title))
     if (!made.ok) return made.error
     cwd = made.dir
   }
   // A picked chat always has an id, so the log row and a later handoff can find it.
-  const sessionId = id ?? (profile || picked.row ? crypto.randomUUID() : undefined)
+  // A container chat too: its pid is not on the Mac, so only the id ties it to its terminal.
+  const sessionId = id ?? (profile || picked.row || run?.container ? crypto.randomUUID() : undefined)
   try {
     const settings = chatSettings(sessionId, profile, noRemote)
     if (sessionId && profile) setChatProfile(sessionId, profile)
     if (sessionId && jev) saveSmartStart(sessionId, jev.why)
-    const fx = ultracodeFlags({ effort: picked.effort, ultracode: picked.ultracode, settings })
+    // A worktree's own .git is a link into top, so the whole repo goes in.
+    const box = run?.container ? top ?? repoTop(cwd) : undefined
+    if (run?.container && !box) throw new Error('A container chat needs a git repo')
+    const risky = box && hasOwnConfig(box) ? riskyKeys(box) : []
+    if (risky.length) void vscode.window.showInformationMessage(`This repo's devcontainer.json sets ${risky.join(', ')}, so the chat uses Switchboard's default container instead`)
+    const prefix = box ? containerPrefix({ repo: box, cwd, override: hasOwnConfig(box) && !risky.length ? undefined : defaultConfigFile() }) : undefined
+    const fx = ultracodeFlags({ effort: picked.effort, ultracode: picked.ultracode, settings: box ? CONTAINER_SETTINGS : settings })
     const message = picked.ultrathink ? withUltrathink(text ?? '') : text ?? ''
-    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote ? title : undefined, branch, sessionId, settings: fx.settings, model: picked.model, effort: fx.effort, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? (run.workbench ? WORKBENCH_NOTE : RESEARCH_NOTE) : ''].filter(Boolean).join(' ') || undefined }, SHELL)
+    command = newChatCommand({ textFile: messageFile(withPointer(message, rulesState.ready.claude, rulesState.kit)), name: title, remote: remote && !box ? title : undefined, branch, sessionId, settings: fx.settings, prefix, model: picked.model, effort: fx.effort, advisor: run?.advisor, system: [settings && profile ? toolsNote(profile, new Set(inv.filter(i => i.held).map(i => i.name)), about) : '', myName(), accountsNote(readLogins(), readLinks(), where, hub.get().signIns.chrome, browserFor(hub.get().signIns.browsers ?? {}, where)) ?? '', uiSdkNote(where) ?? '', run?.research ? (run.workbench ? WORKBENCH_NOTE : RESEARCH_NOTE) : ''].filter(Boolean).join(' ') || undefined }, SHELL)
   } catch (err) {
     return (err as Error).message
   }
@@ -434,6 +456,18 @@ export async function sendToCodex(chat: ChatRow, text: string): Promise<string |
   const t = codexTerm(chat.sessionId)
   const problem = await codexReady({ terminal: t, live: chat.live, startedAt: (t && codexBorn.get(t)) ?? 0, now: Date.now() })
   if (problem || !t) return problem
+  t.show(true)
+  t.sendText(paste, false)
+  setTimeout(() => t.sendText('\r', false), 150)
+  return undefined
+}
+
+/** Types a message into a container chat's terminal: no host mods run in there, so nothing polls the hub for it. */
+export function sendToContainer(chat: ChatRow, text: string): string | undefined {
+  const paste = codexPaste(text)
+  if (!paste) return 'the message has control characters in it, so it was not typed into the chat'
+  const t = tags.ourOf(chat.sessionId)
+  if (!t || t.exitStatus !== undefined) return `that container chat runs outside this ${editor.name} window; type in its terminal`
   t.show(true)
   t.sendText(paste, false)
   setTimeout(() => t.sendText('\r', false), 150)

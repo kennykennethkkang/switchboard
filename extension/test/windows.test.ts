@@ -23,12 +23,12 @@ describe('Windows helpers', () => {
     assert.throws(() => cliCall('safe\n.cmd', [], 'win32'))
   })
 
-  it('resolves bare commands to native executables', () => {
+  it('resolves bare commands to native executables', { skip: process.platform !== 'win32' && 'requires Windows filesystem path semantics' }, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'switchboard-windows-'))
     try {
       fs.writeFileSync(path.join(dir, 'git.exe'), '')
       assert.deepEqual(cliCall('git', ['status'], 'win32', { PATH: dir, PATHEXT: '.exe;.cmd;.bat' }), {
-        cmd: path.join(dir, 'git.exe'), args: ['status'],
+        cmd: path.win32.join(dir, 'git.exe'), args: ['status'],
       })
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
@@ -36,7 +36,7 @@ describe('Windows helpers', () => {
   })
 
   it('double escapes arguments for npm shims', () => {
-    assert.equal(cliCall('npm.cmd', ['100% & x'], 'win32').args[3], '"npm.cmd ^^^"100^^^%^^^ ^^^&^^^ x^^^""')
+    assert.equal(cliCall('npm.cmd', ['100% & x'], 'win32', { PATH: '', PATHEXT: '.CMD' }).args[3], '"npm.cmd ^^^"100^^^%^^^ ^^^&^^^ x^^^""')
   })
 
   it('leaves native executables as direct calls', () => {

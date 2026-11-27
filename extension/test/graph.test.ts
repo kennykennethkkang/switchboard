@@ -275,7 +275,7 @@ describe('the vault', () => {
     fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true })
   })
 
-  it('keeps the rest of a folder when one subfolder cannot be read', async () => {
+  it('keeps the rest of a folder when one subfolder cannot be read', { skip: process.platform === 'win32' && 'Windows does not enforce POSIX mode bits' }, async () => {
     const { home, wiki } = vaultHome()
     fs.mkdirSync(path.join(wiki, 'locked'))
     fs.writeFileSync(path.join(wiki, 'locked', 'x.md'), 'x')
@@ -448,7 +448,7 @@ describe('the knowledge graph', () => {
 
   it('recalls the best seeds, their relations within the hops, and skips superseded notes', () => {
     const r = recall(g(), 'hub recall')
-    assert.match(r, /^hub-recall: how chats query memory\n {2}Recall walks the graph/)
+    assert.match(r, /^hub-recall \(2026-11-01\): how chats query memory\n {2}Recall walks the graph/)
     assert.match(r, /\(hub-recall\) --\[depends-on\]--> \(graph-core\)/)
     assert.match(r, /\(no-graph\) --\[contradicts\]--> \(hub-recall\)/)
     assert.match(r, /\(hub-recall\) --\[in\]--> \(Armasu\)/)
@@ -465,7 +465,7 @@ describe('the knowledge graph', () => {
   it('shows a superseded note that is a seed, marked, follows aliases, and says when nothing matches', () => {
     assert.match(recall(g(), 'old-ask'), /^old-ask \(superseded\): ask the brain/)
     assert.match(recall(g(), 'old-ask'), /\(hub-recall\) --\[supersedes\]--> \(old-ask, superseded\)/)
-    assert.match(recall(g(), 'recall-tool'), /^hub-recall:/)
+    assert.match(recall(g(), 'recall-tool'), /^hub-recall \(2026-11-01\):/)
     assert.equal(recall(g(), 'zebra'), 'Nothing in memory matches "zebra".')
     assert.ok(recall(g(), 'graph', 1).split('\n\n')[0].split('\n').filter(l => !l.startsWith('  ')).length <= 3)
   })
@@ -499,10 +499,20 @@ describe('the knowledge graph', () => {
   it('ranks an unproven note below a proven one, says so, and lists it in health after 14 days', () => {
     const now = Date.parse('2026-11-24T00:00:00Z')
     const b = buildGraph(state(), [note('cache-a', 'description: cache misses after a deploy\nstatus: unproven\nmodified: 2026-11-01T00:00:00Z\n'), note('cache-b-longer', 'description: cache misses after a deploy\n'), note('fresh', 'description: zebra\nstatus: Unproven\nmodified: 2026-11-20T00:00:00Z\n')], [], [], now)
-    assert.match(recall(b, 'cache misses deploy'), /^cache-b-longer: .*[\s\S]*\ncache-a \(unproven, check it first\): /)
+    assert.match(recall(b, 'cache misses deploy'), /^cache-b-longer: .*[\s\S]*\ncache-a \(2026-11-01, unproven, check it first\): /)
     assert.deepEqual(b.health.unproven, [`memory:${dir}/cache-a`])
     assert.equal(b.nodes.find(n => n.label === 'fresh')!.unproven, true)
-    assert.match(recall(buildGraph(state(), [note('plan', 'description: quokka plan\ntype: project\nmodified: 2026-01-01T00:00:00Z\n')], [], [], now), 'quokka'), /^plan \(not updated in 90 days\): /)
+    assert.match(recall(buildGraph(state(), [note('plan', 'description: quokka plan\ntype: project\nmodified: 2026-01-01T00:00:00Z\n')], [], [], now), 'quokka'), /^plan \(2026-01-01, not updated in 90 days\): /)
+  })
+
+  it('dates each seed line by modified, else the file mtime, day only', () => {
+    const at = new Date(2026, 9, 5, 23, 30).getTime()
+    const g = buildGraph(state(), [note('dated', 'description: walrus a\nmodified: 2026-11-01T10:00:00Z\n'), { ...note('touched', 'description: walrus b\n'), mtime: at }], [], [{ kind: 'wiki', file: 'walrus.md', text: '# walrus d', mtime: at }])
+    const r = recall(g, 'walrus')
+    assert.match(r, /^dated \(2026-11-01\): walrus a/m)
+    assert.match(r, /^touched \(2026-10-05\): walrus b/m)
+    assert.match(r, /^walrus \(2026-10-05\): /m)
+    assert.match(recall(buildGraph(state(), [note('bare', 'description: walrus c\n')], []), 'walrus'), /^bare: walrus c/)
   })
 
   it('stays redacted and near 1500 characters on a big graph', () => {

@@ -6,7 +6,7 @@
 import { withDeadline } from './deadline'
 
 const MAX_WORDS = 5
-export const TITLE_MS = 20000
+export const TITLE_MS = 5000
 
 const words = (s: string) => s.replace(/[^\p{L}\p{N}\s'-]/gu, ' ').split(/\s+/).filter(Boolean)
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

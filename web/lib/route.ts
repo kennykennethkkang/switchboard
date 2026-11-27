@@ -23,7 +23,7 @@ export const pageBlurb = (p: Page) => isMap(p) ? 'How chats, code and memory con
   plan: 'The shared to-do: work saved for later chats.',
   live: 'Crowd tests, MiroFish sims and source checks: running now and their results.',
   ship: 'Pick a repo or worktree to commit, push or merge, chat or no chat.',
-  settings: 'Tools, models and how Switchboard behaves.',
+  settings: 'Sign-ins, limits, updates and how Switchboard behaves.',
   research: 'Finished research reports, newest first.',
   workbench: 'Research turned into changes on this Mac, with a log and Undo.',
   usage: 'What Claude and Codex used, what it would cost, and how much of each plan is left.',

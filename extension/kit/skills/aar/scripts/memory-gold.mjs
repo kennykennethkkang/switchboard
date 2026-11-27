@@ -18,9 +18,9 @@ const dir = path.join(os.homedir(), '.claude', 'switchboard')
 const windows = fs.readdirSync(dir).filter(f => /^[0-9a-f]+-\d+\.json$/.test(f))
   .sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs)
 
-// Top notes are the unindented "label: description" lines before the first blank line.
+// Top notes are the unindented "label (date, marks): description" lines before the first blank line.
 const topSlugs = text => text.split('\n\n')[0].split('\n').filter(l => l && !l.startsWith(' '))
-  .map(l => l.slice(0, l.indexOf(': ') < 0 ? undefined : l.indexOf(': ')).replace(/ \(superseded\)$/, ''))
+  .map(l => l.slice(0, l.indexOf(': ') < 0 ? undefined : l.indexOf(': ')).replace(/ \((?:\d{4}-\d{2}-\d{2}|superseded|unproven|not updated)[^()]*\)$/, ''))
 
 for (const f of windows) {
   let w

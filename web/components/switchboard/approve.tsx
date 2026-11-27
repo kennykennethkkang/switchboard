@@ -1,7 +1,8 @@
 'use client'
 import type { DoneCheck } from '@/lib/hub-types'
 import type { HubCommand } from '@/lib/vscode-bridge'
-import { checkLine, sendBackText } from '@/lib/approve'
+import { checkLine, plainCheck, sendBackText } from '@/lib/approve'
+import { heldId, heldText } from './look'
 
 /** Warning triangle, for a check or request that did not pass. */
 export const Warn = ({ size = 12 }: { size?: number }) => (
@@ -11,8 +12,8 @@ export const Warn = ({ size = 12 }: { size?: number }) => (
 )
 
 /** The done-check verdict: green Verified, or red Unverified with what is missing. wrap: long lists wrap instead of cutting off. */
-export function CheckStamp({ check, wrap }: { check?: DoneCheck; wrap?: boolean }) {
-  const line = checkLine(check)
+export function CheckStamp({ check, wrap, simple }: { check?: DoneCheck; wrap?: boolean; simple?: boolean }) {
+  const line = (simple ? plainCheck : checkLine)(check)
   if (!line) return null
   return <span className="hub-stamp" title={line} style={{ display: 'inline-flex', alignItems: wrap ? 'flex-start' : 'center', gap: 5, color: check?.verified ? 'var(--hub-green)' : 'var(--hub-red)', minWidth: 0, fontSize: 13 }}>
     {!check?.verified && <span style={{ display: 'inline-flex', height: '1.4em', alignItems: 'center' }}><Warn /></span>}
@@ -21,15 +22,15 @@ export function CheckStamp({ check, wrap }: { check?: DoneCheck; wrap?: boolean 
 }
 
 /** Ready for your OK: the done-check verdict, Approve and Send back. */
-export function ApproveBar({ sessionId, check, block, send, small, noLabel }: { sessionId: string; check?: DoneCheck; block?: string; send: (c: HubCommand) => void; small?: boolean; noLabel?: boolean }) {
+export function ApproveBar({ sessionId, check, block, send, small, noLabel, simple }: { sessionId: string; check?: DoneCheck; block?: string; send: (c: HubCommand) => void; small?: boolean; noLabel?: boolean; simple?: boolean }) {
   const sm = small ? ' sm' : ''
   return (
     <div className="hub-approve" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 13 }}>
       {!noLabel && <span style={{ color: 'var(--hub-yellow)' }}>Ready for your OK</span>}
       <CheckStamp check={check} />
-      {block && <span role="status" style={{ color: 'var(--hub-red)', flexBasis: '100%' }}>Approve is held: {block}.</span>}
+      {block && <span id={heldId(sessionId)} role="status" style={{ color: 'var(--hub-red)', flexBasis: '100%' }}>{heldText(block, simple)}</span>}
       <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
-        <button type="button" className={`hub-btn primary${sm}`} disabled={!!block} onClick={() => send({ type: 'hub-approve', sessionId })}>Approve</button>
+        <button type="button" className={`hub-btn primary${sm}`} disabled={!!block} title={block ? heldText(block, simple) : undefined} aria-describedby={block ? heldId(sessionId) : undefined} onClick={() => send({ type: 'hub-approve', sessionId })}>Approve</button>
         <button type="button" className={`hub-btn${sm}`} onClick={() => send({ type: 'hub-send', sessionId, text: sendBackText(check) })}>Send back</button>
       </span>
     </div>

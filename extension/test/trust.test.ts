@@ -15,7 +15,7 @@ const ws = path.join(tmp, 'ws'), outside = path.join(tmp, 'other')
 for (const d of ['a', 'b', 'c']) fs.mkdirSync(path.join(ws, d), { recursive: true })
 fs.mkdirSync(outside)
 const ok = { trusted: true, roots: [ws] }
-const A = fs.realpathSync(path.join(ws, 'a')), B = fs.realpathSync(path.join(ws, 'b')), C = fs.realpathSync(path.join(ws, 'c'))
+const A = fs.realpathSync.native(path.join(ws, 'a')), B = fs.realpathSync.native(path.join(ws, 'b')), C = fs.realpathSync.native(path.join(ws, 'c'))
 
 describe('trustFolder', () => {
   it('marks the exact folder trusted and keeps every other key', () => {
@@ -121,13 +121,13 @@ describe('trustFolder keys and other windows', () => {
   it('a repo subfolder writes the repo root; a worktree writes the main checkout; a plain folder writes itself', () => {
     fs.writeFileSync(json, '{}')
     trustFolder(sub, all, json, tmp)
-    assert.deepEqual(keys(), [repo])
+    assert.deepEqual(keys(), [fs.realpathSync.native(repo)])
     fs.writeFileSync(json, '{}')
     trustFolder(wt, all, json, tmp)
-    assert.deepEqual(keys(), [repo])
+    assert.deepEqual(keys(), [fs.realpathSync.native(repo)])
     fs.writeFileSync(json, '{}')
     trustFolder(plain, all, json, tmp)
-    assert.deepEqual(keys(), [plain])
+    assert.deepEqual(keys(), [fs.realpathSync.native(plain)])
   })
 
   const windows = path.join(base, 'windows')
@@ -146,7 +146,7 @@ describe('trustFolder keys and other windows', () => {
     win('live', { pid: process.pid, workspace: repo, trusted: true })
     assert.deepEqual(trustedWindowRoots(windows), [repo])
     trustFolder(sub, { trusted: false, roots: [], others: trustedWindowRoots(windows) }, json, tmp)
-    assert.deepEqual(keys(), [repo])
+    assert.deepEqual(keys(), [fs.realpathSync.native(repo)])
   })
 })
 
@@ -173,12 +173,13 @@ describe('trustFolder: a trusted root vouches for its own repository', () => {
   const run = (cwd: string, root: string) => { fs.writeFileSync(json, '{}'); trustFolder(cwd, only(root), json, base); return keys() }
 
   it('a window on a repo subfolder or a worktree trusts the repo root', () => {
-    assert.deepEqual(run(sub, sub), [outer])
-    assert.deepEqual(run(wt, wt), [outer])
+    const realOuter = fs.realpathSync.native(outer)
+    assert.deepEqual(run(sub, sub), [realOuter])
+    assert.deepEqual(run(wt, wt), [realOuter])
     // Another live trusted window on the worktree vouches the same way.
     fs.writeFileSync(json, '{}')
     trustFolder(sub, { trusted: false, roots: [], others: [wt] }, json, base)
-    assert.deepEqual(keys(), [outer])
+    assert.deepEqual(keys(), [realOuter])
   })
 
   it('a nested repo or submodule never vouches for the repo around it; an unrelated repo or a git failure refuses', () => {

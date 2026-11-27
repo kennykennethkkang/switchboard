@@ -12,9 +12,10 @@ type Want = { key?: ApiKeyName; value?: string }
 // Keyed by folder name, lower case. A recipe replaces the template so optional keys stay out.
 const RECIPES: Record<string, Record<string, Want>> = {
   mirofish: {
-    LLM_API_KEY: { key: 'OPENROUTER_API_KEY' },
-    LLM_BASE_URL: { value: 'https://openrouter.ai/api/v1' },
-    LLM_MODEL_NAME: { value: 'qwen/qwen-plus' },
+    // local Ollama costs nothing; sb-pilot.py picks free or paid OpenRouter per run
+    LLM_API_KEY: { value: 'ollama' },
+    LLM_BASE_URL: { value: 'http://localhost:11434/v1' },
+    LLM_MODEL_NAME: { value: 'gemma3-mirofish' },
     ZEP_API_KEY: { key: 'ZEP_API_KEY' },
     OASIS_DEFAULT_MAX_ROUNDS: { value: '10' },
   },

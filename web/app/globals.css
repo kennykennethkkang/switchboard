@@ -447,6 +447,12 @@ button.hub-done:active > span { transform: scale(0.9); }
 .hub-diff > .a { background: var(--hub-green-soft); }
 .hub-diff > .r { background: var(--hub-red-soft); }
 .hub-diff > .h { color: var(--hub-ash); }
+.hub-diff .note { cursor: pointer; }
+.hub-diff .note:hover, .hub-diff .note:focus-visible { outline: 1px solid var(--hub-hair); outline-offset: -1px; }
+.hub-diff-note { display: grid; gap: 6px; padding: 6px 10px 8px; border-block: 1px solid var(--hub-hair); font: 400 13px/1.4 var(--hub-sans, inherit); white-space: normal; position: sticky; left: 0; }
+.hub-diff-note textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; }
+.hub-diff-note > span { display: flex; gap: 6px; flex-wrap: wrap; }
+.hub-diff-note button { white-space: nowrap; }
 .hub mark { background: none; color: var(--hub-blue); font-weight: 600; }
 .hub-search { font: 400 12px/1 var(--hub-mono); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--hub-hair); background: var(--hub-surface); color: var(--hub-ink); min-width: 0; width: 100%; box-sizing: border-box; }
 .hub-scrim { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--hub-canvas) 55%, transparent); display: grid; justify-items: center; align-items: start; padding: 12vh 16px 16px; }

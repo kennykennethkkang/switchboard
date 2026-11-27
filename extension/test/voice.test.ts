@@ -394,7 +394,7 @@ describe('clip', () => {
   })
 })
 
-describe('macVoice speak', () => {
+describe('macVoice speak', { skip: process.platform !== 'darwin' && 'the voice player uses macOS tools' }, () => {
   const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
   async function rig() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'voice-test-'))
@@ -430,7 +430,7 @@ describe('macVoice speak', () => {
   })
 })
 
-describe('voice.sh', () => {
+describe('voice.sh', { skip: process.platform === 'win32' && 'voice.sh requires a POSIX shell' }, () => {
   it('treats a pid file that names some other process as stale and never kills it', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'voice-sh-'))
     const dir = path.join(home, '.claude', 'switchboard', 'voice')

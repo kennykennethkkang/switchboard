@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 /** Calls .cmd/.bat shims through cmd.exe, quoting every argument. */
 const PLATFORM: NodeJS.Platform = typeof process === 'undefined' ? 'linux' : process.platform
@@ -8,7 +9,7 @@ function resolveCommand(bin: string, platform: NodeJS.Platform, env: NodeJS.Proc
   const extensions = /\.[^\\/.]+$/.test(bin) ? [''] : (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';')
   for (const dir of (env.PATH ?? '').split(';')) {
     for (const ext of extensions) {
-      const candidate = `${dir}/${bin}${ext}`
+      const candidate = path.win32.join(dir, `${bin}${ext}`)
       if (fs.existsSync(candidate)) return candidate
     }
   }

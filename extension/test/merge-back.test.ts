@@ -62,7 +62,7 @@ describe('merge back uncommitted worktree work', () => {
     fs.writeFileSync(path.join(wt, 'b.txt'), 'b\n')
     for (const r of [
       await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, true, idle),
-      await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, w => w === fs.realpathSync(wt)),
+      await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, w => w === fs.realpathSync.native(wt)),
     ]) {
       assert.equal(r.ok, false)
       assert.match(r.text, /chat is still running in it/)
@@ -163,7 +163,7 @@ describe('merge back uncommitted worktree work', () => {
     const r2 = await gitOp(wt, { op: 'merge-back', confirmed: true }, undefined, false, idle)
     assert.equal(r2.ok, true, r2.text)
     assert.equal(fs.readlinkSync(path.join(main, 'dangle')), 'nowhere')
-    assert.ok(fs.statSync(path.join(main, 'a.txt')).mode & 0o100)
+    if (process.platform !== 'win32') assert.ok(fs.statSync(path.join(main, 'a.txt')).mode & 0o100)
     fs.rmSync(path.join(main, 'dangle')); fs.rmSync(path.join(main, 'old.txt')); fs.chmodSync(path.join(main, 'a.txt'), 0o644); sh(main, 'checkout', '--', 'a.txt')
   })
 

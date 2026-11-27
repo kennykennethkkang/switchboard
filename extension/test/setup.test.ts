@@ -97,7 +97,7 @@ describe('setup steps', () => {
     assert.equal(k({ key21st: true }), 1)
     assert.equal(k(), 0)
     assert.doesNotMatch(text({ mcps: ['21st'] }), /21st: no key/)
-    assert.equal(k({ mcps: [], plain: ['21st'] }), 1)
+    assert.equal(k({ mcps: [], plain: ['21st'], platform: 'darwin' }), 1)
     // Linux has no store, so moving it would only lose the key.
     assert.equal(k({ mcps: [], plain: ['21st'], platform: 'linux' }), 0)
     assert.equal(k({ key21st: true, platform: 'linux' }), 1)
@@ -175,7 +175,7 @@ describe('setup steps', () => {
   it('installs each python tool with uv, its skill and its mcp for both AIs, all needing uv', () => {
     const t = (KIT.tools ?? []).find(x => x.uv === 'scrapling[ai]')
     assert.deepEqual(t, { uv: 'scrapling[ai]', skill: { repo: 'D4Vinci/Scrapling', path: 'agent-skill', name: 'scrapling-official' }, mcp: { name: 'scrapling', command: 'scrapling-mcp' } })
-    const s = steps()
+    const s = steps({ platform: 'darwin' })
     assert.deepEqual(s.find(x => x.run?.join(' ') === 'uv tool install scrapling[ai]'), { label: 'scrapling[ai]', needs: ['uv'], quiet: true, run: ['uv', 'tool', 'install', 'scrapling[ai]'] })
     assert.deepEqual(s.find(x => x.skills?.names.includes('scrapling-official')), { label: 'D4Vinci/Scrapling', needs: ['uv'], skills: { repo: 'D4Vinci/Scrapling', names: ['scrapling-official'], path: 'agent-skill' } })
     const bin = '~/.local/bin/scrapling-mcp'
@@ -223,7 +223,7 @@ describe('setup steps', () => {
     assert.ok(!mac.some(s => s.run?.join(' ').includes('abcd')))
     assert.match(steps({ ...saved, platform: 'linux' }).find(s => s.label === 'perplexity')!.run!.at(-1)!, /cat "\$HOME\/\.claude\/switchboard\/keys\/PERPLEXITY_API_KEY"/)
     assert.ok(!steps().some(s => s.label?.startsWith('perplexity')))
-    assert.match(text(), /perplexity: no key saved, skipped/)
+    assert.match(text({ platform: 'darwin' }), /perplexity: no key saved, skipped/)
     assert.ok(!steps({ ...saved, mcps: ['perplexity'], codex: { ...fresh.codex, mcps: ['perplexity'] } }).some(s => s.label?.startsWith('perplexity')))
     assert.match(JSON.stringify(steps({ ...saved, platform: 'win32' })), /perplexity: not added on Windows/)
   })
@@ -232,7 +232,7 @@ describe('setup steps', () => {
     const mac = steps({ keys: [{ name: 'FIRECRAWL_API_KEY', saved: true, last4: 'abcd' }], platform: 'darwin' })
     const wrap = 'FIRECRAWL_API_KEY=$(security find-generic-password -s switchboard -a FIRECRAWL_API_KEY -w) exec npx -y firecrawl-mcp'
     assert.deepEqual(mac.find(s => s.label === 'firecrawl')?.run, ['claude', 'mcp', 'add', '--scope', 'user', 'firecrawl', '--', 'sh', '-c', wrap])
-    assert.match(text(), /firecrawl: no key saved, skipped/)
+    assert.match(text({ platform: 'darwin' }), /firecrawl: no key saved, skipped/)
     const r = steps().map(s => s.run?.join(' '))
     assert.ok(r.includes('claude mcp add --scope user --transport http posthog https://mcp.posthog.com/mcp'))
     assert.ok(r.includes('claude mcp add --scope user --transport http composio https://connect.composio.dev/mcp'))
@@ -447,7 +447,7 @@ describe('setup runner', () => {
     for (const d of [home, elsewhere]) fs.rmSync(d, { recursive: true, force: true })
   })
 
-  it('keeps the old mirrored copy when a refresh fails, says so, and goes on to the next skill', () => {
+  it('keeps the old mirrored copy when a refresh fails, says so, and goes on to the next skill', { skip: process.platform === 'win32' && 'chmod 000 does not block reads on Windows' }, () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mirror-'))
     const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
     const claude = path.join(home, '.claude', 'skills'), agents = path.join(home, '.agents', 'skills')
@@ -619,7 +619,7 @@ describe('setup runner', () => {
     fs.rmSync(home, { recursive: true, force: true })
   })
 
-  it('keeps the old copy when a refresh fails, says so, and goes on to the next skill', () => {
+  it('keeps the old copy when a refresh fails, says so, and goes on to the next skill', { skip: process.platform === 'win32' && 'chmod 000 does not block reads on Windows' }, () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-')), from = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-own-kit-'))
     const MARK = '<!-- switchboard generic copy -->'
     const put = (p: string, body: string) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, body) }
@@ -670,7 +670,7 @@ describe('setup runner', () => {
     assert.ok(!fs.existsSync(path.join(dir, 'mods')))
     // A plain-text key is moved with no key given, and never printed.
     fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify({ mcpServers: { '21st': { headers: { 'x-api-key': 'plain-key-2' } } } }))
-    fs.writeFileSync(plan, JSON.stringify(setupSteps(KIT, { ...fresh, ...setupState(dir), modsDir: path.join(dir, 'mods') })))
+    fs.writeFileSync(plan, JSON.stringify(setupSteps(KIT, { ...fresh, ...setupState(dir), modsDir: path.join(dir, 'mods'), platform: 'darwin' })))
     const env: NodeJS.ProcessEnv = { ...process.env, HOME: dir, USERPROFILE: dir }
     delete env.API_KEY_21ST
     const moved = execFileSync(process.execPath, [path.join(__dirname, '..', 'kit', 'setup-run.mjs'), plan, '--dry-run'], { encoding: 'utf8', env })

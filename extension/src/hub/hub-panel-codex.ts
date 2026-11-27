@@ -17,9 +17,11 @@ import { chainVersion, codexNote, handoffFile, planLabel, projectName } from './
 import { execFile } from 'child_process'
 import * as fs from 'fs'
 import { readGroups } from './split'
+import { sweepContainers } from './devcontainer'
 import { autoMergeOn, cleanWorktree, endedMerges, endedWorktrees, gitOp, liveIn, mainOf, mergeDue, mergeOnEnd, queueEnded, sweepChats, triedLately, worktreeDirs, type MergeClock } from './git'
 import { learnTick, usageOk } from './learn'
 import { rememberChats } from './reap'
+import { codeTask } from './smart-pick'
 import { autoStartPlan, changeTodo, claimTodo, holdReason, holdShown, START_GRACE_MS, clearGoneChats, loadTodos, runLabel, runMessage, projectOf, startTodo } from './todo'
 import { follow, outcomeIn } from '../../ask/chats.mjs'
 import { randomUUID } from 'crypto'
@@ -59,6 +61,10 @@ export function codexPanel(d: {
     const roots = hub.get().projects.map(p => p.path)
     for (const w of [...endedWorktrees(wtSeen, sweepChats(chats, hub.get().progress), Date.now(), worktreeDirs(chats.map(c => c.cwd), roots), fast), ...fast]) {
       void cleanWorktree(w).then(gone => { if (gone) log.info(`Removed merged worktree ${w}`); else if (fast.includes(w)) queueEnded(mergeOnEnd, w, auto && autoMergeOn(mainOf(w))) }).catch(err => log.warn('Worktree cleanup failed:', err))
+    }
+    if (Date.now() - boxSweptAt > 30_000) {
+      boxSweptAt = Date.now()
+      void sweepContainers(boxSeen).then(gone => { if (gone.length) log.info(`Removed ended chat containers ${gone.join(', ')}`) }).catch(err => log.warn('Container cleanup failed:', err))
     }
     for (const [id, wt] of endedMerges(mergeOnEnd, liveIn(chats, codexTied))) {
       // Another window may have tried it while this one waited on the lock.
@@ -178,6 +184,8 @@ export function codexPanel(d: {
 
   // Worktree folders with a live chat, so one that ends is cleaned up.
   const wtSeen = new Map<string, number | undefined>()
+  const boxSeen = new Set<string>()
+  let boxSweptAt = 0
   // Merge all on its own after 15 quiet minutes per repo (mergeDue).
   const mergeClock: MergeClock = { seen: new Set(), since: new Map(), fired: new Map() }
 
@@ -270,7 +278,9 @@ export function codexPanel(d: {
     // The claim gave them a run number; read them back for the chat's label.
     const fresh = hub.get().todos?.[folder]?.todo ?? []
     const label = runLabel(items.map(t => fresh.find(x => x.id === t.id) ?? t), folder)
-    void newChat(folder, runMessage(items), false, undefined, 'claude', undefined, sessionId, true, label, undefined, undefined, false, run).then(problem => {
+    // Judged on the items, not runMessage: its own wording ("add it to the to-do") reads as code work.
+    const own = hub.get().controls.switchboard.codeWorktrees !== false && codeTask(items.map(t => t.text).join('\n'))
+    void newChat(folder, runMessage(items), false, undefined, 'claude', undefined, sessionId, true, label, undefined, undefined, own, run).then(problem => {
       if (!problem) return
       refuse(problem)
       void unmark().catch(() => {})

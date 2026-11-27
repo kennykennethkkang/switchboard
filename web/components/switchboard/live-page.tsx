@@ -173,7 +173,7 @@ export function LivePage({ mirofish, crowd, reports = [], sourceChecks = [], sma
     { label: 'Running now', value: running, tone: running ? 'blue' : undefined, hint: running ? undefined : 'all quiet', onClick: () => setTab('run') },
     { label: 'MiroFish reports', value: reports.length, onClick: () => setTab('rep') },
     { label: 'Source checks', value: sourceChecks?.length ?? 0 },
-    { label: 'Smart picks kept', value: kept !== undefined ? `${kept}%` : 'none yet', tone: kept !== undefined && kept >= 80 ? 'green' : undefined, hint: nAll ? `of ${nAll} judged` : undefined, onClick: () => setTab('smart') },
+    { label: 'Smart picks kept', value: kept !== undefined ? `${kept}%` : 'none yet', tone: kept !== undefined && kept >= 80 ? 'green' : undefined, hint: nAll ? `of ${nAll} judged, not overridden` : undefined, onClick: () => setTab('smart') },
   ]} />
 
   return (

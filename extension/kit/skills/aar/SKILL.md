@@ -10,7 +10,7 @@ Debrief the chat that just ran, so the next one does not repeat its mistakes or 
 ## Which chat
 
 - Finishing: this chat.
-- From a handoff note: the old chat. Read its transcript (the Old transcript path in the note) with grep and targeted reads, not whole. You are usually a subagent here; keep the report short.
+- From a handoff note or a Learn run: the old chat. Its transcript (the Old transcript path in the note) is a `.jsonl` whose lines run to thousands of tokens each, so the Read tool fails on it even with a small `limit`. Use Bash: `grep -n "phrase" <file> | cut -c1-300`, or a node one-liner printing each line's type and first 300 characters of text. You are usually a subagent here; keep the report short.
 
 ## The four questions
 

@@ -10,7 +10,7 @@ dialog.cv::backdrop { background: rgba(0, 0, 0, 0.45); animation: cv-fade 220ms 
   dialog.cv:has(.cv-scr[data-fit]) { width: min(780px, 100vw); min-width: 0; }
 }
 
-.cv-in { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-width: 0; }
+.cv-in { height: 100%; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; min-width: 0; }
 .cv-h { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 14px 16px 10px; }
 .cv-h h2 { margin: 0; font: 600 15px/1.25 var(--hub-sans); color: var(--hub-ink); outline: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cv-h small { display: block; margin-top: 3px; font: 400 11px/1.3 var(--hub-mono); color: var(--hub-ash); }
@@ -18,6 +18,8 @@ dialog.cv::backdrop { background: rgba(0, 0, 0, 0.45); animation: cv-fade 220ms 
 .cv-icon:focus-visible, .cv-tabs button:focus-visible, .cv-b:focus-visible, .cv-shot a:focus-visible, .cl-sec > summary:focus-visible, .cl-tools summary:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 
 .cv-tabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--hub-hair); }
+.cv-meta { display: block; min-width: 0; margin: 0 16px 8px; padding: 6px 8px; overflow: hidden; border: 1px solid var(--hub-hair); border-radius: 6px; background: var(--hub-canvas); color: var(--hub-mute); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: copy; font: 400 11px/1.4 var(--hub-mono); }
+.cv-meta:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 .cv-tabs button { all: unset; cursor: pointer; padding: 10px 10px 9px; font: 500 13px/1 var(--hub-sans); color: var(--hub-mute); border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 6px 6px 0 0; }
 .cv-tabs button[aria-selected='true'] { color: var(--hub-ink); border-bottom-color: var(--hub-ink); }
 

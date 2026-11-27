@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import * as path from 'path'
 import { codexRound } from '../src/hub/indefinite'
 import { lastCodexTurn } from '../src/hub/ais'
 
@@ -97,11 +98,13 @@ describe('usageLine and roundText', () => {
 import { goalFor, goalCheck } from '../src/hub/indefinite'
 
 describe('goal files for Codex rounds', () => {
-  const files: Record<string, string> = { '/repo/.switchboard/goals/t1.md': '# Goal\n\nCheck: `make check`\n' }
+  const repo = path.join(path.parse(process.cwd()).root, 'repo')
+  const goalFile = path.join(repo, '.switchboard', 'goals', 't1.md')
+  const files: Record<string, string> = { [goalFile]: '# Goal\n\nCheck: `make check`\n' }
   const read = (p: string) => { if (p in files) return files[p]; throw new Error('missing') }
   it('finds the goal from a subfolder by walking up to the project root', () => {
-    assert.deepEqual(goalFor('/repo/web/app', 't1', read), { file: '/repo/.switchboard/goals/t1.md', dir: '/repo', text: files['/repo/.switchboard/goals/t1.md'] })
-    assert.equal(goalFor('/repo', 'other', read), undefined)
+    assert.deepEqual(goalFor(path.join(repo, 'web', 'app'), 't1', read), { file: goalFile, dir: repo, text: files[goalFile] })
+    assert.equal(goalFor(repo, 'other', read), undefined)
   })
   it('reads the Check line, none when missing', () => {
     assert.equal(goalCheck('x\nCheck: `pnpm test auth` \n'), 'pnpm test auth')

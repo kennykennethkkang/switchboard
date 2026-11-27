@@ -9,7 +9,7 @@ import * as path from 'path'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'child_process'
 import type { Runner } from '../src/hub/learn'
-import { aarWanted, applyRun, betterOrNot, consolidate, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, proposalCount, proposeRun, stageMemory, syncMemory, tooBig, usageOk } from '../src/hub/learn'
+import { aarWanted, addedClaims, applyRun, betterOrNot, checkProposals, consolidate, EVERY_MS, hashOf, improveDue, jobArgs, learnEnv, lineDiff, markUnproven, proposalCount, proposeRun, stageMemory, syncMemory, tooBig, usageOk } from '../src/hub/learn'
 
 const row = (id: string, side: string, pass: boolean[], items?: number) => ({ id, side, pass, items })
 const yes = (n: number) => new Array<boolean>(n).fill(true)
@@ -87,7 +87,7 @@ describe('better or not', () => {
       // a winning run only becomes a card: nothing written until Kenneth approves
       const p = proposeRun(run, mods)
       assert.equal(fs.readFileSync(target, 'utf8'), 'old\n')
-      assert.equal(p?.ready?.target, 'kit/agents/ops.md')
+      assert.equal(p?.ready?.target?.replace(/\\/g, '/'), 'kit/agents/ops.md')
       assert.deepEqual([p?.ready?.before, p?.ready?.after], [0.9, 1])
       assert.match(p!.ready!.diff, /^-old$/m)
       assert.match(p!.ready!.diff, /^\+new$/m)
@@ -381,6 +381,35 @@ describe('headless runs', () => {
     assert.equal(todos.length, 1)
     assert.equal(proposalCount('## Merge a.md + b.md\n```\n## Notes\n```\n## Rewrite c.md\n## Other'), 2)
     fs.rmSync(root, { recursive: true, force: true })
+  })
+  it('addedClaims: a new path, number or code word with no source is flagged; rewording and prose pass', () => {
+    const old = 'Run `pnpm run test:root` from web/.\nThe cap is 30 rows in src/hub/learn.ts.'
+    const note = '---\nname: x\nmodified: 2099-01-01\n---\nThe cap is 30 rows in src/hub/learn.ts.\nFrom web/, run `pnpm run   test:root`.\nKeep it short.\n- Limit: 45 rows, see src/hub/other.ts\n```sh\n## heading\n```'
+    assert.deepEqual(addedClaims(note, old), ['- Limit: 45 rows, see src/hub/other.ts'])
+    assert.deepEqual(addedClaims('Specs: docs/{a,b}-x.md', 'docs/a-x.md and b-x.md'), [])
+    assert.deepEqual(addedClaims('Only 3 left, see `foo-bar`.', 'there were 30 in foo-bar-baz'), ['Only 3 left, see `foo-bar`.'])
+    assert.deepEqual(addedClaims('Checked 2026-11-25 in web/ and extension/src/x.ts.', 'modified: 2026-11-25T07:00 web/lib, see extension/src/x.ts'), [])
+  })
+  it('markUnproven: adds the status, replaces another one, leaves a note without frontmatter', () => {
+    assert.equal(markUnproven('---\nname: x\n---\nbody'), '---\nname: x\nstatus: unproven\n---\nbody')
+    assert.equal(markUnproven('---\nmetadata:\n  status: proven\n---\nb'), '---\nmetadata:\n  status: unproven\n---\nb')
+    assert.equal(markUnproven('body only'), 'body only')
+    assert.equal(markUnproven('---\n---\nbody'), '---\nstatus: unproven\n---\nbody')
+    assert.equal(markUnproven('---\ndescription: a---b\n---\nbody'), '---\ndescription: a---b\nstatus: unproven\n---\nbody')
+  })
+  it('checkProposals: lists added claims above the note and marks it; a clean proposal is left as it is', async () => {
+    const text = ['# P', '', '## Rewrite a.md', 'Folder: /mem', 'Why: short', '```markdown', '---', 'name: a', '---', 'Uses 7 tries.', '```sh', 'run.sh', '```', '```', '',
+      '## Merge b.md + c.md', 'Folder: /mem', '```markdown', '---', 'name: b', '---', 'Uses 3 tries.', '```', ''].join('\n')
+    const asked: string[] = []
+    const out = await checkProposals(text, async (folder, names) => { asked.push(`${folder}:${names.join(',')}`); return 'Uses 3 tries. run.sh' })
+    assert.deepEqual(asked, ['/mem:b.md,c.md', '/mem:a.md'])
+    assert.equal(out.flagged, 1)
+    const lines = out.text.split('\n'), a = lines.indexOf('## Rewrite a.md'), b = lines.indexOf('## Merge b.md + c.md')
+    assert.ok(lines.slice(a, b).some(l => l.startsWith('Added claims')))
+    assert.ok(lines.slice(a, b).includes('- Uses 7 tries.') && lines.slice(a, b).includes('status: unproven'))
+    assert.ok(lines.slice(a, b).includes('run.sh') && lines[b - 2] === '```')
+    assert.deepEqual(lines.slice(b), text.split('\n').slice(text.split('\n').indexOf('## Merge b.md + c.md')))
+    assert.equal(proposalCount(out.text), 2)
   })
   it('passes only an env allow list', () => {
     const env = learnEnv({ HOME: '/h', PATH: '/p', GITHUB_TOKEN: 'x', OPENROUTER_API_KEY: 'y' })

@@ -8,6 +8,7 @@ import { listSnapshots, restoreSnapshot, saveSnapshot } from '../src/hub/snapsho
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'snap-'))
 process.env.HOME = home
+process.env.USERPROFILE = home
 const work = path.join(home, 'work')
 fs.mkdirSync(work)
 const f = path.join(work, 'rules.md')
@@ -64,10 +65,11 @@ test('restore skips manifest paths outside home or escaping through a symlink', 
   const s = saveSnapshot('esc', [f])
   const dir = path.join(home, '.claude', 'switchboard', 'snapshots', s.id)
   const forged = [f, target, path.join(link, 'x.txt'), '/etc/snap-test-evil']
-  fs.mkdirSync(path.join(dir, 'files', outside), { recursive: true })
-  fs.writeFileSync(path.join(dir, 'files', outside, 'x.txt'), 'evil')
-  fs.mkdirSync(path.join(dir, 'files', link), { recursive: true })
-  fs.writeFileSync(path.join(dir, 'files', link, 'x.txt'), 'evil')
+  const rel = (p: string) => p.replace(/^[A-Za-z]:/, m => m[0]).replace(/^[\\/]+/, '')
+  fs.mkdirSync(path.join(dir, 'files', rel(outside)), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'files', rel(outside), 'x.txt'), 'evil')
+  fs.mkdirSync(path.join(dir, 'files', rel(link)), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'files', rel(link), 'x.txt'), 'evil')
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ ...s, paths: forged, chat: null }))
   fs.writeFileSync(f, 'b')
   const r = restoreSnapshot(s.id)
@@ -75,6 +77,16 @@ test('restore skips manifest paths outside home or escaping through a symlink', 
   assert.equal(fs.readFileSync(target, 'utf8'), 'keep')
   assert.equal(fs.existsSync('/etc/snap-test-evil'), false)
   assert.equal(r.skipped.length, 3)
+})
+
+test('a reason is kept as one line in the manifest, from the hub and the kit script', () => {
+  const s = saveSnapshot('why', [f], undefined, [], 'Learn aar\nof chat x')
+  assert.equal(listSnapshots().find(x => x.id === s.id)?.reason, 'Learn aar of chat x')
+  const out = spawnSync('node', [script, 'save', 'cli why', '--reason', 'retarget links', f], { env: { ...process.env, HOME: home }, encoding: 'utf8' })
+  assert.equal(out.status, 0, out.stderr)
+  const id = out.stdout.trim().split(/\s+/)[0]
+  assert.equal(listSnapshots().find(x => x.id === id)?.reason, 'retarget links')
+  assert.deepEqual(listSnapshots().find(x => x.id === id)?.paths, [f])
 })
 
 test('same-millisecond saves get distinct ids', () => {

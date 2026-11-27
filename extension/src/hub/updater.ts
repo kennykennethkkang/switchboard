@@ -7,6 +7,7 @@ import { execFileSync } from 'child_process'
 import { createLogger } from '../logger'
 import { tryLock, writeJsonAtomic } from '../fs-utils'
 import { compareVersions, pickReleaseAssets, shouldPull } from './updater-pure'
+import { hub } from './hub-service'
 
 const log = createLogger('Updater')
 const API = 'https://api.github.com/repos/kennykennethkkang/switchboard/releases/latest'
@@ -98,41 +99,66 @@ function syncClaudeMods(): void {
   } catch (err) { log.warn('claude-mods update failed:', err) }
 }
 
-async function check(context: vscode.ExtensionContext, manual: boolean): Promise<void> {
+// fromHub: the hub's own button asked; it shows the state and Reload itself, so no VS Code prompts.
+async function check(context: vscode.ExtensionContext, manual: boolean, fromHub = false): Promise<void> {
   if (!manual && !contextVscode(context).workspace.getConfiguration('agentVisualizer').get('autoUpdate', true)) return
+  const current = context.extension.packageJSON.version as string
   const releaseLock = tryLock(LOCK, LOCK_STALE)
-  if (!releaseLock) return
+  if (!releaseLock) {
+    // Another window is checking; an install it finished shows up in the cache.
+    let installed: string | undefined
+    try { installed = (JSON.parse(fs.readFileSync(CACHE, 'utf8')) as { installed?: string }).installed } catch {}
+    if (installed && compareVersions(installed, current) > 0) hub.set({ update: { current, latest: installed, state: 'installed', checkedAt: Date.now() } })
+    else if (manual) hub.set({ update: { ...(hub.get().update ?? { current, state: 'idle' }), note: 'Another window is checking. Try again in a minute.' } })
+    return
+  }
   const heartbeat = setInterval(() => { try { const now = new Date(); fs.utimesSync(LOCK, now, now) } catch {} }, 30_000)
+  hub.set({ update: { current, state: 'checking', latest: hub.get().update?.latest } })
   try {
     const cache = (() => { try { return JSON.parse(fs.readFileSync(CACHE, 'utf8')) as { etag?: string; installed?: string } } catch { return {} as { etag?: string; installed?: string } } })()
-    const current = context.extension.packageJSON.version as string
     // installed: put in by this or another window; an older window only needs a reload
     const pending = cache.installed && compareVersions(cache.installed, current) > 0 ? cache.installed : undefined
     const headers = cache.etag ? { 'If-None-Match': cache.etag } : undefined
     const response = await get(API, headers)
     if (response.status === 304) {
-      if (pending) void askReload(context, pending)
-      else if (manual) void contextVscode(context).window.showInformationMessage('Switchboard is up to date')
+      if (pending) {
+        hub.set({ update: { current, latest: pending, state: 'installed', checkedAt: Date.now() } })
+        if (!fromHub) void askReload(context, pending)
+      }
+      else {
+        hub.set({ update: { current, latest: current, state: 'current', checkedAt: Date.now() } })
+        if (manual && !fromHub) void contextVscode(context).window.showInformationMessage('Switchboard is up to date')
+      }
       syncClaudeMods(); return
     }
     if (!response.ok) throw new Error(`Release check failed (${response.status})`)
     const release = await response.json() as Release
     const latest = release.tag_name.replace(/^v/, '')
     const newer = compareVersions(latest, current) > 0
-    if (newer && cache.installed !== latest) await installRelease(context, release)
-    if (newer) void askReload(context, latest)
-    else if (manual) void contextVscode(context).window.showInformationMessage(`Switchboard is up to date (${current})`)
+    if (newer && cache.installed !== latest) {
+      hub.set({ update: { current, latest, state: 'available' } })
+      await installRelease(context, release)
+    }
+    if (newer) { if (!fromHub) void askReload(context, latest) }
+    else if (manual && !fromHub) void contextVscode(context).window.showInformationMessage(`Switchboard is up to date (${current})`)
     // etag saved only after a good install, so a failed one is retried next time
     writeJsonAtomic(CACHE, { etag: response.headers.get('etag') ?? undefined, checkedAt: new Date().toISOString(), installed: newer ? latest : cache.installed })
+    hub.set({ update: { current, latest, state: newer ? 'installed' : 'current', checkedAt: Date.now() } })
     syncClaudeMods()
-  } catch (err) { log.warn('Update check failed:', err) }
+  } catch (err) {
+    const note = (err as Error).message
+    hub.set({ update: { current, latest: hub.get().update?.latest, state: 'error', note, checkedAt: Date.now() } })
+    log.warn('Update check failed:', err)
+  }
   finally { clearInterval(heartbeat); releaseLock() }
 }
 
 export function startUpdater(context: vscode.ExtensionContext): void {
   const vs = contextVscode(context)
+  const current = context.extension.packageJSON.version as string
+  hub.set({ update: { current, state: 'idle' } })
   const first = setTimeout(() => void check(context, false), ONE_MINUTE)
   const repeat = setInterval(() => void check(context, false), SIX_HOURS)
   context.subscriptions.push({ dispose: () => { clearTimeout(first); clearInterval(repeat) } })
-  context.subscriptions.push(vs.commands.registerCommand('agentVisualizer.checkForUpdates', () => check(context, true)))
+  context.subscriptions.push(vs.commands.registerCommand('agentVisualizer.checkForUpdates', (fromHub?: unknown) => check(context, true, fromHub === true)))
 }

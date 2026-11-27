@@ -8,7 +8,10 @@ import { invalidateSharedRun, sharedRun } from '../src/hub/shared-run'
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'shared-run-'))
 const opts = (directory: string, run: (file: string, args: string[], timeoutMs: number) => Promise<string>, ttlMs = 100) => ({ directory, run, ttlMs, timeoutMs: 100 })
 
-test('two windows share a result inside the ttl and rerun it after expiry', async () => {
+// sharedRun runs straight through on Windows, so the cache tests have nothing to check there.
+const noCache = process.platform === 'win32' && 'no shared cache on Windows'
+
+test('two windows share a result inside the ttl and rerun it after expiry', { skip: noCache }, async () => {
   const directory = temp()
   let calls = 0
   const runner = async () => `read ${++calls}`
@@ -21,7 +24,7 @@ test('two windows share a result inside the ttl and rerun it after expiry', asyn
   fs.rmSync(directory, { recursive: true, force: true })
 })
 
-test('separate module instances read the shared result', async () => {
+test('separate module instances read the shared result', { skip: noCache }, async () => {
   const directory = temp()
   let calls = 0
   const runner = async () => { calls++; await new Promise(resolve => setTimeout(resolve, 80)); return 'read 1' }
@@ -35,7 +38,7 @@ test('separate module instances read the shared result', async () => {
   fs.rmSync(directory, { recursive: true, force: true })
 })
 
-test('in-flight calls in one window use one run', async () => {
+test('in-flight calls in one window use one run', { skip: noCache }, async () => {
   const directory = temp()
   let calls = 0
   const runner = async () => { calls++; await new Promise(resolve => setTimeout(resolve, 20)); return 'result' }
@@ -56,7 +59,7 @@ test('failed and empty runs are never cached', async () => {
   fs.rmSync(directory, { recursive: true, force: true })
 })
 
-test('a stale lock is recovered and corrupt or future cache files rerun', async () => {
+test('a stale lock is recovered and corrupt or future cache files rerun', { skip: noCache }, async () => {
   const directory = temp()
   let calls = 0
   const cacheDir = path.join(directory, 'shared')
@@ -77,7 +80,7 @@ test('a stale lock is recovered and corrupt or future cache files rerun', async 
   fs.rmSync(directory, { recursive: true, force: true })
 })
 
-test('fresh runs bypass cached results', async () => {
+test('fresh runs bypass cached results', { skip: noCache }, async () => {
   const directory = temp()
   let calls = 0
   const options = opts(directory, async () => `run ${++calls}`)

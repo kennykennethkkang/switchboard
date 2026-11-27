@@ -107,7 +107,7 @@ describe('keep awake', () => {
     assert.deepEqual(awakeArgs(), ['-dis', '-w', String(process.ppid)])
   })
 
-  it('takes the pid file only for our caffeinate, so a reused pid is never shown on or killed', async () => {
+  it('takes the pid file only for our caffeinate, so a reused pid is never shown on or killed', { skip: process.platform !== 'darwin' && 'caffeinate is macOS only' }, async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-awake-')), file = path.join(dir, 'awake.pid')
     const { spawn } = await import('child_process')
     // Claude Code runs this form all the time.

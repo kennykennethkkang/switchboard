@@ -173,7 +173,7 @@ const UNTRACKED_BYTES = 256 * 1024
 
 /** A relative path that stays inside the chat's folder. */
 export function insideCwd(cwd: string, file: string): boolean {
-  const api = process.platform === 'win32' ? path.win32 : path
+  const api = process.platform === 'win32' && !/^(?:[A-Za-z]:[\\/]|\\\\)/.test(cwd) ? path.posix : path
   if (!file || api.isAbsolute(file)) return false
   return insidePath(cwd, api.resolve(cwd, file))
 }

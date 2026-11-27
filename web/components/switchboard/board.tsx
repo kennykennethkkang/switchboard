@@ -1430,8 +1430,8 @@ export function BoardView({ hub, isDemo, send: sendHub, onClose, onNew, onTodo, 
     const live = () => fading() || awake() || s.fx.size > 0 || s.court.nodes.some(n => n.state === 'working' || n.state === 'needs')
     // Runs while something moves and can be seen; reduced motion still ticks once a second for the timers, and runs a fade through.
     const run = () => (!motion.matches || fading()) && onScreen && !document.hidden && vscodeBridge?.shown !== false && live()
-    // 30 fps; a drag, zoom or hover draws its own frame, so the camera keeps the screen's rate.
-    const { wake, stop, running } = frameLoop(now => frame(now), run, 30)
+    // 30 fps focused, 15 fps unfocused; a drag, zoom or hover draws its own frame.
+    const { wake, stop, running } = frameLoop(now => frame(now), run, () => document.hasFocus() ? 30 : 63)
     s.wake = wake
     // Once a second also lifts the Zzz of idle sprites, so a quiet board needs no rAF.
     tick = window.setInterval(() => { if (!running() && onScreen && seen() && (live() || !!s.pause || s.court.nodes.some(n => n.kind === 'desk' && n.state === 'idle'))) frame(performance.now()) }, 1000)

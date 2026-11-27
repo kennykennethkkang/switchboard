@@ -19,8 +19,8 @@ const BEFORE: Record<Range, string> = { today: 'yesterday', '7d': 'the 7 days be
 export type Kind = 'input' | 'cacheWrite' | 'cacheRead' | 'output'
 const KINDS: [Kind, string, string][] = [
   ['input', 'New input', 'Text the model read for the first time'],
-  ['cacheWrite', 'Saved to cache', 'Text stored so later turns can reread it cheaply'],
-  ['cacheRead', 'Reread from cache', 'Earlier text read again at a fraction of the input price'],
+  ['cacheWrite', 'Cache write', 'Text stored so later turns can read it back cheaply'],
+  ['cacheRead', 'Cache read', 'Earlier text read again at a fraction of the input price'],
   ['output', 'Output', 'What the model wrote, thinking included'],
 ]
 const ago = (at: number) => { const w = formatDuration(Date.now() - at, 'ago'); return w === 'now' ? 'just now' : `${w} ago` }
@@ -122,7 +122,7 @@ function Breakdown({ report, range }: { report: UsageReport; range: Range }) {
   return (
     <Sec id="us-by" title="Breakdown" actions={<Seg label="Break down by" value={by} onChange={setBy} options={[['model', 'Model'], ['project', 'Project'], ['role', 'Role']]} />}>
       {rows.length ? <div className="us-scroll"><table className="us-table us-by">
-        <thead><tr><th scope="col">{by === 'model' ? 'Model' : by === 'project' ? 'Project' : 'Role'}</th><th scope="col">In</th><th scope="col">Out</th><th scope="col">Reread</th><th scope="col">Share</th><th scope="col">Cost</th></tr></thead>
+        <thead><tr><th scope="col">{by === 'model' ? 'Model' : by === 'project' ? 'Project' : 'Role'}</th><th scope="col">In</th><th scope="col">Out</th><th scope="col" title="Cache read tokens">Cache read</th><th scope="col">Share</th><th scope="col">Cost</th></tr></thead>
         <tbody>{rows.slice(0, 12).map(r => <tr key={r.key}>
           <th scope="row"><span>{by === 'model' ? modelName(r.key) : by === 'role' ? roleName(r.key) : r.key}{r.unpriced && <small>no list price</small>}</span><i className="us-share" aria-hidden><b style={{ transform: `scaleX(${top ? r.costUsd / top : 0})` }} /></i></th>
           <td>{tokens(r.input + r.cacheWrite)}</td><td>{tokens(r.output)}</td><td>{tokens(r.cacheRead)}</td><td>{pct(r.share)}</td><td>{usd(r.costUsd)}</td>

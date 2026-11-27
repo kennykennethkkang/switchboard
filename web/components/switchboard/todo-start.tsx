@@ -28,7 +28,7 @@ export function Start({ folder, label, title, primary, onStart }: { folder: stri
     try { localStorage.setItem(key(folder), JSON.stringify(v)) } catch { /* nothing stored */ }
     setMine(true); setOpen(false); go(v, true)
   }
-  const how = v.auto ? 'Auto' : [v.model, v.effort, v.ultracode ? 'ultracode' : ''].filter(Boolean).join(' ')
+  const how = [v.auto ? 'Auto' : [v.model, v.effort, v.ultracode ? 'ultracode' : ''].filter(Boolean).join(' '), v.advisor ? `${v.advisor} advisor` : ''].filter(Boolean).join(', ')
   return <span ref={wrap} className="tdx-start" onKeyDown={e => { if (open && e.key === 'Escape') { e.stopPropagation(); shut() } }}>
     <button type="button" className={`hub-btn sm tdx-go${primary ? ' primary' : ''}`} aria-label={`${label}: ${title}`} onClick={() => go(v)}>{label}</button>
     <button ref={caret} type="button" className={`hub-btn sm tdx-arrow${primary ? ' primary' : ''}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}

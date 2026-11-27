@@ -7,7 +7,7 @@
  * it keeps the last real state and says why it is not live.
  */
 import { useFlash } from './use-flash'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { commandWait, vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import type { HubState } from '@/lib/hub-types'
 import { demoApply, demoHub, demoTick, demoUpload, emptyHub } from '@/lib/hub-demo'
@@ -26,6 +26,11 @@ const DEMO_OK = process.env.NEXT_PUBLIC_DEMO !== '0'
 
 /** down: why the standalone app is not live right now, while it shows the last state it had (or nothing). */
 const LOAD_FETCH = new Set(['hub-trend', 'hub-changes', 'hub-pipelines'])
+
+// Shell parts mounted without hub props (the nav's account menu) read the one live hub here.
+let shared: { hub: HubState; send: (c: HubCommand) => void } | null = null
+const sharedSubs = new Set<() => void>()
+export const useHubShared = () => useSyncExternalStore(fn => { sharedSubs.add(fn); return () => { sharedSubs.delete(fn) } }, () => shared, () => null)
 
 export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isVSCode: boolean; send: (c: HubCommand) => void; upload: Upload; problem: { text: string; at: number; for?: HubCommand } | null; down?: string; /** The demo took a click that changes nothing here; set for a few seconds. */ inert: boolean } {
   const [hub, setHub] = useState<HubState | null>(null)
@@ -129,5 +134,7 @@ export function useHub(): { hub: HubState; isLive: boolean; isDemo: boolean; isV
   // The extension's own long ops keep the busy bar up too.
   const extBusy = !!(live?.sweep?.busy || live?.jarvis?.busy || live?.repo?.busy || live?.voice === 'transcribing')
   useEffect(() => pending.setExt(extBusy), [extBusy])
-  return { hub: live ?? (isDemo ? demo : empty), isLive: live !== null && !down, isDemo, isVSCode, send, upload, problem, down: isVSCode ? undefined : down, inert: !!inert }
+  const out = live ?? (isDemo ? demo : empty)
+  useEffect(() => { shared = { hub: out, send }; sharedSubs.forEach(f => f()) }, [out, send])
+  return { hub: out, isLive: live !== null && !down, isDemo, isVSCode, send, upload, problem, down: isVSCode ? undefined : down, inert: !!inert }
 }

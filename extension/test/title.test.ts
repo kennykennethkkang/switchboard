@@ -24,3 +24,9 @@ test('titleFor: hands its wait to ask, so the model call can die with it', async
   await titleFor('fix it', async (_p, ms) => { got = ms; return 'Fix it' }, 1234)
   assert.equal(got, 1234)
 })
+
+test('titleFor: waits 5 s by default, so a slow model call cannot hold a new chat long', async () => {
+  let got: number | undefined
+  await titleFor('fix it', async (_p, ms) => { got = ms; return 'Fix it' })
+  assert.equal(got, 5000)
+})

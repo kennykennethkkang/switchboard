@@ -6,13 +6,13 @@ describe('codexPanel runInNewChat', () => {
   const Module = require('module') as { _load: (...args: any[]) => any }
   const item = { id: 'a1', text: 'do it' }
 
-  const load = (calls: unknown[][]) => {
+  const load = (calls: unknown[][], switchboard: Record<string, unknown> = {}) => {
     const original = Module._load
     const noop: any = new Proxy(function () {}, { get: (_t, k) => (k === Symbol.toPrimitive ? () => '' : noop), apply: () => noop })
     Module._load = function (request: string, ...args: any[]) {
       if (request === 'vscode') return noop
       if (request === './actions') return { newChat: async (...a: unknown[]) => { calls.push(a); return undefined } }
-      if (request === './hub-service') return { hub: { get: () => ({ chats: [], todos: {} }) } }
+      if (request === './hub-service') return { hub: { get: () => ({ chats: [], todos: {}, controls: { switchboard } }) } }
       if (request === './todo') return { claimTodo: async () => true, runLabel: () => undefined, runMessage: () => 'msg', changeTodo: async () => {}, startTodo: (d: unknown) => d }
       return original.call(this, request, ...args)
     }
@@ -43,5 +43,20 @@ describe('codexPanel runInNewChat', () => {
       assert.equal(await panel(mod).runInNewChat('/a', [item as any]), true)
       assert.equal(calls[0][12], undefined)
     } finally { restore() }
+  })
+
+  it('a code item starts in its own worktree unless codeWorktrees is off', async () => {
+    const fix = { id: 'b2', text: 'fix the crash on save' }
+    for (const [switchboard, want] of [[{}, true], [{ codeWorktrees: false }, false]] as const) {
+      const calls: unknown[][] = []
+      const { restore, mod } = load(calls, switchboard)
+      try {
+        assert.equal(await panel(mod).runInNewChat('/a', [fix as any]), true)
+        assert.equal(calls[0][11], want)
+      } finally { restore() }
+    }
+    const calls: unknown[][] = []
+    const { restore, mod } = load(calls)
+    try { await panel(mod).runInNewChat('/a', [item as any]); assert.equal(calls[0][11], false) } finally { restore() }
   })
 })

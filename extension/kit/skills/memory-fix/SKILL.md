@@ -16,6 +16,7 @@ Runs the safe repairs on the memory graph by script, then you handle what needs 
    - orphan: add a typed relation or `[[link]]` to a genuinely related note. If nothing is related, leave it and report it.
    - duplicates: compare description and type, not just name. Same thing: write the merged note with `supersedes`, archive the old one. Different things: rename one or add `aliases`.
    - contradictions: resolve with `supersedes` only when both notes cover the same subject and one has newer evidence. Otherwise leave and list it for the user.
+   - possible contradictions (probed): two notes the Learn run's probe judged in conflict with no relation between them yet. Read both. A real conflict: resolve as for contradictions, or mark it `contradicts` and list it for the user. No conflict: add `related` between them, which tells the probe they were checked.
    - invalid: draft the missing description from the note body, set `metadata.type` to user, feedback, project or reference. Do not make up content.
    - stale (project notes over 90 days): check against code and git. Still true: touch nothing, or update it. Replaced: write the new note with `supersedes`. Unverifiable: report only.
    - unproven (a guess over 14 days old): reproduce it, or check it in code, git or the note's chat. Proven: drop `status: unproven` and add its index line. Wrong or unprovable: move it to `memory/archive/`.

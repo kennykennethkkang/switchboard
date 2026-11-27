@@ -16,8 +16,8 @@ import { freshRun } from '@/lib/budget-ui'
 import { relatedChat } from '@/lib/related-chat'
 import { ModelEffort } from './model-effort'
 import { fiveHourUse, runFields, startPicks, type RunPicks } from '@/lib/model-effort'
-import { scheduleText, type Every, type LoopMode, type LoopPick } from '@/lib/loop'
-import { EVERY_OPTIONS, LoopSeg, PROACTIVE_NOTE } from './chat-loop'
+import { autoLoop, codeTask, everyText, scheduleText, statsOf, taskLabel, type Every, type LoopChoice, type LoopMode, type LoopPick, type SmartLoop } from '@/lib/loop'
+import { EVERY_OPTIONS, LoopSeg, MODES, PROACTIVE_NOTE } from './chat-loop'
 import { Pick } from './gear'
 
 /** Asks the editor to split one message into separate asks; resolves [text] on failure. */
@@ -40,7 +40,7 @@ function Related({ text, chats, project, texts, onSend }: { text: string; chats:
     <button type="button" className="hub-btn" onClick={() => onSend(hit.sessionId)} title={`Send this to ${hit.name} instead of starting a new chat`}>Send there</button></p>
 }
 
-/** simple: Simple view, without Wait on, Pipeline, Own worktree and Tools (a busy project still gets its own worktree). */
+/** simple: Simple view, without Wait on, Pipeline, Own worktree and Tools (a code chat or busy project still gets its own worktree). */
 export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: HubState; send: (c: HubCommand) => void; upload: Upload; split?: SplitAsks; simple?: boolean; onDone: () => void }) {
   useDialog()
   // autoFocus loses to the click that opened the panel, so focus once it has settled.
@@ -74,21 +74,28 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
   const [toolsFor, setToolsFor] = useState('')
   const [edited, setEdited] = useState<ChatProfile>()
   const goal = text.trim()
-  // Loop: Claude chats in a project only; Goal and Timer need the id the extension picks for a Claude chat.
-  const [loop, setLoop] = useState<LoopMode>('turn')
+  // Loop: Claude chats in a project only; Goal and Timer need the id the extension picks for a Claude chat. Auto reads the message (loop.ts autoLoop).
+  const [loop, setLoop] = useState<LoopChoice>('auto')
   const [doneWhen, setDoneWhen] = useState('')
   const [every, setEvery] = useState('30')
   const [repeat, setRepeat] = useState('')
   const loops = ai === 'claude' && !research && !simple
-  const mode: LoopMode = loops ? loop : 'turn'
+  const task = taskLabel(goal)
+  const rates = hub.smart?.rates
+  const auto = useMemo(() => autoLoop(goal, task, statsOf(rates)), [goal, task, rates])
+  const mode: LoopMode = !loops ? 'turn' : loop === 'auto' ? auto.mode : loop
+  // Smart select learns from Auto's pick and from a mode chosen by hand over it.
+  const smartLoop: SmartLoop | undefined = loops && goal ? { task, pick: auto.mode, why: auto.why, ...(loop !== 'auto' ? { final: loop } : {}) } : undefined
   const project = making ? '' : hub.projects.find(p => p.path === path)?.name ?? ''
   // What each chat is on, for the related match: its running task, else its first.
   const texts = useMemo(() => Object.fromEntries(hub.progress.map(p => [p.sessionId, (p.tasks.find(t => t.status === 'in_progress') ?? p.tasks[0])?.subject ?? ''])), [hub.progress])
   const targets = startTargets(hub.chats, project, ai)
   const [picked, setPicked] = useState<string[]>([])
-  // A second Claude chat in a busy project gets its own git worktree unless unticked.
+  // A code chat, or a second Claude chat in a busy project, gets its own git worktree unless unticked.
   const [own, setOwn] = useState(true)
-  const busyProject = !making && !research && ai === 'claude' && targets.length > 0
+  const [box, setBox] = useState(false)
+  const claudeHere = !making && !research && ai === 'claude'
+  const ownOffer = claudeHere && (targets.length > 0 || (hub.controls.switchboard.codeWorktrees !== false && codeTask(goal)))
   const waitOn = picked.filter(id => targets.some(c => c.sessionId === id))
   const after = startsAfter(waitOn.map(id => targets.find(c => c.sessionId === id)?.name || id.slice(0, 8)))
   const waitProps = { targets, progress: hub.progress, project, picked: waitOn, onToggle: (id: string) => setPicked(p => toggleId(p, id)) }
@@ -109,14 +116,14 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
   const [asks, setAsks] = useState<string[]>()
   const req = useRef(0)
   const splitGot = useRef<string[]>([])
-  // Timer repeats its own prompt, else the first message.
-  const loopPick: LoopPick | undefined = mode === 'goal' ? { mode, ...(doneWhen.trim() ? { doneWhen: doneWhen.trim() } : {}) }
-    : mode === 'timer' ? { mode, everyMin: Number(every) as Every, text: (repeat.trim() || goal).slice(0, 500) } : undefined
+  // Timer repeats its own prompt, else the first message; Auto takes the interval from the message.
+  const loopPick: LoopPick | undefined = mode === 'goal' ? { mode, ...(loop === 'goal' && doneWhen.trim() ? { doneWhen: doneWhen.trim() } : {}) }
+    : mode === 'timer' ? { mode, everyMin: loop === 'auto' ? auto.everyMin ?? 30 : Number(every) as Every, text: ((loop === 'timer' && repeat.trim()) || goal).slice(0, 500) } : undefined
   const startOne = (text: string, group?: string) => {
     // Seeded first: the extension adds the run to this chat's first prompt.
     if (slug && !group) send({ type: 'hub-pipeline-seed', slug, path, run: freshRun(slug) })
     if (mode === 'proactive') text = scheduleText(text)
-    send({ type: 'hub-new-chat', path: repo ? '' : path, text, ...(loopPick ? { loop: loopPick } : {}), ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}), ...(waitOn.length ? { waitOn } : {}), ...(group ? { group } : {}), ...(busyProject && own ? { worktree: true } : {}), ...runFields(picks, ai), ...(research ? { research: true } : {}), ...(workbench ? { workbench: true } : {}) })
+    send({ type: 'hub-new-chat', path: repo ? '' : path, text, ...(loopPick ? { loop: loopPick } : {}), ...(smartLoop ? { smartLoop } : {}), ...(repo ? { repo } : {}), remote: hub.rc.atStartup, ...(ai !== 'claude' ? { ai } : tools ? { tools } : {}), ...(waitOn.length ? { waitOn } : {}), ...(group ? { group } : {}), ...(ownOffer && own ? { worktree: true } : {}), ...(claudeHere && box ? { container: true } : {}), ...runFields(picks, ai), ...(research ? { research: true } : {}), ...(workbench ? { workbench: true } : {}) })
   }
   const finish = () => { clearText(); files.clear(); onDone() }
   const start = () => {
@@ -179,7 +186,10 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
       {!making && goal && <Related text={text} chats={hub.chats} project={project} texts={texts} onSend={id => sendTo(id, msg)} />}
       {restored && over <= 0 && !files.busy && <p role="status" style={{ ...caps, textTransform: 'none' }}>Draft restored</p>}
       {loops && <div style={{ display: 'grid', gap: 8 }}>
-        <LoopSeg value={loop} onPick={setLoop} label="Loop" />
+        <LoopSeg value={loop} onPick={setLoop} label="Loop" auto />
+        {loop === 'auto' && <p role="status" style={{ margin: 0, fontSize: 13, color: 'var(--hub-mute)' }}>{goal
+          ? <>Auto: <b style={{ fontWeight: 500, color: 'var(--hub-ink)' }}>{MODES.find(([m]) => m === auto.mode)?.[1]}{auto.everyMin ? `, ${everyText(auto.everyMin)}` : ''}</b>, {auto.why}.{auto.mode === 'proactive' ? ` ${PROACTIVE_NOTE}` : ''}</>
+          : 'Auto picks the loop from your message. Hover a mode to see what it does.'}</p>}
         {loop === 'goal' && <input aria-label="Done when (optional)" value={doneWhen} maxLength={2000} placeholder="Done when (optional): all tests pass and Lighthouse scores 90 or more" onChange={e => setDoneWhen(e.target.value)} style={{ font: 'inherit', padding: '7px 10px', borderRadius: 8, minWidth: 0, background: 'var(--hub-canvas)', color: 'var(--hub-ink)', border: '1px solid var(--hub-hair)' }} />}
         {loop === 'timer' && <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <Pick label="How often" options={EVERY_OPTIONS} value={every} onChange={setEvery} />
@@ -227,8 +237,10 @@ export function NewChat({ hub, send, upload, split, simple, onDone }: { hub: Hub
             {pipes.map(p => <option key={p.slug} value={p.slug}>{p.name} ({p.stages} steps)</option>)}
           </select>
         </span>}
-        {busyProject && !simple && <label className="nc-own" style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--hub-mute)', fontSize: 13 }} title="Starts in .claude/worktrees on its own branch, so it cannot clobber the other chat's files. Merge back on its Git card.">
+        {ownOffer && !simple && <label className="nc-own" style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--hub-mute)', fontSize: 13 }} title="Starts in .claude/worktrees on its own branch, so it cannot clobber other chats' files. Merge back on its Git card.">
           <input type="checkbox" checked={own} onChange={e => setOwn(e.target.checked)} /> Separate copy of the project</label>}
+        {claudeHere && !simple && <label className="nc-own" style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--hub-mute)', fontSize: 13 }} title="Runs Claude in the repo's devcontainer (or Switchboard's default one) through Docker, so it can only touch this repo. Needs Docker running.">
+          <input type="checkbox" checked={box} onChange={e => setBox(e.target.checked)} /> In a container</label>}
         {!research && !simple && <button type="button" className="hub-btn nc-tools" disabled={!path || making || ai !== 'claude'} onClick={askPick} title="Every plugin and skill starts on; turn any off for this chat">Choose tools</button>}
           </div>
       {toolsFor && !research && (toolsFor !== path

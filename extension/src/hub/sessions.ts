@@ -8,6 +8,7 @@ import * as fs from 'fs'
 import { execFile } from 'child_process'
 import * as os from 'os'
 import * as path from 'path'
+import { containerChats, DATA } from './devcontainer'
 import { ask } from './projects'
 import { sharedRun } from './shared-run'
 import type { ChatRow } from './types'
@@ -25,15 +26,15 @@ export function newer(a: string, b: string): boolean {
   return false
 }
 
-/** started: whether the session has a prompt in its transcript yet. */
-export function chatRows(files: Record<string, unknown>[], alive: (pid: number) => boolean, now = Date.now(), started: (f: { sessionId: string; cwd: string }) => boolean = () => true): ChatRow[] {
+/** started: whether the session has a prompt in its transcript yet. A file marked container: its pid is inside the container, so the row gets pid 0. */
+export function chatRows(files: Record<string, unknown>[], alive: (pid: number, f: Record<string, unknown>) => boolean, now = Date.now(), started: (f: { sessionId: string; cwd: string }) => boolean = () => true): ChatRow[] {
   const all = files.flatMap(f => {
     const pid = f.pid, sessionId = str(f.sessionId)
     if (typeof pid !== 'number' || !sessionId) return []
     // sdk-cli without a bridge is a headless `claude -p` (bench runs); with one but nothing said yet, Remote Control's idle standby.
     if (f.entrypoint === 'sdk-cli' && (!str(f.bridgeSessionId) || !started({ sessionId, cwd: str(f.cwd) ?? '' }))) return []
-    const updatedAt = typeof f.updatedAt === 'number' ? f.updatedAt : undefined
-    return [{ pid, sessionId, name: str(f.name), cwd: str(f.cwd) ?? '', status: str(f.status), statusAt: typeof f.statusUpdatedAt === 'number' ? f.statusUpdatedAt : undefined, waitingFor: str(f.waitingFor), version: str(f.version), kind: str(f.kind), updatedAt, bridgeId: str(f.bridgeSessionId), live: alive(pid) }]
+    const updatedAt = typeof f.updatedAt === 'number' ? f.updatedAt : undefined, box = f.container === true
+    return [{ pid: box ? 0 : pid, ...(box ? { container: true as const } : {}), sessionId, name: str(f.name), cwd: str(f.cwd) ?? '', status: str(f.status), statusAt: typeof f.statusUpdatedAt === 'number' ? f.statusUpdatedAt : undefined, waitingFor: str(f.waitingFor), version: str(f.version), kind: str(f.kind), updatedAt, bridgeId: str(f.bridgeSessionId), live: alive(pid, f) }]
   })
   // A killed chat that was resumed leaves its old file: dead rows drop when the session runs elsewhere, else the newest stays.
   // Several live rows are real (the Claude panel and a terminal), so they all stay.
@@ -102,14 +103,28 @@ export async function rcRunningNow(platform: NodeJS.Platform = process.platform,
 
 const alive = (pid: number) => { try { process.kill(pid, 0); return true } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } }
 
-export async function readChats(): Promise<ChatRow[]> {
-  const names = await fs.promises.readdir(DIR).catch(() => [] as string[])
+async function readFiles(dir: string): Promise<Record<string, unknown>[]> {
+  const names = await fs.promises.readdir(dir).catch(() => [] as string[])
   const files: Record<string, unknown>[] = []
   for (const n of names) {
     if (!/^\d+\.json$/.test(n)) continue
-    try { files.push(JSON.parse(await fs.promises.readFile(path.join(DIR, n), 'utf8'))) } catch { /* mid-write */ }
+    try { files.push(JSON.parse(await fs.promises.readFile(path.join(dir, n), 'utf8'))) } catch { /* mid-write */ }
   }
-  return chatRows(files, alive, Date.now(), hasTranscript)
+  return files
+}
+
+// Every refresh reads chats, so Docker is asked at most every 10 s, and never with no container chat files.
+let boxes: { at: number; live: Promise<Set<string>> } | undefined
+const liveBoxes = () => {
+  if (!boxes || Date.now() - boxes.at > 10_000) boxes = { at: Date.now(), live: containerChats().catch(() => new Set<string>()) }
+  return boxes.live
+}
+
+export async function readChats(): Promise<ChatRow[]> {
+  // Claude in a container writes its session file to DATA/sessions (CLAUDE_CONFIG_DIR) with a pid from in there.
+  const [files, box] = await Promise.all([readFiles(DIR), readFiles(path.join(DATA, 'sessions'))])
+  const live = box.length ? await liveBoxes() : new Set<string>()
+  return chatRows([...files, ...box.map(f => ({ ...f, container: true }))], (pid, f) => f.container === true ? live.has(`${f.cwd}\n${pid}`) : alive(pid), Date.now(), hasTranscript)
 }
 
 export const transcriptOf = ({ sessionId, cwd }: { sessionId: string; cwd: string }) => path.join(os.homedir(), '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'), `${sessionId}.jsonl`)

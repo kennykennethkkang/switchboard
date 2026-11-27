@@ -83,7 +83,7 @@ describe('ask-server', () => {
   after(cleanup)
 
   function start(home: string, cwd: string, env: Record<string, string> = {}) {
-    const child = spawn(process.execPath, [server], { env: { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: cwd, ...env }, stdio: ['pipe', 'pipe', 'inherit'] })
+    const child = spawn(process.execPath, [server], { env: { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: cwd, ...env }, stdio: ['pipe', 'pipe', 'inherit'] })
     children.push(child)
     const lines: Record<string, unknown>[] = []
     const waiters: Array<() => void> = []

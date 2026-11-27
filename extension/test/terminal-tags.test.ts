@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import * as path from 'node:path'
 import { TerminalTags, ANSI, restoredOurs } from '../src/hub/terminal-tags'
 import type { ChatRow } from '../src/hub/types'
 
 type Fake = { name: string; exitStatus?: unknown; disposed: boolean; pid: number; processId: Promise<number>; dispose(): void }
 const term = (name: string, pid = 0): Fake => ({ name, pid, disposed: false, processId: Promise.resolve(pid), dispose() { this.disposed = true } })
-const chat = (sessionId: string, name: string, o: Partial<ChatRow> = {}): ChatRow => ({ pid: 0, sessionId, name, cwd: '/w/app', link: '', live: true, why: [], ...o })
+const chat = (sessionId: string, name: string, o: Partial<ChatRow> = {}): ChatRow => ({ pid: 0, sessionId, name, cwd: path.join(path.sep, 'w', 'app'), link: '', live: true, why: [], ...o })
 
 describe('terminal tags', () => {
   it('a terminal restored after a reload is ours by its icon id or chat name', () => {
@@ -158,13 +159,13 @@ describe('terminal tags', () => {
     dead.exitStatus = { code: 0 }
     tags.own(live, 'Claude', 's1'); tags.own(done, 'Claude', 's2'); tags.own(dead, 'Claude', 's3'); tags.seen(mine)
     const gone = term('Claude: d'); tags.own(gone, 'Claude', 's4'); tags.gone(gone)
-    const chats = [chat('s1', 'a'), chat('s2', 'b', { live: false }), chat('s3', 'c'), chat('s4', 'd', { live: false }), chat('s5', 'e'), chat('s6', 'far', { cwd: '/elsewhere' })]
+    const chats = [chat('s1', 'a'), chat('s2', 'b', { live: false }), chat('s3', 'c'), chat('s4', 'd', { live: false }), chat('s5', 'e'), chat('s6', 'far', { cwd: path.join(path.sep, 'elsewhere') })]
     const rows = tags.rows([live, done, dead, mine], chats)
     assert.deepEqual(rows.map(r => [r.owner, r.name, r.state]), [
       ['switchboard', 'Claude: a', 'running'], ['switchboard', 'Claude: b', 'ended'], ['switchboard', 'Claude: c', 'exited'], ['user', 'zsh', 'running'],
     ])
     assert.deepEqual(rows.map(r => r.chat), ['a', 'b', 'c', undefined])
-    assert.deepEqual(tags.missing(chats, '/w').map(c => c.sessionId), ['s4', 's5'])
+    assert.deepEqual(tags.missing(chats, path.join(path.sep, 'w')).map(c => c.sessionId), ['s4', 's5'])
     assert.equal(tags.find(rows[3].id), mine)
   })
 

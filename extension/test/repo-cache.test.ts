@@ -113,9 +113,9 @@ it('rechecks a cached root when a nested folder becomes a repository', async () 
   const run = (cwd: string, args: string[]) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
   try {
     run(root, ['init', '-b', 'main'])
-    assert.equal(await repoRoot(child), fs.realpathSync(root))
+    assert.equal(fs.realpathSync.native((await repoRoot(child))!), fs.realpathSync.native(root))
     run(child, ['init', '-b', 'nested'])
-    assert.equal(await repoRoot(child), fs.realpathSync(child))
+    assert.equal(fs.realpathSync.native((await repoRoot(child))!), fs.realpathSync.native(child))
   } finally { fs.rmSync(root, { recursive: true, force: true }) }
 })
 

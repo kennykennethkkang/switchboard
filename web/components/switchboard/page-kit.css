@@ -43,3 +43,11 @@
   .pk-seg > button { flex: 1 1 0; justify-content: center; min-width: 0; padding: 6px 4px; font-size: 12px; }
   .pk-seg .pk-n { margin-left: 3px; padding: 1px 4px; }
 }
+
+/* Touch: every control reaches 44px. */
+@media (pointer: coarse) {
+  .hub-btn.sm, .hub-stuck-acts .hub-btn, .pk-seg > button, .pk-sec-acts .hub-btn { min-height: 44px; }
+  .pk-stats dt > button { min-height: 44px; display: inline-flex; align-items: center; }
+  .sb .sb-btn, .sb-meters { min-height: 44px; display: inline-flex; align-items: center; }
+  .pk-n { min-height: 0; }
+}

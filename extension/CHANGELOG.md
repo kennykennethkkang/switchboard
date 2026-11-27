@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.21.200
+
+- Advisor: New chat and To-do Start have an Advisor select (Fable, Opus, Sonnet) that starts Claude with `--advisor`, so the chat's model consults a stronger one at key moments. Only advisors ranked at or above the picked model are listed; Auto never picks one. Claude only
+
+## 0.21.199
+
+- In a container: a chat container with no claude in it is also removed once it has run 15 minutes, so one whose chat ended before a window reload, or ran under 30 s, no longer stays running
+- repo-rules 0.2.13: a prose write (.md, .mdx, .txt) under the repos, Documents/Research or Claude's memory that reads as AI-written gets a note listing the tells to fix. The write is never held. The detector is avoid-ai-writing (MIT), vendored in the mod
+- repo-rules 0.2.14: the Codex guard copy now copies the detector's vendor folder with register.ts, so repo-rules loads for Codex chats
+
+## 0.21.198
+
+- In a container: a running container chat now shows as running on the board, and the message box reaches it. Switchboard reads the session files claude writes in there and asks Docker which of them still run, at most every 10 s and only when container chats exist. Messages are typed into the chat's terminal, since no mods run inside the container
+
+## 0.21.197
+
+- In a container: a chat's container is removed (docker rm -f) once claude in it exits, on SessionEnd or Approve. Switchboard checks the running containers every 30 s and only removes one where it saw claude run, so a container that is still starting stays
+- hub_recall seed lines show each note's date (modified, else mtime)
+
+## 0.21.196
+
+- In a container: a repo with no .devcontainer folder no longer stops at a devcontainer-lock.json error (Switchboard's own container config skips the lockfile; a repo's own lockfile still pins its features), and git works in there (the repo shows as root-owned, so git refused it). git config stays read-only inside
+
+## 0.21.195
+
+- In a container: a repo devcontainer.json that sets initializeCommand, runArgs, privileged, capAdd, securityOpt, mounts, workspaceMount, dockerComposeFile or ports is skipped for Switchboard's default container, with a notice, since the chat runs with permissions bypassed
+
+## 0.21.194
+
+- New chat: In a container runs a Claude chat inside the repo's devcontainer through Docker, or a Node 22 one Switchboard keeps outside the repo. Each chat folder gets its own container, the chat shows on the board as usual, and it runs with permissions bypassed since the container is the guard. Git hooks and git config in there are copies, so nothing it writes there runs on the Mac. Needs Docker running; the first container chat asks for /login once
+
+## 0.21.193
+
+- New chat: a Claude chat whose task reads as code work (fix, build, add, a UI change) starts in its own worktree even when nothing else runs in the project, like Cursor and Conductor; To-do runs with code items do too. Settings > Chats > Code chats in their own worktree turns it off; New chat can untick it per chat
+
+## 0.21.192
+
+- Home: chats waiting on your review (finished, or asking to be approved) sit at the top of Needs you, oldest wait first
+
+## 0.21.191
+
+- Account menu at the foot of the rail (a header icon on phones): Sign in with GitHub, Sync now, Turn off sync, the installed version and one Update button (Check for updates, Reload once a newer release is in). The same Updates row sits in Settings, Installed and About; the palette's Check for updates still prompts as before
+- Updates: a check while another window holds it reads that window's install and offers Reload, instead of doing nothing
+- Help: a short "How Switchboard works" dialog from the rail or the account menu
+- Simple view: plain words on held Approve ("Not checked yet. Still needed: ..."), one status per chat card (Waiting on you, Working, Stuck, Done), AI sign-ins only, General and Sign-ins tabs, no dev server chip; Coder view keeps the precise text
+- A disabled Approve says why in its tooltip and to screen readers
+- Nav: the same page names at every width (Research and Workbench, not Reports and Bench); 44 px targets on touch screens
+- Coder view: `?` lists shortcuts, `g` then a letter jumps to a page, `n` starts a chat, a skip link jumps past the rail; Find adds Check for updates, Sign in, Commit, Push and Open diff; the Git panel shows the git command each button runs; the chat view shows session id, cwd, model and cost, click to copy
+- Usage: Cache read and Cache write instead of Reread and Saved to cache
+
+## 0.21.190
+
+- New chat: the model title gets 5 s instead of 20 s; a slower answer gives the goal's first words, so a busy Mac no longer holds the terminal back for the title
+
+## 0.21.189
+
+- New chat: the loop picker starts on Auto, which picks Turn, Goal, Timer or Proactive from the message and says why before Start (Timer takes its interval from "every 2 h"). Smart select logs the pick and any mode chosen by hand over it, and switches Auto's pick once another mode has clearly held up better for that kind of task
+- Loop picker: hovering or focusing Auto, Turn, Goal, Timer or Proactive shows what it is for, when it stops and an example, in New chat and on the chat page
+
+## 0.21.188
+
+- Review notes: on a finished chat's Changes diff, tap a line (or Enter on it), write a note and Send to chat; the chat gets "Review note on file:line" with the line's text. Removed lines give the old file's line number
+
+## 0.21.187
+
+- New chat: the title, the model pick and the tool pick now run at the same time before the terminal opens, so a chat starts after the slowest of the three calls instead of all three in a row
+- Map: the court draws at 15 fps while the page has no focus (typing in another window or in the terminal beside the panel) and 30 fps when it has focus; drag, zoom and hover still draw at once
+
+## 0.21.186
+
+- Windows: Commit, Discard and Push in the Git panel found no picked files, because the repo-relative check resolved its placeholder root to a drive path
+- Windows: the hook forwarder checks window pids with process.kill(pid, 0) instead of one PowerShell per pid, which ran past the hook's 1.5 s exit
+- Windows: screenshot paths with drive letters and backslashes show in the chat view; bare commands resolve to C:\dir\cmd.exe, not mixed separators; Learn finds kit targets and the memory graph labels ~/.claude/CLAUDE.md
+- Release workflow: pnpm 12 installs again (esbuild builds allowed in pnpm-workspace.yaml), Windows checks out with LF, and the tests that assumed macOS or POSIX paths, modes and tools are platform-correct
+
 ## 0.21.185
 
 - Stuck notes: a quiet subagent's note waits for the lead's turn to end too, so a subagent that finished by then sends none

@@ -145,7 +145,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-pause'; action: 'resume' | 'cancel' }
   | { type: 'hub-hand-to'; sessionId: string }
   | { type: 'hub-ai-login'; ai: AiId }
-  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean; /** With research: start in the Workbench folder with its note. */ workbench?: boolean; /** Claude only: start in a Goal or Timer loop (loop.ts). */ loop?: { mode: 'turn' | 'goal' | 'timer'; doneWhen?: string; everyMin?: 10 | 30 | 60 | 180 | 1440; text?: string } }
+  | { type: 'hub-new-chat'; path: string; text?: string; remote: boolean; branch?: string; ai?: AiId; tools?: ChatProfile; repo?: { create: string; private: boolean } | { clone: string }; waitOn?: string[]; /** Chats started from one split share it. */ group?: string; /** Claude only: start in its own git worktree. */ worktree?: boolean; /** Claude only: run in the repo's devcontainer, else Switchboard's default one. */ container?: boolean; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; /** Claude only: --advisor, a model Claude consults mid-task. */ advisor?: string; auto?: boolean; research?: boolean; /** With research: start in the Workbench folder with its note. */ workbench?: boolean; /** Claude only: start in a Goal or Timer loop (loop.ts). */ loop?: { mode: 'turn' | 'goal' | 'timer'; doneWhen?: string; everyMin?: 10 | 30 | 60 | 180 | 1440; text?: string }; /** New chat's loop pick for Smart select to learn from (loop.ts SmartLoop). */ smartLoop?: { task: string; pick: 'turn' | 'goal' | 'timer' | 'proactive'; why: string; final?: 'turn' | 'goal' | 'timer' | 'proactive' } }
   /** Cut a New chat message into its separate asks; answered by hub-split-result with the same reqId. */
   | { type: 'hub-split'; reqId: string; path: string; text: string }
   | { type: 'hub-pick-tools'; text: string; path?: string }
@@ -218,6 +218,8 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-sync-sign-in' }
   | { type: 'hub-sync-now' }
   | { type: 'hub-sync-off' }
+  | { type: 'hub-update-check' }
+  | { type: 'hub-update-reload' }
   | { type: 'hub-setup' }
   | { type: 'hub-rules-sync' }
   | { type: 'hub-role-model'; role: string; model: 'inherit' | 'fable' | 'opus' | 'sonnet' | 'haiku' }
@@ -271,7 +273,7 @@ export type WebviewToExtensionMessage =
   | { type: 'hub-todo-dismiss'; path: string; id: string }
   | { type: 'hub-todo-move'; path: string; ids: string[] }
   /** Items and their open prerequisites, in a new chat or sent to a running one (to). */
-  | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; auto?: boolean; research?: boolean }
+  | { type: 'hub-todo-run'; path: string; ids: string[]; to?: string; /** The run's own picks (picker.ts fills what is unset while auto is not false): Claude model alias, effort level, ultracode (at xhigh it is --effort ultracode), no auto pick, start in the research folder with the research note. */ model?: string; effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'; ultracode?: boolean; /** Claude only: --advisor, a model Claude consults mid-task. */ advisor?: string; auto?: boolean; research?: boolean }
   | { type: 'hub-todo-sync'; path: string; on: boolean }
   | { type: 'hub-todo-pilot'; path: string; on?: boolean; paused?: boolean }
   | { type: 'hub-todo-replace'; path: string; remote: string }

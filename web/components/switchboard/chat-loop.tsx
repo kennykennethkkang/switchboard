@@ -1,12 +1,12 @@
 'use client'
 
 // A chat's loop (Turn, Goal, Timer, Proactive), its time and cost line, and Refine now, under its title.
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type PointerEvent } from 'react'
 import type { ChatProfile, ChatRow } from '@/lib/hub-types'
 import { vscodeBridge, type HubCommand } from '@/lib/vscode-bridge'
 import { budgetFill, budgetForm, budgetLine, budgetMsg, checkBackCount } from '@/lib/budget-ui'
 import { indefiniteHint } from '@/lib/indefinite'
-import { EVERY, ROUTINES_URL, everyText, loopOf, scheduleText, type Every, type LoopMode } from '@/lib/loop'
+import { EVERY, ROUTINES_URL, everyText, loopOf, scheduleText, type Every, type LoopChoice, type LoopMode } from '@/lib/loop'
 import { Pick } from './gear'
 import { TaskBar } from './chat-cards'
 import { label } from './look'
@@ -21,15 +21,42 @@ export const MODES: Array<[LoopMode, string, string]> = [
   ['timer', 'Timer', 'Sends a prompt on an interval while the chat is open'],
   ['proactive', 'Proactive', 'A cloud routine: runs on a schedule or a GitHub event, even with this Mac off'],
 ]
+const AUTO: [LoopChoice, string, string] = ['auto', 'Auto', 'Picks one of the four from your message']
+/** The hover card per loop: what it is for, when it stops, and an example. */
+export const LOOP_INFO: Record<LoopChoice, { use: string; stops: string; example: string }> = {
+  auto: { use: 'Any message. Turn, unless it asks to keep going (Goal), to check back (Timer) or to run on a schedule (Proactive).', stops: 'Like the mode it picks, shown below before you start. Click a mode to pick it yourself; each mode you change and each chat you approve teaches it.', example: 'Fix the login bug until all tests pass: Goal' },
+  turn: { use: 'Questions, fixes and steps you want to look at before the next one.', stops: 'When it answers. You send the next message.', example: 'Why does the build fail on Windows?' },
+  goal: { use: 'Long jobs with a clear finish: tests to pass, a score to reach, a list to clear.', stops: "When the goal file's check passes, the gate command exits 0, or a time or cost limit is hit.", example: 'Get Lighthouse to 90 or more on every page' },
+  timer: { use: 'Watching something while the chat is open: CI, a deploy, an inbox.', stops: 'After 12 sends or when the chat ends. Needs this Mac and the chat open.', example: 'Every 30 min, check CI and fix what fails' },
+  proactive: { use: "Jobs on a schedule or a GitHub event that run in Anthropic's cloud, even with this Mac off.", stops: 'When you pause or delete it on claude.ai routines. Hourly at most; it uses your plan.', example: 'Every weekday at 9am, triage new issues' },
+}
 export const EVERY_OPTIONS: Array<[string, string]> = EVERY.map(m => [String(m), everyText(m)])
 export const PROACTIVE_NOTE = "Made with /schedule in a new Claude chat. It runs in Anthropic's cloud, hourly at most or on GitHub events, and uses your plan."
 
-/** The Turn / Goal / Timer / Proactive buttons; disabled ones say why in their title. */
-export function LoopSeg({ value, onPick, label: name, only }: { value: LoopMode; onPick: (m: LoopMode) => void; label: string; only?: LoopMode[] }) {
+/** The Turn / Goal / Timer / Proactive buttons (Auto first with auto); hover or keyboard focus shows the mode's card. */
+export function LoopSeg<M extends LoopChoice>({ value, onPick, label: name, only, auto }: { value: M; onPick: (m: M) => void; label: string; only?: LoopMode[]; auto?: boolean }) {
+  const [tip, setTip] = useState<LoopChoice>()
+  const id = useId()
+  const list = [...(auto ? [AUTO] : []), ...MODES.filter(([m]) => !only || only.includes(m))]
+  const shown = tip && list.find(([m]) => m === tip)
+  const mouse = (m?: LoopChoice) => (e: PointerEvent) => { if (e.pointerType === 'mouse') setTip(m) }
   return (
-    <div role="group" aria-label={name} className="cv-seg" style={{ width: 'fit-content' }}>
-      {MODES.filter(([m]) => !only || only.includes(m)).map(([m, text, hint]) => <button key={m} type="button" aria-pressed={value === m} title={hint} onClick={() => onPick(m)}>{text}</button>)}
-    </div>
+    <span className="hub-tip-at" style={{ width: 'fit-content' }} onPointerLeave={mouse(undefined)} onKeyDown={e => { if (e.key === 'Escape' && tip) { e.stopPropagation(); setTip(undefined) } }}>
+      <div role="group" aria-label={name} className="cv-seg">
+        {list.map(([m, text]) => <button key={m} type="button" aria-pressed={value === m} aria-describedby={tip === m ? id : undefined} onClick={() => onPick(m as M)}
+          onPointerEnter={mouse(m)} onFocus={e => { if (e.currentTarget.matches(':focus-visible')) setTip(m) }} onBlur={() => setTip(undefined)}>{text}</button>)}
+      </div>
+      {shown && <div id={id} role="tooltip" className="hub-tip" style={{ width: 'min(360px, calc(100vw - 32px))' }}>
+        <div style={{ display: 'grid', gap: 6, padding: 12, borderRadius: 10, fontSize: 13, color: 'var(--hub-body)', background: 'var(--hub-elev)', border: '1px solid var(--hub-hair-strong)', boxShadow: 'var(--hub-shadow-pop)' }}>
+          <b style={{ fontWeight: 500, color: 'var(--hub-ink)' }}>{shown[1]}: {shown[2]}</b>
+          <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 10px', margin: 0 }}>
+            {([['For', 'use'], ['Stops', 'stops'], ['Example', 'example']] as const).map(([t, k]) => <div key={k} style={{ display: 'contents' }}>
+              <dt style={{ ...label, lineHeight: '19px' }}>{t}</dt><dd style={{ margin: 0, color: k === 'example' ? 'var(--hub-mute)' : undefined }}>{LOOP_INFO[shown[0]][k]}</dd>
+            </div>)}
+          </dl>
+        </div>
+      </div>}
+    </span>
   )
 }
 

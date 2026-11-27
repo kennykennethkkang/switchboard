@@ -311,7 +311,7 @@ describe('merge all worktrees', () => {
     fs.writeFileSync(path.join(busy, 'busy.txt'), 'x\n')
     fs.writeFileSync(path.join(clash, 'a.txt'), 'clash\n')
     fs.writeFileSync(path.join(main, 'a.txt'), 'main edit\n')
-    const r = await mergeWorktrees(main, w => w === busy, pass)
+    const r = await mergeWorktrees(main, w => w === fs.realpathSync.native(busy), pass)
     assert.equal(r.ok, true, r.text)
     assert.match(r.text, /Merged one, two/)
     assert.match(r.text, /Kept clash: clashes with main/)
@@ -364,8 +364,9 @@ describe('merge all worktrees', () => {
     assert.match((await mergeWorktrees(main, () => false, pass)).text, /already running/)
     fs.rmSync(path.join(main, '.git', 'switchboard-merge.lock'))
     const wt = path.join(main, '.claude', 'worktrees', 'late')
-    assert.equal(liveIn([{ live: false, cwd: wt, sessionId: 'c' }], id => id === 'c')(wt), true)
-    assert.equal(liveIn([{ live: false, cwd: wt, sessionId: 'c' }])(wt), false)
+    const realWt = fs.realpathSync.native(wt)
+    assert.equal(liveIn([{ live: false, cwd: wt, sessionId: 'c' }], id => id === 'c')(realWt), true)
+    assert.equal(liveIn([{ live: false, cwd: wt, sessionId: 'c' }])(realWt), false)
   })
 
   it('runs automatically after 15 quiet minutes, once per quiet spell in any window', () => {

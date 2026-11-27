@@ -7,6 +7,7 @@ import { listPipelines, savePipeline, seedPipeline, takeSeeded } from '../src/hu
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pipe-'))
 process.env.HOME = home
+process.env.USERPROFILE = home
 const cwd = path.join(home, 'proj')
 const run = path.join(cwd, '.switchboard', 'stages', '2026-11-14-x-abc')
 fs.mkdirSync(path.join(run, '01_research', 'output'), { recursive: true })

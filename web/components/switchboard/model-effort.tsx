@@ -1,9 +1,9 @@
 'use client'
-// Model, effort and ultracode for one run: New chat's footer and the To-do Start popover.
+// Model, effort, ultracode and advisor for one run: New chat's footer and the To-do Start popover.
 // Auto on: picker.ts picks per task. Off: the selects show, '' leaves that flag to the defaults.
 import { useId, type CSSProperties } from 'react'
 import type { AiId } from '@/lib/hub-types'
-import { EFFORTS, MODELS, heldLine, type RunPicks } from '@/lib/model-effort'
+import { EFFORTS, MODELS, advisorsFor, heldLine, type RunPicks } from '@/lib/model-effort'
 import { autoLine } from '@/lib/auto-reason'
 
 const lab: CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', minWidth: 0, color: 'var(--hub-mute)', fontSize: 13 }
@@ -17,6 +17,7 @@ export function ModelEffort({ ai, value, onChange, compact, usage, task }: { ai:
   const set = (p: Partial<RunPicks>) => onChange({ ...value, ...p })
   const why = value.auto && task ? autoLine(task, ai, usage ?? 0) : undefined
   const held = usage === undefined ? undefined : heldLine(usage, value.auto)
+  const advisors = advisorsFor(value.auto ? undefined : value.model)
   const select = (name: string, list: Array<[string, string]>, v: string | undefined, to: (v: string | undefined) => void) =>
     <label style={compact ? { ...lab, display: 'grid', gridTemplateColumns: '52px 1fr' } : lab}>{name}
       <select className="hub-select" value={v ?? ''} onChange={e => to(e.target.value || undefined)} style={{ color: v ? undefined : 'var(--hub-mute)', flex: compact ? 1 : undefined }}>
@@ -41,6 +42,8 @@ export function ModelEffort({ ai, value, onChange, compact, usage, task }: { ai:
           {ai === 'claude' && <button type="button" role="switch" className="hub-switch" aria-checked={!!value.ultracode} title="Runs the first message as a multi-agent workflow"
             onClick={() => set({ ultracode: !value.ultracode })}><span aria-hidden />Ultracode</button>}
         </>}
+      {/* Auto never picks an advisor, so it shows in both modes; a model change drops one ranked below it. */}
+      {ai === 'claude' && select('Advisor', advisors, advisors.some(([a]) => a === value.advisor) ? value.advisor : undefined, advisor => set({ advisor }))}
     </div>
   )
 }

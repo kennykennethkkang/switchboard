@@ -82,6 +82,18 @@ test('plan and apply: retarget, archive a superseded note, back up first', () =>
   assert.match(fs.readFileSync(path.join(bak, mem, 'user.md'), 'utf8'), /\[\[fresh-nots\]\]/)
 })
 
+test('a probed pair goes to judgment, never to an action', () => {
+  for (const f of fs.readdirSync(mem)) fs.rmSync(path.join(mem, f), { recursive: true })
+  w('a.md', note('a'))
+  w('b.md', note('b'))
+  w('MEMORY.md', '- [](a.md) about a\n- [](b.md) about b\n')
+  const graph = { nodes: [node('a'), node('b')], edges: [], health: { dangling: [], orphans: [], duplicates: [], contradictions: [], superseded: [], invalid: [], stale: [], loops: [], probed: [[id('a'), id('b')]] } }
+  const { actions, left } = plan(graph, home)
+  assert.deepEqual(actions, [])
+  assert.equal(left.length, 1)
+  assert.match(left[0], /^possible contradiction .*a\.md vs .*b\.md \(probe\)/)
+})
+
 test('a loop or a missing superseder is never auto-archived', () => {
   w('x.md', note('x'))
   w('y.md', note('y'))

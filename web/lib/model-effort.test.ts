@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { emptyHub } from './hub-demo'
-import { fiveHourUse, heldLine, runFields, startPicks } from './model-effort'
+import { advisorsFor, fiveHourUse, heldLine, runFields, startPicks } from './model-effort'
 
 const now = Date.now()
 const later = new Date(now + 3600_000).toISOString()
@@ -19,6 +19,22 @@ test('runFields: ultracode is Claude only, a bad effort is dropped', () => {
 
 test('runFields: other AIs get nothing', () => {
   assert.deepEqual(runFields({ auto: false, model: 'opus' }, 'hermes'), {})
+})
+
+test('advisorsFor: only advisors ranked at or above the model', () => {
+  const names = (m?: string) => advisorsFor(m).map(([a]) => a)
+  assert.deepEqual(names(undefined), ['fable', 'opus', 'sonnet'])
+  assert.deepEqual(names('haiku'), ['fable', 'opus', 'sonnet'])
+  assert.deepEqual(names('opus'), ['fable', 'opus'])
+  assert.deepEqual(names('fable'), ['fable'])
+  assert.deepEqual(names('claude-opus-5-5'), ['fable', 'opus', 'sonnet'])
+})
+
+test('runFields: advisor is Claude only and dropped below the model', () => {
+  assert.deepEqual(runFields({ auto: true, advisor: 'opus' }, 'claude'), { auto: true, advisor: 'opus' })
+  assert.deepEqual(runFields({ auto: false, model: 'opus', advisor: 'sonnet' }, 'claude'), { auto: false, model: 'opus' })
+  assert.deepEqual(runFields({ auto: false, advisor: 'opus' }, 'codex'), { auto: false })
+  assert.deepEqual(runFields({ auto: false, advisor: 'gpt' }, 'claude'), { auto: false })
 })
 
 test('heldLine: from 60% on, and only while auto picks', () => {

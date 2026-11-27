@@ -12,7 +12,7 @@ const dirOf = (id: string) => {
 }
 
 /** Copies the files that exist into a new snapshot; missing ones are left out of paths. */
-export function saveSnapshot(label: string, files: string[], chat?: string, skipped: string[] = []): Snapshot {
+export function saveSnapshot(label: string, files: string[], chat?: string, skipped: string[] = [], reason?: string): Snapshot {
   const at = Date.now()
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'snap'
   fs.mkdirSync(root(), { recursive: true })
@@ -28,7 +28,8 @@ export function saveSnapshot(label: string, files: string[], chat?: string, skip
     fs.copyFileSync(f, to)
     paths.push(f)
   }
-  const snap: Snapshot = { id, label, at, paths, ...(chat ? { chat } : {}), ...(skipped.length ? { skipped } : {}) }
+  const why = reason?.replace(/\s+/g, ' ').trim().slice(0, 500)
+  const snap: Snapshot = { id, label, at, paths, ...(chat ? { chat } : {}), ...(skipped.length ? { skipped } : {}), ...(why ? { reason: why } : {}) }
   fs.mkdirSync(path.join(root(), id), { recursive: true })
   fs.writeFileSync(path.join(root(), id, 'manifest.json'), JSON.stringify({ ...snap, chat: chat ?? null }, null, 1))
   return snap
@@ -42,7 +43,7 @@ export function listSnapshots(): Snapshot[] {
   for (const id of ids) {
     try {
       const m = JSON.parse(fs.readFileSync(path.join(root(), id, 'manifest.json'), 'utf8'))
-      if (typeof m.id === 'string' && typeof m.at === 'number' && Array.isArray(m.paths)) out.push({ id: m.id, label: String(m.label), at: m.at, paths: m.paths, ...(m.chat ? { chat: m.chat } : {}), ...(Array.isArray(m.skipped) && m.skipped.length ? { skipped: m.skipped.map(String) } : {}) })
+      if (typeof m.id === 'string' && typeof m.at === 'number' && Array.isArray(m.paths)) out.push({ id: m.id, label: String(m.label), at: m.at, paths: m.paths, ...(m.chat ? { chat: m.chat } : {}), ...(Array.isArray(m.skipped) && m.skipped.length ? { skipped: m.skipped.map(String) } : {}), ...(typeof m.reason === 'string' && m.reason ? { reason: m.reason } : {}) })
     } catch { /* not a snapshot */ }
   }
   return out.sort((a, b) => b.at - a.at || b.id.localeCompare(a.id))

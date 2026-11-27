@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Undo points for kit, rules, agent and memory edits.
-//   node snapshot.mjs save <label> <files...>   prints "<id> <n> files"
+//   node snapshot.mjs save <label> [--reason <why>] <files...>   prints "<id> <n> files"
 //   node snapshot.mjs list
 //   node snapshot.mjs restore <id>              saves the current files as "before undo" first
 // Store: ~/.claude/switchboard/snapshots/<id>/{manifest.json,files/}. Same format as extension/src/hub/snapshots.ts.
@@ -11,7 +11,7 @@ import path from 'node:path'
 const root = () => path.join(os.homedir(), '.claude', 'switchboard', 'snapshots')
 const rel = p => p.replace(/^[A-Za-z]:/, m => m[0]).replace(/^[\\/]+/, '')
 
-function save(label, files, chat = process.env.CLAUDE_SESSION_ID, skipped = []) {
+function save(label, files, chat = process.env.CLAUDE_SESSION_ID, skipped = [], reason) {
   const at = Date.now()
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'snap'
   fs.mkdirSync(root(), { recursive: true })
@@ -28,7 +28,8 @@ function save(label, files, chat = process.env.CLAUDE_SESSION_ID, skipped = []) 
     paths.push(f)
   }
   fs.mkdirSync(path.join(root(), id), { recursive: true })
-  fs.writeFileSync(path.join(root(), id, 'manifest.json'), JSON.stringify({ id, label, at, paths, chat: chat ?? null, ...(skipped.length ? { skipped } : {}) }, null, 1))
+  const why = reason?.replace(/\s+/g, ' ').trim().slice(0, 500)
+  fs.writeFileSync(path.join(root(), id, 'manifest.json'), JSON.stringify({ id, label, at, paths, chat: chat ?? null, ...(skipped.length ? { skipped } : {}), ...(why ? { reason: why } : {}) }, null, 1))
   return { id, label, at, paths }
 }
 
@@ -65,8 +66,9 @@ function restore(id) {
 
 const [cmd, ...a] = process.argv.slice(2)
 try {
-  if (cmd === 'save' && a.length > 1) { const s = save(a[0], a.slice(1)); console.log(`${s.id} ${s.paths.length} files`) }
-  else if (cmd === 'list') for (const s of list()) console.log(`${s.id}\t${new Date(s.at).toISOString()}\t${s.label}\t${s.paths.length} files`)
+  const r = a[1] === '--reason' ? a[2] : undefined, files = a.slice(r === undefined ? 1 : 3)
+  if (cmd === 'save' && files.length) { const s = save(a[0], files, undefined, [], r); console.log(`${s.id} ${s.paths.length} files`) }
+  else if (cmd === 'list') for (const s of list()) console.log(`${s.id}\t${new Date(s.at).toISOString()}\t${s.label}\t${s.paths.length} files${s.reason ? `\t${s.reason}` : ''}`)
   else if (cmd === 'restore' && a[0]) { const r = restore(a[0]); for (const k of r.skipped) console.error(`skipped ${k}`); console.log(`restored ${a[0]}; undo with: restore ${r.id}`) }
-  else { console.error('usage: snapshot.mjs save <label> <files...> | list | restore <id>'); process.exit(2) }
+  else { console.error('usage: snapshot.mjs save <label> [--reason <why>] <files...> | list | restore <id>'); process.exit(2) }
 } catch (e) { console.error(e.message); process.exit(1) }

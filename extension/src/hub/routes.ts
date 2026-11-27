@@ -38,7 +38,7 @@ import type { HubService } from './hub-service'
 import type { WebviewToExtensionMessage } from '../protocol'
 import type { GitOp, SettingKey, SwitchboardKey } from './types'
 import { isAi } from './ais'
-import { isLoopPick } from './loop'
+import { isLoopPick, isSmartLoop } from './loop'
 import { isRepoAsk } from './projects'
 import { isKeyName } from './keys'
 import { CODEX_EFFORTS, CODEX_MODELS, ROLE_MODELS } from './roles'
@@ -106,7 +106,7 @@ const SPLIT_MAX = 8000
 const paths: Check = v => Array.isArray(v) && v.length <= MAX_PATHS && v.every(x => typeof x === 'string')
 // Typed by Kenneth; todo.ts cuts it to 2000 after cleaning, this only stops a huge body.
 const todoText: Check = v => typeof v === 'string' && v.length <= 2000
-const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexFirst', 'codexModel', 'codexEffort', 'autoPick', 'autoMerge']
+const SWITCHBOARD_KEYS: SwitchboardKey[] = ['hooks', 'statusBar', 'idleMinutes', 'brief', 'askBrain', 'syncRules', 'accessNote', 'autoStart', 'autoFix', 'stopServers', 'name', 'askClaude', 'claudeMode', 'askCodex', 'keepApp', 'hardenBuild', 'pauseAt', 'learn', 'oneWindow', 'showBrowsers', 'toasts', 'notices', 'noticeSpot', 'phone', 'smartModelSwitch', 'codexFirst', 'codexModel', 'codexEffort', 'autoPick', 'autoMerge', 'codeWorktrees']
 
 /** Every field of every hub command, as protocol.ts declares it; the runner trusts these types. */
 const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubCommand, { type: T }>, 'type'>]-?: Check } } = {
@@ -137,7 +137,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-pause': { action: oneOf('resume', 'cancel') },
   'hub-hand-to': { sessionId: str },
   'hub-ai-login': { ai: isAi },
-  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool), workbench: opt(bool), loop: opt(isLoopPick) },
+  'hub-new-chat': { path: str, text: opt(str), remote: bool, branch: opt(str), ai: opt(isAi), tools: opt(profile), repo: opt(isRepoAsk), waitOn: opt(v => Array.isArray(v) && v.length <= 20 && v.every(x => typeof x === 'string')), group: opt(str), worktree: opt(bool), container: opt(bool), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), advisor: opt(model), auto: opt(bool), research: opt(bool), workbench: opt(bool), loop: opt(isLoopPick), smartLoop: opt(isSmartLoop) },
   'hub-split': { reqId: str, path: str, text: v => typeof v === 'string' && v.length <= SPLIT_MAX },
   'hub-pick-tools': { text: str, path: opt(str) },
   'hub-tool-precedence': { name: str, value: oneOf('always', 'auto', 'never') },
@@ -192,6 +192,8 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-sync-sign-in': {},
   'hub-sync-now': {},
   'hub-sync-off': {},
+  'hub-update-check': {},
+  'hub-update-reload': {},
   'hub-setup': {},
   'hub-rules-sync': {},
   'hub-role-model': { role: str, model: oneOf(...ROLE_MODELS) },
@@ -231,7 +233,7 @@ const SHAPES: { [T in HubCommand['type']]: { [K in Exclude<keyof Extract<HubComm
   'hub-todo-accept': { path: str, id: str },
   'hub-todo-dismiss': { path: str, id: str },
   'hub-todo-move': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 500 && v.every(x => typeof x === 'string') },
-  'hub-todo-run': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(x => typeof x === 'string'), to: opt(str), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), auto: opt(bool), research: opt(bool) },
+  'hub-todo-run': { path: str, ids: v => Array.isArray(v) && v.length > 0 && v.length <= 50 && v.every(x => typeof x === 'string'), to: opt(str), model: opt(model), effort: opt(oneOf('low', 'medium', 'high', 'xhigh', 'max')), ultracode: opt(bool), advisor: opt(model), auto: opt(bool), research: opt(bool) },
   'hub-todo-sync': { path: str, on: bool },
   'hub-todo-pilot': { path: str, on: opt(bool), paused: opt(bool) },
   'hub-todo-replace': { path: str, remote: v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v) },

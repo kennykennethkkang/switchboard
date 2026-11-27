@@ -1,5 +1,5 @@
 /**
- * Learn automatically (Settings): improve-system twice a week with a memory consolidation pass after it, and an aar on long chats that end, each a headless
+ * Learn automatically (Settings): improve-system twice a week with a memory consolidation pass and a contradiction probe (probe.ts) after it, and an aar on long chats that end, each a headless
  * `claude -p`, one at a time across windows (learn.lock), only under the pause threshold. Self-improve runs that clearly
  * beat baseline become a Learning ready card; only Kenneth's Approve writes claude-mods (never the built kit). The rest stay to-dos.
  */
@@ -14,6 +14,7 @@ import { createLogger } from '../logger'
 import { transcriptFile } from './chat-view'
 import { slugOf } from './flowmap'
 import { hub, resetMs } from './hub-service'
+import { probeMemory } from './probe'
 import { projectName, repoTop } from './projects'
 import { saveSnapshot } from './snapshots'
 import { claudeBinary } from './setup'
@@ -73,7 +74,7 @@ function findTarget(r: Results, baseline: string, mods: string): string | undefi
   const kit = path.join(mods, 'kit')
   if (typeof r.target === 'string') {
     const t = path.resolve(r.target)
-    return t.startsWith(kit + path.sep) && KIT_FILE.test(t) ? t : undefined
+    return t.startsWith(kit + path.sep) && KIT_FILE.test(t.replace(/\\/g, '/')) ? t : undefined
   }
   const ls = (d: string) => { try { return fs.readdirSync(d) } catch { return [] } }
   const files = [path.join(kit, 'rules.md'), ...ls(path.join(kit, 'agents')).map(f => path.join(kit, 'agents', f)), ...ls(path.join(kit, 'skills')).map(f => path.join(kit, 'skills', f, 'SKILL.md'))]
@@ -110,7 +111,7 @@ function loadRun(run: string, mods: string) {
   if (baseline === undefined || cand === undefined) return undefined
   const target = findTarget(r, baseline, mods)
   const g = betterOrNot(r, baseline, target && read(target))
-  return { r, baseline, cand, target, g, name: target ? path.relative(mods, target) : 'a kit file', diff: path.join(run, 'candidate.diff') }
+  return { r, baseline, cand, target, g, name: target ? path.relative(mods, target).replace(/\\/g, '/') : 'a kit file', diff: path.join(run, 'candidate.diff') }
 }
 
 export type Ready = LearnReady & { run: string; hash: string }
@@ -133,7 +134,7 @@ export function applyRun(run: string, mods: string, hash: string): { applied: bo
   if (hashOf(cand) !== hash) return { applied: false, text: `Learn proposal for ${name}, not applied (candidate changed since the card). Diff: ${diff}` }
   if (!g.apply || !target) return { applied: false, text: `Learn proposal for ${name}, not applied (${g.why}). Diff: ${diff}` }
   fs.copyFileSync(target, path.join(run, 'previous.md'))
-  try { saveSnapshot(`Learn: ${name}`, [target]) } catch { /* the undo point is best effort */ }
+  try { saveSnapshot(`Learn: ${name}`, [target], undefined, [], `Approved Learn run ${path.basename(run)}: ${g.why}`) } catch { /* the undo point is best effort */ }
   fs.writeFileSync(target, cand)
   return { applied: true, text: `Learned: ${name} in claude-mods updated (${g.why}). Diff: ${diff}. Undo: cp "${path.join(run, 'previous.md')}" "${target}"` }
 }
@@ -247,7 +248,7 @@ async function improve(st: State, run: Runner, todo: (folder: string, text: stri
   try {
     const before = stageMemory(mem, stage)
     code = await run(jobArgs('improve', improvePrompt(r.mods, stage), id, r.scripts, stage), r.flow)
-    syncMemory(stage, mem, before)
+    syncMemory(stage, mem, before, `Learn improve run ${id}`)
   } finally { fs.rmSync(path.join(STAGE, id), { recursive: true, force: true }) }
   const seen = new Set(st.runs ?? [])
   let dirs: string[] = []
@@ -264,7 +265,8 @@ async function improve(st: State, run: Runner, todo: (folder: string, text: stri
   writeState({ ...now, runs: [...(now.runs ?? []), ...dirs], ready: [...(now.ready ?? []), ...ready] })
   showReady()
   const merged = await consolidate(r, run, todo).catch(err => { log.warn('Learn consolidation failed:', err); return 'memory consolidation failed' })
-  return `${code ? `improve-system exited ${code}` : lines.length + ready.length ? `${ready.length} ready for you, ${lines.length} proposed` : 'nothing to change'}; ${merged}`
+  const probed = await probeMemory(hub.get()).catch(err => { log.warn('Learn contradiction probe failed:', err); return 'contradiction probe failed' })
+  return `${code ? `improve-system exited ${code}` : lines.length + ready.length ? `${ready.length} ready for you, ${lines.length} proposed` : 'nothing to change'}; ${merged}; ${probed}`
 }
 
 const PROPOSALS = path.join(DIR, 'consolidate')
@@ -273,6 +275,70 @@ const memoryDirs = () => { const root = path.join(os.homedir(), '.claude', 'proj
 /** A proposal is one `## Merge` or `## Rewrite` heading; other headings can sit inside a proposed note. */
 export const proposalCount = (text: string) => text.split('\n').filter(l => /^## (Merge|Rewrite) /.test(l)).length
 
+/** What a made-up claim would carry: the words of `code`, and words holding a digit, a slash or an inner dot (numbers, dates, paths, file names).
+ * Code is checked word by word and {a,b} lists piece by piece, so a reworded span still matches. */
+const claimTerms = (line: string) => [
+  ...[...line.matchAll(/`([^`\n]+)`/g)].flatMap(x => x[1].split(/\s+/)),
+  ...line.replace(/`[^`\n]*`/g, ' ').split(/\s+/).filter(w => /\d|\/|\w\.\w/.test(w)),
+].flatMap(t => t.split(/[{},]/)).map(t => t.replace(/^[^\w~/.-]+|[^\w/]+$/g, '').toLowerCase()).filter(t => /\d/.test(t) || /\w{3}/.test(t))
+/** Body lines of a proposed note with a term found nowhere in the sources (old notes and their transcripts).
+ * shortcut: prose lines with no such term always pass; a word-level check would need a model. */
+export function addedClaims(note: string, sources: string): string[] {
+  const src = sources.toLowerCase(), had = new Set(sources.split('\n').map(l => l.trim()))
+  const body = note.replace(FRONT, '')
+  return body.split('\n').map(l => l.trim()).filter(l => l && !/^(```|~~~|#)/.test(l) && !had.has(l) && claimTerms(l).some(t => !found(src, t)))
+}
+const FRONT = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(?:\r?\n|$)/
+/** t in src as a whole term: 3 is not in 30, foo-bar is not in foo-bar-baz, but 2026-11-25 is in 2026-11-25T07:00. */
+const found = (src: string, t: string) => {
+  const stop = (c: string) => /\d/.test(c) ? /\d/ : /\w/.test(c) ? /[\w-]/ : undefined
+  const l = stop(t[0]), r = stop(t[t.length - 1])
+  for (let i = src.indexOf(t); i >= 0; i = src.indexOf(t, i + 1))
+    if (!l?.test(src[i - 1] ?? ' ') && !r?.test(src[i + t.length] ?? ' ')) return true
+  return false
+}
+/** The note with `status: unproven` in its frontmatter; a note without frontmatter is left as it is. */
+export function markUnproven(note: string): string {
+  const m = FRONT.exec(note), fm = m?.[1] ?? ''
+  if (!m) return note
+  const next = /^(\s*)status:.*$/m.test(fm) ? fm.replace(/^(\s*)status:.*$/m, '$1status: unproven') : fm ? `${fm}\nstatus: unproven` : 'status: unproven'
+  return `---\n${next}\n---\n${note.slice(m[0].length)}`
+}
+/** Each proposal whose new note adds claims gets them listed above its note, and the note gets status: unproven. source: the old notes' text plus their transcripts. */
+export async function checkProposals(text: string, source: (folder: string, names: string[]) => Promise<string>): Promise<{ text: string; flagged: number }> {
+  const lines = text.split('\n'), starts = lines.flatMap((l, i) => /^## (Merge|Rewrite) /.test(l) ? [i] : [])
+  let flagged = 0
+  // Back to front, so inserted lines do not move the sections still to check.
+  for (let k = starts.length - 1; k >= 0; k--) {
+    const at = starts[k], end = starts[k + 1] ?? lines.length, sec = lines.slice(at, end)
+    const open = sec.findIndex(l => /^```/.test(l))
+    // The last bare fence closes it: a proposed note can hold code fences of its own.
+    const close = sec.map(l => /^```\s*$/.test(l)).lastIndexOf(true)
+    if (open < 0 || close <= open) continue
+    const names = lines[at].replace(/^## (Merge|Rewrite) /, '').split('+').map(s => s.trim()).filter(Boolean)
+    const folder = sec.find(l => l.startsWith('Folder: '))?.slice(8).trim() ?? ''
+    const note = sec.slice(open + 1, close).join('\n'), added = addedClaims(note, await source(folder, names))
+    if (!added.length) continue
+    flagged++
+    lines.splice(at + open, close - open + 1, 'Added claims: these lines match nothing in the old note or its transcript, so the note carries status: unproven until they are checked.', ...added.map(l => `- ${l.replace(/^[-*] /, '')}`), '', lines[at + open], ...markUnproven(note).split('\n'), lines[at + close])
+  }
+  return { text: lines.join('\n'), flagged }
+}
+// shortcut: bigger transcripts are skipped, so their notes' claims read as unmatched; stream them if that shows up.
+const TRANSCRIPT_CAP = 100 * 1024 * 1024
+/** The old notes and the transcripts they came from, for checkProposals; '' for a folder Learn did not hand the run. */
+async function claimSource(mems: string[], folder: string, names: string[]): Promise<string> {
+  if (!mems.includes(folder)) return ''
+  const out: string[] = []
+  for (const n of names.filter(n => /^[\w.-]+\.md$/.test(n))) {
+    const note = read(path.join(folder, n)) ?? read(path.join(folder, 'archive', n)) ?? ''
+    out.push(note)
+    const id = /^\s*originSessionId:\s*(\S+)/m.exec(note)?.[1], f = id && await transcriptFile(id)
+    if (f && fs.statSync(f).size <= TRANSCRIPT_CAP) out.push(read(f) ?? '')
+  }
+  return out.join('\n')
+}
+
 /** Letta-style sleep-time pass after improve-system: one read-only run proposes rewrites and merges; Switchboard keeps the file and files one to-do. */
 export async function consolidate(r: { flow: string; mods: string }, run: Runner, todo: (folder: string, text: string) => Promise<void>, mems = memoryDirs(), keep = PROPOSALS): Promise<string> {
   if (!mems.length) return 'no memory to consolidate'
@@ -280,12 +346,13 @@ export async function consolidate(r: { flow: string; mods: string }, run: Runner
   fs.mkdirSync(stage, { recursive: true })
   try {
     const code = await run(jobArgs('consolidate', consolidatePrompt(r.mods, mems, out), id, [], stage), r.flow)
-    const text = read(out) ?? '', n = proposalCount(text)
+    const raw = read(out) ?? '', n = proposalCount(raw)
     if (!n) return code ? `memory consolidation exited ${code}` : 'memory consolidation: nothing to merge'
     fs.mkdirSync(keep, { recursive: true })
     const file = path.join(keep, `${new Date().toISOString().slice(0, 10)}-${id.slice(0, 8)}.md`)
+    const { text, flagged } = await checkProposals(raw, (folder, names) => claimSource(mems, folder, names))
     fs.writeFileSync(file, text)
-    await todo(r.flow, `Memory consolidation: ${n} proposed rewrite${n > 1 ? 's' : ''} or merge${n > 1 ? 's' : ''} in ${file}. Review, then apply the ones you want with the memory-fix skill (gold check before and after).`)
+    await todo(r.flow, `Memory consolidation: ${n} proposed rewrite${n > 1 ? 's' : ''} or merge${n > 1 ? 's' : ''} in ${file}${flagged ? `, ${flagged} adding claims with no source (marked unproven)` : ''}. Review, then apply the ones you want with the memory-fix skill (gold check before and after).`)
     return `memory consolidation: ${n} proposed`
   } finally { fs.rmSync(stage, { recursive: true, force: true }) }
 }
@@ -302,7 +369,7 @@ async function aar(next: { sessionId: string; cwd: string }, st: State, run: Run
   try {
     const before = stageMemory(mem, stage)
     const code = await run(jobArgs('aar', aarPrompt(r.mods, next.sessionId, next.cwd, file, stage), id, [], stage), r.flow)
-    const saved = syncMemory(stage, mem, before)
+    const saved = syncMemory(stage, mem, before, `Learn aar of chat ${next.sessionId}`)
     return `aar on ${projectName(next.cwd)} chat ${next.sessionId.slice(0, 8)}${code ? ` exited ${code}` : ''}${saved.length ? `, ${saved.length} memory note${saved.length > 1 ? 's' : ''}` : ''}`
   } finally { fs.rmSync(path.join(STAGE, id), { recursive: true, force: true }) }
 }
@@ -318,10 +385,10 @@ export function stageMemory(mem: string, stage: string): Map<string, string> {
   return before
 }
 /** New or changed notes go back; MEMORY.md is merged by line, so a chat's edits meanwhile survive. Deleted notes are not copied. */
-export function syncMemory(stage: string, mem: string, before: Map<string, string>): string[] {
+export function syncMemory(stage: string, mem: string, before: Map<string, string>, reason?: string): string[] {
   const changed = notes(stage).filter(f => fs.readFileSync(path.join(stage, f), 'utf8') !== before.get(f))
   if (changed.length) fs.mkdirSync(mem, { recursive: true })
-  if (changed.length) try { saveSnapshot('Learn: memory', changed.map(f => path.join(mem, f))) } catch { /* the undo point is best effort */ }
+  if (changed.length) try { saveSnapshot('Learn: memory', changed.map(f => path.join(mem, f)), undefined, [], reason) } catch { /* the undo point is best effort */ }
   for (const f of changed) {
     const text = fs.readFileSync(path.join(stage, f), 'utf8'), target = path.join(mem, f)
     if (f !== 'MEMORY.md' || !fs.existsSync(target)) { fs.writeFileSync(target, text); continue }

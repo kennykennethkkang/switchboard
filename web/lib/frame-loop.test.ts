@@ -33,3 +33,19 @@ test('minDt skips frames that come sooner than it, but keeps the loop going', ()
   q.shift()!(t + 33); assert.equal(seen.length, 2)
   l.stop()
 })
+
+test('reads a changing minDt value on each frame', () => {
+  const q: Array<(t: number) => void> = []
+  const g = globalThis as any
+  g.requestAnimationFrame = (f: (t: number) => void) => q.push(f)
+  g.cancelAnimationFrame = () => { q.length = 0 }
+  const seen: number[] = []
+  let minDt = 63
+  const l = frameLoop(now => seen.push(now), () => true, () => minDt)
+  l.wake()
+  const t = seen[0]
+  q.shift()!(t + 40); assert.equal(seen.length, 1)
+  minDt = 30
+  q.shift()!(t + 50); assert.equal(seen.length, 2)
+  l.stop()
+})
