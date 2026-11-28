@@ -160,7 +160,7 @@ export function plan(graph, home) {
     edited.set(f, text)
     if (rest.length) remaining.push([id, rest])
   }
-  for (const [f, text] of edited) if (text !== fs.readFileSync(f, 'utf8')) actions.push({ type: 'edit', file: f, text })
+  for (const [f, text] of edited) if (text !== fs.readFileSync(f, 'utf8')) actions.push({ type: 'edit', file: f, text, why: 'retargeted dangling links' })
   const gone = new Map()
   const moved = new Set()
   for (const id of h.superseded) {
@@ -168,14 +168,14 @@ export function plan(graph, home) {
     const f = fp(id)
     const to = f && path.join(path.dirname(f), 'archive', path.basename(f))
     if (!isLive(id) || loopIds.has(id) || !by || !fs.existsSync(f) || fs.existsSync(to) || !ok(f)) continue
-    actions.push({ type: 'move', file: f, to })
+    actions.push({ type: 'move', file: f, to, why: `superseded by ${by.id}, archived` })
     moved.add(id)
     gone.set(path.dirname(f), new Set([...(gone.get(path.dirname(f)) ?? []), path.basename(f)]))
   }
   const dirs = new Set(nodes.filter(n => isLive(n.id)).map(n => fp(n.id)).filter(Boolean).map(f => path.dirname(f)))
   for (const d of dirs) {
     const text = fs.existsSync(d) ? syncIndex(d, gone.get(d)) : undefined
-    if (text !== undefined && ok(path.join(d, 'MEMORY.md'))) actions.push({ type: 'index', file: path.join(d, 'MEMORY.md'), text })
+    if (text !== undefined && ok(path.join(d, 'MEMORY.md'))) actions.push({ type: 'index', file: path.join(d, 'MEMORY.md'), text, why: 'MEMORY.md lines synced to live notes' })
   }
   const P = id => fp(id) ?? id
   for (const f of unsafe) left.push(`unsafe ${f}: a link, or outside the memory folders and wiki; not touched`)
@@ -198,6 +198,7 @@ export function apply(actions, backupDir, home = os.homedir()) {
     if (a.type === 'note') continue
     if (!safePath(home, a.file)) throw new Error(`refusing ${a.file}`)
     save(a.file)
+    fs.appendFileSync(path.join(backupDir, 'reasons.txt'), `${a.file}\tmemory-fix ${a.type}: ${a.why ?? ''}\n`)
     if (a.type === 'move') { fs.mkdirSync(path.dirname(a.to), { recursive: true }); fs.renameSync(a.file, a.to) } else fs.writeFileSync(a.file, a.text)
   }
 }

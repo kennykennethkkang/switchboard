@@ -17,7 +17,7 @@ const inv: Installed[] = [
   { kind: 'plugin', name: 'security-guidance@claude-code-plugins', enabled: false },
   { kind: 'skill', name: 'animate', enabled: true },
   { kind: 'skill', name: 'accessible-motion', enabled: true },
-  { kind: 'skill', name: 'hover-interactions', enabled: true },
+  { kind: 'skill', name: 'animation-styles', enabled: true },
   { kind: 'skill', name: 'dataviz', enabled: true },
   { kind: 'skill', name: 'phone', enabled: true },
   { kind: 'asset', name: 'linear.app', enabled: true, source: 'library', path: '/lib/linear.app/DESIGN.md' },
@@ -31,7 +31,7 @@ const off = (): ChatProfile => ({
 })
 
 test('designSet: every installed design skill and stitch plugin, pixelfx only for pixel art', () => {
-  assert.deepEqual(names(designSet(inv, false)), ['accessible-motion', 'animate', 'dataviz', 'hover-interactions', 'impeccable@impeccable', 'stitch-design@google-labs-code-stitch-skills'])
+  assert.deepEqual(names(designSet(inv, false)), ['accessible-motion', 'animate', 'animation-styles', 'dataviz', 'impeccable@impeccable', 'stitch-design@google-labs-code-stitch-skills'])
   assert.ok(names(designSet(inv, true)).includes('pixelfx@pixelfx'))
 })
 

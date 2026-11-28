@@ -78,7 +78,7 @@ function findTarget(r: Results, baseline: string, mods: string): string | undefi
   }
   const ls = (d: string) => { try { return fs.readdirSync(d) } catch { return [] } }
   const files = [path.join(kit, 'rules.md'), ...ls(path.join(kit, 'agents')).map(f => path.join(kit, 'agents', f)), ...ls(path.join(kit, 'skills')).map(f => path.join(kit, 'skills', f, 'SKILL.md'))]
-  return files.find(f => KIT_FILE.test(f) && read(f) === baseline)
+  return files.find(f => KIT_FILE.test(f.replace(/\\/g, '/')) && read(f) === baseline)
 }
 
 export const hashOf = (s: string) => createHash('sha256').update(s).digest('hex')

@@ -20,9 +20,9 @@ Pick one and say which.
 |---|---|---|---|
 | quick | 1 to 2 hops, stable facts | do it yourself, 2 to 4 sub-questions | ~15 tool calls |
 | standard | a topic, a comparison, a few hops | yourself, breadth then depth | ~40 tool calls |
-| deep | broad, contested or many entities | fan out 3 to 6 researcher subagents in parallel, one per sub-question, then merge | ~25 calls each |
+| deep | broad, contested or many entities | fan out 3 to 6 researcher subagents in parallel, one per sub-question, then merge | ~15 calls each |
 
-For deep, each subagent brief carries: its sub-question, the source rules below, the ledger format, "~25 tool calls", and "return ledger rows only". You merge, verify and write.
+For deep, each subagent brief carries: its sub-question, the source rules below, the ledger format, "~15 tool calls", and "return ledger rows only". You merge, verify and write.
 
 ## Method
 

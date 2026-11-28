@@ -49,7 +49,7 @@ test('gated tools stay off by default and survive a saved on profile', () => {
 
 test('defaultProfile: everything on but the second security-guidance, whose hooks would run twice', () => {
   const names = ['auth0@claude-plugins-official', 'stitch-design@google-labs-code-stitch-skills', 'code-simplifier@claude-plugins-official', 'github@claude-plugins-official', 'security-guidance@claude-code-plugins']
-  const d = defaultProfile([...names.map(name => ({ kind: 'plugin' as const, name, enabled: false })), ...['image-to-code-skill', 'gsap-greensock'].map(name => ({ kind: 'skill' as const, name, enabled: true }))])
+  const d = defaultProfile([...names.map(name => ({ kind: 'plugin' as const, name, enabled: false })), ...['image-to-code-skill', 'gsap-scrolltrigger'].map(name => ({ kind: 'skill' as const, name, enabled: true }))])
   assert.deepEqual(FLAGGED, ['security-guidance@claude-code-plugins'])
   assert.equal(d.plugins['security-guidance@claude-code-plugins'], false)
   assert.ok(Object.entries(d.plugins).every(([k, on]) => on || FLAGGED.includes(k)))

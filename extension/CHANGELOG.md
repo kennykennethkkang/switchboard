@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.21.202
+
+- Set up no longer installs skills that went unused for a month or repeat others: ten from emilkowalski/skills (animate, apple-design and emil-design-eng stay), minimalist-ui and industrial-brutalist-ui, caveman and find-skills
+- Kit skills gsap-greensock, hover-interactions, page-transitions, scroll-animations and e2e-testing are gone; design and browser-test picks no longer turn them on
+- Kit text fixes from a prompt audit: extract-static-html picks its strategy itself instead of stopping twice to ask, dead file and skill links are out, accessibility cites the right WCAG numbers, deep-research gives each researcher about 15 calls, taste-design writes no em dashes and loops only when reduced motion is off, web-design-guidelines reviews the diff instead of asking, Jev runs as /claude-x-jev <task>
+- Role files: plain skill names (no anthropic-skills: prefix), qa answers to the lead and drops the Switchboard-only 380px check
+
+## 0.21.201
+
+- Windows: Learn finds the kit file a self-improve run changed when the run did not name it, so its card shows instead of "target not found in claude-mods"
+- Screenshot links in a chat's outputs also work for paths with a short-name part such as RUNNER~1
+- Backups: `snapshot.mjs save --reason` and memory-fix's reasons.txt are back; a kit sync had dropped them after 0.21.199's merge
+- Windows CI: the remaining test failures were test setup (8.3 temp paths, USERPROFILE, file modes, POSIX-only commands, a 5 s timeout on the first ask-server spawn), fixed in the tests
+
 ## 0.21.200
 
 - Advisor: New chat and To-do Start have an Advisor select (Fable, Opus, Sonnet) that starts Claude with `--advisor`, so the chat's model consults a stronger one at key moments. Only advisors ranked at or above the picked model are listed; Auto never picks one. Claude only

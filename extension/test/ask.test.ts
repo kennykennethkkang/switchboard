@@ -72,7 +72,8 @@ describe('ask-core', () => {
 // The real server over stdio, with HOME in a temp dir so the discovery file is a fake window.
 // A stuck case fails on its timeout; afterEach still kills its child and closes its server, so npm test never hangs.
 describe('ask-server', () => {
-  const T = { timeout: 5000 }
+  // 15 s: the first ask-server spawn is a cold start on the Windows runner (5010 ms once).
+  const T = { timeout: 15_000 }
   const server = path.join(__dirname, '..', 'ask', 'ask-server.mjs')
   const children: ReturnType<typeof spawn>[] = [], servers: http.Server[] = []
   const cleanup = () => {
@@ -224,7 +225,7 @@ describe('ask-server', () => {
       })
     })
     const s = start(home, home, {})
-    const c = spawn(process.execPath, [server, '--codex'], { env: { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: home }, stdio: ['pipe', 'pipe', 'inherit'] })
+    const c = spawn(process.execPath, [server, '--codex'], { env: { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: 'sess1', CLAUDE_PROJECT_DIR: home }, stdio: ['pipe', 'pipe', 'inherit'] })
     s.child.kill()
     children.push(c)
     const lines: Record<string, any>[] = []

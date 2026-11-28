@@ -13,7 +13,7 @@ This skill ensures that digital interfaces are Perceivable, Operable, Understand
 
 - Defining UI component specifications for Web, iOS, or Android.
 - Auditing existing code for accessibility barriers or compliance gaps.
-- Implementing new WCAG 2.2 standards like Target Size (Minimum) and Focus Appearance.
+- Implementing new WCAG 2.2 standards like Target Size (Minimum) and Focus Appearance (SC 2.4.13, Level AAA).
 - Mapping high-level design requirements to technical attributes (ARIA roles, traits, hints).
 
 ## Core Concepts
@@ -39,7 +39,7 @@ Determine the functional purpose (e.g., Is this a button, a link, or a tab?). Us
 ### Step 3: Implement Operable Controls
 
 - Ensure a minimum **24x24 CSS pixel** target size (WCAG 2.2 SC 2.5.8).
-- Verify all interactive elements are reachable via keyboard and have a visible focus indicator (SC 2.4.11).
+- Verify all interactive elements are reachable via keyboard and have a visible focus indicator (SC 2.4.7) and not hidden behind sticky content (SC 2.4.11).
 - Provide single-pointer alternatives for dragging movements.
 
 ### Step 4: Ensure Understandable Logic
@@ -142,6 +142,5 @@ Switch(
 
 - `accessible-motion`
 - `web-design-guidelines`
-- `write-swift`
 
 <!-- switchboard generic copy -->

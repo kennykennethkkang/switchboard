@@ -10,14 +10,16 @@ import { commandProblem } from '../src/hub/routes'
 describe('devcontainer chats', () => {
   const p = containerPrefix({ repo: '/r/app', cwd: '/r/app/.claude/worktrees/x', home: '/h', data: '/h/box', exists: () => true })
 
-  it('mounts the repo, the login folder and only this chat folder transcripts', () => {
+  const posix = { skip: process.platform === 'win32' && 'container chats run a POSIX sh command' }
+
+  it('mounts the repo, the login folder and only this chat folder transcripts', posix, () => {
     assert.match(p, /--mount 'type=bind,source=\/r\/app,target=\/r\/app'/)
     assert.match(p, /--mount 'type=bind,source=\/h\/box,target=\/sb-claude'/)
     assert.match(p, /source=\/h\/\.claude\/projects\/-r-app--claude-worktrees-x,target=\/sb-claude\/projects\/-r-app--claude-worktrees-x'/)
     assert.doesNotMatch(p, /source=\/h\/\.claude\/projects,/)
   })
 
-  it('gives the container copies of the git hooks and config, never the real ones', () => {
+  it('gives the container copies of the git hooks and config, never the real ones', posix, () => {
     assert.match(p, /cp '\/r\/app\/\.git\/config' '\/h\/\.claude\/switchboard\/container-git\/-r-app\/config'/)
     assert.match(p, /source=\/h\/\.claude\/switchboard\/container-git\/-r-app\/hooks,target=\/r\/app\/\.git\/hooks'/)
     assert.match(p, /source=\/h\/\.claude\/switchboard\/container-git\/-r-app\/config,target=\/r\/app\/\.git\/config'/)

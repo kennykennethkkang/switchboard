@@ -36,9 +36,8 @@ describe('setup steps', () => {
     for (const m of ['done-check', 'bash-approve']) assert.ok(KIT.mods.includes(m), m)
   })
 
-  it('ships the reel picks: pixelfx, humanizer, last30days and find-skills', () => {
+  it('ships the reel picks: pixelfx, humanizer and last30days', () => {
     for (const id of ['pixelfx@pixelfx', 'humanizer@humanizer', 'last30days@last30days-skill']) assert.ok(KIT.plugins.includes(id), id)
-    assert.ok(KIT.skills?.some(k => k.repo === 'vercel-labs/skills' && k.names.includes('find-skills')))
   })
 
   it('adds every marketplace, plugin, mod and mcp on a fresh machine', () => {
@@ -116,8 +115,8 @@ describe('setup steps', () => {
   })
 
   it('hands the runner the bundled own skills, which it adds or refreshes itself', () => {
-    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft', 'adjust'])
-    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'e2e-testing', 'accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations', 'toolchain', 'memory-fix', 'goal', 'local-draft', 'adjust'] } }])
+    assert.deepEqual(KIT.own, ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'accessible-motion', 'toolchain', 'memory-fix', 'goal', 'local-draft', 'adjust'])
+    assert.deepEqual(steps().filter(s => s.own), [{ label: 'Switchboard skills', own: { from: '/ext/kit/skills', names: ['aar', 'deep-research', 'harden', 'animation-styles', 'improve-system', 'awwwards', 'crowd-ab', 'model-bench', 'self-improve', 'stages', 'gemini', 'phone', 'accessibility', 'click-path-audit', 'accessible-motion', 'toolchain', 'memory-fix', 'goal', 'local-draft', 'adjust'] } }])
     assert.equal(steps({ skills: ['aar', 'animation-styles'] }).filter(s => s.own).length, 1)
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'kit', 'skills', 'animation-styles', 'SKILL.md')))
   })
@@ -254,11 +253,6 @@ describe('setup steps', () => {
       assert.match(md, /cdn\.jsdelivr\.net\/npm\/@ui-sdk\/web@<exact version>\/browser\/web\.js/, role)
       assert.match(md, /never the unpinned ui-sdk\.dev\/web\.js/, role)
     }
-  })
-
-  it('installs caveman as a skill, not as a plugin with hooks', () => {
-    assert.ok(KIT.skills?.some(k => k.repo === 'JuliusBrussee/caveman' && k.names.includes('caveman')))
-    assert.ok(!KIT.plugins.some(p => p.startsWith('caveman')))
   })
 
   it('fetches a skill again when only Codex lacks it', () => {
@@ -661,7 +655,7 @@ describe('setup runner', () => {
     assert.match(out, /copy .*mods/)
     assert.match(out, /Set up done/)
     assert.match(out, /git clone --depth 1 https:\/\/github.com\/emilkowalski\/skills.git/)
-    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit e2e-testing accessible-motion hover-interactions page-transitions scroll-animations toolchain memory-fix goal local-draft adjust from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
+    assert.match(out, /copy aar deep-research harden animation-styles improve-system awwwards crowd-ab model-bench self-improve stages gemini phone accessibility click-path-audit accessible-motion toolchain memory-fix goal local-draft adjust from .* to ~\/.claude\/skills and ~\/.agents\/skills/)
     assert.match(out, /claude mcp remove --scope user 21st/)
     assert.match(out, /claude mcp add-json --scope user 21st .*"type":"http"/)
     assert.match(out, /codex plugin add superpowers@superpowers-dev/)

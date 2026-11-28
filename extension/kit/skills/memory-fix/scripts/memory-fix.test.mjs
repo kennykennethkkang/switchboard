@@ -80,6 +80,9 @@ test('plan and apply: retarget, archive a superseded note, back up first', () =>
   assert.doesNotMatch(fs.readFileSync(path.join(mem, 'MEMORY.md'), 'utf8'), /old\.md/)
   assert.match(fs.readFileSync(path.join(bak, mem, 'old.md'), 'utf8'), /name: old/)
   assert.match(fs.readFileSync(path.join(bak, mem, 'user.md'), 'utf8'), /\[\[fresh-nots\]\]/)
+  const why = fs.readFileSync(path.join(bak, 'reasons.txt'), 'utf8')
+  assert.match(why, /old\.md\tmemory-fix move: superseded by \S+, archived/)
+  assert.match(why, /user\.md\tmemory-fix edit: retargeted dangling links/)
 })
 
 test('a probed pair goes to judgment, never to an action', () => {

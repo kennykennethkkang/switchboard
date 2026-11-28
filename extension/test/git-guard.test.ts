@@ -38,7 +38,7 @@ describe('installGuard', () => {
         assert.match(r.stderr, /Refused: Kenneth commits and pushes himself/)
       }
       assert.equal(commit(dir).status, 0)
-      assert.equal(fs.statSync(hook(dir, 'pre-push')).mode & 0o777, 0o755)
+      if (process.platform !== 'win32') assert.equal(fs.statSync(hook(dir, 'pre-push')).mode & 0o777, 0o755)
     } finally { fs.rmSync(dir, { recursive: true, force: true }) }
   })
 

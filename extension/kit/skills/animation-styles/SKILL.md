@@ -43,7 +43,6 @@ To see all twenty running, open `gallery.html` in a browser: every snippet live,
 
 - `accessible-motion` for reduced motion and the pause control WCAG 2.2.2 asks for on anything looping over 5 seconds.
 - `gsap-scrolltrigger` when a style should play on scroll or scrub with it.
-- `page-transitions` when the style is used between routes or views.
 - `animate` for the timing and easing calls once the look is chosen.
 
 <!-- switchboard generic copy -->

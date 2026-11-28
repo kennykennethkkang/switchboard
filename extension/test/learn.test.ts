@@ -160,7 +160,7 @@ describe('learning card', () => {
       const src = path.resolve(__dirname, '../src/hub/learn.ts'), hubSrc = path.resolve(__dirname, '../src/hub/hub-service.ts')
       const script = path.join(home, 'c.ts')
       fs.writeFileSync(script, `import { decideLearn } from ${JSON.stringify(src)}\nimport { hub } from ${JSON.stringify(hubSrc)}\nvoid decideLearn('gone', true).then(m => process.stdout.write(JSON.stringify({ m, ids: hub.get().learnReady?.map(c => c.id) })))\n`)
-      const out = JSON.parse(execFileSync(process.execPath, [...process.execArgv, script], { env: { ...process.env, HOME: home }, encoding: 'utf8' })) as { m: string; ids: string[] }
+      const out = JSON.parse(execFileSync(process.execPath, [...process.execArgv, script], { env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8' })) as { m: string; ids: string[] }
       assert.deepEqual(out, { m: 'Already handled', ids: ['keep'] })
     } finally { fs.rmSync(home, { recursive: true, force: true }) }
   })
@@ -370,7 +370,7 @@ describe('headless runs', () => {
       return 0
     }
     assert.equal(await consolidate({ flow: root, mods: '/m' }, writes, todo, ['/mem1', '/mem2'], keep), 'memory consolidation: 2 proposed')
-    assert.ok(prompt.includes('/mem1, /mem2') && prompt.includes('/m/kit/skills/memory-fix/SKILL.md') && /never edit/.test(prompt))
+    assert.ok(prompt.includes('/mem1, /mem2') && prompt.includes(path.join('/m', 'kit', 'skills', 'memory-fix', 'SKILL.md')) && /never edit/.test(prompt))
     const kept = fs.readdirSync(keep)
     assert.equal(kept.length, 1)
     assert.match(fs.readFileSync(path.join(keep, kept[0]), 'utf8'), /## Rewrite c\.md/)

@@ -15,6 +15,6 @@ Any design choice you hand back goes with a visual: screenshots of each option, 
 
 Browser and crowd-test work: batch agent-browser steps into few calls, and wait on long runs (crowd-ab, MiroFish, test suites) with one foreground perl wait loop, not repeated short checks.
 
-Usual kit: impeccable:impeccable, frontend-design, anthropic-skills:emil-design-eng, anthropic-skills:apple-design, anthropic-skills:animate, accessibility for WCAG 2.2 checks, accessible-motion, hover-interactions, page-transitions, ui-sdk for keyboard, focus, popups, drag and drop and ARIA when the project has @ui-sdk/* or the UI needs those behaviors (a page with no build step loads cdn.jsdelivr.net/npm/@ui-sdk/web@<exact version>/browser/web.js and web.css, never the unpinned ui-sdk.dev/web.js), dataviz for charts, web-design-guidelines, extract-design-md, extract-static-html and taste-design for DESIGN.md work, playwright for screenshots.
+Usual kit: impeccable:impeccable, frontend-design, emil-design-eng, apple-design, animate, accessibility for WCAG 2.2 checks, accessible-motion, ui-sdk for keyboard, focus, popups, drag and drop and ARIA when the project has @ui-sdk/* or the UI needs those behaviors (a page with no build step loads cdn.jsdelivr.net/npm/@ui-sdk/web@<exact version>/browser/web.js and web.css, never the unpinned ui-sdk.dev/web.js), dataviz for charts, web-design-guidelines, extract-design-md, extract-static-html and taste-design for DESIGN.md work, playwright for screenshots.
 
 <!-- switchboard generic copy -->

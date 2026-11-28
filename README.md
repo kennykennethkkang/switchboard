@@ -202,7 +202,7 @@ Shipped with Switchboard:
 - DESIGN.md files (kit/design-md) from [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) by VoltAgent, MIT.
 - Silkscreen font by Jason Kottke ([kottke.org](https://kottke.org/plus/type/silkscreen)), SIL Open Font License 1.1.
 - Hanken Grotesk font by [The Hanken Grotesk Project Authors](https://github.com/marcologous/hanken-grotesk), SIL Open Font License 1.1.
-- Kit skills, each with its LICENSE: memory-fix, ideas from Mem0 ([arxiv 2504.19413](https://arxiv.org/abs/2504.19413)), Graphiti ([arxiv 2501.13956](https://arxiv.org/abs/2501.13956)) and A-MEM ([arxiv 2502.12110](https://arxiv.org/abs/2502.12110)), and the Learn run's contradiction probe from [GBrain](https://github.com/garrytan/gbrain) by Garry Tan, MIT, no code taken; aar, adapted from aar-loop by Cooper Simson, MIT; the awwwards rubric, adapted from [claude-skill-awwwards](https://github.com/tponscr-debug/claude-skill-awwwards) by Thomas Pons, MIT; accessibility, click-path-audit and e2e-testing from ECC by Affaan Mustafa, MIT; accessible-motion, gsap-greensock, hover-interactions, page-transitions and scroll-animations by Dylan Tarre, MIT; image-to-code-skill by Leonxlnx, MIT; extract-design-md, extract-static-html and taste-design from [stitch-skills](https://github.com/google-labs-code/stitch-skills) by Google, Apache 2.0.
+- Kit skills, each with its LICENSE: memory-fix, ideas from Mem0 ([arxiv 2504.19413](https://arxiv.org/abs/2504.19413)), Graphiti ([arxiv 2501.13956](https://arxiv.org/abs/2501.13956)) and A-MEM ([arxiv 2502.12110](https://arxiv.org/abs/2502.12110)), and the Learn run's contradiction probe from [GBrain](https://github.com/garrytan/gbrain) by Garry Tan, MIT, no code taken; aar, adapted from aar-loop by Cooper Simson, MIT; the awwwards rubric, adapted from [claude-skill-awwwards](https://github.com/tponscr-debug/claude-skill-awwwards) by Thomas Pons, MIT; accessibility and click-path-audit from ECC by Affaan Mustafa, MIT; accessible-motion by Dylan Tarre, MIT; image-to-code-skill by Leonxlnx, MIT; extract-design-md, extract-static-html and taste-design from [stitch-skills](https://github.com/google-labs-code/stitch-skills) by Google, Apache 2.0.
 - web-design-guidelines by Vercel; claude-x-jev and jev-setup-project by Charles J Dove (Jev).
 - The harden skill and the Harden build check run [BLA (bla-agents)](https://github.com/qybaihe/bla) by qybaihe, MIT, to harden a build against AI reverse-engineering; it runs via npx, no code is bundled.
 - The Board page's pixel character per agent is an idea from [Pixel Agents](https://github.com/pablodelucca/pixel-agents) by pablodelucca, MIT; no code is copied.
@@ -224,14 +224,12 @@ Installed by Set up from their own repos (not bundled):
 - [ponytail](https://github.com/DietrichGebert/ponytail) by Dietrich Gebert
 - [impeccable](https://github.com/pbakaus/impeccable) by Paul Bakaus, Apache 2.0
 - [skills](https://github.com/emilkowalski/skills) by Emil Kowalski
-- [taste-skill-classics](https://github.com/Leonxlnx/taste-skill-classics) and [imagegen-skills](https://github.com/Leonxlnx/imagegen-skills) by Leonxlnx
+- [imagegen-skills](https://github.com/Leonxlnx/imagegen-skills) by Leonxlnx
 - [pixelfx](https://github.com/patch-gg/pixelfx) by Patch
 - [humanizer](https://github.com/blader/humanizer) by Siqi Chen
 - [last30days](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
 - [founder](https://github.com/emotixco/claude-skills-founder) by Emotix, MIT; 14 founder skills (/pricing-strategy, /pitch-deck, /go-to-market and more), off until a chat names founder work
 - [Codex plugin for Claude Code](https://github.com/openai/codex-plugin-cc) by OpenAI, Apache 2.0; /codex:rescue and /codex:setup hand a job to the Codex CLI from a chat. Claude only, Codex does not get it
-- [find-skills](https://github.com/vercel-labs/skills) by Vercel
-- [caveman](https://github.com/JuliusBrussee/caveman) by Julius Brussee, Apache-2.0
 - [untangle-codebase](https://github.com/caldoai/skills) by Maze (caldoai), MIT; /untangle-codebase lists every hidden link, needless link and bit of surplus in a repo, then fixes the list
 - [ui-sdk](https://github.com/vercel-labs/ui) by Vercel Labs, Apache 2.0; the UI SDK skill, so designer and engineer build keyboard, focus, popup and drag and drop behaviors from @ui-sdk/core instead of hand-rolled ARIA
 - [Scrapling](https://github.com/D4Vinci/Scrapling) by Karim Shoair, BSD 3-Clause
@@ -244,7 +242,6 @@ Installed by Set up from their own repos (not bundled):
 - Claude in Chrome, Anthropic's browser extension, used for Kenneth's signed-in Chrome
 - [archify](https://github.com/tt-a1i/archify) by tt-a1i, Apache 2.0
 - [diagram-design](https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery
-- grill-me by [Matt Pocock](https://github.com/mattpocock/skills)
 - Anthropic's [official plugins](https://github.com/anthropics/claude-plugins-official) (code-review, context7, frontend-design, playwright)
 
 Licenses are MIT unless noted. [NOTICE](NOTICE) and [extension/NOTICE](extension/NOTICE) have the full lines.

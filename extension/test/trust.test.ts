@@ -6,7 +6,8 @@ import * as path from 'path'
 import { execFileSync } from 'child_process'
 import { trustFolder, trustedWindowRoots } from '../src/hub/trust'
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-trust-'))
+// native: os.tmpdir() can be an 8.3 short path on Windows (RUNNER~1), and the keys below are long ones.
+const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-trust-')))
 after(() => fs.rmSync(tmp, { recursive: true, force: true }))
 const file = path.join(tmp, '.claude.json')
 const read = () => JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -106,7 +107,7 @@ describe('trustFolder', () => {
 
 describe('trustFolder keys and other windows', () => {
   const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
-  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-trust-git-')))
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'sb-trust-git-')))
   after(() => fs.rmSync(base, { recursive: true, force: true }))
   const json = path.join(base, '.claude.json')
   const keys = () => Object.keys(JSON.parse(fs.readFileSync(json, 'utf8')).projects ?? {})

@@ -19,10 +19,9 @@ import { LIBRARY } from './local'
 export type Pick = { name: string; kind: 'plugin' | 'skill' | 'asset' | 'builtin' | 'mcp'; rule: string; held?: boolean }
 
 export const DESIGN_SKILLS = [
-  'impeccable', 'frontend-design', 'emil-design-eng', 'apple-design', 'animate', 'animate-expo', 'animation-vocabulary',
-  'animation-styles', 'find-animation-opportunities', 'improve-animations', 'accessible-motion', 'hover-interactions',
-  'page-transitions', 'scroll-animations', 'web-design-guidelines', 'accessibility', 'dataviz', 'mobile-native', 'awwwards',
-  'brandkit', 'ask-sonner', 'imagegen-frontend-web', 'imagegen-frontend-mobile', 'image-to-code-skill', 'gsap-greensock', 'gsap-scrolltrigger',
+  'impeccable', 'frontend-design', 'emil-design-eng', 'apple-design', 'animate', 'animation-styles', 'accessible-motion',
+  'web-design-guidelines', 'accessibility', 'dataviz', 'awwwards', 'brandkit', 'imagegen-frontend-web', 'imagegen-frontend-mobile',
+  'image-to-code-skill', 'gsap-scrolltrigger',
 ]
 const DESIGN = /\b(ui|ux|(re)?design(er|ing)?|css|(re)?styl(e|es|ing)|layout|frontend|front-end|animat\w*|motion|typography|colou?rs?|theme|landing page|components?|tailwind|figma|mockups?|dashboard|responsive|hover|transitions?|visual|screens?)\b/i
 const PIXEL = /\b(pixel[- ]?art|sprites?|game juice)\b/i
@@ -32,7 +31,7 @@ const RULES: Array<[RegExp, string, string[]]> = [
   [/\b(bland|voice agents?|phone calls?|bland pathways?|conversational pathways?)\b/i, 'Bland words', ['bland']],
   [/\b(seo|marketing|copywriting|ad copy|ad creative|pricing page|cold email|email sequence|launch post|conversion rate|growth (hacking|marketing|loops?)|competitor (analysis|profiling|research)|onboarding emails?)\b/i, 'marketing words', ['marketing-skills']],
   [/\b(pricing strategy|pitch deck|fundrais(e|ing)|go-to-market|gtm plan|mvp scope|validate (the|my|an?) idea|investor update|unit economics|user personas?)\b/i, 'founder words', ['founder']],
-  [/\b(playwright|e2e|end-to-end)\b/i, 'browser test words', ['e2e-testing', 'playwright']],
+  [/\b(playwright|e2e|end-to-end)\b/i, 'browser test words', ['playwright']],
   [/\b(scrapling|scrap(?:e|ing)|crawl(?:er|ing)?|anti-bot)\b/i, 'scraping words', ['mcp:scrapling']],
   [/\b(charts?|graphs?|plots?|dataviz)\b/i, 'chart words', ['dataviz']],
   [/\bjev\b/i, 'Jev words', ['claude-x-jev']],

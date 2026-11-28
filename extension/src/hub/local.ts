@@ -557,8 +557,8 @@ export async function pluginMcp(claude = CLAUDE): Promise<Connection[]> {
 /** Skill name to where it came from, per kit/setup.json: switchboard for Kenneth's own, the author for a bundled third-party one, owner/repo for a fetched one. Beside dist/ in the VSIX, two up from src/hub in tests. */
 // Third-party skills shipped in "own": their author, not switchboard. Keep in step with NOTICE.
 const OWN_AUTHORS: Record<string, string> = Object.fromEntries([
-  ...['accessibility', 'click-path-audit', 'e2e-testing'].map(n => [n, 'ECC (Affaan Mustafa)']),
-  ...['accessible-motion', 'hover-interactions', 'page-transitions', 'scroll-animations'].map(n => [n, 'Dylan Tarre']),
+  ...['accessibility', 'click-path-audit'].map(n => [n, 'ECC (Affaan Mustafa)']),
+  ...['accessible-motion'].map(n => [n, 'Dylan Tarre']),
 ])
 
 function kitSources(): Record<string, string> {
